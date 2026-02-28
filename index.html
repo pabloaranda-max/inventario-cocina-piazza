@@ -8161,10 +8161,25 @@
      if (input.files && input.files[0]) {
        const reader = new FileReader();
        reader.onload = function(e) {
-         const img = document.getElementById('preview-foto');
-         img.src = e.target.result;
-         img.style.display = 'block';
-       }
+         const tempImg = new Image();
+         tempImg.onload = function() {
+           const canvas = document.createElement('canvas');
+           const MAX = 1024;
+           let w = tempImg.width, h = tempImg.height;
+           if (w > MAX || h > MAX) {
+             if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+             else { w = Math.round(w * MAX / h); h = MAX; }
+           }
+           canvas.width = w;
+           canvas.height = h;
+           canvas.getContext('2d').drawImage(tempImg, 0, 0, w, h);
+           const compressed = canvas.toDataURL('image/jpeg', 0.75);
+           const preview = document.getElementById('preview-foto');
+           preview.src = compressed;
+           preview.style.display = 'block';
+         };
+         tempImg.src = e.target.result;
+       };
        reader.readAsDataURL(input.files[0]);
      }
    }
@@ -8195,8 +8210,10 @@
      };
      
      manualesLocal.push(nuevoManual);
-     localStorage.setItem(`manuales_cocina_${sesionActiva.fecha}`, JSON.stringify(manualesLocal));
-     
+     try {
+       localStorage.setItem(`manuales_cocina_${sesionActiva.fecha}`, JSON.stringify(manualesLocal));
+     } catch(e) { /* cuota excedida, datos en memoria */ }
+
      renderManuales();
      cerrarModalManual();
      actualizarHeader();
@@ -8206,19 +8223,22 @@
    function renderManuales() {
      const container = document.getElementById('lista-manuales');
      container.innerHTML = '';
-     
+
      if (manualesLocal.length === 0) return;
-     
+
      const title = document.createElement('h3');
      title.textContent = "Ítems No Catalogados";
      title.style.margin = "8px 0";
      container.appendChild(title);
-     
+
      manualesLocal.forEach(m => {
        const d = document.createElement('div');
        d.className = 'item capturado';
        d.innerHTML = `
-         <div class="badge-manual">MANUAL</div>
+         <div style="display:flex; justify-content:space-between; align-items:center;">
+           <div class="badge-manual">MANUAL</div>
+           <button onclick="borrarManual('${m.codigo}')" style="background:#ef4444; color:white; border-radius:6px; padding:2px 10px; font-size:18px; min-height:32px; line-height:1;">✕</button>
+         </div>
          <div class="item-name">${m.nombre.toUpperCase()}</div>
          <div class="item-code">${m.codigo} | ${m.unidad} | COCINA</div>
          <div class="manual-row">
@@ -8231,6 +8251,16 @@
        `;
        container.appendChild(d);
      });
+   }
+
+   function borrarManual(codigo) {
+     manualesLocal = manualesLocal.filter(m => m.codigo !== codigo);
+     try {
+       localStorage.setItem(`manuales_cocina_${sesionActiva.fecha}`, JSON.stringify(manualesLocal));
+     } catch(e) {}
+     renderManuales();
+     actualizarHeader();
+     evaluarBotonEnviar();
    }
 
    // ------ ENVÍO Y CONFIRMACIÓN ------
