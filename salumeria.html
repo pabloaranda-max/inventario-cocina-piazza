@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+ <title>📦 Inventario SALUMERIA - Piazza Pasticcio</title>
+ <style>
+   /* ESTILOS CRÍTICOS Y GLOBALES */
+   * { box-sizing: border-box; margin: 0; padding: 0; }
+   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f5f5; color: #333; }
+   
+   /* Touch targets mínimo 48px */
+   button { min-height: 48px; cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
+   
+   /* Evitar zoom en iOS — todos los inputs font-size >= 16px */
+   input, textarea, select { font-size: 16px; font-family: inherit; }
+
+   /* PANTALLA 1: INICIO DE SESIÓN */
+   #pantalla-inicio {
+     padding: 24px; display: flex; flex-direction: column; justify-content: center;
+     min-height: 100vh; background: white;
+   }
+   .inicio-titulo { font-size: 28px; text-align: center; margin-bottom: 8px; }
+   .inicio-sub { text-align: center; color: #666; margin-bottom: 32px; font-size: 18px; }
+   .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+   .form-group label { font-weight: bold; font-size: 14px; }
+   .form-group input { padding: 14px; border: 1px solid #ddd; border-radius: 8px; }
+   #btn-iniciar { background: #667eea; color: white; font-size: 18px; padding: 16px; margin-top: 16px; width: 100%; border-radius: 28px; }
+   
+   #banner-sesion { background: #fff3cd; color: #856404; padding: 16px; border-radius: 8px; display: none; flex-direction: column; gap: 12px; border: 1px solid #ffeeba; margin-bottom: 24px; }
+   .banner-btns { display: flex; gap: 8px; }
+   .banner-btns button { flex: 1; border-radius: 6px; }
+   #btn-continuar { background: #667eea; color: white; }
+   #btn-nueva { background: white; border: 1px solid #ddd; color: #333; }
+
+   /* PANTALLA 2: INVENTARIO */
+   #pantalla-inventario { display: none; padding-bottom: 120px; }
+   
+   /* Header sticky */
+   #header-sticky { position: sticky; top: 0; background: #667eea; color: white; padding: 16px; z-index: 50; }
+   #header-line1 { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
+   #header-line2 { font-size: 14px; opacity: 0.9; }
+
+   /* Búsqueda y Chips sticky */
+   #search-sticky { position: sticky; top: 73px; background: white; padding: 12px 16px; z-index: 50; border-bottom: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+   .search-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+   .search-row input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
+   .search-row button { width: 48px; height: 48px; background: #f3f4f6; color: #555; border-radius: 8px; font-size: 16px; }
+   
+   /* Chips scrolleables sin scrollbar visible */
+   .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
+   .chips::-webkit-scrollbar { display: none; }
+   .chip { padding: 8px 16px; background: #f3f4f6; border-radius: 20px; font-size: 14px; color: #555; white-space: nowrap; font-weight: normal; }
+   .chip.active { background: #667eea; color: white; font-weight: bold; }
+
+   /* Lista y Tarjetas */
+   #lista, #lista-manuales { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+   .item { background: white; padding: 16px; border-radius: 8px; border-left: 4px solid transparent; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+   /* Items con cantidad */
+   .item.capturado { border-left: 4px solid #22c55e; background: #f0fff4; }
+   
+   .item-name { font-weight: bold; font-size: 15px; margin-bottom: 4px; }
+   .item-code { font-size: 12px; color: #777; margin-bottom: 8px; }
+   
+   /* Qty row */
+   .qty-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+   .qty-input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; text-align: center; font-weight: bold; }
+   .qty-btn { width: 48px; height: 48px; border-radius: 6px; font-size: 20px; background: #667eea; color: white; flex-shrink: 0; }
+
+   /* Manuales */
+   .badge-manual { display: inline-block; background: #ef4444; color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-bottom: 6px; font-weight: bold;}
+   .manual-row { display: flex; gap: 12px; margin-top: 8px; align-items: center; }
+   .manual-row img { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
+   .manual-desc { font-size: 13px; color: #666; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+   /* Flotantes */
+   .fab { position: fixed; bottom: 24px; border-radius: 28px; padding: 14px 20px; font-size: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 100; }
+   .fab-enviar { left: 16px; background: #22c55e; color: white; }
+   .fab-manual { right: 16px; background: #f59e0b; color: white; }
+   .fab:disabled { opacity: 0.4; cursor: not-allowed; }
+   
+   #btn-top { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); color: white; width: 48px; height: 48px; border-radius: 24px; z-index: 200; font-size: 20px; backdrop-filter: blur(4px); display: none; }
+
+   /* Modales */
+   .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; justify-content: center; align-items: flex-end; }
+   .modal-content { background: white; width: 100%; max-height: 90vh; border-radius: 16px 16px 0 0; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+   .modal-title { font-size: 20px; font-weight: bold; margin-bottom: 8px; }
+   
+   .btn-green { background: #22c55e; color: white; border-radius: 8px; width: 100%; padding: 16px; }
+   .btn-gray { background: #e5e7eb; color: #333; border-radius: 8px; width: 100%; padding: 16px; }
+   
+   /* File input estelizado */
+   .file-input-wrapper { position: relative; overflow: hidden; display: inline-block; width: 100%; }
+   .file-input-wrapper input[type=file] { font-size: 100px; position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer; height: 100%; }
+   .btn-file { background: #f3f4f6; border: 2px dashed #ccc; color: #555; padding: 16px; text-align: center; border-radius: 8px; font-weight: bold; }
+   #preview-foto { max-height: 200px; object-fit: contain; border-radius: 8px; margin-top: 8px; display: none; width: 100%; }
+
+   /* Spinner */
+   .spinner { border: 4px solid rgba(0,0,0,0.1); width: 48px; height: 48px; border-radius: 50%; border-left-color: #667eea; animation: spin 1s linear infinite; margin: 0 auto 16px; }
+   @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+   #modal-spinner .modal-content { background: white; width: 85%; max-width: 320px; border-radius: 16px; align-items: center; padding: 32px; margin: auto; }
+   
+   .resumen-lista { max-height: 150px; overflow-y: auto; background: #f9fafb; padding: 12px; border-radius: 8px; font-size: 14px; margin-top: 8px;}
+   .resumen-lista li { margin-bottom: 6px; margin-left: 16px; }
+ </style>
+</head>
+<body>
+
+ <div id="pantalla-inicio">
+   <div id="banner-sesion">
+     <p id="banner-text">Sesión activa encontrada.</p>
+     <div class="banner-btns">
+       <button id="btn-continuar" onclick="continuarSesion()">Continuar</button>
+       <button id="btn-nueva" onclick="iniciarNuevaToma(true)">Iniciar nueva</button>
+     </div>
+   </div>
+   
+   <div class="inicio-titulo">📦 Inventario SALUMERIA</div>
+   <div class="inicio-sub">Piazza Pasticcio</div>
+   
+   <div class="form-group">
+     <label>Nombre del operario</label>
+     <input type="text" id="operario-input" placeholder="Tu nombre completo">
+   </div>
+   <div class="form-group">
+     <label>Área que estás contando</label>
+     <input type="text" id="area-input" placeholder="Ej: Cámara fría, Refri 1, Alacena seca...">
+   </div>
+   <div class="form-group">
+     <label>Fecha de la toma</label>
+     <input type="date" id="fecha-input">
+   </div>
+   
+   <button id="btn-iniciar" onclick="iniciarNuevaToma(false)">Iniciar toma →</button>
+ </div>
+
+ <div id="pantalla-inventario">
+   
+   <div id="header-sticky">
+     <div id="header-line1">📦 SALUMERIA | Área | Operario</div>
+     <div id="header-line2">Fecha | 0 capturados</div>
+   </div>
+   
+   <div id="search-sticky">
+     <div class="search-row">
+       <input type="text" id="search-input" placeholder="Buscar producto o código..." oninput="filtrarLista()">
+       <button onclick="limpiarBusqueda()">✕</button>
+     </div>
+     <div class="chips" id="chips-container">
+       </div>
+   </div>
+   
+   <div id="lista">
+<div class="item" data-nombre="barriga de cerdo" data-codigo="mp0017" data-grupo="CARNES">
+  <div class="item-name">BARRIGA DE CERDO</div>
+  <div class="item-code">MP0017 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="MP0017" data-nombre="BARRIGA DE CERDO" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="cabeza de cerdo" data-codigo="xmat2507000926" data-grupo="CARNES">
+  <div class="item-name">CABEZA DE CERDO</div>
+  <div class="item-code">XMAT2507000926 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2507000926" data-nombre="CABEZA DE CERDO" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="cabeza de cerdo pelón" data-codigo="xmat2503000799" data-grupo="CARNES">
+  <div class="item-name">CABEZA DE CERDO PELÓN</div>
+  <div class="item-code">XMAT2503000799 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2503000799" data-nombre="CABEZA DE CERDO PELÓN" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="cachete limpio c.p." data-codigo="xmat2410000294" data-grupo="CARNES">
+  <div class="item-name">CACHETE LIMPIO C.P.</div>
+  <div class="item-code">XMAT2410000294 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2410000294" data-nombre="CACHETE LIMPIO C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="carne de cabeza c.p." data-codigo="xmat2504000852" data-grupo="CARNES">
+  <div class="item-name">CARNE DE CABEZA C.P.</div>
+  <div class="item-code">XMAT2504000852 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2504000852" data-nombre="CARNE DE CABEZA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="carne de cabeza de cerdo" data-codigo="xmat2507000928" data-grupo="CARNES">
+  <div class="item-name">CARNE DE CABEZA DE CERDO</div>
+  <div class="item-code">XMAT2507000928 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2507000928" data-nombre="CARNE DE CABEZA DE CERDO" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="cerdo de engorda en canal" data-codigo="xmat2505000884" data-grupo="CARNES">
+  <div class="item-name">CERDO DE ENGORDA EN CANAL</div>
+  <div class="item-code">XMAT2505000884 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2505000884" data-nombre="CERDO DE ENGORDA EN CANAL" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="cerdo manitas" data-codigo="xmat2602001346" data-grupo="CARNES">
+  <div class="item-name">CERDO MANITAS</div>
+  <div class="item-code">XMAT2602001346 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2602001346" data-nombre="CERDO MANITAS" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="copa de cerdo" data-codigo="mp0037" data-grupo="CARNES">
+  <div class="item-name">COPA DE CERDO</div>
+  <div class="item-code">MP0037 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="MP0037" data-nombre="COPA DE CERDO" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="coppa c.p." data-codigo="xmat2506000915" data-grupo="CARNES">
+  <div class="item-name">COPPA C.P.</div>
+  <div class="item-code">XMAT2506000915 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2506000915" data-nombre="COPPA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="cr cochinillo cerdo pelon" data-codigo="xmat2506000896" data-grupo="CARNES">
+  <div class="item-name">CR COCHINILLO CERDO PELON</div>
+  <div class="item-code">XMAT2506000896 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2506000896" data-nombre="CR COCHINILLO CERDO PELON" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="espaldilla de cerdo" data-codigo="xmat2412000546" data-grupo="CARNES">
+  <div class="item-name">ESPALDILLA DE CERDO</div>
+  <div class="item-code">XMAT2412000546 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2412000546" data-nombre="ESPALDILLA DE CERDO" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="espaldilla de cerdo con hueso" data-codigo="xmat2412000547" data-grupo="CARNES">
+  <div class="item-name">ESPALDILLA DE CERDO CON HUESO</div>
+  <div class="item-code">XMAT2412000547 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2412000547" data-nombre="ESPALDILLA DE CERDO CON HUESO" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="huesos c.p." data-codigo="xmat2506000921" data-grupo="CARNES">
+  <div class="item-name">HUESOS C.P.</div>
+  <div class="item-code">XMAT2506000921 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2506000921" data-nombre="HUESOS C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="lardo c.p." data-codigo="xmat2506000917" data-grupo="CARNES">
+  <div class="item-name">LARDO C.P.</div>
+  <div class="item-code">XMAT2506000917 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2506000917" data-nombre="LARDO C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="lardo de cerdo" data-codigo="xmat2411000429" data-grupo="CARNES">
+  <div class="item-name">LARDO DE CERDO</div>
+  <div class="item-code">XMAT2411000429 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2411000429" data-nombre="LARDO DE CERDO" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="lomo c.p." data-codigo="xmat2506000916" data-grupo="CARNES">
+  <div class="item-name">LOMO C.P.</div>
+  <div class="item-code">XMAT2506000916 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2506000916" data-nombre="LOMO C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="lomo de cerdo" data-codigo="mp0068" data-grupo="CARNES">
+  <div class="item-name">LOMO DE CERDO</div>
+  <div class="item-code">MP0068 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="MP0068" data-nombre="LOMO DE CERDO" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="manteca c.p." data-codigo="xmat2602001359" data-grupo="CARNES">
+  <div class="item-name">MANTECA C.P.</div>
+  <div class="item-code">XMAT2602001359 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2602001359" data-nombre="MANTECA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="manteca de cerdo" data-codigo="xmat2408000033" data-grupo="CARNES">
+  <div class="item-name">MANTECA DE CERDO</div>
+  <div class="item-code">XMAT2408000033 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2408000033" data-nombre="MANTECA DE CERDO" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="otros c.p." data-codigo="xmat2506000919" data-grupo="CARNES">
+  <div class="item-name">OTROS C.P.</div>
+  <div class="item-code">XMAT2506000919 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2506000919" data-nombre="OTROS C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="panceta de cerdo" data-codigo="xmat2411000427" data-grupo="CARNES">
+  <div class="item-name">PANCETA DE CERDO</div>
+  <div class="item-code">XMAT2411000427 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2411000427" data-nombre="PANCETA DE CERDO" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="pancetta c.p." data-codigo="xmat2506000914" data-grupo="CARNES">
+  <div class="item-name">PANCETTA C.P.</div>
+  <div class="item-code">XMAT2506000914 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2506000914" data-nombre="PANCETTA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="patas c.p." data-codigo="xmat2602001361" data-grupo="CARNES">
+  <div class="item-name">PATAS C.P.</div>
+  <div class="item-code">XMAT2602001361 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2602001361" data-nombre="PATAS C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="piel c.p." data-codigo="xmat2506000918" data-grupo="CARNES">
+  <div class="item-name">PIEL C.P.</div>
+  <div class="item-code">XMAT2506000918 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2506000918" data-nombre="PIEL C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="piel de cerdo" data-codigo="xmat2410000287" data-grupo="CARNES">
+  <div class="item-name">PIEL DE CERDO</div>
+  <div class="item-code">XMAT2410000287 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2410000287" data-nombre="PIEL DE CERDO" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="pierna c.p." data-codigo="xmat2506000912" data-grupo="CARNES">
+  <div class="item-name">PIERNA C.P.</div>
+  <div class="item-code">XMAT2506000912 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2506000912" data-nombre="PIERNA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="pierna de cerdo con hueso" data-codigo="xmat2510001121" data-grupo="CARNES">
+  <div class="item-name">PIERNA DE CERDO CON HUESO</div>
+  <div class="item-code">XMAT2510001121 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2510001121" data-nombre="PIERNA DE CERDO CON HUESO" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="pierna de cerdo sin hueso" data-codigo="xmat2503000769" data-grupo="CARNES">
+  <div class="item-name">PIERNA DE CERDO SIN HUESO</div>
+  <div class="item-code">XMAT2503000769 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2503000769" data-nombre="PIERNA DE CERDO SIN HUESO" data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="pt spianata c.p." data-codigo="xsub2602000427" data-grupo="CARNES">
+  <div class="item-name">PT SPIANATA C.P.</div>
+  <div class="item-code">XSUB2602000427 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2602000427" data-nombre="PT SPIANATA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="spalla c.p." data-codigo="xmat2506000913" data-grupo="CARNES">
+  <div class="item-name">SPALLA C.P.</div>
+  <div class="item-code">XMAT2506000913 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2506000913" data-nombre="SPALLA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="sub ciauscolo c.p." data-codigo="xsub2511000325" data-grupo="CARNES">
+  <div class="item-name">SUB CIAUSCOLO C.P.</div>
+  <div class="item-code">XSUB2511000325 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2511000325" data-nombre="SUB CIAUSCOLO C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="sub coppa c.p." data-codigo="xsub2507000234" data-grupo="CARNES">
+  <div class="item-name">SUB COPPA C.P.</div>
+  <div class="item-code">XSUB2507000234 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2507000234" data-nombre="SUB COPPA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="sub coppa di testa c.p." data-codigo="xsub2504000190" data-grupo="CARNES">
+  <div class="item-name">SUB COPPA DI TESTA C.P.</div>
+  <div class="item-code">XSUB2504000190 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2504000190" data-nombre="SUB COPPA DI TESTA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="sub lardo c.p." data-codigo="xsub2507000228" data-grupo="CARNES">
+  <div class="item-name">SUB LARDO C.P.</div>
+  <div class="item-code">XSUB2507000228 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2507000228" data-nombre="SUB LARDO C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="sub lonza c.p." data-codigo="xsub2602000421" data-grupo="CARNES">
+  <div class="item-name">SUB LONZA C.P.</div>
+  <div class="item-code">XSUB2602000421 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2602000421" data-nombre="SUB LONZA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="sub mortadella casa c.p." data-codigo="xsub2602000418" data-grupo="CARNES">
+  <div class="item-name">SUB MORTADELLA CASA C.P.</div>
+  <div class="item-code">XSUB2602000418 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2602000418" data-nombre="SUB MORTADELLA CASA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="sub nduja c.p." data-codigo="xsub2507000238" data-grupo="CARNES">
+  <div class="item-name">SUB NDUJA C.P.</div>
+  <div class="item-code">XSUB2507000238 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2507000238" data-nombre="SUB NDUJA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="sub pancetta c.p." data-codigo="xsub2507000230" data-grupo="CARNES">
+  <div class="item-name">SUB PANCETTA C.P.</div>
+  <div class="item-code">XSUB2507000230 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2507000230" data-nombre="SUB PANCETTA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="sub prosciutto di spalla c.p." data-codigo="xsub2507000232" data-grupo="CARNES">
+  <div class="item-name">SUB PROSCIUTTO DI SPALLA C.P.</div>
+  <div class="item-code">XSUB2507000232 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2507000232" data-nombre="SUB PROSCIUTTO DI SPALLA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="sub salame lardellato c.p." data-codigo="xsub2602000420" data-grupo="CARNES">
+  <div class="item-name">SUB SALAME LARDELLATO C.P.</div>
+  <div class="item-code">XSUB2602000420 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2602000420" data-nombre="SUB SALAME LARDELLATO C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="sub salame mariola c.p." data-codigo="xsub2512000348" data-grupo="CARNES">
+  <div class="item-name">SUB SALAME MARIOLA C.P.</div>
+  <div class="item-code">XSUB2512000348 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2512000348" data-nombre="SUB SALAME MARIOLA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="sub salame strolghino c.p." data-codigo="xsub2512000350" data-grupo="CARNES">
+  <div class="item-name">SUB SALAME STROLGHINO C.P.</div>
+  <div class="item-code">XSUB2512000350 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2512000350" data-nombre="SUB SALAME STROLGHINO C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="sub salchicha ahumada c.p." data-codigo="xsub2507000231" data-grupo="CARNES">
+  <div class="item-name">SUB SALCHICHA AHUMADA C.P.</div>
+  <div class="item-code">XSUB2507000231 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2507000231" data-nombre="SUB SALCHICHA AHUMADA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="sub salchicha fresca c.p." data-codigo="xsub2512000346" data-grupo="CARNES">
+  <div class="item-name">SUB SALCHICHA FRESCA C.P.</div>
+  <div class="item-code">XSUB2512000346 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2512000346" data-nombre="SUB SALCHICHA FRESCA C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="sub spianata piccante c.p." data-codigo="xsub2507000237" data-grupo="CARNES">
+  <div class="item-name">SUB SPIANATA PICCANTE C.P.</div>
+  <div class="item-code">XSUB2507000237 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2507000237" data-nombre="SUB SPIANATA PICCANTE C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="CARNES" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="recortes c.p." data-codigo="xmat2602001360" data-grupo="GENERAL">
+  <div class="item-name">RECORTES C.P.</div>
+  <div class="item-code">XMAT2602001360 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XMAT2602001360" data-nombre="RECORTES C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="GENERAL" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+<div class="item" data-nombre="pt strolghino c.p." data-codigo="xsub2511000312" data-grupo="PRODUCTO TERMINADO">
+  <div class="item-name">PT STROLGHINO C.P.</div>
+  <div class="item-code">XSUB2511000312 | KG | SALUMERIA</div>
+  <div class="qty-row">
+    <button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>
+    <input type="number" class="qty-input" inputmode="decimal" step="0.01" data-codigo="XSUB2511000312" data-nombre="PT STROLGHINO C.P." data-unidad="KG" data-almacen="SALUMERIA" data-grupo="PRODUCTO TERMINADO" value="0" oninput="guardar(this)" min="0">
+    <button class="qty-btn plus" onclick="cambiar(this,1)">+</button>
+  </div>
+</div>
+</div>
+   
+   <div id="lista-manuales"></div>
+   
+   <button class="fab fab-enviar" id="btn-enviar" onclick="abrirModalConfirmar()" disabled>Enviar ✓</button>
+   <button class="fab fab-manual" id="btn-manual" onclick="abrirModalManual()">＋ No catalogado</button>
+   <button id="btn-top" onclick="scrollToTop()">↑</button>
+ </div>
+
+ <div id="modal-manual" class="modal-overlay">
+   <div class="modal-content">
+     <div class="modal-title">Ítem no catalogado</div>
+     
+     <div class="form-group">
+       <label>Nombre del producto *</label>
+       <input type="text" id="man-nombre" placeholder="Ej: Salsa de la casa" required>
+     </div>
+     
+     <div style="display:flex; gap: 12px;">
+       <div class="form-group" style="flex:1;">
+         <label>Cantidad *</label>
+         <input type="number" id="man-cantidad" inputmode="decimal" step="0.01" min="0" placeholder="0.00" required>
+       </div>
+       <div class="form-group" style="flex:1;">
+         <label>Unidad</label>
+         <input type="text" id="man-unidad" placeholder="KG, LT, PZA...">
+       </div>
+     </div>
+
+     <div class="form-group">
+       <label>Descripción de uso</label>
+       <textarea id="man-desc" rows="2" placeholder="Ej: Se usó en evento de marzo..."></textarea>
+     </div>
+
+     <div class="form-group">
+       <div class="file-input-wrapper">
+         <div class="btn-file">📷 Tomar foto o elegir</div>
+         <input type="file" id="man-foto" accept="image/*" capture="environment" onchange="previewImage(this)">
+       </div>
+       <img id="preview-foto" src="" alt="Vista previa">
+     </div>
+
+     <div class="modal-actions">
+       <button class="btn-gray" onclick="cerrarModalManual()">Cancelar</button>
+       <button class="btn-green" onclick="guardarManual()">Guardar ítem</button>
+     </div>
+   </div>
+ </div>
+
+ <div id="modal-confirmar" class="modal-overlay">
+   <div class="modal-content">
+     <div class="modal-title">Confirmar envío</div>
+     <div id="resumen-envio"></div>
+     <div class="modal-actions">
+       <button class="btn-gray" onclick="cerrarModalConfirmar()">Cancelar</button>
+       <button class="btn-green" onclick="ejecutarEnvio()">Confirmar envío</button>
+     </div>
+   </div>
+ </div>
+
+ <div id="modal-spinner" class="modal-overlay" style="align-items: center;">
+   <div class="modal-content">
+     <div class="spinner" id="spinner-loader"></div>
+     <div id="spinner-text" style="font-size: 18px; font-weight: bold; text-align: center;">Enviando...</div>
+     <div id="spinner-actions" style="display: none; width: 100%; margin-top: 16px;">
+        <button class="btn-green" onclick="limpiarYVolverInicio()">Nueva toma</button>
+     </div>
+   </div>
+ </div>
+
+ <script>
+   // CONSTANTE GLOBAL
+   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzsNy5iU_OREl8l81OWKeSs6W6UVTzLswktd-dbwM1Be7MWhQ88zp3gyKM4QPj1hYeGNQ/exec';
+   
+   // Variables de Estado
+   let sesionActiva = null;
+   let inventarioLocal = {};
+   let manualesLocal = [];
+   let currentChip = 'Todos';
+
+   // Grupos según requerimiento
+   const grupos = ['Todos', 'CARNES', 'GENERAL', 'PRODUCTO TERMINADO'];
+
+   document.addEventListener('DOMContentLoaded', () => {
+     // Setear fecha de hoy
+     document.getElementById('fecha-input').value = new Date().toISOString().split('T')[0];
+     
+     // Checar si hay sesión guardada en sessionStorage
+     const saved = sessionStorage.getItem('sesion_activa');
+     if (saved) {
+       const sesion = JSON.parse(saved);
+       const dataKey = `inventario_cocina_${sesion.fecha}`;
+       const dataMan = `manuales_cocina_${sesion.fecha}`;
+       
+       // Mostrar banner si hay datos en LocalStorage para esta fecha
+       if (localStorage.getItem(dataKey) || localStorage.getItem(dataMan)) {
+         sesionActiva = sesion;
+         document.getElementById('banner-text').textContent = `Sesión activa: ${sesion.operario} — ${sesion.area} — ${sesion.fecha}. ¿Continuar o iniciar nueva?`;
+         document.getElementById('banner-sesion').style.display = 'flex';
+         
+         // Pre-llenar campos
+         document.getElementById('operario-input').value = sesion.operario;
+         document.getElementById('area-input').value = sesion.area;
+         document.getElementById('fecha-input').value = sesion.fecha;
+       }
+     }
+     
+     renderChips();
+     
+     // Control botón flotante subir
+     window.addEventListener('scroll', () => {
+       if (window.scrollY > 300) document.getElementById('btn-top').style.display = 'block';
+       else document.getElementById('btn-top').style.display = 'none';
+     });
+   });
+
+   // ------ LOGICA DE INICIO Y SESIÓN ------
+
+   function iniciarNuevaToma(forzarNueva) {
+     const operario = document.getElementById('operario-input').value.trim();
+     const area = document.getElementById('area-input').value.trim();
+     const fecha = document.getElementById('fecha-input').value;
+
+     if (!operario || !area) {
+       alert("El nombre del operario y el área son requeridos.");
+       return;
+     }
+
+     if (forzarNueva && sesionActiva) {
+       // Limpiar localStorage de la sesión anterior
+       localStorage.removeItem(`inventario_cocina_${sesionActiva.fecha}`);
+       localStorage.removeItem(`manuales_cocina_${sesionActiva.fecha}`);
+     }
+
+     sesionActiva = { operario, area, fecha };
+     sessionStorage.setItem('sesion_activa', JSON.stringify(sesionActiva));
+     
+     prepararInventario();
+   }
+
+   function continuarSesion() {
+     prepararInventario();
+   }
+
+   function prepararInventario() {
+     // Ocultar inicio, mostrar inventario
+     document.getElementById('pantalla-inicio').style.display = 'none';
+     document.getElementById('pantalla-inventario').style.display = 'block';
+     
+     // Cargar datos del localStorage
+     const dataKey = `inventario_cocina_${sesionActiva.fecha}`;
+     const dataMan = `manuales_cocina_${sesionActiva.fecha}`;
+     
+     inventarioLocal = JSON.parse(localStorage.getItem(dataKey) || '{}');
+     manualesLocal = JSON.parse(localStorage.getItem(dataMan) || '[]');
+     
+     // Rellenar cantidades de los items en DOM
+     document.querySelectorAll('#lista .item').forEach(item => {
+       const input = item.querySelector('.qty-input');
+       const code = input.getAttribute('data-codigo');
+       
+       if (inventarioLocal[code]) {
+         input.value = inventarioLocal[code];
+         item.classList.add('capturado');
+       } else {
+         input.value = 0;
+         item.classList.remove('capturado');
+       }
+     });
+     
+     renderManuales();
+     actualizarHeader();
+     evaluarBotonEnviar();
+   }
+
+   // ------ LOGICA DEL INVENTARIO ------
+
+   function actualizarHeader() {
+     const prods = Object.values(inventarioLocal).filter(v => v > 0).length;
+     const mans = manualesLocal.length;
+     const total = prods + mans;
+     
+     document.getElementById('header-line1').textContent = `📦 SALUMERIA | ${sesionActiva.area} | ${sesionActiva.operario}`;
+     document.getElementById('header-line2').textContent = `${sesionActiva.fecha} | ${total} capturados`;
+   }
+
+   function cambiar(btn, delta) {
+     const input = btn.parentElement.querySelector('.qty-input');
+     let val = parseFloat(input.value) || 0;
+     val += delta;
+     if (val < 0) val = 0;
+     
+     input.value = (val % 1 === 0) ? val : val.toFixed(2);
+     guardar(input);
+   }
+
+   function guardar(input) {
+     const val = parseFloat(input.value) || 0;
+     const code = input.getAttribute('data-codigo');
+     const item = input.closest('.item');
+     
+     if (val > 0) {
+       inventarioLocal[code] = val;
+       item.classList.add('capturado');
+     } else {
+       delete inventarioLocal[code];
+       item.classList.remove('capturado');
+     }
+     
+     // Auto-guardado
+     localStorage.setItem(`inventario_cocina_${sesionActiva.fecha}`, JSON.stringify(inventarioLocal));
+     
+     actualizarHeader();
+     evaluarBotonEnviar();
+   }
+
+   function evaluarBotonEnviar() {
+     const total = Object.values(inventarioLocal).filter(v => v > 0).length + manualesLocal.length;
+     document.getElementById('btn-enviar').disabled = (total === 0);
+   }
+
+   function scrollToTop() {
+     window.scrollTo({ top: 0, behavior: 'smooth' });
+   }
+
+   // ------ FILTROS Y BÚSQUEDA ------
+
+   function renderChips() {
+     const container = document.getElementById('chips-container');
+     container.innerHTML = '';
+     grupos.forEach(g => {
+       const btn = document.createElement('button');
+       btn.className = `chip ${g === currentChip ? 'active' : ''}`;
+       btn.textContent = g;
+       btn.onclick = () => {
+         currentChip = g;
+         renderChips();
+         filtrarLista();
+       };
+       container.appendChild(btn);
+     });
+   }
+
+   function limpiarBusqueda() {
+     document.getElementById('search-input').value = '';
+     filtrarLista();
+   }
+
+   function filtrarLista() {
+     const query = document.getElementById('search-input').value.toLowerCase();
+     const items = document.querySelectorAll('#lista .item');
+     
+     items.forEach(item => {
+       const nombre = item.getAttribute('data-nombre').toLowerCase();
+       const codigo = item.getAttribute('data-codigo').toLowerCase();
+       const grupo = item.getAttribute('data-grupo');
+       
+       const textMatch = nombre.includes(query) || codigo.includes(query);
+       const chipMatch = (currentChip === 'Todos' || grupo === currentChip);
+       
+       if (textMatch && chipMatch) {
+         item.style.display = 'block';
+       } else {
+         item.style.display = 'none';
+       }
+     });
+   }
+
+   // ------ ÍTEM MANUAL ------
+
+   function abrirModalManual() {
+     document.getElementById('modal-manual').style.display = 'flex';
+     document.getElementById('man-nombre').value = '';
+     document.getElementById('man-cantidad').value = '';
+     document.getElementById('man-unidad').value = '';
+     document.getElementById('man-desc').value = '';
+     document.getElementById('man-foto').value = '';
+     document.getElementById('preview-foto').style.display = 'none';
+     document.getElementById('preview-foto').src = '';
+   }
+
+   function cerrarModalManual() {
+     document.getElementById('modal-manual').style.display = 'none';
+   }
+
+   function previewImage(input) {
+     if (input.files && input.files[0]) {
+       const reader = new FileReader();
+       reader.onload = function(e) {
+         const img = document.getElementById('preview-foto');
+         img.src = e.target.result;
+         img.style.display = 'block';
+       }
+       reader.readAsDataURL(input.files[0]);
+     }
+   }
+
+   function guardarManual() {
+     const nombre = document.getElementById('man-nombre').value.trim();
+     const cantidad = parseFloat(document.getElementById('man-cantidad').value);
+     const unidad = document.getElementById('man-unidad').value.trim();
+     const desc = document.getElementById('man-desc').value.trim();
+     const foto = document.getElementById('preview-foto').src;
+     
+     if (!nombre || isNaN(cantidad) || !foto || foto === window.location.href) {
+       alert("Por favor completa el nombre, la cantidad y toma una foto.");
+       return;
+     }
+     
+     const consecutivo = manualesLocal.length + 1;
+     const codigo = `MANUAL-${consecutivo.toString().padStart(3, '0')}`;
+     
+     const nuevoManual = {
+       codigo: codigo,
+       nombre: nombre,
+       cantidad: cantidad,
+       unidad: unidad,
+       descripcion: desc,
+       foto_base64: foto,
+       catalogado: false
+     };
+     
+     manualesLocal.push(nuevoManual);
+     localStorage.setItem(`manuales_cocina_${sesionActiva.fecha}`, JSON.stringify(manualesLocal));
+     
+     renderManuales();
+     cerrarModalManual();
+     actualizarHeader();
+     evaluarBotonEnviar();
+   }
+
+   function renderManuales() {
+     const container = document.getElementById('lista-manuales');
+     container.innerHTML = '';
+     
+     if (manualesLocal.length === 0) return;
+     
+     const title = document.createElement('h3');
+     title.textContent = "Ítems No Catalogados";
+     title.style.margin = "8px 0";
+     container.appendChild(title);
+     
+     manualesLocal.forEach(m => {
+       const d = document.createElement('div');
+       d.className = 'item capturado';
+       d.innerHTML = `
+         <div class="badge-manual">MANUAL</div>
+         <div class="item-name">${m.nombre.toUpperCase()}</div>
+         <div class="item-code">${m.codigo} | ${m.unidad} | COCINA</div>
+         <div class="manual-row">
+           <img src="${m.foto_base64}" alt="Foto">
+           <div>
+             <strong>Cant: ${m.cantidad}</strong>
+             <div class="manual-desc">${m.descripcion}</div>
+           </div>
+         </div>
+       `;
+       container.appendChild(d);
+     });
+   }
+
+   // ------ ENVÍO Y CONFIRMACIÓN ------
+
+   function abrirModalConfirmar() {
+     const keys = Object.keys(inventarioLocal).filter(k => inventarioLocal[k] > 0);
+     let htmlLista = '';
+     
+     // Tomar los primeros 5
+     keys.slice(0, 5).forEach(cod => {
+       const el = document.querySelector(`.qty-input[data-codigo="${cod}"]`);
+       const nombre = el ? el.getAttribute('data-nombre') : cod;
+       htmlLista += `<li>${nombre} (x${inventarioLocal[cod]})</li>`;
+     });
+     if(keys.length === 0 && manualesLocal.length > 0) {
+         htmlLista += `<li>(Solo ítems manuales)</li>`;
+     }
+     
+     document.getElementById('resumen-envio').innerHTML = `
+       <p><strong>Operario:</strong> ${sesionActiva.operario}</p>
+       <p><strong>Área:</strong> ${sesionActiva.area}</p>
+       <p><strong>Fecha:</strong> ${sesionActiva.fecha}</p>
+       <p><strong>Catálogo:</strong> ${keys.length} ítems</p>
+       <p><strong>Manuales:</strong> ${manualesLocal.length} ítems</p>
+       <div class="resumen-lista">
+         <strong>Primeros capturados:</strong><br>
+         <ul>${htmlLista}</ul>
+       </div>
+     `;
+     document.getElementById('modal-confirmar').style.display = 'flex';
+   }
+
+   function cerrarModalConfirmar() {
+     document.getElementById('modal-confirmar').style.display = 'none';
+   }
+
+   function ejecutarEnvio() {
+     cerrarModalConfirmar();
+     document.getElementById('modal-spinner').style.display = 'flex';
+     
+     // Armar Payload
+     const productos = [];
+     document.querySelectorAll('#lista .qty-input').forEach(input => {
+       const val = parseFloat(input.value) || 0;
+       if (val > 0) {
+         productos.push({
+           codigo: input.getAttribute('data-codigo'),
+           nombre: input.getAttribute('data-nombre'),
+           unidad: input.getAttribute('data-unidad'),
+           cantidad: val,
+           catalogado: true
+         });
+       }
+     });
+     
+     const payload = {
+       operario: sesionActiva.operario,
+       area: sesionActiva.area,
+       fecha: sesionActiva.fecha,
+       almacen: "SALUMERIA",
+       timestamp: new Date().toISOString(),
+       productos: productos,
+       manuales: manualesLocal
+     };
+     
+     // Enviar con mode: 'no-cors'
+     fetch(APPS_SCRIPT_URL, {
+       method: 'POST',
+       mode: 'no-cors',
+       headers: {'Content-Type': 'text/plain'},
+       body: JSON.stringify(payload)
+     }).then(() => {
+       // Por el CORS no podemos leer respuesta, usamos timeout de 3 seg para éxito
+       esperarYConfirmarExito();
+     }).catch(err => {
+       alert("Error de red. Intenta nuevamente.");
+       document.getElementById('modal-spinner').style.display = 'none';
+     });
+   }
+
+   function esperarYConfirmarExito() {
+     setTimeout(() => {
+       document.getElementById('spinner-loader').style.display = 'none';
+       document.getElementById('spinner-text').innerHTML = "✓ Inventario enviado correctamente.<br><br><span style='font-size:14px; color:#555;'>Puedes cerrar la app o iniciar una nueva toma.</span>";
+       document.getElementById('spinner-actions').style.display = 'block';
+       
+       // Limpiar el localStorage de esta sesión
+       localStorage.removeItem(`inventario_cocina_${sesionActiva.fecha}`);
+       localStorage.removeItem(`manuales_cocina_${sesionActiva.fecha}`);
+       
+     }, 3000);
+   }
+
+   function limpiarYVolverInicio() {
+     // Limpiar sessionStorage es opcional, pero lo dejamos si desean mantener el operario en memoria. 
+     // Reiniciamos todo reseteando la página.
+     window.location.reload();
+   }
+ </script>
+</body>
+</html>
