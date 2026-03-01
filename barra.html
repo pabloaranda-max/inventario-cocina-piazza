@@ -4268,8 +4268,8 @@
      const desc = document.getElementById('man-desc').value.trim();
      const foto = document.getElementById('preview-foto').src;
      
-     if (!nombre || isNaN(cantidad) || !foto || foto === window.location.href) {
-       alert("Por favor completa el nombre, la cantidad y toma una foto.");
+     if (!nombre || isNaN(cantidad) || cantidad <= 0) {
+       alert("Por favor completa el nombre y la cantidad.");
        return;
      }
      
@@ -4319,7 +4319,7 @@
          <div class="item-name">${m.nombre.toUpperCase()}</div>
          <div class="item-code">${m.codigo} | ${m.unidad} | COCINA</div>
          <div class="manual-row">
-           <img src="${m.foto_base64}" alt="Foto">
+           ${m.foto_base64 ? `<img src="${m.foto_base64}" alt="Foto">` : ''}
            <div>
              <strong>Cant: ${m.cantidad}</strong>
              <div class="manual-desc">${m.descripcion}</div>
