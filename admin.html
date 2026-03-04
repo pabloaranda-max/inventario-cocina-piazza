@@ -359,6 +359,7 @@ async function enviarChat() {
     });
 
     const data = await res.json();
+    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
     const reply = data.choices?.[0]?.message?.content || 'Sin respuesta';
     chatHistory.push({ role: 'assistant', content: reply });
 
@@ -366,7 +367,7 @@ async function enviarChat() {
     messagesDiv.innerHTML += `<div class="msg ai">${reply}</div>`;
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   } catch(e) {
-    document.getElementById('loading-msg').textContent = 'Error al conectar con el asistente.';
+    document.getElementById('loading-msg').textContent = 'Error: ' + e.message;
   }
 }
 </script>

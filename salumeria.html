@@ -1234,13 +1234,14 @@
         body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'system', content: sistema }, ...groqHistory], max_tokens: 300, temperature: 0.7 })
       });
       const data = await res.json();
+      if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
       const reply = data.choices && data.choices[0] ? data.choices[0].message.content : 'Sin respuesta';
       groqHistory.push({ role: 'assistant', content: reply });
       document.getElementById('groq-loading').remove();
       msgs.innerHTML += '<div class="gmsg ai">' + reply + '</div>';
       msgs.scrollTop = msgs.scrollHeight;
     } catch(e) {
-      document.getElementById('groq-loading').textContent = 'Error de conexion. Intenta de nuevo.';
+      document.getElementById('groq-loading').textContent = 'Error: ' + e.message;
     }
   }
 
