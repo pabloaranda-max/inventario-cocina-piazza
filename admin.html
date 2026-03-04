@@ -101,7 +101,7 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
   <div class="login-titulo">🔐 Admin</div>
   <div class="login-sub">Inventario Piazza Pasticcio</div>
   <input type="password" class="login-input" id="pwd-input" placeholder="Contraseña" onkeyup="if(event.key==='Enter') login()">
-  <input type="password" class="login-input" id="groq-key-input" placeholder="API Key GROQ (opcional)" style="margin-top:0">
+  <input type="text" class="login-input" id="groq-key-input" placeholder="API Key GROQ (opcional)" style="margin-top:0; font-size:12px;">
   <button class="btn-login" onclick="login()">Entrar</button>
   <div id="login-error" style="color:#dc2626;margin-top:12px;font-size:14px;"></div>
 </div>
