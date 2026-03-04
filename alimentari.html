@@ -102,6 +102,24 @@
    
    .resumen-lista { max-height: 150px; overflow-y: auto; background: #f9fafb; padding: 12px; border-radius: 8px; font-size: 14px; margin-top: 8px;}
    .resumen-lista li { margin-bottom: 6px; margin-left: 16px; }
+
+  /* GROQ CHAT BUTTON */
+  .fab-groq { bottom: 90px; right: 16px; background: #1e293b; color: white; width: 52px; height: 52px; border-radius: 50%; font-size: 22px; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .groq-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; align-items: flex-end; }
+  .groq-overlay.active { display: flex; }
+  .groq-panel { background: white; width: 100%; border-radius: 20px 20px 0 0; padding: 20px; max-height: 80vh; display: flex; flex-direction: column; }
+  .groq-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .groq-title { font-weight: bold; font-size: 16px; }
+  .groq-close { background: #f1f5f9; color: #333; padding: 6px 12px; font-size: 14px; min-height: 36px; }
+  .groq-messages { flex: 1; overflow-y: auto; margin-bottom: 12px; min-height: 150px; max-height: 300px; }
+  .gmsg { padding: 10px 14px; border-radius: 10px; margin-bottom: 8px; font-size: 14px; line-height: 1.5; }
+  .gmsg.user { background: #667eea; color: white; margin-left: 15%; }
+  .gmsg.ai { background: #f1f5f9; color: #333; margin-right: 15%; }
+  .gmsg.loading { color: #94a3b8; font-style: italic; background: #f1f5f9; margin-right: 15%; }
+  .groq-input-row { display: flex; gap: 8px; }
+  .groq-input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+  .groq-send { background: #667eea; color: white; padding: 12px 16px; min-height: 48px; border-radius: 8px; }
+
  </style>
 </head>
 <body>
@@ -4346,6 +4364,63 @@
      // Reiniciamos todo reseteando la página.
      window.location.reload();
    }
+
+  // ── GROQ ──────────────────────────────────────────────────
+  function getGroqKey() { return localStorage.getItem('groq_api_key') || ''; }
+  let groqHistory = [];
+
+  function abrirGroq() { document.getElementById('groq-overlay').classList.add('active'); document.getElementById('groq-input').focus(); }
+  function cerrarGroq() { document.getElementById('groq-overlay').classList.remove('active'); }
+
+  async function enviarGroq() {
+    const input = document.getElementById('groq-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = '';
+    const msgs = document.getElementById('groq-messages');
+    msgs.innerHTML += '<div class="gmsg user">' + msg + '</div>';
+    msgs.innerHTML += '<div class="gmsg loading" id="groq-loading">Pensando...</div>';
+    msgs.scrollTop = msgs.scrollHeight;
+    groqHistory.push({ role: 'user', content: msg });
+
+    const capturados = Object.keys(inventarioLocal || {}).filter(k => inventarioLocal[k] > 0).length;
+    const sistema = 'Eres un asistente de inventario para Piazza Pasticcio, restaurante italiano en CDMX. El operario esta haciendo la toma de inventario del almacen ALIMENTARI. Lleva ' + capturados + ' productos capturados. Ayuda con dudas sobre productos, unidades de medida (KG=kilogramos, LT=litros, PZA=pieza, B.750=botella 750ml) o como usar la app. Responde en espanol, de forma muy breve y practica.';
+
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + getGroqKey(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'system', content: sistema }, ...groqHistory], max_tokens: 300, temperature: 0.7 })
+      });
+      const data = await res.json();
+      const reply = data.choices && data.choices[0] ? data.choices[0].message.content : 'Sin respuesta';
+      groqHistory.push({ role: 'assistant', content: reply });
+      document.getElementById('groq-loading').remove();
+      msgs.innerHTML += '<div class="gmsg ai">' + reply + '</div>';
+      msgs.scrollTop = msgs.scrollHeight;
+    } catch(e) {
+      document.getElementById('groq-loading').textContent = 'Error de conexion. Intenta de nuevo.';
+    }
+  }
+
  </script>
+
+  <!-- GROQ CHAT -->
+  <button class="fab fab-groq" onclick="abrirGroq()" title="Asistente IA">🤖</button>
+  <div class="groq-overlay" id="groq-overlay">
+    <div class="groq-panel">
+      <div class="groq-header">
+        <div class="groq-title">🤖 Asistente de Inventario</div>
+        <button class="groq-close" onclick="cerrarGroq()">Cerrar</button>
+      </div>
+      <div class="groq-messages" id="groq-messages">
+        <div class="gmsg ai">Hola, soy tu asistente. Puedo ayudarte a encontrar productos, aclarar unidades de medida o resolver dudas de la toma. ¿En qué te ayudo?</div>
+      </div>
+      <div class="groq-input-row">
+        <input type="text" class="groq-input" id="groq-input" placeholder="Pregunta algo..." onkeyup="if(event.key==='Enter') enviarGroq()">
+        <button class="groq-send" onclick="enviarGroq()">➤</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
