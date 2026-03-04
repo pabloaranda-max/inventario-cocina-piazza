@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Admin — Inventario Piazza Pasticcio</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f5f5; color: #333; }
+button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
+
+/* LOGIN */
+#pantalla-login {
+  min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; padding: 24px;
+  background: white;
+}
+.login-titulo { font-size: 26px; margin-bottom: 8px; text-align: center; }
+.login-sub { color: #666; margin-bottom: 32px; text-align: center; }
+.login-input {
+  width: 100%; max-width: 320px; padding: 14px;
+  border: 1px solid #ddd; border-radius: 8px;
+  font-size: 16px; margin-bottom: 12px; display: block;
+}
+.btn-login {
+  width: 100%; max-width: 320px; padding: 14px;
+  background: #667eea; color: white; font-size: 16px;
+  border-radius: 28px; min-height: 48px;
+}
+
+/* ADMIN */
+#pantalla-admin { display: none; padding-bottom: 40px; }
+.admin-header {
+  background: #1e293b; color: white; padding: 16px;
+  position: sticky; top: 0; z-index: 50;
+}
+.admin-header h1 { font-size: 18px; margin-bottom: 4px; }
+.admin-header p { font-size: 13px; color: #94a3b8; }
+.admin-header-row { display: flex; justify-content: space-between; align-items: center; }
+.btn-logout { background: #475569; color: white; padding: 8px 14px; font-size: 13px; }
+
+/* TABS */
+.tabs { display: flex; overflow-x: auto; background: white; border-bottom: 2px solid #e2e8f0; padding: 0 16px; }
+.tab { padding: 14px 16px; font-size: 14px; font-weight: bold; color: #64748b; cursor: pointer; white-space: nowrap; border-bottom: 3px solid transparent; margin-bottom: -2px; background: none; border-radius: 0; min-height: auto; }
+.tab.active { color: #667eea; border-bottom-color: #667eea; }
+
+/* CONTENT */
+.tab-content { display: none; padding: 16px; }
+.tab-content.active { display: block; }
+
+/* STATS */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.stat-card { background: white; border-radius: 10px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+.stat-num { font-size: 28px; font-weight: bold; color: #667eea; }
+.stat-label { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+/* TOMAS */
+.toma-card {
+  background: white; border-radius: 10px; padding: 14px;
+  margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  border-left: 4px solid #667eea;
+}
+.toma-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.toma-operario { font-weight: bold; font-size: 15px; }
+.toma-almacen { font-size: 11px; background: #667eea; color: white; padding: 3px 8px; border-radius: 12px; }
+.toma-meta { font-size: 12px; color: #64748b; margin-bottom: 10px; }
+.toma-footer { display: flex; justify-content: space-between; align-items: center; }
+.toma-items { font-size: 13px; color: #374151; }
+.btn-borrar { background: #fee2e2; color: #dc2626; padding: 8px 14px; font-size: 13px; min-height: 36px; }
+.btn-borrar:hover { background: #fca5a5; }
+
+/* GROQ CHAT */
+.chat-container { background: white; border-radius: 10px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.chat-messages { min-height: 200px; max-height: 400px; overflow-y: auto; margin-bottom: 12px; }
+.msg { padding: 10px 14px; border-radius: 10px; margin-bottom: 8px; font-size: 14px; line-height: 1.5; }
+.msg.user { background: #667eea; color: white; margin-left: 20%; }
+.msg.ai { background: #f1f5f9; color: #333; margin-right: 20%; }
+.msg.ai.loading { color: #94a3b8; font-style: italic; }
+.chat-input-row { display: flex; gap: 8px; }
+.chat-input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+.btn-send { background: #667eea; color: white; padding: 12px 16px; min-height: 48px; }
+
+/* FILTROS */
+.filtros-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.filtro-chip { padding: 8px 14px; border-radius: 20px; font-size: 13px; background: #e2e8f0; color: #475569; cursor: pointer; min-height: 36px; }
+.filtro-chip.active { background: #667eea; color: white; }
+
+.empty-state { text-align: center; color: #94a3b8; padding: 40px 20px; font-size: 15px; }
+.loading-state { text-align: center; color: #94a3b8; padding: 40px 20px; }
+.spinner-sm { width: 24px; height: 24px; border: 3px solid #e2e8f0; border-top-color: #667eea; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-msg { background: #fee2e2; color: #dc2626; padding: 12px; border-radius: 8px; margin-bottom: 12px; font-size: 14px; }
+.success-msg { background: #dcfce7; color: #16a34a; padding: 12px; border-radius: 8px; margin-bottom: 12px; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="pantalla-login">
+  <div class="login-titulo">🔐 Admin</div>
+  <div class="login-sub">Inventario Piazza Pasticcio</div>
+  <input type="password" class="login-input" id="pwd-input" placeholder="Contraseña" onkeyup="if(event.key==='Enter') login()">
+  <input type="password" class="login-input" id="groq-key-input" placeholder="API Key GROQ (opcional)" style="margin-top:0">
+  <button class="btn-login" onclick="login()">Entrar</button>
+  <div id="login-error" style="color:#dc2626;margin-top:12px;font-size:14px;"></div>
+</div>
+
+<!-- ADMIN -->
+<div id="pantalla-admin">
+  <div class="admin-header">
+    <div class="admin-header-row">
+      <div>
+        <h1>⚙️ Admin Inventario</h1>
+        <p>Piazza Pasticcio</p>
+      </div>
+      <button class="btn-logout" onclick="logout()">Salir</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('tomas')">📋 Tomas</button>
+    <button class="tab" onclick="showTab('reporte')">📊 Resumen</button>
+    <button class="tab" onclick="showTab('groq')">🤖 Asistente</button>
+  </div>
+
+  <!-- TAB: TOMAS -->
+  <div id="tab-tomas" class="tab-content active">
+    <div class="filtros-row" id="filtros-almacen">
+      <button class="filtro-chip active" onclick="filtrarAlmacen('TODOS', this)">Todos</button>
+      <button class="filtro-chip" onclick="filtrarAlmacen('COCINA', this)">Cocina</button>
+      <button class="filtro-chip" onclick="filtrarAlmacen('ALIMENTARI', this)">Alimentari</button>
+      <button class="filtro-chip" onclick="filtrarAlmacen('SALUMERIA', this)">Salumeria</button>
+      <button class="filtro-chip" onclick="filtrarAlmacen('BARRA', this)">Barra</button>
+    </div>
+    <div id="tomas-container">
+      <div class="loading-state"><div class="spinner-sm"></div>Cargando tomas...</div>
+    </div>
+  </div>
+
+  <!-- TAB: REPORTE -->
+  <div id="tab-reporte" class="tab-content">
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card"><div class="stat-num" id="stat-total">—</div><div class="stat-label">Tomas totales</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-operarios">—</div><div class="stat-label">Operarios activos</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-items">—</div><div class="stat-label">Ítems capturados</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-manuales">—</div><div class="stat-label">No catalogados</div></div>
+    </div>
+    <div id="reporte-detalle"></div>
+  </div>
+
+  <!-- TAB: GROQ -->
+  <div id="tab-groq" class="tab-content">
+    <div class="chat-container">
+      <div class="chat-messages" id="chat-messages">
+        <div class="msg ai">Hola, soy tu asistente de inventario. Puedo ayudarte a analizar las tomas, identificar errores, generar reportes o responder preguntas sobre el inventario. ¿En qué te ayudo?</div>
+      </div>
+      <div class="chat-input-row">
+        <input type="text" class="chat-input" id="chat-input" placeholder="Pregunta algo..." onkeyup="if(event.key==='Enter') enviarChat()">
+        <button class="btn-send" onclick="enviarChat()">➤</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ADMIN_PASSWORD = 'piazza2026';
+const GROQ_MODEL = 'llama-3.1-8b-instant';
+
+function getGroqKey() {
+  return localStorage.getItem('groq_api_key') || '';
+}
+
+const ALMACENES = {
+  COCINA:     'https://script.google.com/macros/s/AKfycbyTJ-jeve3udC1mAuhcmjlUwY0oiJO2HMu55ovpUa5z48JX2j1K25BsVULrgr_tnIQ/exec',
+  ALIMENTARI: 'https://script.google.com/macros/s/AKfycbxgmVa9zMMYy0eGe8zFEVnoUuZWPH1w9cgT2oxBXI307N5eMD6vLnfd88Aovo6n6spO/exec',
+  SALUMERIA:  'https://script.google.com/a/macros/piazza-pasticcio.com/s/AKfycbzsNy5iU_OREl8l81OWKeSs6W6UVTzLswktd-dbwM1Be7MWhQ88zp3gyKM4QPj1hYeGNQ/exec',
+  BARRA:      'https://script.google.com/macros/s/AKfycby_lsQ9Rn36eAP7zQJrvGjCfDD_rAIhkDSsfYTL8UWg-jYB0YkVdR_uXD-fb0BZvF60BQ/exec'
+};
+
+let todasLasTomas = [];
+let filtroActual = 'TODOS';
+
+// ── AUTH ──────────────────────────────────────────────────
+function login() {
+  const pwd = document.getElementById('pwd-input').value;
+  if (pwd === ADMIN_PASSWORD) {
+    const key = document.getElementById('groq-key-input').value.trim();
+    if (key) localStorage.setItem('groq_api_key', key);
+    document.getElementById('pantalla-login').style.display = 'none';
+    document.getElementById('pantalla-admin').style.display = 'block';
+    cargarTodasLasTomas();
+  } else {
+    document.getElementById('login-error').textContent = 'Contraseña incorrecta';
+  }
+}
+
+function logout() {
+  document.getElementById('pantalla-login').style.display = 'flex';
+  document.getElementById('pantalla-admin').style.display = 'none';
+  document.getElementById('pwd-input').value = '';
+}
+
+// ── TABS ──────────────────────────────────────────────────
+function showTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  event.target.classList.add('active');
+  if (tab === 'reporte') generarReporte();
+}
+
+// ── CARGAR TOMAS ──────────────────────────────────────────
+async function cargarTodasLasTomas() {
+  const container = document.getElementById('tomas-container');
+  container.innerHTML = '<div class="loading-state"><div class="spinner-sm"></div>Cargando tomas de todos los almacenes...</div>';
+  
+  todasLasTomas = [];
+  const promesas = Object.entries(ALMACENES).map(([nombre, url]) =>
+    fetch(url + '?action=listar')
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok && data.tomas) {
+          data.tomas.forEach(t => { t.almacen_nombre = nombre; t.script_url = url; });
+          todasLasTomas.push(...data.tomas);
+        }
+      })
+      .catch(() => {}) // si falla uno, continúa con los demás
+  );
+  
+  await Promise.all(promesas);
+  todasLasTomas.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  renderTomas();
+}
+
+function filtrarAlmacen(almacen, btn) {
+  filtroActual = almacen;
+  document.querySelectorAll('.filtro-chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  renderTomas();
+}
+
+function renderTomas() {
+  const container = document.getElementById('tomas-container');
+  const tomas = filtroActual === 'TODOS' 
+    ? todasLasTomas 
+    : todasLasTomas.filter(t => t.almacen_nombre === filtroActual);
+
+  if (tomas.length === 0) {
+    container.innerHTML = '<div class="empty-state">Sin tomas registradas</div>';
+    return;
+  }
+
+  container.innerHTML = tomas.map(t => `
+    <div class="toma-card" id="toma-${t.timestamp.replace(/[:.]/g,'-')}">
+      <div class="toma-header">
+        <div class="toma-operario">${t.operario || 'Sin nombre'}</div>
+        <div class="toma-almacen">${t.almacen_nombre}</div>
+      </div>
+      <div class="toma-meta">📍 ${t.area || '—'} &nbsp;·&nbsp; 📅 ${t.fecha} &nbsp;·&nbsp; 🕐 ${new Date(t.timestamp).toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'})}</div>
+      <div class="toma-footer">
+        <div class="toma-items">📦 ${t.items} ítems</div>
+        <button class="btn-borrar" onclick="borrarToma('${t.timestamp}','${t.area}','${t.fecha}','${t.almacen_nombre}','${t.script_url}')">🗑 Borrar</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function borrarToma(timestamp, area, fecha, almacen, scriptUrl) {
+  if (!confirm(`¿Borrar toma de ${area} (${almacen})?\nEsta acción no se puede deshacer.`)) return;
+  
+  const id = timestamp.replace(/[:.]/g,'-');
+  const card = document.getElementById('toma-' + id);
+  if (card) card.style.opacity = '0.5';
+
+  try {
+    const url = `${scriptUrl}?action=borrar&timestamp=${encodeURIComponent(timestamp)}&area=${encodeURIComponent(area)}&fecha=${encodeURIComponent(fecha)}`;
+    await fetch(url);
+    // Con no-cors no podemos leer respuesta, asumimos éxito
+    todasLasTomas = todasLasTomas.filter(t => t.timestamp !== timestamp);
+    renderTomas();
+  } catch(e) {
+    if (card) card.style.opacity = '1';
+    alert('Error al borrar. Intenta de nuevo.');
+  }
+}
+
+// ── REPORTE ───────────────────────────────────────────────
+function generarReporte() {
+  const operarios = new Set(todasLasTomas.map(t => t.operario)).size;
+  const totalItems = todasLasTomas.reduce((s, t) => s + (t.items || 0), 0);
+  const manuales = todasLasTomas.filter(t => t.tiene_manuales).length;
+
+  document.getElementById('stat-total').textContent = todasLasTomas.length;
+  document.getElementById('stat-operarios').textContent = operarios;
+  document.getElementById('stat-items').textContent = totalItems;
+  document.getElementById('stat-manuales').textContent = manuales;
+
+  // Por almacén
+  const porAlmacen = {};
+  todasLasTomas.forEach(t => {
+    if (!porAlmacen[t.almacen_nombre]) porAlmacen[t.almacen_nombre] = { tomas: 0, items: 0 };
+    porAlmacen[t.almacen_nombre].tomas++;
+    porAlmacen[t.almacen_nombre].items += (t.items || 0);
+  });
+
+  document.getElementById('reporte-detalle').innerHTML = Object.entries(porAlmacen).map(([alm, d]) => `
+    <div class="toma-card" style="border-left-color:#22c55e">
+      <div class="toma-operario">${alm}</div>
+      <div class="toma-meta" style="margin-top:8px">
+        📋 ${d.tomas} tomas &nbsp;·&nbsp; 📦 ${d.items} ítems capturados
+      </div>
+    </div>
+  `).join('') || '<div class="empty-state">Sin datos</div>';
+}
+
+// ── GROQ CHAT ─────────────────────────────────────────────
+function buildContexto() {
+  const resumen = todasLasTomas.slice(0, 20).map(t =>
+    `- ${t.operario} | ${t.almacen_nombre} | Área: ${t.area} | Fecha: ${t.fecha} | ${t.items} ítems`
+  ).join('\n');
+  return `Eres un asistente de operaciones para Piazza Pasticcio, un restaurante italiano en CDMX. 
+Tienes acceso al resumen de las últimas tomas de inventario:
+${resumen}
+Responde en español, de forma concisa y práctica.`;
+}
+
+let chatHistory = [];
+
+async function enviarChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+
+  const messagesDiv = document.getElementById('chat-messages');
+  messagesDiv.innerHTML += `<div class="msg user">${msg}</div>`;
+  messagesDiv.innerHTML += `<div class="msg ai loading" id="loading-msg">Pensando...</div>`;
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+  chatHistory.push({ role: 'user', content: msg });
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getGroqKey()}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [
+          { role: 'system', content: buildContexto() },
+          ...chatHistory
+        ],
+        max_tokens: 500,
+        temperature: 0.7
+      })
+    });
+
+    const data = await res.json();
+    const reply = data.choices?.[0]?.message?.content || 'Sin respuesta';
+    chatHistory.push({ role: 'assistant', content: reply });
+
+    document.getElementById('loading-msg').remove();
+    messagesDiv.innerHTML += `<div class="msg ai">${reply}</div>`;
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  } catch(e) {
+    document.getElementById('loading-msg').textContent = 'Error al conectar con el asistente.';
+  }
+}
+</script>
+</body>
+</html>
