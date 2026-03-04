@@ -331,6 +331,7 @@ async function enviarChat() {
   const input = document.getElementById('chat-input');
   const msg = input.value.trim();
   if (!msg) return;
+  if (!getGroqKey()) { alert('No hay API Key de GROQ guardada. Cierra sesión e ingrésala en el login.'); return; }
   input.value = '';
 
   const messagesDiv = document.getElementById('chat-messages');
@@ -360,7 +361,7 @@ async function enviarChat() {
 
     const data = await res.json();
     if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-    const reply = data.choices?.[0]?.message?.content || 'Sin respuesta';
+    const reply = data.choices?.[0]?.message?.content || ('DEBUG: ' + JSON.stringify(data).substring(0, 200));
     chatHistory.push({ role: 'assistant', content: reply });
 
     document.getElementById('loading-msg').remove();
