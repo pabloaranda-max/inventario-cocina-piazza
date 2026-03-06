@@ -833,12 +833,12 @@ async function cargarTodo() {
     p.id = String(p.id);
     p.clienteId = String(p.clienteId);
     if (!Array.isArray(p.items)) p.items = [];
-    p.items.forEach(i => { i.productoId = Number(i.productoId); i.qty = Number(i.qty); });
+    p.items.forEach(i => { i.productoId = String(i.productoId); i.qty = Number(i.qty); });
     if (!p.factura)     p.factura     = 'Sin factura';
     if (!p.fechaPedido) p.fechaPedido = '';
     if (!p.mes)         p.mes         = p.fechaPedido ? p.fechaPedido.slice(0,7) : '';
     if (!p.resumen)     p.resumen     = p.items.map(i => {
-      const pr = productos.find(x => x.id === Number(i.productoId));
+      const pr = productos.find(x => x.id === i.productoId);
       return pr ? `${pr.nombre} ×${i.qty}` : `×${i.qty}`;
     }).join(', ');
   });
