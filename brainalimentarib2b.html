@@ -797,33 +797,22 @@ let productos = [];
 let pedidos   = [];
 
 // ================================================================
-//  API — JSONP para lecturas, no-cors para escrituras
+//  API — fetch con credentials:omit (evita cookies Google → sin redirect login)
 // ================================================================
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz2ofRxbXayOnxnl4LGri9Mcq4UEcN-H_TDgo2wVfpl_vhbu1VuzV6Zxu9sc-drpU9I/exec';
 
-function jsonpGet(params) {
-  return new Promise((resolve, reject) => {
-    const cb = '__cb' + Date.now();
-    const script = document.createElement('script');
-    window[cb] = (data) => {
-      delete window[cb];
-      document.head.removeChild(script);
-      resolve(data);
-    };
-    script.onerror = () => { delete window[cb]; reject(new Error('JSONP error')); };
-    script.src = SCRIPT_URL + '?' + params + '&callback=' + cb;
-    document.head.appendChild(script);
-  });
-}
-
 async function api(action, body = {}) {
   if (action === 'getAll') {
-    return jsonpGet('action=getAll');
+    const r = await fetch(SCRIPT_URL + '?action=getAll', { credentials: 'omit' });
+    const data = await r.json();
+    if (data.error) throw new Error('BD: ' + data.error);
+    return data;
   }
-  // Escrituras: no-cors (optimistic UI, no leemos respuesta)
+  // Escrituras: no-cors + credentials omit
   fetch(SCRIPT_URL, {
     method: 'POST',
     mode: 'no-cors',
+    credentials: 'omit',
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ action, ...body })
   }).catch(() => {});
