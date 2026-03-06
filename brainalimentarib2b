@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alimentari – Pedidos B2B</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #F5F0E8;
+    --dark: #1A1612;
+    --terracotta: #C4613A;
+    --olive: #6B7A3E;
+    --gold: #D4A853;
+    --light-border: #E0D8CC;
+    --muted: #8A7F72;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--cream);
+    color: var(--dark);
+    min-height: 100vh;
+  }
+
+  /* LOADING OVERLAY */
+  #loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--dark);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    transition: opacity 0.4s;
+  }
+  #loading-overlay.hidden { opacity: 0; pointer-events: none; }
+  .loading-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    color: var(--cream);
+    margin-bottom: 20px;
+  }
+  .loading-logo span { color: var(--terracotta); font-style: italic; }
+  .spinner {
+    width: 32px; height: 32px;
+    border: 2px solid rgba(245,240,232,0.2);
+    border-top-color: var(--terracotta);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .loading-text {
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 14px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* TOAST */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--dark);
+    color: var(--cream);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    padding: 12px 20px;
+    z-index: 9000;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.2s;
+    pointer-events: none;
+    max-width: 280px;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.error { background: var(--terracotta); }
+
+  /* HEADER */
+  header {
+    background: var(--dark);
+    color: var(--cream);
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem;
+    letter-spacing: 0.05em;
+  }
+  .logo span { color: var(--terracotta); font-style: italic; }
+
+  .nav-tabs { display: flex; gap: 4px; }
+
+  .tab-btn {
+    background: none;
+    border: 1px solid rgba(245,240,232,0.2);
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab-btn.active, .tab-btn:hover {
+    background: var(--terracotta);
+    border-color: var(--terracotta);
+  }
+
+  /* MAIN LAYOUT */
+  .container { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    font-weight: 400;
+    margin-bottom: 8px;
+  }
+
+  .section-sub {
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+  }
+
+  /* CARDS GRID */
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .card {
+    background: white;
+    border: 1px solid var(--light-border);
+    padding: 24px;
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: 4px 4px 0px var(--terracotta); }
+
+  .card-label { font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .card-name { font-family: 'Playfair Display', serif; font-size: 1.2rem; margin-bottom: 4px; }
+  .card-detail { font-size: 0.75rem; color: var(--muted); margin-bottom: 3px; }
+  .card-actions { display: flex; gap: 8px; margin-top: 16px; }
+
+  .btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    border: 1px solid var(--dark);
+    background: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn:hover { background: var(--dark); color: var(--cream); }
+  .btn-primary { background: var(--terracotta); color: white; border-color: var(--terracotta); }
+  .btn-primary:hover { background: #a84e2e; border-color: #a84e2e; color: white; }
+  .btn-sm { padding: 5px 10px; font-size: 0.62rem; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    font-weight: 500;
+  }
+  .tag-pasta    { background: #EDE8DC; color: #6B5B3E; }
+  .tag-embutido { background: #F5E6E0; color: #8B3A2A; }
+  .tag-lacteo   { background: #E8EFE0; color: #4A6028; }
+  .tag-otro     { background: #E8E8E8; color: #555; }
+
+  /* FORM */
+  .form-section { background: white; border: 1px solid var(--light-border); padding: 32px; max-width: 700px; }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+
+  label { font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+
+  input, select, textarea {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.82rem;
+    border: 1px solid var(--light-border);
+    padding: 10px 12px;
+    background: var(--cream);
+    color: var(--dark);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--terracotta); }
+  textarea { resize: vertical; min-height: 80px; }
+
+  .form-actions { margin-top: 24px; display: flex; gap: 12px; }
+
+  /* PEDIDOS TABLE */
+  .pedidos-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .filters { display: flex; gap: 8px; }
+
+  .filter-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    border: 1px solid var(--light-border);
+    background: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn.active { background: var(--dark); color: var(--cream); border-color: var(--dark); }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  thead tr { border-bottom: 2px solid var(--dark); }
+  th {
+    text-align: left;
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px;
+    font-weight: 400;
+  }
+  td { padding: 14px; border-bottom: 1px solid var(--light-border); vertical-align: middle; }
+  tr:hover td { background: rgba(245,240,232,0.6); }
+
+  .status-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 2px;
+    font-weight: 500;
+  }
+  .status-recibido   { background: #EDE8DC; color: #6B5B3E; }
+  .status-preparando { background: #FFF3CD; color: #856404; }
+  .status-entregado  { background: #D1E7DD; color: #155724; }
+  .status-pendiente  { background: #F8D7DA; color: #842029; }
+  .status-pagado     { background: #D1E7DD; color: #155724; }
+  .status-facturado  { background: #D1E7DD; color: #155724; }
+  .status-sin-factura { background: #FFF3CD; color: #856404; }
+
+  /* STATS */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .stat-card { background: var(--dark); color: var(--cream); padding: 20px 24px; }
+  .stat-num { font-family: 'Playfair Display', serif; font-size: 2.2rem; color: var(--gold); }
+  .stat-label { font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(26,22,18,0.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--cream);
+    border: 1px solid var(--light-border);
+    padding: 32px;
+    width: 90%;
+    max-width: 540px;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  .modal-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .close-btn { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--muted); }
+
+  /* PRODUCTO ROW EN PEDIDO */
+  .producto-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .remove-btn { background: none; border: none; color: var(--terracotta); cursor: pointer; font-size: 1rem; }
+
+  .divider { border: none; border-top: 1px solid var(--light-border); margin: 24px 0; }
+
+  .empty-state { text-align: center; padding: 48px; color: var(--muted); font-size: 0.8rem; letter-spacing: 0.05em; }
+  .empty-state .emoji { font-size: 2rem; margin-bottom: 12px; display: block; }
+
+  @media (max-width: 600px) {
+    .stats-row { grid-template-columns: 1fr 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+    header { padding: 16px; }
+    .logo { font-size: 1.2rem; }
+    .nav-tabs { gap: 2px; }
+    .tab-btn { padding: 6px 10px; font-size: 0.62rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOADING OVERLAY -->
+<div id="loading-overlay">
+  <div class="loading-logo">Aliment<span>ari</span></div>
+  <div class="spinner"></div>
+  <div class="loading-text">Cargando datos...</div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<header>
+  <div class="logo">Aliment<span>ari</span></div>
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="showTab('pedidos', this)">Pedidos</button>
+    <button class="tab-btn" onclick="showTab('clientes', this)">Clientes</button>
+    <button class="tab-btn" onclick="showTab('productos', this)">Productos</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- PEDIDOS -->
+  <div class="section active" id="tab-pedidos">
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-num" id="stat-total">—</div>
+        <div class="stat-label">Pedidos este mes</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="stat-pendientes">—</div>
+        <div class="stat-label">Por entregar</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="stat-cobrar" style="font-size:1.5rem">—</div>
+        <div class="stat-label">Por cobrar</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="stat-clientes">—</div>
+        <div class="stat-label">Clientes activos</div>
+      </div>
+    </div>
+
+    <div class="pedidos-header">
+      <div>
+        <div class="section-title">Pedidos</div>
+        <div class="section-sub">Gestión de órdenes B2B</div>
+      </div>
+      <button class="btn btn-primary" onclick="openModal('modal-pedido')">+ Nuevo pedido</button>
+    </div>
+
+    <div class="filters" style="margin-bottom:16px">
+      <button class="filter-btn active" onclick="filtrarPedidos('todos',this)">Todos</button>
+      <button class="filter-btn" onclick="filtrarPedidos('Recibido',this)">Recibidos</button>
+      <button class="filter-btn" onclick="filtrarPedidos('Preparando',this)">Preparando</button>
+      <button class="filter-btn" onclick="filtrarPedidos('Entregado',this)">Entregados</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Cliente</th><th>Productos</th><th>Total</th>
+            <th>Entrega</th><th>Estado</th><th>Pago</th><th>Factura</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="pedidos-tbody"></tbody>
+      </table>
+      <div id="pedidos-empty" class="empty-state">
+        <span class="emoji">📦</span>No hay pedidos todavía. ¡Crea el primero!
+      </div>
+    </div>
+  </div>
+
+  <!-- CLIENTES -->
+  <div class="section" id="tab-clientes">
+    <div class="pedidos-header">
+      <div>
+        <div class="section-title">Clientes</div>
+        <div class="section-sub">Restaurantes y distribuidores</div>
+      </div>
+      <button class="btn btn-primary" onclick="openModal('modal-cliente')">+ Nuevo cliente</button>
+    </div>
+    <div class="cards-grid" id="clientes-grid">
+      <div class="empty-state" style="grid-column:1/-1">
+        <span class="emoji">🍽️</span>Agrega tu primer cliente B2B
+      </div>
+    </div>
+  </div>
+
+  <!-- PRODUCTOS -->
+  <div class="section" id="tab-productos">
+    <div class="pedidos-header">
+      <div>
+        <div class="section-title">Catálogo</div>
+        <div class="section-sub">Productos disponibles para venta</div>
+      </div>
+      <button class="btn btn-primary" onclick="openModal('modal-producto')">+ Nuevo producto</button>
+    </div>
+    <div class="cards-grid" id="productos-grid">
+      <div class="empty-state" style="grid-column:1/-1">
+        <span class="emoji">🧀</span>Agrega tu primer producto
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL: NUEVO PEDIDO -->
+<div class="modal-overlay" id="modal-pedido">
+  <div class="modal">
+    <div class="modal-title">
+      Nuevo Pedido
+      <button class="close-btn" onclick="closeModal('modal-pedido')">×</button>
+    </div>
+    <div class="form-section" style="padding:0;border:none;background:none">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Cliente</label>
+          <select id="ped-cliente"><option value="">Selecciona cliente...</option></select>
+        </div>
+        <div class="form-group">
+          <label>Fecha de entrega</label>
+          <input type="date" id="ped-fecha">
+        </div>
+        <div class="form-group">
+          <label>Estado de pago</label>
+          <select id="ped-pago">
+            <option value="Pendiente">Pendiente</option>
+            <option value="Pagado">Pagado</option>
+          </select>
+        </div>
+      </div>
+      <hr class="divider">
+      <label style="margin-bottom:10px;display:block">Productos</label>
+      <div id="productos-pedido-list"></div>
+      <button class="btn btn-sm" onclick="agregarProductoPedido()" style="margin-top:8px">+ Agregar producto</button>
+      <hr class="divider">
+      <div class="form-group full">
+        <label>Notas</label>
+        <textarea id="ped-notas" placeholder="Indicaciones especiales..."></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" id="btn-guardar-pedido" onclick="guardarPedido()">Guardar pedido</button>
+        <button class="btn" onclick="closeModal('modal-pedido')">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NUEVO CLIENTE -->
+<div class="modal-overlay" id="modal-cliente">
+  <div class="modal">
+    <div class="modal-title">
+      Nuevo Cliente
+      <button class="close-btn" onclick="closeModal('modal-cliente')">×</button>
+    </div>
+    <div class="form-section" style="padding:0;border:none;background:none">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Nombre del restaurante</label>
+          <input type="text" id="cli-nombre" placeholder="ej. Restaurante Noma">
+        </div>
+        <div class="form-group">
+          <label>Contacto</label>
+          <input type="text" id="cli-contacto" placeholder="Nombre de la persona">
+        </div>
+        <div class="form-group">
+          <label>Teléfono</label>
+          <input type="tel" id="cli-tel" placeholder="55 1234 5678">
+        </div>
+        <div class="form-group">
+          <label>Correo</label>
+          <input type="email" id="cli-email" placeholder="correo@restaurante.com">
+        </div>
+        <div class="form-group">
+          <label>RFC</label>
+          <input type="text" id="cli-rfc" placeholder="XAXX010101000">
+        </div>
+        <div class="form-group full">
+          <label>Dirección de entrega</label>
+          <input type="text" id="cli-dir" placeholder="Calle, colonia, CDMX">
+        </div>
+        <div class="form-group full">
+          <label>Días de entrega</label>
+          <input type="text" id="cli-dias" placeholder="ej. Lunes y jueves">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" id="btn-guardar-cliente" onclick="guardarCliente()">Guardar cliente</button>
+        <button class="btn" onclick="closeModal('modal-cliente')">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NUEVO PRODUCTO -->
+<div class="modal-overlay" id="modal-producto">
+  <div class="modal">
+    <div class="modal-title">
+      Nuevo Producto
+      <button class="close-btn" onclick="closeModal('modal-producto')">×</button>
+    </div>
+    <div class="form-section" style="padding:0;border:none;background:none">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Nombre del producto</label>
+          <input type="text" id="pro-nombre" placeholder="ej. Pasta spaghetti 500g">
+        </div>
+        <div class="form-group">
+          <label>Categoría</label>
+          <select id="pro-cat">
+            <option value="pasta">Pasta</option>
+            <option value="embutido">Embutido</option>
+            <option value="lacteo">Lácteo</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Unidad</label>
+          <select id="pro-unidad">
+            <option value="kg">kg</option>
+            <option value="pieza">pieza</option>
+            <option value="paquete">paquete</option>
+            <option value="litro">litro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Precio unitario ($MXN)</label>
+          <input type="number" id="pro-precio" placeholder="0.00" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>Disponible</label>
+          <select id="pro-disponible">
+            <option value="1">Sí</option>
+            <option value="0">No</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" id="btn-guardar-producto" onclick="guardarProducto()">Guardar producto</button>
+        <button class="btn" onclick="closeModal('modal-producto')">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================================================================
+//  CONFIGURACIÓN — REEMPLAZA ESTA URL DESPUÉS DE PUBLICAR EL SCRIPT
+// ================================================================
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwWR5ZtNZUz2sdYs2NCscEmmGIRJAZgOJ2ZaDhuLZko_APu7OHBs-LuRGVmJTu-LKys/exec';
+
+// ================================================================
+//  ESTADO EN MEMORIA
+// ================================================================
+let clientes  = [];
+let productos = [];
+let pedidos   = [];
+
+// ================================================================
+//  API — COMUNICACIÓN CON APPS SCRIPT
+// ================================================================
+async function api(action, body = {}) {
+  const payload = { action, ...body };
+  const res = await fetch(SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'text/plain' }  // evita CORS preflight
+  });
+  if (!res.ok) throw new Error('Error de red: ' + res.status);
+  const json = await res.json();
+  if (json.error) throw new Error(json.error);
+  return json;
+}
+
+// Carga inicial — trae los tres catálogos de una vez
+async function cargarTodo() {
+  const data = await api('getAll');
+  clientes  = data.clientes  || [];
+  productos = data.productos || [];
+  pedidos   = data.pedidos   || [];
+  // Normalizar tipos
+  clientes.forEach(c => { c.id = Number(c.id); });
+  productos.forEach(p => { p.id = Number(p.id); p.precio = Number(p.precio); p.disponible = Number(p.disponible); });
+  pedidos.forEach(p => {
+    p.id = Number(p.id);
+    p.clienteId = Number(p.clienteId);
+    if (!Array.isArray(p.items)) p.items = [];
+    p.items.forEach(i => { i.productoId = Number(i.productoId); i.qty = Number(i.qty); });
+    if (!p.factura) p.factura = 'Sin factura';
+  });
+}
+
+// ================================================================
+//  TOAST
+// ================================================================
+let toastTimer;
+function toast(msg, tipo = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (tipo === 'error' ? ' error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+
+// ================================================================
+//  UTILS
+// ================================================================
+function getCliente(id)  { return clientes.find(c => c.id === id); }
+function getProducto(id) { return productos.find(p => p.id === id); }
+
+function calcTotal(items) {
+  return items.reduce((sum, item) => {
+    const p = getProducto(item.productoId);
+    return sum + (p ? p.precio * item.qty : 0);
+  }, 0);
+}
+
+function formatMXN(n) {
+  return '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 0 });
+}
+
+// ================================================================
+//  TABS
+// ================================================================
+function showTab(tab, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (btn) btn.classList.add('active');
+  renderAll();
+}
+
+// ================================================================
+//  MODALES
+// ================================================================
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  if (id === 'modal-pedido') {
+    renderClientesSelect();
+    renderProductosPedidoList([]);
+    document.getElementById('ped-fecha').value = '';
+    document.getElementById('ped-notas').value = '';
+  }
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+
+// ================================================================
+//  RENDER — PEDIDOS
+// ================================================================
+let filtroActivo = 'todos';
+
+function filtrarPedidos(filtro, btn) {
+  filtroActivo = filtro;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderPedidos();
+}
+
+function renderPedidos() {
+  const tbody = document.getElementById('pedidos-tbody');
+  const empty = document.getElementById('pedidos-empty');
+  const lista = filtroActivo === 'todos' ? pedidos : pedidos.filter(p => p.estado === filtroActivo);
+
+  if (lista.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+  tbody.innerHTML = lista.map(p => {
+    const cli   = getCliente(p.clienteId);
+    const total = calcTotal(p.items);
+    const itemsStr = p.items.map(i => {
+      const pr = getProducto(i.productoId);
+      return pr ? `${pr.nombre} ×${i.qty}` : '';
+    }).filter(Boolean).join(', ');
+
+    const estadoClass   = { 'Recibido': 'status-recibido', 'Preparando': 'status-preparando', 'Entregado': 'status-entregado' }[p.estado] || 'status-recibido';
+    const pagoClass     = p.pago === 'Pagado' ? 'status-pagado' : 'status-pendiente';
+    const facturaClass  = p.factura === 'Facturada' ? 'status-facturado' : 'status-sin-factura';
+    const selectStyle   = "border:none;cursor:pointer;font-family:'DM Mono',monospace;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;appearance:none;padding:3px 9px;border-radius:2px";
+
+    return `<tr>
+      <td style="color:var(--muted)">#${String(p.id).slice(-4)}</td>
+      <td><strong>${cli ? cli.nombre : '—'}</strong></td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.72rem;color:var(--muted)">${itemsStr}</td>
+      <td><strong>${formatMXN(total)}</strong></td>
+      <td style="font-size:0.75rem">${p.fecha || '—'}</td>
+      <td>
+        <select class="status-badge ${estadoClass}" onchange="cambiarEstadoPedido(${p.id},'estado',this.value,this)" style="${selectStyle}">
+          <option ${p.estado==='Recibido'?'selected':''}>Recibido</option>
+          <option ${p.estado==='Preparando'?'selected':''}>Preparando</option>
+          <option ${p.estado==='Entregado'?'selected':''}>Entregado</option>
+        </select>
+      </td>
+      <td>
+        <select class="status-badge ${pagoClass}" onchange="cambiarEstadoPedido(${p.id},'pago',this.value,this)" style="${selectStyle}">
+          <option ${p.pago==='Pendiente'?'selected':''}>Pendiente</option>
+          <option ${p.pago==='Pagado'?'selected':''}>Pagado</option>
+        </select>
+      </td>
+      <td>
+        <select class="status-badge ${facturaClass}" onchange="cambiarEstadoPedido(${p.id},'factura',this.value,this)" style="${selectStyle}">
+          <option ${p.factura==='Sin factura'?'selected':''}>Sin factura</option>
+          <option ${p.factura==='Facturada'?'selected':''}>Facturada</option>
+        </select>
+      </td>
+      <td><button class="btn btn-sm" onclick="eliminarPedido(${p.id})" style="border-color:var(--terracotta);color:var(--terracotta)">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function cambiarEstadoPedido(id, campo, valor, select) {
+  const p = pedidos.find(x => x.id === id);
+  if (!p) return;
+  const anterior = p[campo];
+  p[campo] = valor;
+  renderPedidos();
+  renderStats();
+  try {
+    await api('updatePedido', { id, cambios: { [campo]: valor } });
+    toast('Pedido actualizado');
+  } catch (e) {
+    p[campo] = anterior; // revertir
+    renderPedidos();
+    toast('Error al actualizar', 'error');
+  }
+}
+
+async function eliminarPedido(id) {
+  if (!confirm('¿Eliminar este pedido?')) return;
+  const prev = [...pedidos];
+  pedidos = pedidos.filter(p => p.id !== id);
+  renderAll();
+  try {
+    await api('deletePedido', { id });
+    toast('Pedido eliminado');
+  } catch (e) {
+    pedidos = prev;
+    renderAll();
+    toast('Error al eliminar', 'error');
+  }
+}
+
+// ================================================================
+//  RENDER — STATS
+// ================================================================
+function renderStats() {
+  const hoy = new Date();
+  const esteMe = pedidos.filter(p => {
+    const d = new Date(p.fecha);
+    return d.getMonth() === hoy.getMonth() && d.getFullYear() === hoy.getFullYear();
+  });
+  const porEntregar = pedidos.filter(p => p.estado !== 'Entregado').length;
+  const porCobrar   = pedidos.filter(p => p.pago !== 'Pagado').reduce((s,p) => s + calcTotal(p.items), 0);
+  const clientesActivos = [...new Set(pedidos.map(p => p.clienteId))].length;
+
+  document.getElementById('stat-total').textContent     = esteMe.length;
+  document.getElementById('stat-pendientes').textContent = porEntregar;
+  document.getElementById('stat-cobrar').textContent    = formatMXN(porCobrar);
+  document.getElementById('stat-clientes').textContent  = clientesActivos;
+}
+
+// ================================================================
+//  RENDER — CLIENTES
+// ================================================================
+function renderClientes() {
+  const grid = document.getElementById('clientes-grid');
+  if (clientes.length === 0) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><span class="emoji">🍽️</span>Agrega tu primer cliente B2B</div>';
+    return;
+  }
+  grid.innerHTML = clientes.map(c => `
+    <div class="card">
+      <div class="card-label">Restaurante B2B</div>
+      <div class="card-name">${c.nombre}</div>
+      <div class="card-detail">👤 ${c.contacto}</div>
+      <div class="card-detail">📱 ${c.tel}</div>
+      <div class="card-detail">📧 ${c.email}</div>
+      <div class="card-detail">🧾 RFC: ${c.rfc}</div>
+      <div class="card-detail">📍 ${c.dir}</div>
+      <div class="card-detail">📅 ${c.dias}</div>
+      <div class="card-actions">
+        <button class="btn btn-sm btn-primary" onclick="nuevoPedidoCliente(${c.id})">Nuevo pedido</button>
+        <button class="btn btn-sm" onclick="eliminarCliente(${c.id})" style="border-color:var(--terracotta);color:var(--terracotta)">Eliminar</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function eliminarCliente(id) {
+  if (!confirm('¿Eliminar cliente?')) return;
+  const prev = [...clientes];
+  clientes = clientes.filter(c => c.id !== id);
+  renderClientes();
+  try {
+    await api('deleteCliente', { id });
+    toast('Cliente eliminado');
+  } catch (e) {
+    clientes = prev;
+    renderClientes();
+    toast('Error al eliminar', 'error');
+  }
+}
+
+function nuevoPedidoCliente(clienteId) {
+  showTab('pedidos', document.querySelectorAll('.tab-btn')[0]);
+  openModal('modal-pedido');
+  setTimeout(() => { document.getElementById('ped-cliente').value = clienteId; }, 50);
+}
+
+// ================================================================
+//  RENDER — PRODUCTOS
+// ================================================================
+function renderProductos() {
+  const grid = document.getElementById('productos-grid');
+  if (productos.length === 0) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><span class="emoji">🧀</span>Agrega tu primer producto</div>';
+    return;
+  }
+  grid.innerHTML = productos.map(p => {
+    const tagClass = { pasta: 'tag-pasta', embutido: 'tag-embutido', lacteo: 'tag-lacteo', otro: 'tag-otro' }[p.cat] || 'tag-otro';
+    return `
+      <div class="card" style="${!p.disponible ? 'opacity:0.5' : ''}">
+        <div class="card-label">Catálogo Alimentari</div>
+        <div class="card-name">${p.nombre}</div>
+        <div style="margin:8px 0"><span class="tag ${tagClass}">${p.cat}</span></div>
+        <div class="card-detail" style="font-size:1rem;font-weight:500;color:var(--terracotta)">${formatMXN(p.precio)} / ${p.unidad}</div>
+        <div class="card-detail" style="margin-top:4px">${p.disponible ? '✓ Disponible' : '✗ No disponible'}</div>
+        <div class="card-actions">
+          <button class="btn btn-sm" onclick="toggleDisponible(${p.id})">${p.disponible ? 'Deshabilitar' : 'Habilitar'}</button>
+          <button class="btn btn-sm" onclick="eliminarProducto(${p.id})" style="border-color:var(--terracotta);color:var(--terracotta)">Eliminar</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function toggleDisponible(id) {
+  const p = productos.find(x => x.id === id);
+  if (!p) return;
+  const nuevoVal = p.disponible ? 0 : 1;
+  p.disponible = nuevoVal;
+  renderProductos();
+  try {
+    await api('updateProducto', { id, cambios: { disponible: nuevoVal } });
+    toast('Producto actualizado');
+  } catch (e) {
+    p.disponible = nuevoVal ? 0 : 1;
+    renderProductos();
+    toast('Error al actualizar', 'error');
+  }
+}
+
+async function eliminarProducto(id) {
+  if (!confirm('¿Eliminar producto?')) return;
+  const prev = [...productos];
+  productos = productos.filter(p => p.id !== id);
+  renderProductos();
+  try {
+    await api('deleteProducto', { id });
+    toast('Producto eliminado');
+  } catch (e) {
+    productos = prev;
+    renderProductos();
+    toast('Error al eliminar', 'error');
+  }
+}
+
+// ================================================================
+//  FORM — GUARDAR CLIENTE
+// ================================================================
+async function guardarCliente() {
+  const nombre = document.getElementById('cli-nombre').value.trim();
+  if (!nombre) { toast('Ingresa el nombre del restaurante', 'error'); return; }
+
+  const btn = document.getElementById('btn-guardar-cliente');
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+
+  const nuevo = {
+    id:       Date.now(),
+    nombre,
+    contacto: document.getElementById('cli-contacto').value,
+    tel:      document.getElementById('cli-tel').value,
+    email:    document.getElementById('cli-email').value,
+    rfc:      document.getElementById('cli-rfc').value,
+    dir:      document.getElementById('cli-dir').value,
+    dias:     document.getElementById('cli-dias').value,
+  };
+
+  try {
+    await api('addCliente', { data: nuevo });
+    clientes.push(nuevo);
+    closeModal('modal-cliente');
+    renderClientes();
+    document.querySelectorAll('#modal-cliente input').forEach(i => i.value = '');
+    toast('Cliente guardado ✓');
+  } catch (e) {
+    toast('Error al guardar: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Guardar cliente';
+  }
+}
+
+// ================================================================
+//  FORM — GUARDAR PRODUCTO
+// ================================================================
+async function guardarProducto() {
+  const nombre = document.getElementById('pro-nombre').value.trim();
+  const precio = parseFloat(document.getElementById('pro-precio').value);
+  if (!nombre || !precio) { toast('Completa nombre y precio', 'error'); return; }
+
+  const btn = document.getElementById('btn-guardar-producto');
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+
+  const nuevo = {
+    id:         Date.now(),
+    nombre,
+    cat:        document.getElementById('pro-cat').value,
+    unidad:     document.getElementById('pro-unidad').value,
+    precio,
+    disponible: parseInt(document.getElementById('pro-disponible').value),
+  };
+
+  try {
+    await api('addProducto', { data: nuevo });
+    productos.push(nuevo);
+    closeModal('modal-producto');
+    renderProductos();
+    document.getElementById('pro-nombre').value = '';
+    document.getElementById('pro-precio').value = '';
+    toast('Producto guardado ✓');
+  } catch (e) {
+    toast('Error al guardar: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Guardar producto';
+  }
+}
+
+// ================================================================
+//  FORM — PEDIDO (items)
+// ================================================================
+let itemsPedido = [];
+
+function renderClientesSelect() {
+  const sel = document.getElementById('ped-cliente');
+  sel.innerHTML = '<option value="">Selecciona cliente...</option>' +
+    clientes.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+}
+
+function renderProductosPedidoList(items) {
+  itemsPedido = items;
+  const container = document.getElementById('productos-pedido-list');
+  if (itemsPedido.length === 0) {
+    container.innerHTML = '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:8px">Sin productos aún</div>';
+    return;
+  }
+  const disponibles = productos.filter(p => p.disponible);
+  container.innerHTML = itemsPedido.map((item, idx) => `
+    <div class="producto-row">
+      <select onchange="itemsPedido[${idx}].productoId=parseInt(this.value)"
+        style="font-family:'DM Mono',monospace;font-size:0.75rem;border:1px solid var(--light-border);padding:6px;background:var(--cream)">
+        <option value="">Producto...</option>
+        ${disponibles.map(p => `<option value="${p.id}" ${p.id===item.productoId?'selected':''}>${p.nombre} – ${formatMXN(p.precio)}/${p.unidad}</option>`).join('')}
+      </select>
+      <input type="number" min="1" value="${item.qty}"
+        style="width:60px;font-family:'DM Mono',monospace;font-size:0.75rem;border:1px solid var(--light-border);padding:6px;background:var(--cream)"
+        onchange="itemsPedido[${idx}].qty=parseInt(this.value)||1">
+      <button class="remove-btn" onclick="quitarItem(${idx})">✕</button>
+    </div>
+  `).join('');
+}
+
+function agregarProductoPedido() {
+  itemsPedido.push({ productoId: productos.find(p=>p.disponible)?.id || 0, qty: 1 });
+  renderProductosPedidoList(itemsPedido);
+}
+
+function quitarItem(idx) {
+  itemsPedido.splice(idx, 1);
+  renderProductosPedidoList(itemsPedido);
+}
+
+// ================================================================
+//  FORM — GUARDAR PEDIDO
+// ================================================================
+async function guardarPedido() {
+  const clienteId = parseInt(document.getElementById('ped-cliente').value);
+  if (!clienteId)           { toast('Selecciona un cliente', 'error'); return; }
+  if (itemsPedido.length === 0) { toast('Agrega al menos un producto', 'error'); return; }
+
+  const btn = document.getElementById('btn-guardar-pedido');
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+
+  const nuevo = {
+    id:        Date.now(),
+    clienteId,
+    items:     [...itemsPedido],
+    fecha:     document.getElementById('ped-fecha').value,
+    estado:    'Recibido',
+    pago:      document.getElementById('ped-pago').value,
+    factura:   'Sin factura',
+    notas:     document.getElementById('ped-notas').value,
+  };
+
+  try {
+    await api('addPedido', { data: nuevo });
+    pedidos.push(nuevo);
+    closeModal('modal-pedido');
+    renderAll();
+    toast('Pedido guardado ✓');
+  } catch (e) {
+    toast('Error al guardar: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Guardar pedido';
+  }
+}
+
+// ================================================================
+//  RENDER ALL
+// ================================================================
+function renderAll() {
+  renderStats();
+  renderPedidos();
+  renderClientes();
+  renderProductos();
+}
+
+// ================================================================
+//  INIT — carga datos al abrir
+// ================================================================
+(async () => {
+  const overlay = document.getElementById('loading-overlay');
+  try {
+    await cargarTodo();
+    renderAll();
+  } catch (e) {
+    document.querySelector('.loading-text').textContent = 'Error al conectar con la base de datos';
+    document.querySelector('.loading-text').style.color = '#C4613A';
+    console.error(e);
+    return; // no ocultar overlay si hay error de conexión
+  }
+  overlay.classList.add('hidden');
+  setTimeout(() => overlay.style.display = 'none', 400);
+})();
+</script>
+</body>
+</html>
