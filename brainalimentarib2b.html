@@ -312,6 +312,7 @@
   .status-recibido    { background: rgba(92,107,48,0.12);  color: #3D4A18; }
   .status-preparando  { background: rgba(201,147,58,0.18); color: #7A5410; }
   .status-entregado   { background: rgba(92,107,48,0.22);  color: #2E3A10; }
+  .status-cancelado   { background: rgba(125,43,43,0.12);  color: #7D2B2B; }
   .status-pendiente   { background: rgba(125,43,43,0.14);  color: #7D2B2B; }
   .status-pagado      { background: rgba(92,107,48,0.22);  color: #2E3A10; }
   .status-facturado   { background: rgba(92,107,48,0.22);  color: #2E3A10; }
@@ -823,7 +824,7 @@ async function api(action, body = {}) {
 async function cargarTodo() {
   const data = await api('getAll');
   if (data.error) throw new Error('BD: ' + data.error);
-  clientes  = data.clientes  || [];
+  clientes  = (data.clientes  || []).filter(c => String(c.activo) !== '0');
   productos = data.productos || [];
   pedidos   = data.pedidos   || [];
   // Normalizar tipos
@@ -977,7 +978,7 @@ function renderPedidos() {
     const cli          = getCliente(p.clienteId);
     const total        = calcTotal(p.items);
     const resumen      = p.resumen || p.items.map(i => { const pr = getProducto(i.productoId); return pr ? `${pr.nombre} ×${i.qty}` : ''; }).filter(Boolean).join(', ');
-    const estadoClass  = { 'Recibido': 'status-recibido', 'Preparando': 'status-preparando', 'Entregado': 'status-entregado' }[p.estado] || 'status-recibido';
+    const estadoClass  = { 'Recibido': 'status-recibido', 'Preparando': 'status-preparando', 'Entregado': 'status-entregado', 'Cancelado': 'status-cancelado' }[p.estado] || 'status-recibido';
     const pagoClass    = p.pago === 'Pagado' ? 'status-pagado' : 'status-pendiente';
     const facturaClass = p.factura === 'Facturada' ? 'status-facturado' : 'status-sin-factura';
     const selectStyle  = "border:none;cursor:pointer;font-family:'DM Mono',monospace;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;appearance:none;padding:3px 9px;border-radius:2px";
@@ -997,6 +998,7 @@ function renderPedidos() {
           <option ${p.estado==='Recibido'?'selected':''}>Recibido</option>
           <option ${p.estado==='Preparando'?'selected':''}>Preparando</option>
           <option ${p.estado==='Entregado'?'selected':''}>Entregado</option>
+          <option ${p.estado==='Cancelado'?'selected':''}>Cancelado</option>
         </select>
       </td>
       <td>
@@ -1034,17 +1036,19 @@ async function cambiarEstadoPedido(id, campo, valor, select) {
 }
 
 async function eliminarPedido(id) {
-  if (!confirm('¿Eliminar este pedido?')) return;
-  const prev = [...pedidos];
-  pedidos = pedidos.filter(p => p.id !== id);
+  if (!confirm('¿Cancelar este pedido? Quedará registrado como Cancelado.')) return;
+  const p = pedidos.find(x => x.id === id);
+  if (!p) return;
+  const prevEstado = p.estado;
+  p.estado = 'Cancelado';
   renderAll();
   try {
     await api('deletePedido', { id });
-    toast('Pedido eliminado');
+    toast('Pedido cancelado');
   } catch (e) {
-    pedidos = prev;
+    p.estado = prevEstado;
     renderAll();
-    toast('Error al eliminar', 'error');
+    toast('Error al cancelar', 'error');
   }
 }
 
@@ -1159,18 +1163,9 @@ async function toggleDisponible(id) {
 }
 
 async function eliminarProducto(id) {
-  if (!confirm('¿Eliminar producto?')) return;
-  const prev = [...productos];
-  productos = productos.filter(p => p.id !== id);
-  renderProductos();
-  try {
-    await api('deleteProducto', { id });
-    toast('Producto eliminado');
-  } catch (e) {
-    productos = prev;
-    renderProductos();
-    toast('Error al eliminar', 'error');
-  }
+  const p = productos.find(x => x.id === id);
+  if (!p || !p.disponible) return;
+  toggleDisponible(id);
 }
 
 // ================================================================
@@ -1193,6 +1188,7 @@ async function guardarCliente() {
     rfc:      document.getElementById('cli-rfc').value,
     dir:      document.getElementById('cli-dir').value,
     dias:     document.getElementById('cli-dias').value,
+    activo:   '1',
   };
 
   try {
