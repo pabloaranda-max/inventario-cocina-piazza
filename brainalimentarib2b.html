@@ -856,7 +856,7 @@ async function cargarTodo() {
     p.items.forEach(i => { i.productoId = String(i.productoId); i.qty = Number(i.qty); });
     if (!p.factura)     p.factura     = 'Sin factura';
     if (!p.fechaPedido) p.fechaPedido = '';
-    p.mes = (p.mes || '').trim();
+    p.mes = (p.mes || '').trim().slice(0, 7);
     if (!p.mes)         p.mes         = p.fechaPedido ? p.fechaPedido.slice(0,7) : '';
     if (!p.resumen)     p.resumen     = p.items.map(i => {
       const pr = productos.find(x => x.id === i.productoId);
