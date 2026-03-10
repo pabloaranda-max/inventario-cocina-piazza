@@ -393,27 +393,22 @@ function abrirModalNotasByTs(ts) {
 }
 
 function cargarItemsToma(toma) {
-  const cb = '__det' + Date.now();
-  const script = document.createElement('script');
-  window[cb] = (data) => {
-    delete window[cb];
-    document.head.removeChild(script);
-    document.getElementById('notas-items-loading').style.display = 'none';
-    document.getElementById('notas-items-tabla').style.display = 'block';
-    if (data.ok && data.items) {
-      itemsToma = data.items;
-      renderItemsToma(itemsToma);
-    } else {
-      document.getElementById('notas-items-lista').innerHTML =
-        '<div style="padding:12px;color:#dc2626;font-size:13px;">Error al cargar ítems.</div>';
-    }
-  };
-  script.onerror = () => {
-    delete window[cb];
-    document.getElementById('notas-items-loading').textContent = 'No se pudo cargar la lista de ítems.';
-  };
-  script.src = `${toma.script_url}?action=detalle&timestamp=${encodeURIComponent(toma.timestamp)}&callback=${cb}`;
-  document.head.appendChild(script);
+  fetch(`${toma.script_url}?action=detalle&timestamp=${encodeURIComponent(toma.timestamp)}`)
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('notas-items-loading').style.display = 'none';
+      document.getElementById('notas-items-tabla').style.display = 'block';
+      if (data.ok && data.items) {
+        itemsToma = data.items;
+        renderItemsToma(itemsToma);
+      } else {
+        document.getElementById('notas-items-lista').innerHTML =
+          '<div style="padding:12px;color:#dc2626;font-size:13px;">Error al cargar ítems.</div>';
+      }
+    })
+    .catch(() => {
+      document.getElementById('notas-items-loading').textContent = 'No se pudo cargar la lista de ítems.';
+    });
 }
 
 function renderItemsToma(items) {
