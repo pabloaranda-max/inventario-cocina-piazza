@@ -24,6 +24,12 @@
 
   // ── Sirve la app con verificación de acceso ──────────────────
   function doGet(e) {
+    // API endpoint para lectura desde GitHub Pages (sin sesión)
+    if (e && e.parameter && e.parameter.action === 'getAll') {
+      const data = serverGetAll();
+      return ContentService.createTextOutput(JSON.stringify(data))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     const email = Session.getActiveUser().getEmail();
     if (!EMAILS_AUTORIZADOS.includes(email)) {
       return HtmlService.createHtmlOutput(

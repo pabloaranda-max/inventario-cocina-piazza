@@ -592,10 +592,11 @@
 
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
       <div class="filters">
-        <button class="filter-btn active" onclick="filtrarEstado('todos',this)">Todos</button>
+        <button class="filter-btn active" onclick="filtrarEstado('activos',this)">Activos</button>
         <button class="filter-btn" onclick="filtrarEstado('Recibido',this)">Recibidos</button>
         <button class="filter-btn" onclick="filtrarEstado('Preparando',this)">Preparando</button>
         <button class="filter-btn" onclick="filtrarEstado('Entregado',this)">Entregados</button>
+        <button class="filter-btn" onclick="filtrarEstado('Cancelado',this)" style="color:var(--cochinilla)">Cancelados</button>
       </div>
       <select id="filtro-mes" onchange="filtrarMes(this.value)"
         style="font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.08em;border:1px solid var(--light-border);padding:6px 10px;background:var(--cream);color:var(--dark);cursor:pointer">
@@ -844,6 +845,7 @@ async function cargarTodo() {
     p.items.forEach(i => { i.productoId = String(i.productoId); i.qty = Number(i.qty); });
     if (!p.factura)     p.factura     = 'Sin factura';
     if (!p.fechaPedido) p.fechaPedido = '';
+    p.mes = (p.mes || '').trim();
     if (!p.mes)         p.mes         = p.fechaPedido ? p.fechaPedido.slice(0,7) : '';
     if (!p.resumen)     p.resumen     = p.items.map(i => {
       const pr = productos.find(x => x.id === i.productoId);
@@ -940,7 +942,7 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
 // ================================================================
 //  RENDER — PEDIDOS
 // ================================================================
-let filtroActivo = 'todos';
+let filtroActivo = 'activos';
 let filtroMesActivo = 'todos';
 
 function filtrarEstado(filtro, btn) {
@@ -971,7 +973,9 @@ function renderFiltroMeses() {
 function renderPedidos() {
   const tbody = document.getElementById('pedidos-tbody');
   const empty = document.getElementById('pedidos-empty');
-  let lista = filtroActivo === 'todos' ? pedidos : pedidos.filter(p => p.estado === filtroActivo);
+  let lista = filtroActivo === 'activos'
+    ? pedidos.filter(p => p.estado !== 'Cancelado')
+    : pedidos.filter(p => p.estado === filtroActivo);
   if (filtroMesActivo !== 'todos') lista = lista.filter(p => p.mes === filtroMesActivo);
 
   if (lista.length === 0) {
