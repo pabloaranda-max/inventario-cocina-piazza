@@ -832,9 +832,9 @@ async function api(action, body = {}) {
 async function cargarTodo() {
   const data = await api('getAll');
   if (data.error) throw new Error('BD: ' + data.error);
-  clientes  = (data.clientes  || []).filter(c => String(c.activo) !== '0');
-  productos = data.productos || [];
-  pedidos   = data.pedidos   || [];
+  clientes  = (data.clientes  || []).filter(c => c.activo !== 'false' && String(c.activo) !== '0');
+  productos = (data.productos || []).filter(p => p.disponible !== 'borrado');
+  pedidos   = (data.pedidos   || []).filter(p => p.estado !== 'borrado');
   // Normalizar tipos
   clientes.forEach(c => { c.id = String(c.id); });
   productos.forEach(p => { p.id = String(p.id); p.precio = Number(p.precio); p.disponible = p.disponible === '1' || p.disponible === 1 || p.disponible === true || p.disponible === 'true' ? 1 : 0; });
@@ -1067,19 +1067,16 @@ async function eliminarPedido(id) {
 //  RENDER — STATS
 // ================================================================
 function renderStats() {
-  const hoy = new Date();
-  const esteMe = pedidos.filter(p => {
-    const d = new Date(p.fecha);
-    return d.getMonth() === hoy.getMonth() && d.getFullYear() === hoy.getFullYear();
-  });
-  const porEntregar = pedidos.filter(p => p.estado !== 'Entregado').length;
-  const porCobrar   = pedidos.filter(p => p.pago !== 'Pagado').reduce((s,p) => s + calcTotal(p.items), 0);
-  const clientesActivos = [...new Set(pedidos.map(p => p.clienteId))].length;
+  const mesActual = new Date().toISOString().slice(0, 7);
+  const activos   = pedidos.filter(p => p.estado !== 'Cancelado');
+  const esteMe    = activos.filter(p => p.mes === mesActual);
+  const porEntregar = activos.filter(p => p.estado !== 'Entregado').length;
+  const porCobrar   = activos.filter(p => p.pago !== 'Pagado').reduce((s,p) => s + calcTotal(p.items), 0);
 
-  document.getElementById('stat-total').textContent     = esteMe.length;
+  document.getElementById('stat-total').textContent      = esteMe.length;
   document.getElementById('stat-pendientes').textContent = porEntregar;
-  document.getElementById('stat-cobrar').textContent    = formatMXN(porCobrar);
-  document.getElementById('stat-clientes').textContent  = clientesActivos;
+  document.getElementById('stat-cobrar').textContent     = formatMXN(porCobrar);
+  document.getElementById('stat-clientes').textContent   = clientes.length;
 }
 
 // ================================================================
@@ -1103,7 +1100,8 @@ function renderClientes() {
       <div class="card-detail">📅 ${c.dias}</div>
       <div class="card-actions">
         <button class="btn btn-sm btn-primary" onclick="nuevoPedidoCliente('${c.id}')">Nuevo pedido</button>
-        <button class="btn btn-sm" onclick="eliminarCliente('${c.id}')" style="border-color:var(--cochinilla);color:var(--cochinilla)">Eliminar</button>
+        <button class="btn btn-sm" onclick="editarCliente('${c.id}')">Editar</button>
+        <button class="btn btn-sm" onclick="eliminarCliente('${c.id}')" style="border-color:var(--cochinilla);color:var(--cochinilla)">Archivar</button>
       </div>
     </div>
   `).join('');
@@ -1149,8 +1147,8 @@ function renderProductos() {
         <div class="card-detail" style="font-size:1rem;font-weight:500;color:var(--cochinilla)">${formatMXN(p.precio)} / ${p.unidad}</div>
         <div class="card-detail" style="margin-top:4px">${p.disponible ? '✓ Disponible' : '✗ No disponible'}</div>
         <div class="card-actions">
+          <button class="btn btn-sm" onclick="editarProducto('${p.id}')">Editar</button>
           <button class="btn btn-sm" onclick="toggleDisponible('${p.id}')">${p.disponible ? 'Deshabilitar' : 'Habilitar'}</button>
-          <button class="btn btn-sm" onclick="eliminarProducto('${p.id}')" style="border-color:var(--cochinilla);color:var(--cochinilla)">Eliminar</button>
         </div>
       </div>
     `;
@@ -1180,8 +1178,26 @@ async function eliminarProducto(id) {
 }
 
 // ================================================================
-//  FORM — GUARDAR CLIENTE
+//  FORM — GUARDAR / EDITAR CLIENTE
 // ================================================================
+let editandoClienteId = null;
+
+function editarCliente(id) {
+  const c = clientes.find(x => x.id === id);
+  if (!c) return;
+  editandoClienteId = id;
+  document.querySelector('#modal-cliente .modal-title').childNodes[0].textContent = 'Editar Cliente ';
+  document.getElementById('btn-guardar-cliente').textContent = 'Actualizar cliente';
+  document.getElementById('cli-nombre').value   = c.nombre   || '';
+  document.getElementById('cli-contacto').value = c.contacto || '';
+  document.getElementById('cli-tel').value      = c.tel      || '';
+  document.getElementById('cli-email').value    = c.email    || '';
+  document.getElementById('cli-rfc').value      = c.rfc      || '';
+  document.getElementById('cli-dir').value      = c.dir      || '';
+  document.getElementById('cli-dias').value     = c.dias     || '';
+  openModal('modal-cliente');
+}
+
 async function guardarCliente() {
   const nombre = document.getElementById('cli-nombre').value.trim();
   if (!nombre) { toast('Ingresa el nombre del restaurante', 'error'); return; }
@@ -1190,8 +1206,7 @@ async function guardarCliente() {
   btn.disabled = true;
   btn.textContent = 'Guardando...';
 
-  const nuevo = {
-    id:       Date.now(),
+  const campos = {
     nombre,
     contacto: document.getElementById('cli-contacto').value,
     tel:      document.getElementById('cli-tel').value,
@@ -1199,27 +1214,53 @@ async function guardarCliente() {
     rfc:      document.getElementById('cli-rfc').value,
     dir:      document.getElementById('cli-dir').value,
     dias:     document.getElementById('cli-dias').value,
-    activo:   '1',
   };
 
   try {
-    await api('addCliente', { data: nuevo });
-    clientes.push(nuevo);
+    if (editandoClienteId) {
+      await api('updateCliente', { id: editandoClienteId, cambios: campos });
+      const c = clientes.find(x => x.id === editandoClienteId);
+      if (c) Object.assign(c, campos);
+      toast('Cliente actualizado ✓');
+    } else {
+      const nuevo = { id: Date.now(), ...campos, activo: '1' };
+      await api('addCliente', { data: nuevo });
+      clientes.push(nuevo);
+      toast('Cliente guardado ✓');
+    }
     closeModal('modal-cliente');
     renderClientes();
     document.querySelectorAll('#modal-cliente input').forEach(i => i.value = '');
-    toast('Cliente guardado ✓');
   } catch (e) {
     toast('Error al guardar: ' + e.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Guardar cliente';
+    btn.textContent = editandoClienteId ? 'Actualizar cliente' : 'Guardar cliente';
+    editandoClienteId = null;
+    document.querySelector('#modal-cliente .modal-title').childNodes[0].textContent = 'Nuevo Cliente ';
+    document.getElementById('btn-guardar-cliente').textContent = 'Guardar cliente';
   }
 }
 
 // ================================================================
-//  FORM — GUARDAR PRODUCTO
+//  FORM — GUARDAR / EDITAR PRODUCTO
 // ================================================================
+let editandoProductoId = null;
+
+function editarProducto(id) {
+  const p = productos.find(x => x.id === id);
+  if (!p) return;
+  editandoProductoId = id;
+  document.querySelector('#modal-producto .modal-title').childNodes[0].textContent = 'Editar Producto ';
+  document.getElementById('btn-guardar-producto').textContent = 'Actualizar producto';
+  document.getElementById('pro-nombre').value      = p.nombre      || '';
+  document.getElementById('pro-cat').value         = p.cat         || '';
+  document.getElementById('pro-unidad').value      = p.unidad      || '';
+  document.getElementById('pro-precio').value      = p.precio      || '';
+  document.getElementById('pro-disponible').value  = p.disponible ? '1' : '0';
+  openModal('modal-producto');
+}
+
 async function guardarProducto() {
   const nombre = document.getElementById('pro-nombre').value.trim();
   const precio = parseFloat(document.getElementById('pro-precio').value);
@@ -1229,28 +1270,37 @@ async function guardarProducto() {
   btn.disabled = true;
   btn.textContent = 'Guardando...';
 
-  const nuevo = {
-    id:         Date.now(),
+  const campos = {
     nombre,
     cat:        document.getElementById('pro-cat').value,
     unidad:     document.getElementById('pro-unidad').value,
     precio,
-    disponible: parseInt(document.getElementById('pro-disponible').value),
+    disponible: document.getElementById('pro-disponible').value === '1' ? 1 : 0,
   };
 
   try {
-    await api('addProducto', { data: nuevo });
-    productos.push(nuevo);
+    if (editandoProductoId) {
+      await api('updateProducto', { id: editandoProductoId, cambios: campos });
+      const p = productos.find(x => x.id === editandoProductoId);
+      if (p) Object.assign(p, campos);
+      toast('Producto actualizado ✓');
+    } else {
+      const nuevo = { id: Date.now(), ...campos };
+      await api('addProducto', { data: nuevo });
+      productos.push(nuevo);
+      toast('Producto guardado ✓');
+    }
     closeModal('modal-producto');
     renderProductos();
     document.getElementById('pro-nombre').value = '';
     document.getElementById('pro-precio').value = '';
-    toast('Producto guardado ✓');
   } catch (e) {
     toast('Error al guardar: ' + e.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Guardar producto';
+    editandoProductoId = null;
+    document.querySelector('#modal-producto .modal-title').childNodes[0].textContent = 'Nuevo Producto ';
+    document.getElementById('btn-guardar-producto').textContent = 'Guardar producto';
   }
 }
 
