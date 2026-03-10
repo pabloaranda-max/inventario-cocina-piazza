@@ -179,7 +179,19 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
       <h2 style="font-size:17px;">📝 Notas y Correcciones</h2>
       <button onclick="cerrarModalNotas()" style="background:#e2e8f0;color:#333;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:bold;">✕</button>
     </div>
-    <div id="notas-toma-info" style="background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:#475569;line-height:1.6;"></div>
+    <div id="notas-toma-info" style="background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px;color:#475569;line-height:1.6;"></div>
+
+    <!-- Lista de ítems de la toma -->
+    <div id="notas-items-section" style="margin-bottom:16px;">
+      <div id="notas-items-loading" style="text-align:center;color:#94a3b8;padding:16px;font-size:13px;">Cargando ítems...</div>
+      <div id="notas-items-tabla" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-size:13px;font-weight:bold;">Ítems de la toma</span>
+          <input type="text" id="filtro-items" placeholder="Buscar ítem..." oninput="filtrarItems()" style="border:1px solid #ddd;border-radius:6px;padding:5px 8px;font-size:12px;width:140px;">
+        </div>
+        <div id="notas-items-lista" style="max-height:220px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;"></div>
+      </div>
+    </div>
 
     <label style="font-size:13px;font-weight:bold;display:block;margin-bottom:6px;">Nota general de la toma</label>
     <textarea id="nota-general" rows="3" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:10px;font-size:14px;resize:vertical;box-sizing:border-box;" placeholder="Observaciones generales sobre esta toma..."></textarea>
@@ -359,18 +371,94 @@ function generarReporte() {
 let tomaActiva = null;
 let correcciones = [];
 
+let itemsToma = []; // ítems cargados de la toma activa
+
 function abrirModalNotasByTs(ts) {
   const toma = todasLasTomas.find(t => t.timestamp === ts);
   if (!toma) return;
   tomaActiva = toma;
   correcciones = [];
+  itemsToma = [];
   document.getElementById('nota-general').value = '';
   document.getElementById('lista-correcciones').innerHTML = '';
   document.getElementById('notas-msg').innerHTML = '';
+  document.getElementById('filtro-items').value = '';
   document.getElementById('notas-toma-info').innerHTML =
     `<strong>${toma.operario || 'Sin nombre'}</strong> · ${toma.almacen_nombre} · ${toma.area || '—'}<br>
      📅 ${toma.fecha} · 📦 ${toma.items} ítems`;
+  document.getElementById('notas-items-loading').style.display = 'block';
+  document.getElementById('notas-items-tabla').style.display = 'none';
   document.getElementById('modal-notas').style.display = 'block';
+  cargarItemsToma(toma);
+}
+
+function cargarItemsToma(toma) {
+  const cb = '__det' + Date.now();
+  const script = document.createElement('script');
+  window[cb] = (data) => {
+    delete window[cb];
+    document.head.removeChild(script);
+    document.getElementById('notas-items-loading').style.display = 'none';
+    document.getElementById('notas-items-tabla').style.display = 'block';
+    if (data.ok && data.items) {
+      itemsToma = data.items;
+      renderItemsToma(itemsToma);
+    } else {
+      document.getElementById('notas-items-lista').innerHTML =
+        '<div style="padding:12px;color:#dc2626;font-size:13px;">Error al cargar ítems.</div>';
+    }
+  };
+  script.onerror = () => {
+    delete window[cb];
+    document.getElementById('notas-items-loading').textContent = 'No se pudo cargar la lista de ítems.';
+  };
+  script.src = `${toma.script_url}?action=detalle&timestamp=${encodeURIComponent(toma.timestamp)}&callback=${cb}`;
+  document.head.appendChild(script);
+}
+
+function renderItemsToma(items) {
+  const lista = document.getElementById('notas-items-lista');
+  if (!items.length) {
+    lista.innerHTML = '<div style="padding:12px;color:#94a3b8;font-size:13px;">Sin ítems.</div>';
+    return;
+  }
+  lista.innerHTML = items.map((it, i) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid #f1f5f9;background:${i%2?'#f8fafc':'#fff'};">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:bold;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${it.nombre}</div>
+        <div style="font-size:11px;color:#64748b;">${it.codigo} · ${it.unidad} · <strong>${it.cantidad}</strong></div>
+      </div>
+      <button onclick="preCorreccionItem(${i})" style="margin-left:8px;background:#dbeafe;color:#1d4ed8;border:none;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer;flex-shrink:0;">+ Corregir</button>
+    </div>
+  `).join('');
+}
+
+function filtrarItems() {
+  const q = document.getElementById('filtro-items').value.toLowerCase();
+  const filtrados = itemsToma.filter(it =>
+    it.nombre.toLowerCase().includes(q) || it.codigo.toLowerCase().includes(q)
+  );
+  renderItemsToma(filtrados);
+}
+
+function preCorreccionItem(idx) {
+  // Buscar en itemsToma original (no filtrado)
+  const filtroVal = document.getElementById('filtro-items').value.toLowerCase();
+  const filtrados = itemsToma.filter(it =>
+    it.nombre.toLowerCase().includes(filtroVal) || it.codigo.toLowerCase().includes(filtroVal)
+  );
+  const it = filtrados[idx];
+  if (!it) return;
+  correcciones.push({
+    codigo: it.codigo,
+    nombre: it.nombre,
+    cantOriginal: String(it.cantidad),
+    cantCorregida: '',
+    nota: ''
+  });
+  renderCorrecciones();
+  // Scroll al bloque de correcciones
+  document.getElementById('lista-correcciones').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function cerrarModalNotas() {
