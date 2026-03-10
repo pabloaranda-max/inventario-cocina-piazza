@@ -92,15 +92,17 @@ async function handlePost(token, body) {
   const { action, data, id, cambios } = body;
 
   if (action === 'addCliente') {
-    const row = [newId(), data.nombre, data.contacto, data.tel, data.email, data.rfc, data.dir, data.dias, 'true'];
+    const newClienteId = newId();
+    const row = [newClienteId, data.nombre, data.contacto, data.tel, data.email, data.rfc, data.dir, data.dias, 'true'];
     await sheetsAppend(token, 'clientes', [row]);
-    return { ok: true };
+    return { ok: true, id: newClienteId };
   }
 
   if (action === 'addProducto') {
-    const row = [newId(), data.nombre, data.cat, data.unidad, data.precio, 'true'];
+    const newProductoId = newId();
+    const row = [newProductoId, data.nombre, data.cat, data.unidad, data.precio, 'true'];
     await sheetsAppend(token, 'productos', [row]);
-    return { ok: true };
+    return { ok: true, id: newProductoId };
   }
 
   if (action === 'addPedido') {

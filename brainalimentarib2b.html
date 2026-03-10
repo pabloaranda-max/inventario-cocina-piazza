@@ -1315,7 +1315,8 @@ async function guardarCliente() {
       toast('Cliente actualizado ✓');
     } else {
       const nuevo = { id: Date.now(), ...campos, activo: '1' };
-      await api('addCliente', { data: nuevo });
+      const res = await api('addCliente', { data: nuevo });
+      if (res.id) nuevo.id = res.id;
       clientes.push(nuevo);
       toast('Cliente guardado ✓');
     }
@@ -1377,7 +1378,8 @@ async function guardarProducto() {
       toast('Producto actualizado ✓');
     } else {
       const nuevo = { id: Date.now(), ...campos };
-      await api('addProducto', { data: nuevo });
+      const res = await api('addProducto', { data: nuevo });
+      if (res.id) nuevo.id = res.id;
       productos.push(nuevo);
       toast('Producto guardado ✓');
     }
