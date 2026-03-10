@@ -522,68 +522,91 @@ async function guardarNotas() {
 // ── PDF ────────────────────────────────────────────────────
 function imprimirTomaByTs(ts) {
   const toma = todasLasTomas.find(t => t.timestamp === ts);
-  if (toma) abrirEImprimirPDF(toma, [], '');
+  if (!toma) return;
+  // Sin ítems cargados aún — cargar primero, luego generar PDF
+  document.getElementById('notas-items-loading').style.display = 'block';
+  document.getElementById('notas-items-tabla').style.display = 'none';
+  fetch(`${toma.script_url}?action=detalle&timestamp=${encodeURIComponent(toma.timestamp)}`)
+    .then(r => r.json())
+    .then(data => generarPDFAdmin(toma, data.items || [], [], ''))
+    .catch(() => generarPDFAdmin(toma, [], [], ''));
 }
 
 function imprimirTomaActiva() {
   if (!tomaActiva) return;
-  abrirEImprimirPDF(tomaActiva, correcciones, document.getElementById('nota-general').value.trim());
+  generarPDFAdmin(tomaActiva, itemsToma, correcciones, document.getElementById('nota-general').value.trim());
 }
 
-function abrirEImprimirPDF(toma, corrs, notaGeneral) {
+function generarPDFAdmin(toma, items, corrs, notaGeneral) {
   const fecha_imp = new Date().toLocaleString('es-MX');
-  const corrsHtml = corrs && corrs.length ? `
-    <h3 style="margin:20px 0 8px;font-size:14px;">Correcciones registradas</h3>
-    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+
+  // Mapa de correcciones por código para resaltar en la tabla
+  const corrMap = {};
+  (corrs || []).forEach(c => { if (c.codigo) corrMap[c.codigo] = c; });
+
+  const itemsHtml = items.length ? `
+    <h3 style="margin:20px 0 8px;font-size:14px;">Ítems inventariados</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
       <thead><tr style="background:#e0e7ff;">
         <th style="border:1px solid #ddd;padding:5px;text-align:left;">Código</th>
         <th style="border:1px solid #ddd;padding:5px;text-align:left;">Nombre</th>
-        <th style="border:1px solid #ddd;padding:5px;text-align:center;">Original</th>
+        <th style="border:1px solid #ddd;padding:5px;text-align:center;">Unidad</th>
+        <th style="border:1px solid #ddd;padding:5px;text-align:center;">Cantidad</th>
         <th style="border:1px solid #ddd;padding:5px;text-align:center;">Corregido</th>
         <th style="border:1px solid #ddd;padding:5px;text-align:left;">Nota</th>
       </tr></thead>
-      <tbody>${corrs.map((c,i)=>`<tr style="background:${i%2?'#f8fafc':'#fff'}">
-        <td style="border:1px solid #ddd;padding:5px;">${c.codigo||'—'}</td>
-        <td style="border:1px solid #ddd;padding:5px;">${c.nombre||'—'}</td>
-        <td style="border:1px solid #ddd;padding:5px;text-align:center;">${c.cantOriginal||'—'}</td>
-        <td style="border:1px solid #ddd;padding:5px;text-align:center;">${c.cantCorregida||'—'}</td>
-        <td style="border:1px solid #ddd;padding:5px;">${c.nota||''}</td>
-      </tr>`).join('')}</tbody>
+      <tbody>${items.map((it,i) => {
+        const c = corrMap[it.codigo];
+        const bg = c ? '#fef9c3' : (i%2 ? '#f8fafc' : '#fff');
+        return `<tr style="background:${bg}">
+          <td style="border:1px solid #ddd;padding:4px;">${it.codigo}</td>
+          <td style="border:1px solid #ddd;padding:4px;">${it.nombre}</td>
+          <td style="border:1px solid #ddd;padding:4px;text-align:center;">${it.unidad}</td>
+          <td style="border:1px solid #ddd;padding:4px;text-align:center;font-weight:bold;">${it.cantidad}</td>
+          <td style="border:1px solid #ddd;padding:4px;text-align:center;color:#dc2626;font-weight:bold;">${c ? c.cantCorregida : ''}</td>
+          <td style="border:1px solid #ddd;padding:4px;font-size:10px;">${c ? (c.nota || '') : ''}</td>
+        </tr>`;
+      }).join('')}</tbody>
     </table>` : '';
+
   const notaHtml = notaGeneral ? `
-    <h3 style="margin:20px 0 8px;font-size:14px;">Nota general</h3>
-    <div style="border:1px solid #ddd;padding:10px;border-radius:6px;font-size:13px;">${notaGeneral}</div>` : '';
+    <div style="border:1px solid #ddd;padding:10px;border-radius:6px;font-size:13px;margin-bottom:12px;background:#f8fafc;">
+      <strong>Nota general:</strong> ${notaGeneral}
+    </div>` : '';
+
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>Toma ${toma.almacen_nombre} - ${toma.fecha}</title>
   <style>
     body{font-family:Arial,sans-serif;padding:24px;color:#333;font-size:13px;}
-    h1{font-size:19px;margin-bottom:4px;}
-    .meta{font-size:12px;color:#555;margin-bottom:16px;border-bottom:1px solid #ddd;padding-bottom:10px;}
-    .firma{margin-top:60px;display:flex;gap:60px;}
+    h1{font-size:18px;margin-bottom:4px;}
+    .meta{font-size:12px;color:#555;margin-bottom:14px;border-bottom:1px solid #ddd;padding-bottom:8px;}
+    .firma{margin-top:50px;display:flex;gap:60px;}
     .firma-box{flex:1;border-top:1px solid #333;padding-top:8px;font-size:12px;color:#555;}
-    @media print{body{padding:10px;}}
+    .btn-print{position:fixed;top:16px;right:16px;background:#667eea;color:white;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.2);}
+    @media print{.btn-print{display:none;}body{padding:8px;}}
   </style></head><body>
+  <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
   <h1>Piazza Pasticcio — Toma de Inventario</h1>
   <div class="meta">
     <strong>Almacén:</strong> ${toma.almacen_nombre} &nbsp;|&nbsp;
     <strong>Área:</strong> ${toma.area||'—'} &nbsp;|&nbsp;
     <strong>Fecha:</strong> ${toma.fecha}<br>
     <strong>Operario:</strong> ${toma.operario||'—'} &nbsp;|&nbsp;
-    <strong>Ítems capturados:</strong> ${toma.items}<br>
+    <strong>Ítems:</strong> ${items.length} &nbsp;|&nbsp;
     <strong>Revisado por:</strong> ${adminActual||'—'} &nbsp;|&nbsp;
-    <strong>Impreso:</strong> ${fecha_imp}
+    <strong>Generado:</strong> ${fecha_imp}
   </div>
-  ${notaHtml}${corrsHtml}
+  ${notaHtml}${itemsHtml}
   <div class="firma">
-    <div class="firma-box">Firma del Operario &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
-    <div class="firma-box">Firma del Supervisor &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+    <div class="firma-box">Firma del Operario &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+    <div class="firma-box">Firma del Supervisor &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
   </div>
   </body></html>`;
+
   const win = window.open('', '_blank');
   win.document.write(html);
   win.document.close();
   win.focus();
-  setTimeout(() => win.print(), 600);
 }
 
 // ── GROQ CHAT ─────────────────────────────────────────────
