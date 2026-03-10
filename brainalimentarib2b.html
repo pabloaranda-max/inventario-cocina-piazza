@@ -843,9 +843,9 @@ async function api(action, body = {}) {
 async function cargarTodo() {
   const data = await api('getAll');
   if (data.error) throw new Error('BD: ' + data.error);
-  clientes  = data.clientes  || [];
-  productos = (data.productos || []).filter(p => p.disponible !== 'borrado');
-  pedidos   = (data.pedidos  || []).filter(p => p.estado !== 'borrado');
+  clientes  = (data.clientes  || []).filter(c => c.id);
+  productos = (data.productos || []).filter(p => p.id && p.disponible !== 'borrado');
+  pedidos   = (data.pedidos  || []).filter(p => p.id && p.estado !== 'borrado');
   // Normalizar tipos
   clientes.forEach(c => { c.id = String(c.id); });
   productos.forEach(p => { p.id = String(p.id); p.precio = Number(p.precio); p.disponible = p.disponible === '1' || p.disponible === 1 || p.disponible === true || p.disponible === 'true' ? 1 : 0; });
