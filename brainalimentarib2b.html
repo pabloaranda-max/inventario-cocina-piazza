@@ -482,31 +482,38 @@
     tbody { display: flex; flex-direction: column; gap: 10px; }
     tbody tr {
       display: grid;
-      grid-template-columns: 1fr auto;
-      grid-template-rows: auto auto auto auto auto;
-      gap: 2px 10px;
+      grid-template-columns: 1fr 1fr 1fr auto;
+      gap: 4px 6px;
       background: var(--card-bg);
       border: 1px solid var(--light-border);
       border-left: 3px solid var(--olive);
-      padding: 14px;
+      padding: 12px;
     }
     tbody tr:hover td { background: none; }
 
     /* Asignación de celdas al grid */
     tbody td { border: none; padding: 1px 0; vertical-align: middle; }
-    tbody td:nth-child(1) { font-size: 0.65rem; color: var(--muted); align-self: center; }
+
+    /* Fila 1: P-001 | total */
+    tbody td:nth-child(1) { grid-column: 1; grid-row: 1; font-size: 0.65rem; color: var(--muted); align-self: center; }
     tbody td:nth-child(2) { display: none; }
-    tbody td:nth-child(3) { grid-column: 1 / -1; font-size: 0.92rem; padding-top: 4px; border-top: 1px solid var(--light-border); margin-top: 2px; }
-    tbody td:nth-child(4) { grid-column: 1 / -1; font-size: 0.72rem; color: var(--muted); white-space: normal !important; overflow: visible !important; max-width: none !important; }
-    tbody td:nth-child(5) { font-size: 0.85rem; font-weight: 600; }
-    tbody td:nth-child(6) { font-size: 0.72rem; color: var(--muted); }
-    tbody td:nth-child(7) { grid-column: 1 / -1; padding-top: 8px; border-top: 1px solid var(--light-border); margin-top: 4px; }
-    tbody td:nth-child(8) { display: inline-block; }
-    tbody td:nth-child(9) { display: inline-block; }
-    tbody td:nth-child(10) { justify-self: end; align-self: center; }
+    tbody td:nth-child(5) { grid-column: 2 / 4; grid-row: 1; font-size: 0.88rem; font-weight: 600; text-align: right; }
+    tbody td:nth-child(6) { display: none; }
+
+    /* Fila 2: cliente */
+    tbody td:nth-child(3) { grid-column: 1 / -1; grid-row: 2; font-size: 0.92rem; padding-top: 6px; border-top: 1px solid var(--light-border); }
+
+    /* Fila 3: resumen */
+    tbody td:nth-child(4) { grid-column: 1 / -1; grid-row: 3; font-size: 0.72rem; color: var(--muted); white-space: normal !important; overflow: visible !important; max-width: none !important; }
+
+    /* Fila 4: estado | pago | factura | borrar */
+    tbody td:nth-child(7)  { grid-column: 1; grid-row: 4; padding-top: 6px; border-top: 1px solid var(--light-border); }
+    tbody td:nth-child(8)  { grid-column: 2; grid-row: 4; padding-top: 6px; border-top: 1px solid var(--light-border); }
+    tbody td:nth-child(9)  { grid-column: 3; grid-row: 4; padding-top: 6px; border-top: 1px solid var(--light-border); }
+    tbody td:nth-child(10) { grid-column: 4; grid-row: 4; padding-top: 6px; border-top: 1px solid var(--light-border); align-self: center; justify-self: end; }
 
     /* Select pills en mobile */
-    .status-badge { font-size: 0.65rem !important; padding: 5px 10px !important; min-height: 30px; }
+    .status-badge { font-size: 0.6rem !important; padding: 4px 6px !important; width: 100%; box-sizing: border-box; }
 
     /* Cards grid clientes/productos */
     .cards-grid { grid-template-columns: 1fr; }
@@ -829,7 +836,7 @@ async function cargarTodo() {
   pedidos   = data.pedidos   || [];
   // Normalizar tipos
   clientes.forEach(c => { c.id = String(c.id); });
-  productos.forEach(p => { p.id = String(p.id); p.precio = Number(p.precio); p.disponible = Number(p.disponible); });
+  productos.forEach(p => { p.id = String(p.id); p.precio = Number(p.precio); p.disponible = p.disponible === '1' || p.disponible === 1 || p.disponible === true || p.disponible === 'true' ? 1 : 0; });
   pedidos.forEach(p => {
     p.id = String(p.id);
     p.clienteId = String(p.clienteId);
@@ -1116,7 +1123,7 @@ async function eliminarCliente(id) {
 function nuevoPedidoCliente(clienteId) {
   showTab('pedidos', document.querySelectorAll('.tab-btn')[0]);
   openModal('modal-pedido');
-  setTimeout(() => { document.getElementById('ped-cliente').value = clienteId; }, 50);
+  setTimeout(() => { document.getElementById('ped-cliente').value = clienteId; pedidoClienteId = clienteId; }, 50);
 }
 
 // ================================================================
@@ -1247,11 +1254,14 @@ async function guardarProducto() {
 //  FORM — PEDIDO (items)
 // ================================================================
 let itemsPedido = [];
+let pedidoClienteId = '';
 
 function renderClientesSelect() {
+  pedidoClienteId = '';
   const sel = document.getElementById('ped-cliente');
   sel.innerHTML = '<option value="">Selecciona cliente...</option>' +
     clientes.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+  sel.onchange = () => { pedidoClienteId = sel.value; };
 }
 
 function renderProductosPedidoList(items) {
@@ -1264,7 +1274,7 @@ function renderProductosPedidoList(items) {
   const disponibles = productos.filter(p => p.disponible);
   container.innerHTML = itemsPedido.map((item, idx) => `
     <div class="producto-row">
-      <select onchange="itemsPedido[${idx}].productoId=parseInt(this.value)"
+      <select onchange="itemsPedido[${idx}].productoId=this.value"
         style="font-family:'DM Mono',monospace;font-size:0.75rem;border:1px solid var(--light-border);padding:6px;background:var(--cream)">
         <option value="">Producto...</option>
         ${disponibles.map(p => `<option value="${p.id}" ${p.id===item.productoId?'selected':''}>${p.nombre} – ${formatMXN(p.precio)}/${p.unidad}</option>`).join('')}
@@ -1278,7 +1288,7 @@ function renderProductosPedidoList(items) {
 }
 
 function agregarProductoPedido() {
-  itemsPedido.push({ productoId: productos.find(p=>p.disponible)?.id || 0, qty: 1 });
+  itemsPedido.push({ productoId: productos.find(p=>p.disponible)?.id || '', qty: 1 });
   renderProductosPedidoList(itemsPedido);
 }
 
@@ -1291,7 +1301,7 @@ function quitarItem(idx) {
 //  FORM — GUARDAR PEDIDO
 // ================================================================
 async function guardarPedido() {
-  const clienteId = parseInt(document.getElementById('ped-cliente').value);
+  const clienteId = pedidoClienteId || document.getElementById('ped-cliente').value;
   if (!clienteId)           { toast('Selecciona un cliente', 'error'); return; }
   if (itemsPedido.length === 0) { toast('Agrega al menos un producto', 'error'); return; }
 
