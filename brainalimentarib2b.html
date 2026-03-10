@@ -632,6 +632,10 @@
       </div>
       <button class="btn btn-primary" onclick="openModal('modal-cliente')">+ Nuevo cliente</button>
     </div>
+    <div class="filters" style="margin-bottom:16px">
+      <button class="filter-btn cli-filter active" onclick="filtrarClientes('activos',this)">Activos</button>
+      <button class="filter-btn cli-filter" onclick="filtrarClientes('archivados',this)" style="color:var(--cochinilla)">Archivados</button>
+    </div>
     <div class="cards-grid" id="clientes-grid">
       <div class="empty-state" style="grid-column:1/-1">
         <span class="emoji">🍽️</span>Agrega tu primer cliente B2B
@@ -648,6 +652,10 @@
       </div>
       <button class="btn btn-primary" onclick="openModal('modal-producto')">+ Nuevo producto</button>
     </div>
+    <div class="filters" style="margin-bottom:16px">
+      <button class="filter-btn prod-filter active" onclick="filtrarProductos('disponibles',this)">Disponibles</button>
+      <button class="filter-btn prod-filter" onclick="filtrarProductos('deshabilitados',this)" style="color:var(--cochinilla)">No disponibles</button>
+    </div>
     <div class="cards-grid" id="productos-grid">
       <div class="empty-state" style="grid-column:1/-1">
         <span class="emoji">🧀</span>Agrega tu primer producto
@@ -661,7 +669,7 @@
 <div class="modal-overlay" id="modal-pedido">
   <div class="modal">
     <div class="modal-title">
-      Nuevo Pedido
+      <span id="modal-pedido-title">Nuevo Pedido</span>
       <button class="close-btn" onclick="closeModal('modal-pedido')">×</button>
     </div>
     <div class="form-section" style="padding:0;border:none;background:none">
@@ -835,9 +843,9 @@ async function api(action, body = {}) {
 async function cargarTodo() {
   const data = await api('getAll');
   if (data.error) throw new Error('BD: ' + data.error);
-  clientes  = (data.clientes  || []).filter(c => c.activo !== 'false' && String(c.activo) !== '0');
+  clientes  = data.clientes  || [];
   productos = (data.productos || []).filter(p => p.disponible !== 'borrado');
-  pedidos   = (data.pedidos   || []).filter(p => p.estado !== 'borrado');
+  pedidos   = (data.pedidos  || []).filter(p => p.estado !== 'borrado');
   // Normalizar tipos
   clientes.forEach(c => { c.id = String(c.id); });
   productos.forEach(p => { p.id = String(p.id); p.precio = Number(p.precio); p.disponible = p.disponible === '1' || p.disponible === 1 || p.disponible === true || p.disponible === 'true' ? 1 : 0; });
@@ -872,6 +880,7 @@ function toast(msg, tipo = 'ok') {
 // ================================================================
 //  UTILS
 // ================================================================
+function esClienteActivo(c) { return c.activo !== 'false' && String(c.activo) !== '0'; }
 function getCliente(id)  { return clientes.find(c => c.id === String(id)); }
 function getProducto(id) { return productos.find(p => p.id === String(id)); }
 
@@ -925,11 +934,16 @@ function showTab(tab, btn) {
 function openModal(id) {
   document.getElementById(id).classList.add('open');
   if (id === 'modal-pedido') {
+    editandoPedidoId = null;
+    document.getElementById('modal-pedido-title').textContent = 'Nuevo Pedido';
+    document.getElementById('btn-guardar-pedido').textContent = 'Guardar pedido';
     renderClientesSelect();
+    itemsPedido = [];
     renderProductosPedidoList([]);
     const hoy = new Date().toISOString().slice(0,10);
     document.getElementById('ped-fechaPedido').value = hoy;
     document.getElementById('ped-fecha').value = '';
+    document.getElementById('ped-pago').value = 'Pendiente';
     document.getElementById('ped-notas').value = '';
   }
 }
@@ -947,6 +961,9 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
 // ================================================================
 let filtroActivo = 'activos';
 let filtroMesActivo = 'todos';
+let filtroClientesActivo = 'activos';
+let filtroProductosActivo = 'disponibles';
+let editandoPedidoId = null;
 
 function filtrarEstado(filtro, btn) {
   filtroActivo = filtro;
@@ -1053,7 +1070,10 @@ function renderPedidos() {
           <option ${p.factura==='Facturada'?'selected':''}>Facturada</option>
         </select>
       </td>
-      <td><button class="btn btn-sm" onclick="eliminarPedido('${p.id}')" style="border-color:var(--cochinilla);color:var(--cochinilla)">✕</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm" onclick="editarPedido('${p.id}')" style="margin-right:4px">✎</button>
+        <button class="btn btn-sm" onclick="eliminarPedido('${p.id}')" style="border-color:var(--cochinilla);color:var(--cochinilla)">✕</button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -1105,19 +1125,29 @@ function renderStats() {
   document.getElementById('stat-total').textContent      = esteMe.length;
   document.getElementById('stat-pendientes').textContent = porEntregar;
   document.getElementById('stat-cobrar').textContent     = formatMXN(porCobrar);
-  document.getElementById('stat-clientes').textContent   = clientes.length;
+  document.getElementById('stat-clientes').textContent   = clientes.filter(esClienteActivo).length;
 }
 
 // ================================================================
 //  RENDER — CLIENTES
 // ================================================================
+function filtrarClientes(filtro, btn) {
+  filtroClientesActivo = filtro;
+  document.querySelectorAll('.cli-filter').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderClientes();
+}
+
 function renderClientes() {
   const grid = document.getElementById('clientes-grid');
-  if (clientes.length === 0) {
-    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><span class="emoji">🍽️</span>Agrega tu primer cliente B2B</div>';
+  const lista = filtroClientesActivo === 'activos'
+    ? clientes.filter(esClienteActivo)
+    : clientes.filter(c => !esClienteActivo(c));
+  if (lista.length === 0) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><span class="emoji">🍽️</span>${filtroClientesActivo === 'activos' ? 'Agrega tu primer cliente B2B' : 'No hay clientes archivados'}</div>`;
     return;
   }
-  grid.innerHTML = clientes.map(c => `
+  grid.innerHTML = lista.map(c => `
     <div class="card">
       <div class="card-label">Restaurante B2B</div>
       <div class="card-name">${c.nombre}</div>
@@ -1128,26 +1158,48 @@ function renderClientes() {
       <div class="card-detail">📍 ${c.dir}</div>
       <div class="card-detail">📅 ${c.dias}</div>
       <div class="card-actions">
-        <button class="btn btn-sm btn-primary" onclick="nuevoPedidoCliente('${c.id}')">Nuevo pedido</button>
+        ${esClienteActivo(c) ? `<button class="btn btn-sm btn-primary" onclick="nuevoPedidoCliente('${c.id}')">Nuevo pedido</button>` : ''}
         <button class="btn btn-sm" onclick="editarCliente('${c.id}')">Editar</button>
-        <button class="btn btn-sm" onclick="eliminarCliente('${c.id}')" style="border-color:var(--cochinilla);color:var(--cochinilla)">Archivar</button>
+        ${esClienteActivo(c)
+          ? `<button class="btn btn-sm" onclick="eliminarCliente('${c.id}')" style="border-color:var(--cochinilla);color:var(--cochinilla)">Archivar</button>`
+          : `<button class="btn btn-sm" onclick="restaurarCliente('${c.id}')" style="border-color:var(--verde,#4a7c59);color:var(--verde,#4a7c59)">Restaurar</button>`
+        }
       </div>
     </div>
   `).join('');
 }
 
 async function eliminarCliente(id) {
-  if (!confirm('¿Eliminar cliente?')) return;
-  const prev = [...clientes];
-  clientes = clientes.filter(c => c.id !== id);
+  if (!confirm('¿Archivar este cliente?')) return;
+  const c = clientes.find(x => x.id === id);
+  if (!c) return;
+  const prev = c.activo;
+  c.activo = 'false';
   renderClientes();
   try {
     await api('deleteCliente', { id });
-    toast('Cliente eliminado');
+    toast('Cliente archivado');
   } catch (e) {
-    clientes = prev;
+    c.activo = prev;
     renderClientes();
-    toast('Error al eliminar', 'error');
+    toast('Error al archivar', 'error');
+  }
+}
+
+async function restaurarCliente(id) {
+  const c = clientes.find(x => x.id === id);
+  if (!c) return;
+  const prev = c.activo;
+  c.activo = 'true';
+  renderClientes();
+  renderStats();
+  try {
+    await api('updateCliente', { id, cambios: { activo: 'true' } });
+    toast('Cliente restaurado');
+  } catch (e) {
+    c.activo = prev;
+    renderClientes();
+    toast('Error al restaurar', 'error');
   }
 }
 
@@ -1160,16 +1212,26 @@ function nuevoPedidoCliente(clienteId) {
 // ================================================================
 //  RENDER — PRODUCTOS
 // ================================================================
+function filtrarProductos(filtro, btn) {
+  filtroProductosActivo = filtro;
+  document.querySelectorAll('.prod-filter').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderProductos();
+}
+
 function renderProductos() {
   const grid = document.getElementById('productos-grid');
-  if (productos.length === 0) {
-    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><span class="emoji">🧀</span>Agrega tu primer producto</div>';
+  const lista = filtroProductosActivo === 'disponibles'
+    ? productos.filter(p => p.disponible)
+    : productos.filter(p => !p.disponible);
+  if (lista.length === 0) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><span class="emoji">🧀</span>${filtroProductosActivo === 'disponibles' ? 'Agrega tu primer producto' : 'No hay productos deshabilitados'}</div>`;
     return;
   }
-  grid.innerHTML = productos.map(p => {
+  grid.innerHTML = lista.map(p => {
     const tagClass = { pasta: 'tag-pasta', embutido: 'tag-embutido', lacteo: 'tag-lacteo', otro: 'tag-otro' }[p.cat] || 'tag-otro';
     return `
-      <div class="card" style="${!p.disponible ? 'opacity:0.5' : ''}">
+      <div class="card">
         <div class="card-label">Catálogo Alimentari</div>
         <div class="card-name">${p.nombre}</div>
         <div style="margin:8px 0"><span class="tag ${tagClass}">${p.cat}</span></div>
@@ -1343,7 +1405,7 @@ function renderClientesSelect() {
   pedidoClienteId = '';
   const sel = document.getElementById('ped-cliente');
   sel.innerHTML = '<option value="">Selecciona cliente...</option>' +
-    clientes.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+    clientes.filter(esClienteActivo).map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
   sel.onchange = () => { pedidoClienteId = sel.value; };
 }
 
@@ -1381,8 +1443,29 @@ function quitarItem(idx) {
 }
 
 // ================================================================
-//  FORM — GUARDAR PEDIDO
+//  FORM — EDITAR / GUARDAR PEDIDO
 // ================================================================
+function editarPedido(id) {
+  const p = pedidos.find(x => x.id === id);
+  if (!p) return;
+  editandoPedidoId = id;
+  document.getElementById('modal-pedido-title').textContent = 'Editar Pedido';
+  document.getElementById('btn-guardar-pedido').textContent = 'Guardar cambios';
+  document.getElementById('modal-pedido').classList.add('open');
+  renderClientesSelect();
+  setTimeout(() => {
+    const sel = document.getElementById('ped-cliente');
+    sel.value = p.clienteId;
+    pedidoClienteId = p.clienteId;
+  }, 20);
+  itemsPedido = p.items ? p.items.map(i => ({ ...i })) : [];
+  renderProductosPedidoList(itemsPedido);
+  document.getElementById('ped-fechaPedido').value = p.fechaPedido || '';
+  document.getElementById('ped-fecha').value = p.fecha || '';
+  document.getElementById('ped-pago').value = p.pago || 'Pendiente';
+  document.getElementById('ped-notas').value = p.notas || '';
+}
+
 async function guardarPedido() {
   const clienteId = pedidoClienteId || document.getElementById('ped-cliente').value;
   if (!clienteId)           { toast('Selecciona un cliente', 'error'); return; }
@@ -1399,6 +1482,36 @@ async function guardarPedido() {
 
   const fechaPedido = document.getElementById('ped-fechaPedido').value || new Date().toISOString().slice(0,10);
   const mes         = fechaPedido.slice(0,7);
+
+  if (editandoPedidoId) {
+    // Modo edición
+    const cambios = {
+      clienteId,
+      items: [...itemsPedido],
+      resumen,
+      fechaPedido,
+      mes,
+      fecha:  document.getElementById('ped-fecha').value,
+      pago:   document.getElementById('ped-pago').value,
+      notas:  document.getElementById('ped-notas').value,
+    };
+    const idx = pedidos.findIndex(x => x.id === editandoPedidoId);
+    const prev = { ...pedidos[idx] };
+    Object.assign(pedidos[idx], cambios);
+    try {
+      await api('updatePedido', { id: editandoPedidoId, cambios });
+      closeModal('modal-pedido');
+      renderAll();
+      toast('Pedido actualizado ✓');
+    } catch (e) {
+      Object.assign(pedidos[idx], prev);
+      toast('Error al guardar: ' + e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Guardar cambios';
+    }
+    return;
+  }
 
   const nuevo = {
     id:          Date.now(),
