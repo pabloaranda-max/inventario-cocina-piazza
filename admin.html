@@ -574,39 +574,57 @@ function generarPDFAdmin(toma, items, corrs, notaGeneral) {
       <strong>Nota general:</strong> ${notaGeneral}
     </div>` : '';
 
+  const filename = `Toma_${toma.almacen_nombre}_${toma.fecha}.pdf`;
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>Toma ${toma.almacen_nombre} - ${toma.fecha}</title>
+  <title>${filename}</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
   <style>
-    body{font-family:Arial,sans-serif;padding:24px;color:#333;font-size:13px;}
-    h1{font-size:18px;margin-bottom:4px;}
-    .meta{font-size:12px;color:#555;margin-bottom:14px;border-bottom:1px solid #ddd;padding-bottom:8px;}
-    .firma{margin-top:50px;display:flex;gap:60px;}
-    .firma-box{flex:1;border-top:1px solid #333;padding-top:8px;font-size:12px;color:#555;}
-    .btn-print{position:fixed;top:16px;right:16px;background:#667eea;color:white;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.2);}
-    @media print{.btn-print{display:none;}body{padding:8px;}}
+    body{font-family:Arial,sans-serif;padding:20px;color:#333;font-size:12px;margin:0;}
+    h1{font-size:17px;margin-bottom:4px;}
+    .meta{font-size:11px;color:#555;margin-bottom:12px;border-bottom:1px solid #ddd;padding-bottom:8px;}
+    .firma{margin-top:40px;display:flex;gap:60px;}
+    .firma-box{flex:1;border-top:1px solid #333;padding-top:8px;font-size:11px;color:#555;}
+    #cargando{position:fixed;inset:0;background:white;display:flex;align-items:center;justify-content:center;font-size:16px;color:#667eea;font-family:Arial,sans-serif;}
   </style></head><body>
-  <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
-  <h1>Piazza Pasticcio — Toma de Inventario</h1>
-  <div class="meta">
-    <strong>Almacén:</strong> ${toma.almacen_nombre} &nbsp;|&nbsp;
-    <strong>Área:</strong> ${toma.area||'—'} &nbsp;|&nbsp;
-    <strong>Fecha:</strong> ${toma.fecha}<br>
-    <strong>Operario:</strong> ${toma.operario||'—'} &nbsp;|&nbsp;
-    <strong>Ítems:</strong> ${items.length} &nbsp;|&nbsp;
-    <strong>Revisado por:</strong> ${adminActual||'—'} &nbsp;|&nbsp;
-    <strong>Generado:</strong> ${fecha_imp}
+  <div id="cargando">Generando PDF...</div>
+  <div id="contenido" style="display:none;">
+    <h1>Piazza Pasticcio — Toma de Inventario</h1>
+    <div class="meta">
+      <strong>Almacén:</strong> ${toma.almacen_nombre} &nbsp;|&nbsp;
+      <strong>Área:</strong> ${toma.area||'—'} &nbsp;|&nbsp;
+      <strong>Fecha:</strong> ${toma.fecha}<br>
+      <strong>Operario:</strong> ${toma.operario||'—'} &nbsp;|&nbsp;
+      <strong>Ítems:</strong> ${items.length} &nbsp;|&nbsp;
+      <strong>Revisado por:</strong> ${adminActual||'—'} &nbsp;|&nbsp;
+      <strong>Generado:</strong> ${fecha_imp}
+    </div>
+    ${notaHtml}${itemsHtml}
+    <div class="firma">
+      <div class="firma-box">Firma del Operario &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+      <div class="firma-box">Firma del Supervisor &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+    </div>
   </div>
-  ${notaHtml}${itemsHtml}
-  <div class="firma">
-    <div class="firma-box">Firma del Operario &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
-    <div class="firma-box">Firma del Supervisor &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
-  </div>
+  <script>
+    window.addEventListener('load', function() {
+      const el = document.getElementById('contenido');
+      el.style.display = 'block';
+      html2pdf().set({
+        margin: 10,
+        filename: '${filename}',
+        image: { type: 'jpeg', quality: 0.97 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }).from(el).save().then(function() {
+        document.getElementById('cargando').textContent = '✓ PDF descargado';
+        setTimeout(function(){ window.close(); }, 1500);
+      });
+    });
+  <\/script>
   </body></html>`;
 
   const win = window.open('', '_blank');
   win.document.write(html);
   win.document.close();
-  win.focus();
 }
 
 // ── GROQ CHAT ─────────────────────────────────────────────
