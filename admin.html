@@ -92,6 +92,14 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
 
 .error-msg { background: #fee2e2; color: #dc2626; padding: 12px; border-radius: 8px; margin-bottom: 12px; font-size: 14px; }
 .success-msg { background: #dcfce7; color: #16a34a; padding: 12px; border-radius: 8px; margin-bottom: 12px; font-size: 14px; }
+.btn-notas { background: #dbeafe; color: #1d4ed8; padding: 8px 14px; font-size: 13px; min-height: 36px; }
+.btn-notas:hover { background: #bfdbfe; }
+.btn-pdf-card { background: #dcfce7; color: #16a34a; padding: 8px 14px; font-size: 13px; min-height: 36px; }
+.btn-pdf-card:hover { background: #bbf7d0; }
+.modal-notas-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:200; overflow-y:auto; padding:20px 12px; }
+.modal-notas-box { background:white; border-radius:12px; max-width:560px; margin:auto; padding:20px; }
+.corr-block { border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:8px; background:#f8fafc; }
+.corr-input { width:100%; border:1px solid #ddd; border-radius:6px; padding:7px; font-size:13px; margin-bottom:6px; box-sizing:border-box; }
 </style>
 </head>
 <body>
@@ -100,6 +108,7 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
 <div id="pantalla-login">
   <div class="login-titulo">🔐 Admin</div>
   <div class="login-sub">Inventario Piazza Pasticcio</div>
+  <input type="text" class="login-input" id="nombre-input" placeholder="Tu nombre (ej: Javier)" onkeyup="if(event.key==='Enter') login()">
   <input type="password" class="login-input" id="pwd-input" placeholder="Contraseña" onkeyup="if(event.key==='Enter') login()">
   <input type="text" class="login-input" id="groq-key-input" placeholder="API Key GROQ (opcional)" style="margin-top:0; font-size:12px;">
   <button class="btn-login" onclick="login()">Entrar</button>
@@ -111,7 +120,7 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
   <div class="admin-header">
     <div class="admin-header-row">
       <div>
-        <h1>⚙️ Admin Inventario</h1>
+        <h1 id="admin-nombre-display">⚙️ Admin Inventario</h1>
         <p>Piazza Pasticcio</p>
       </div>
       <button class="btn-logout" onclick="logout()">Salir</button>
@@ -163,9 +172,36 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
   </div>
 </div>
 
+<!-- MODAL NOTAS Y CORRECCIONES -->
+<div id="modal-notas" class="modal-notas-overlay">
+  <div class="modal-notas-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h2 style="font-size:17px;">📝 Notas y Correcciones</h2>
+      <button onclick="cerrarModalNotas()" style="background:#e2e8f0;color:#333;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:bold;">✕</button>
+    </div>
+    <div id="notas-toma-info" style="background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:#475569;line-height:1.6;"></div>
+
+    <label style="font-size:13px;font-weight:bold;display:block;margin-bottom:6px;">Nota general de la toma</label>
+    <textarea id="nota-general" rows="3" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:10px;font-size:14px;resize:vertical;box-sizing:border-box;" placeholder="Observaciones generales sobre esta toma..."></textarea>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px;">
+      <span style="font-size:13px;font-weight:bold;">Correcciones por ítem</span>
+      <button onclick="agregarCorreccion()" style="background:#667eea;color:white;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:bold;">+ Agregar</button>
+    </div>
+    <div id="lista-correcciones"></div>
+
+    <div id="notas-msg" style="margin-top:10px;font-size:13px;min-height:20px;"></div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <button onclick="guardarNotas()" style="flex:1;background:#667eea;color:white;padding:13px;border-radius:8px;font-size:15px;font-weight:bold;">💾 Guardar y Enviar</button>
+      <button onclick="imprimirTomaActiva()" style="background:#dcfce7;color:#16a34a;padding:13px 16px;border-radius:8px;font-size:15px;font-weight:bold;border:none;cursor:pointer;">🖨️ PDF</button>
+    </div>
+  </div>
+</div>
+
 <script>
-const ADMIN_PASSWORD = 'piazza2026';
+const ADMIN_PASSWORD = 'adminpasticcio2026';
 const GROQ_MODEL = 'llama-3.1-8b-instant';
+let adminActual = null;
 
 function getGroqKey() {
   return localStorage.getItem('groq_api_key') || '';
@@ -183,16 +219,17 @@ let filtroActual = 'TODOS';
 
 // ── AUTH ──────────────────────────────────────────────────
 function login() {
+  const nombre = document.getElementById('nombre-input').value.trim();
   const pwd = document.getElementById('pwd-input').value;
-  if (pwd === ADMIN_PASSWORD) {
-    const key = document.getElementById('groq-key-input').value.trim();
-    if (key) localStorage.setItem('groq_api_key', key);
-    document.getElementById('pantalla-login').style.display = 'none';
-    document.getElementById('pantalla-admin').style.display = 'block';
-    cargarTodasLasTomas();
-  } else {
-    document.getElementById('login-error').textContent = 'Contraseña incorrecta';
-  }
+  if (!nombre) { document.getElementById('login-error').textContent = 'Ingresa tu nombre'; return; }
+  if (pwd !== ADMIN_PASSWORD) { document.getElementById('login-error').textContent = 'Contraseña incorrecta'; return; }
+  adminActual = nombre;
+  const key = document.getElementById('groq-key-input').value.trim();
+  if (key) localStorage.setItem('groq_api_key', key);
+  document.getElementById('pantalla-login').style.display = 'none';
+  document.getElementById('pantalla-admin').style.display = 'block';
+  document.getElementById('admin-nombre-display').textContent = `⚙️ Admin — ${adminActual}`;
+  cargarTodasLasTomas();
 }
 
 function logout() {
@@ -258,9 +295,13 @@ function renderTomas() {
         <div class="toma-almacen">${t.almacen_nombre}</div>
       </div>
       <div class="toma-meta">📍 ${t.area || '—'} &nbsp;·&nbsp; 📅 ${t.fecha} &nbsp;·&nbsp; 🕐 ${new Date(t.timestamp).toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'})}</div>
-      <div class="toma-footer">
+      <div class="toma-footer" style="flex-wrap:wrap;gap:6px;">
         <div class="toma-items">📦 ${t.items} ítems</div>
-        <button class="btn-borrar" onclick="borrarToma('${t.timestamp}','${t.area}','${t.fecha}','${t.almacen_nombre}','${t.script_url}')">🗑 Borrar</button>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-notas" onclick="abrirModalNotasByTs('${t.timestamp}')">📝 Notas</button>
+          <button class="btn-pdf-card" onclick="imprimirTomaByTs('${t.timestamp}')">📄 PDF</button>
+          <button class="btn-borrar" onclick="borrarToma('${t.timestamp}','${t.area}','${t.fecha}','${t.almacen_nombre}','${t.script_url}')">🗑 Borrar</button>
+        </div>
       </div>
     </div>
   `).join('');
@@ -312,6 +353,154 @@ function generarReporte() {
       </div>
     </div>
   `).join('') || '<div class="empty-state">Sin datos</div>';
+}
+
+// ── NOTAS Y CORRECCIONES ──────────────────────────────────
+let tomaActiva = null;
+let correcciones = [];
+
+function abrirModalNotasByTs(ts) {
+  const toma = todasLasTomas.find(t => t.timestamp === ts);
+  if (!toma) return;
+  tomaActiva = toma;
+  correcciones = [];
+  document.getElementById('nota-general').value = '';
+  document.getElementById('lista-correcciones').innerHTML = '';
+  document.getElementById('notas-msg').innerHTML = '';
+  document.getElementById('notas-toma-info').innerHTML =
+    `<strong>${toma.operario || 'Sin nombre'}</strong> · ${toma.almacen_nombre} · ${toma.area || '—'}<br>
+     📅 ${toma.fecha} · 📦 ${toma.items} ítems`;
+  document.getElementById('modal-notas').style.display = 'block';
+}
+
+function cerrarModalNotas() {
+  document.getElementById('modal-notas').style.display = 'none';
+  tomaActiva = null;
+}
+
+function agregarCorreccion() {
+  correcciones.push({ codigo:'', nombre:'', cantOriginal:'', cantCorregida:'', nota:'' });
+  renderCorrecciones();
+}
+
+function eliminarCorreccion(i) {
+  correcciones.splice(i, 1);
+  renderCorrecciones();
+}
+
+function renderCorrecciones() {
+  document.getElementById('lista-correcciones').innerHTML = correcciones.map((c, i) => `
+    <div class="corr-block">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:12px;font-weight:bold;color:#64748b;">Corrección ${i+1}</span>
+        <button onclick="eliminarCorreccion(${i})" style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:4px;font-size:12px;border:none;cursor:pointer;">✕</button>
+      </div>
+      <input class="corr-input" type="text" placeholder="Código ítem (ej: MP0015)" value="${c.codigo}" oninput="correcciones[${i}].codigo=this.value">
+      <input class="corr-input" type="text" placeholder="Nombre del ítem" value="${c.nombre}" oninput="correcciones[${i}].nombre=this.value">
+      <div style="display:flex;gap:6px;margin-bottom:6px;">
+        <input style="flex:1;border:1px solid #ddd;border-radius:6px;padding:7px;font-size:13px;" type="number" placeholder="Cant. original" value="${c.cantOriginal}" oninput="correcciones[${i}].cantOriginal=this.value">
+        <input style="flex:1;border:1px solid #ddd;border-radius:6px;padding:7px;font-size:13px;" type="number" placeholder="Cant. corregida" value="${c.cantCorregida}" oninput="correcciones[${i}].cantCorregida=this.value">
+      </div>
+      <textarea class="corr-input" rows="2" placeholder="Nota / motivo" oninput="correcciones[${i}].nota=this.value" style="resize:vertical;">${c.nota}</textarea>
+    </div>
+  `).join('');
+}
+
+async function guardarNotas() {
+  if (!tomaActiva) return;
+  const msg = document.getElementById('notas-msg');
+  msg.innerHTML = '<span style="color:#64748b">Enviando...</span>';
+  const payload = {
+    action: 'guardarNotas',
+    admin: adminActual,
+    fechaNota: new Date().toISOString(),
+    toma: {
+      timestamp: tomaActiva.timestamp,
+      operario: tomaActiva.operario,
+      area: tomaActiva.area,
+      fecha: tomaActiva.fecha,
+      almacen: tomaActiva.almacen_nombre
+    },
+    notaGeneral: document.getElementById('nota-general').value.trim(),
+    correcciones: correcciones
+  };
+  try {
+    await fetch(tomaActiva.script_url, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    });
+    msg.innerHTML = '<span style="color:#16a34a">✓ Enviado al servidor correctamente.</span>';
+  } catch(e) {
+    msg.innerHTML = '<span style="color:#dc2626">Error de red al enviar.</span>';
+  }
+}
+
+// ── PDF ────────────────────────────────────────────────────
+function imprimirTomaByTs(ts) {
+  const toma = todasLasTomas.find(t => t.timestamp === ts);
+  if (toma) abrirEImprimirPDF(toma, [], '');
+}
+
+function imprimirTomaActiva() {
+  if (!tomaActiva) return;
+  abrirEImprimirPDF(tomaActiva, correcciones, document.getElementById('nota-general').value.trim());
+}
+
+function abrirEImprimirPDF(toma, corrs, notaGeneral) {
+  const fecha_imp = new Date().toLocaleString('es-MX');
+  const corrsHtml = corrs && corrs.length ? `
+    <h3 style="margin:20px 0 8px;font-size:14px;">Correcciones registradas</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr style="background:#e0e7ff;">
+        <th style="border:1px solid #ddd;padding:5px;text-align:left;">Código</th>
+        <th style="border:1px solid #ddd;padding:5px;text-align:left;">Nombre</th>
+        <th style="border:1px solid #ddd;padding:5px;text-align:center;">Original</th>
+        <th style="border:1px solid #ddd;padding:5px;text-align:center;">Corregido</th>
+        <th style="border:1px solid #ddd;padding:5px;text-align:left;">Nota</th>
+      </tr></thead>
+      <tbody>${corrs.map((c,i)=>`<tr style="background:${i%2?'#f8fafc':'#fff'}">
+        <td style="border:1px solid #ddd;padding:5px;">${c.codigo||'—'}</td>
+        <td style="border:1px solid #ddd;padding:5px;">${c.nombre||'—'}</td>
+        <td style="border:1px solid #ddd;padding:5px;text-align:center;">${c.cantOriginal||'—'}</td>
+        <td style="border:1px solid #ddd;padding:5px;text-align:center;">${c.cantCorregida||'—'}</td>
+        <td style="border:1px solid #ddd;padding:5px;">${c.nota||''}</td>
+      </tr>`).join('')}</tbody>
+    </table>` : '';
+  const notaHtml = notaGeneral ? `
+    <h3 style="margin:20px 0 8px;font-size:14px;">Nota general</h3>
+    <div style="border:1px solid #ddd;padding:10px;border-radius:6px;font-size:13px;">${notaGeneral}</div>` : '';
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Toma ${toma.almacen_nombre} - ${toma.fecha}</title>
+  <style>
+    body{font-family:Arial,sans-serif;padding:24px;color:#333;font-size:13px;}
+    h1{font-size:19px;margin-bottom:4px;}
+    .meta{font-size:12px;color:#555;margin-bottom:16px;border-bottom:1px solid #ddd;padding-bottom:10px;}
+    .firma{margin-top:60px;display:flex;gap:60px;}
+    .firma-box{flex:1;border-top:1px solid #333;padding-top:8px;font-size:12px;color:#555;}
+    @media print{body{padding:10px;}}
+  </style></head><body>
+  <h1>Piazza Pasticcio — Toma de Inventario</h1>
+  <div class="meta">
+    <strong>Almacén:</strong> ${toma.almacen_nombre} &nbsp;|&nbsp;
+    <strong>Área:</strong> ${toma.area||'—'} &nbsp;|&nbsp;
+    <strong>Fecha:</strong> ${toma.fecha}<br>
+    <strong>Operario:</strong> ${toma.operario||'—'} &nbsp;|&nbsp;
+    <strong>Ítems capturados:</strong> ${toma.items}<br>
+    <strong>Revisado por:</strong> ${adminActual||'—'} &nbsp;|&nbsp;
+    <strong>Impreso:</strong> ${fecha_imp}
+  </div>
+  ${notaHtml}${corrsHtml}
+  <div class="firma">
+    <div class="firma-box">Firma del Operario &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+    <div class="firma-box">Firma del Supervisor &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+  </div>
+  </body></html>`;
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 600);
 }
 
 // ── GROQ CHAT ─────────────────────────────────────────────

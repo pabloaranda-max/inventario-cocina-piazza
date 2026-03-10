@@ -7955,7 +7955,8 @@
      <div class="spinner" id="spinner-loader"></div>
      <div id="spinner-text" style="font-size: 18px; font-weight: bold; text-align: center;">Enviando...</div>
      <div id="spinner-actions" style="display: none; width: 100%; margin-top: 16px;">
-        <button class="btn-green" onclick="limpiarYVolverInicio()">Nueva toma</button>
+        <button class="btn-green" onclick="limpiarYVolverInicio()" style="margin-bottom:8px;">Nueva toma</button>
+        <button onclick="descargarPDF()" style="width:100%;background:#3b82f6;color:white;padding:14px;border-radius:8px;font-size:15px;font-weight:bold;border:none;cursor:pointer;">📄 Descargar PDF</button>
      </div>
    </div>
  </div>
@@ -8422,6 +8423,84 @@
     } catch(e) {
       document.getElementById('groq-loading').textContent = 'Error de conexion. Intenta de nuevo.';
     }
+  }
+
+  // ── PDF OPERARIO ───────────────────────────────────────────
+  function descargarPDF() {
+    if (!sesionActiva) return;
+    const items = [];
+    document.querySelectorAll('#lista .qty-input').forEach(input => {
+      const val = parseFloat(input.value) || 0;
+      if (val > 0) items.push({
+        codigo: input.getAttribute('data-codigo'),
+        nombre: input.getAttribute('data-nombre'),
+        unidad: input.getAttribute('data-unidad'),
+        cantidad: val
+      });
+    });
+    const fecha_imp = new Date().toLocaleString('es-MX');
+    const itemsHtml = items.map((it,i)=>`<tr style="background:${i%2?'#f8fafc':'#fff'}">
+      <td style="border:1px solid #ddd;padding:5px;font-size:11px;">${it.codigo}</td>
+      <td style="border:1px solid #ddd;padding:5px;">${it.nombre}</td>
+      <td style="border:1px solid #ddd;padding:5px;text-align:center;">${it.unidad}</td>
+      <td style="border:1px solid #ddd;padding:5px;text-align:center;font-weight:bold;">${it.cantidad}</td>
+    </tr>`).join('');
+    const manualesHtml = manualesLocal.length ? `
+      <h3 style="margin:20px 0 8px;font-size:14px;">Ítems No Catalogados</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:#fef3c7;">
+          <th style="border:1px solid #ddd;padding:5px;text-align:left;">Código</th>
+          <th style="border:1px solid #ddd;padding:5px;text-align:left;">Nombre</th>
+          <th style="border:1px solid #ddd;padding:5px;text-align:center;">Unidad</th>
+          <th style="border:1px solid #ddd;padding:5px;text-align:center;">Cant.</th>
+        </tr></thead>
+        <tbody>${manualesLocal.map((m,i)=>`<tr style="background:${i%2?'#fffbeb':'#fff'}">
+          <td style="border:1px solid #ddd;padding:5px;">${m.codigo}</td>
+          <td style="border:1px solid #ddd;padding:5px;">${m.nombre}</td>
+          <td style="border:1px solid #ddd;padding:5px;text-align:center;">${m.unidad||'—'}</td>
+          <td style="border:1px solid #ddd;padding:5px;text-align:center;font-weight:bold;">${m.cantidad}</td>
+        </tr>`).join('')}</tbody>
+      </table>` : '';
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>Inventario COCINA - ${sesionActiva.fecha}</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:20px;color:#333;font-size:13px;}
+      h1{font-size:18px;margin-bottom:4px;}
+      .meta{font-size:12px;color:#555;margin-bottom:14px;border-bottom:1px solid #ddd;padding-bottom:8px;}
+      .firma{margin-top:50px;display:flex;gap:60px;}
+      .firma-box{flex:1;border-top:1px solid #333;padding-top:8px;font-size:12px;color:#555;}
+      @media print{body{padding:8px;}}
+    </style></head><body>
+    <h1>Piazza Pasticcio — Toma de Inventario</h1>
+    <div class="meta">
+      <strong>Almacén:</strong> COCINA &nbsp;|&nbsp;
+      <strong>Área:</strong> ${sesionActiva.area} &nbsp;|&nbsp;
+      <strong>Fecha:</strong> ${sesionActiva.fecha}<br>
+      <strong>Operario:</strong> ${sesionActiva.operario} &nbsp;|&nbsp;
+      <strong>Ítems catálogo:</strong> ${items.length} &nbsp;|&nbsp;
+      <strong>No catalogados:</strong> ${manualesLocal.length}<br>
+      <strong>Generado:</strong> ${fecha_imp}
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr style="background:#e0e7ff;">
+        <th style="border:1px solid #ddd;padding:6px;text-align:left;">Código</th>
+        <th style="border:1px solid #ddd;padding:6px;text-align:left;">Nombre</th>
+        <th style="border:1px solid #ddd;padding:6px;text-align:center;">Unidad</th>
+        <th style="border:1px solid #ddd;padding:6px;text-align:center;">Cantidad</th>
+      </tr></thead>
+      <tbody>${itemsHtml}</tbody>
+    </table>
+    ${manualesHtml}
+    <div class="firma">
+      <div class="firma-box">Firma del Operario &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+      <div class="firma-box">Firma del Supervisor &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+    </div>
+    </body></html>`;
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 600);
   }
 
  </script>
