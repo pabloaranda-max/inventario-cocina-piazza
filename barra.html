@@ -4055,20 +4055,21 @@
      // Setear fecha de hoy
      document.getElementById('fecha-input').value = new Date().toISOString().split('T')[0];
      
-     // Checar si hay sesión guardada en sessionStorage
-     const saved = sessionStorage.getItem('sesion_activa');
+     // Checar sesión: sessionStorage (tab abierto) o localStorage (tab cerrado)
+     const saved = sessionStorage.getItem('sesion_activa') || localStorage.getItem('ultima_sesion_barra');
      if (saved) {
        const sesion = JSON.parse(saved);
-       const dataKey = `inventario_cocina_${sesion.fecha}`;
-       const dataMan = `manuales_cocina_${sesion.fecha}`;
-       
-       // Mostrar banner si hay datos en LocalStorage para esta fecha
-       if (localStorage.getItem(dataKey) || localStorage.getItem(dataMan)) {
+       const dataKey = `inventario_barra_${sesion.fecha}`;
+       const dataMan = `manuales_barra_${sesion.fecha}`;
+       const invData = JSON.parse(localStorage.getItem(dataKey) || '{}');
+       const manData = JSON.parse(localStorage.getItem(dataMan) || '[]');
+       const totalItems = Object.values(invData).filter(v => v > 0).length + manData.length;
+
+       if (totalItems > 0) {
          sesionActiva = sesion;
-         document.getElementById('banner-text').textContent = `Sesión activa: ${sesion.operario} — ${sesion.area} — ${sesion.fecha}. ¿Continuar o iniciar nueva?`;
+         document.getElementById('banner-text').textContent =
+           `📂 Toma guardada del ${sesion.fecha} — ${sesion.operario} · ${sesion.area} · ${totalItems} ítems capturados`;
          document.getElementById('banner-sesion').style.display = 'flex';
-         
-         // Pre-llenar campos
          document.getElementById('operario-input').value = sesion.operario;
          document.getElementById('area-input').value = sesion.area;
          document.getElementById('fecha-input').value = sesion.fecha;
@@ -4098,13 +4099,14 @@
 
      if (forzarNueva && sesionActiva) {
        // Limpiar localStorage de la sesión anterior
-       localStorage.removeItem(`inventario_cocina_${sesionActiva.fecha}`);
-       localStorage.removeItem(`manuales_cocina_${sesionActiva.fecha}`);
+       localStorage.removeItem(`inventario_barra_${sesionActiva.fecha}`);
+       localStorage.removeItem(`manuales_barra_${sesionActiva.fecha}`);
      }
 
      sesionActiva = { operario, area, fecha };
      sessionStorage.setItem('sesion_activa', JSON.stringify(sesionActiva));
-     
+     localStorage.setItem('ultima_sesion_barra', JSON.stringify(sesionActiva));
+
      prepararInventario();
    }
 
@@ -4118,8 +4120,8 @@
      document.getElementById('pantalla-inventario').style.display = 'block';
      
      // Cargar datos del localStorage
-     const dataKey = `inventario_cocina_${sesionActiva.fecha}`;
-     const dataMan = `manuales_cocina_${sesionActiva.fecha}`;
+     const dataKey = `inventario_barra_${sesionActiva.fecha}`;
+     const dataMan = `manuales_barra_${sesionActiva.fecha}`;
      
      inventarioLocal = JSON.parse(localStorage.getItem(dataKey) || '{}');
      manualesLocal = JSON.parse(localStorage.getItem(dataMan) || '[]');
@@ -4178,7 +4180,7 @@
      }
      
      // Auto-guardado
-     localStorage.setItem(`inventario_cocina_${sesionActiva.fecha}`, JSON.stringify(inventarioLocal));
+     localStorage.setItem(`inventario_barra_${sesionActiva.fecha}`, JSON.stringify(inventarioLocal));
      
      actualizarHeader();
      evaluarBotonEnviar();
@@ -4307,7 +4309,7 @@
      
      manualesLocal.push(nuevoManual);
      try {
-       localStorage.setItem(`manuales_cocina_${sesionActiva.fecha}`, JSON.stringify(manualesLocal));
+       localStorage.setItem(`manuales_barra_${sesionActiva.fecha}`, JSON.stringify(manualesLocal));
      } catch(e) { /* cuota excedida, datos en memoria */ }
 
      renderManuales();
@@ -4352,7 +4354,7 @@
    function borrarManual(codigo) {
      manualesLocal = manualesLocal.filter(m => m.codigo !== codigo);
      try {
-       localStorage.setItem(`manuales_cocina_${sesionActiva.fecha}`, JSON.stringify(manualesLocal));
+       localStorage.setItem(`manuales_barra_${sesionActiva.fecha}`, JSON.stringify(manualesLocal));
      } catch(e) {}
      renderManuales();
      actualizarHeader();
@@ -4444,9 +4446,10 @@
        document.getElementById('spinner-actions').style.display = 'block';
        
        // Limpiar el localStorage de esta sesión
-       localStorage.removeItem(`inventario_cocina_${sesionActiva.fecha}`);
-       localStorage.removeItem(`manuales_cocina_${sesionActiva.fecha}`);
-       
+       localStorage.removeItem(`inventario_barra_${sesionActiva.fecha}`);
+       localStorage.removeItem(`manuales_barra_${sesionActiva.fecha}`);
+       localStorage.removeItem('ultima_sesion_barra');
+
      }, 3000);
    }
 

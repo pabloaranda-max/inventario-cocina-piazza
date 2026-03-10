@@ -3965,20 +3965,21 @@
      // Setear fecha de hoy
      document.getElementById('fecha-input').value = new Date().toISOString().split('T')[0];
      
-     // Checar si hay sesión guardada en sessionStorage
-     const saved = sessionStorage.getItem('sesion_activa');
+     // Checar sesión: sessionStorage (tab abierto) o localStorage (tab cerrado)
+     const saved = sessionStorage.getItem('sesion_activa') || localStorage.getItem('ultima_sesion_alimentari');
      if (saved) {
        const sesion = JSON.parse(saved);
        const dataKey = `inventario_alimentari_${sesion.fecha}`;
        const dataMan = `manuales_alimentari_${sesion.fecha}`;
-       
-       // Mostrar banner si hay datos en LocalStorage para esta fecha
-       if (localStorage.getItem(dataKey) || localStorage.getItem(dataMan)) {
+       const invData = JSON.parse(localStorage.getItem(dataKey) || '{}');
+       const manData = JSON.parse(localStorage.getItem(dataMan) || '[]');
+       const totalItems = Object.values(invData).filter(v => v > 0).length + manData.length;
+
+       if (totalItems > 0) {
          sesionActiva = sesion;
-         document.getElementById('banner-text').textContent = `Sesión activa: ${sesion.operario} — ${sesion.area} — ${sesion.fecha}. ¿Continuar o iniciar nueva?`;
+         document.getElementById('banner-text').textContent =
+           `📂 Toma guardada del ${sesion.fecha} — ${sesion.operario} · ${sesion.area} · ${totalItems} ítems capturados`;
          document.getElementById('banner-sesion').style.display = 'flex';
-         
-         // Pre-llenar campos
          document.getElementById('operario-input').value = sesion.operario;
          document.getElementById('area-input').value = sesion.area;
          document.getElementById('fecha-input').value = sesion.fecha;
@@ -4014,6 +4015,7 @@
 
      sesionActiva = { operario, area, fecha };
      sessionStorage.setItem('sesion_activa', JSON.stringify(sesionActiva));
+     localStorage.setItem('ultima_sesion_alimentari', JSON.stringify(sesionActiva));
      
      prepararInventario();
    }
@@ -4356,7 +4358,8 @@
        // Limpiar el localStorage de esta sesión
        localStorage.removeItem(`inventario_alimentari_${sesionActiva.fecha}`);
        localStorage.removeItem(`manuales_alimentari_${sesionActiva.fecha}`);
-       
+       localStorage.removeItem('ultima_sesion_alimentari');
+
      }, 3000);
    }
 
