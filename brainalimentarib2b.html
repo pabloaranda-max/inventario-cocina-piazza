@@ -1528,7 +1528,8 @@ async function guardarPedido() {
   };
 
   try {
-    await api('addPedido', { data: nuevo });
+    const res = await api('addPedido', { data: nuevo });
+    if (res.id) nuevo.id = res.id; // usar el ID real generado por el worker
     pedidos.push(nuevo);
     closeModal('modal-pedido');
     renderAll();

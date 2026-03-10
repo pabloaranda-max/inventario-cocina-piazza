@@ -104,10 +104,11 @@ async function handlePost(token, body) {
   }
 
   if (action === 'addPedido') {
-    const row = [newId(), data.clienteId, JSON.stringify(data.items), data.resumen,
+    const newPedidoId = newId();
+    const row = [newPedidoId, data.clienteId, JSON.stringify(data.items), data.resumen,
       data.fechaPedido, data.mes, data.fecha, data.estado || 'pendiente', data.pago || '', data.factura || '', data.notas || ''];
     await sheetsAppend(token, 'pedidos', [row]);
-    return { ok: true };
+    return { ok: true, id: newPedidoId };
   }
 
   if (action === 'updateCliente' || action === 'deleteCliente') {
@@ -115,7 +116,7 @@ async function handlePost(token, body) {
   }
 
   if (action === 'updateProducto' || action === 'deleteProducto') {
-    return await updateRow(token, 'productos', HEADERS.productos, id, cambios, action === 'deleteProducto' ? { disponible: 'false' } : cambios);
+    return await updateRow(token, 'productos', HEADERS.productos, id, cambios, action === 'deleteProducto' ? { disponible: 'borrado' } : cambios);
   }
 
   if (action === 'updatePedido' || action === 'deletePedido') {
@@ -133,7 +134,7 @@ async function updateRow(token, sheet, headers, id, cambios, overrideCambios) {
   const updates = overrideCambios || cambios;
   Object.entries(updates).forEach(([k, v]) => {
     const col = headers.indexOf(k);
-    if (col !== -1) row[col] = v;
+    if (col !== -1) row[col] = (k === 'items' && typeof v !== 'string') ? JSON.stringify(v) : v;
   });
   const rowNum = idx + 1;
   await sheetsUpdate(token, `${sheet}!A${rowNum}`, [row]);
