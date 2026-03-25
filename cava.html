@@ -263,6 +263,7 @@
    document.addEventListener('DOMContentLoaded', () => {
      // Setear fecha de hoy
      document.getElementById('fecha-input').value = new Date().toISOString().split('T')[0];
+     document.getElementById('area-input').value = AREA;
      
      // Checar si hay sesión guardada en sessionStorage
      const saved = sessionStorage.getItem('sesion_activa');
