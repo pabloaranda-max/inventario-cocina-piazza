@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+ <title>📦 Inventario GENERAL - Piazza Pasticcio</title>
+ <style>
+   /* ESTILOS CRÍTICOS Y GLOBALES */
+   * { box-sizing: border-box; margin: 0; padding: 0; }
+   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f5f5; color: #333; }
+   
+   /* Touch targets mínimo 48px */
+   button { min-height: 48px; cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
+   
+   /* Evitar zoom en iOS — todos los inputs font-size >= 16px */
+   input, textarea, select { font-size: 16px; font-family: inherit; }
+
+   /* PANTALLA 1: INICIO DE SESIÓN */
+   #pantalla-inicio {
+     padding: 24px; display: flex; flex-direction: column; justify-content: center;
+     min-height: 100vh; background: white;
+   }
+   .inicio-titulo { font-size: 28px; text-align: center; margin-bottom: 8px; }
+   .inicio-sub { text-align: center; color: #666; margin-bottom: 32px; font-size: 18px; }
+   .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+   .form-group label { font-weight: bold; font-size: 14px; }
+   .form-group input { padding: 14px; border: 1px solid #ddd; border-radius: 8px; }
+   #btn-iniciar { background: #667eea; color: white; font-size: 18px; padding: 16px; margin-top: 16px; width: 100%; border-radius: 28px; }
+   
+   #banner-sesion { background: #fff3cd; color: #856404; padding: 16px; border-radius: 8px; display: none; flex-direction: column; gap: 12px; border: 1px solid #ffeeba; margin-bottom: 24px; }
+   .banner-btns { display: flex; gap: 8px; }
+   .banner-btns button { flex: 1; border-radius: 6px; }
+   #btn-continuar { background: #667eea; color: white; }
+   #btn-nueva { background: white; border: 1px solid #ddd; color: #333; }
+
+   /* PANTALLA 2: INVENTARIO */
+   #pantalla-inventario { display: none; padding-bottom: 120px; }
+   
+   /* Header sticky */
+   #header-sticky { position: sticky; top: 0; background: #667eea; color: white; padding: 16px; z-index: 50; }
+   #header-line1 { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
+   #header-line2 { font-size: 14px; opacity: 0.9; }
+
+   /* Búsqueda y Chips sticky */
+   #search-sticky { position: sticky; top: 73px; background: white; padding: 12px 16px; z-index: 50; border-bottom: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+   .search-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+   .search-row input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
+   .search-row button { width: 48px; height: 48px; background: #f3f4f6; color: #555; border-radius: 8px; font-size: 16px; }
+   
+   /* Chips scrolleables sin scrollbar visible */
+   .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
+   .chips::-webkit-scrollbar { display: none; }
+   .chip { padding: 8px 16px; background: #f3f4f6; border-radius: 20px; font-size: 14px; color: #555; white-space: nowrap; font-weight: normal; }
+   .chip.active { background: #667eea; color: white; font-weight: bold; }
+
+   /* Lista y Tarjetas */
+   #lista, #lista-manuales { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+   .item { background: white; padding: 16px; border-radius: 8px; border-left: 4px solid transparent; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+   /* Items con cantidad */
+   .item.capturado { border-left: 4px solid #22c55e; background: #f0fff4; }
+   
+   .item-name { font-weight: bold; font-size: 15px; margin-bottom: 4px; }
+   .item-code { font-size: 12px; color: #777; margin-bottom: 8px; }
+   
+   /* Qty row */
+   .qty-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+   .qty-input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; text-align: center; font-weight: bold; }
+   .qty-btn { width: 48px; height: 48px; border-radius: 6px; font-size: 20px; background: #667eea; color: white; flex-shrink: 0; }
+
+   /* Manuales */
+   .badge-manual { display: inline-block; background: #ef4444; color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-bottom: 6px; font-weight: bold;}
+   .manual-row { display: flex; gap: 12px; margin-top: 8px; align-items: center; }
+   .manual-row img { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
+   .manual-desc { font-size: 13px; color: #666; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+   /* Flotantes */
+   .fab { position: fixed; bottom: 24px; border-radius: 28px; padding: 14px 20px; font-size: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 100; }
+   .fab-enviar { left: 16px; background: #22c55e; color: white; }
+   .fab-manual { right: 16px; background: #f59e0b; color: white; }
+   .fab:disabled { opacity: 0.4; cursor: not-allowed; }
+   
+   #btn-top { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); color: white; width: 48px; height: 48px; border-radius: 24px; z-index: 200; font-size: 20px; backdrop-filter: blur(4px); display: none; }
+
+   /* Modales */
+   .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; justify-content: center; align-items: flex-end; }
+   .modal-content { background: white; width: 100%; max-height: 90vh; border-radius: 16px 16px 0 0; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+   .modal-title { font-size: 20px; font-weight: bold; margin-bottom: 8px; }
+   
+   .btn-green { background: #22c55e; color: white; border-radius: 8px; width: 100%; padding: 16px; }
+   .btn-gray { background: #e5e7eb; color: #333; border-radius: 8px; width: 100%; padding: 16px; }
+   
+   /* File input estelizado */
+   .file-input-wrapper { position: relative; overflow: hidden; display: inline-block; width: 100%; }
+   .file-input-wrapper input[type=file] { font-size: 100px; position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer; height: 100%; }
+   .btn-file { background: #f3f4f6; border: 2px dashed #ccc; color: #555; padding: 16px; text-align: center; border-radius: 8px; font-weight: bold; }
+   #preview-foto { max-height: 200px; object-fit: contain; border-radius: 8px; margin-top: 8px; display: none; width: 100%; }
+
+   /* Spinner */
+   .spinner { border: 4px solid rgba(0,0,0,0.1); width: 48px; height: 48px; border-radius: 50%; border-left-color: #667eea; animation: spin 1s linear infinite; margin: 0 auto 16px; }
+   @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+   #modal-spinner .modal-content { background: white; width: 85%; max-width: 320px; border-radius: 16px; align-items: center; padding: 32px; margin: auto; }
+   
+   .resumen-lista { max-height: 150px; overflow-y: auto; background: #f9fafb; padding: 12px; border-radius: 8px; font-size: 14px; margin-top: 8px;}
+   .resumen-lista li { margin-bottom: 6px; margin-left: 16px; }
+
+  /* GROQ CHAT BUTTON */
+  .fab-groq { bottom: 90px; right: 16px; background: #1e293b; color: white; width: 52px; height: 52px; border-radius: 50%; font-size: 22px; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .groq-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; align-items: flex-end; }
+  .groq-overlay.active { display: flex; }
+  .groq-panel { background: white; width: 100%; border-radius: 20px 20px 0 0; padding: 20px; max-height: 80vh; display: flex; flex-direction: column; }
+  .groq-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .groq-title { font-weight: bold; font-size: 16px; }
+  .groq-close { background: #f1f5f9; color: #333; padding: 6px 12px; font-size: 14px; min-height: 36px; }
+  .groq-messages { flex: 1; overflow-y: auto; margin-bottom: 12px; min-height: 150px; max-height: 300px; }
+  .gmsg { padding: 10px 14px; border-radius: 10px; margin-bottom: 8px; font-size: 14px; line-height: 1.5; }
+  .gmsg.user { background: #667eea; color: white; margin-left: 15%; }
+  .gmsg.ai { background: #f1f5f9; color: #333; margin-right: 15%; }
+  .gmsg.loading { color: #94a3b8; font-style: italic; background: #f1f5f9; margin-right: 15%; }
+  .groq-input-row { display: flex; gap: 8px; }
+  .groq-input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+  .groq-send { background: #667eea; color: white; padding: 12px 16px; min-height: 48px; border-radius: 8px; }
+
+ </style>
+</head>
+<body>
+
+ <div id="pantalla-inicio">
+   <div id="banner-sesion">
+     <p id="banner-text">Sesión activa encontrada.</p>
+     <div class="banner-btns">
+       <button id="btn-continuar" onclick="continuarSesion()">Continuar</button>
+       <button id="btn-nueva" onclick="iniciarNuevaToma(true)">Iniciar nueva</button>
+     </div>
+   </div>
+   
+   <div class="inicio-titulo">📦 Inventario GENERAL</div>
+   <div class="inicio-sub">Piazza Pasticcio</div>
+   
+   <div class="form-group">
+     <label>Nombre del operario</label>
+     <input type="text" id="operario-input" placeholder="Tu nombre completo">
+   </div>
+   <div class="form-group">
+     <label>Área que estás contando</label>
+     <input type="text" id="area-input" placeholder="Ej: Cámara fría, Refri 1, Alacena seca...">
+   </div>
+   <div class="form-group">
+     <label>Fecha de la toma</label>
+     <input type="date" id="fecha-input">
+   </div>
+   
+   <button id="btn-iniciar" onclick="iniciarNuevaToma(false)">Iniciar toma →</button>
+ </div>
+
+ <div id="pantalla-inventario">
+   
+   <div id="header-sticky">
+     <div id="header-line1">📦 GENERAL | Área | Operario</div>
+     <div id="header-line2">Fecha | 0 capturados</div>
+   </div>
+   
+   <div id="search-sticky">
+     <div class="search-row">
+       <input type="text" id="search-input" placeholder="Buscar producto o código..." oninput="filtrarLista()">
+       <button onclick="limpiarBusqueda()">✕</button>
+     </div>
+     <div class="chips" id="chips-container">
+       </div>
+   </div>
+   
+   <div id="lista">
+  <div id="catalogo-loading" style="text-align:center;padding:60px 16px;color:#999;">
+    <div style="font-size:36px;margin-bottom:12px">⏳</div>
+    <div style="font-size:15px">Cargando catálogo...</div>
+  </div>
+
+</div>
+   
+   <div id="lista-manuales"></div>
+   
+   <button class="fab fab-enviar" id="btn-enviar" onclick="abrirModalConfirmar()" disabled>Enviar ✓</button>
+   <button class="fab fab-manual" id="btn-manual" onclick="abrirModalManual()">＋ No catalogado</button>
+   <button id="btn-top" onclick="scrollToTop()">↑</button>
+ </div>
+
+ <div id="modal-manual" class="modal-overlay">
+   <div class="modal-content">
+     <div class="modal-title">Ítem no catalogado</div>
+     
+     <div class="form-group">
+       <label>Nombre del producto *</label>
+       <input type="text" id="man-nombre" placeholder="Ej: Salsa de la casa" required>
+     </div>
+     
+     <div style="display:flex; gap: 12px;">
+       <div class="form-group" style="flex:1;">
+         <label>Cantidad *</label>
+         <input type="number" id="man-cantidad" inputmode="decimal" step="0.01" min="0" placeholder="0.00" required>
+       </div>
+       <div class="form-group" style="flex:1;">
+         <label>Unidad</label>
+         <input type="text" id="man-unidad" placeholder="KG, LT, PZA...">
+       </div>
+     </div>
+
+     <div class="form-group">
+       <label>Descripción de uso</label>
+       <textarea id="man-desc" rows="2" placeholder="Ej: Se usó en evento de marzo..."></textarea>
+     </div>
+
+     <div class="form-group">
+       <div class="file-input-wrapper">
+         <div class="btn-file">📷 Tomar foto o elegir</div>
+         <input type="file" id="man-foto" accept="image/*" capture="environment" onchange="previewImage(this)">
+       </div>
+       <img id="preview-foto" src="" alt="Vista previa">
+     </div>
+
+     <div class="modal-actions">
+       <button class="btn-gray" onclick="cerrarModalManual()">Cancelar</button>
+       <button class="btn-green" onclick="guardarManual()">Guardar ítem</button>
+     </div>
+   </div>
+ </div>
+
+ <div id="modal-confirmar" class="modal-overlay">
+   <div class="modal-content">
+     <div class="modal-title">Confirmar envío</div>
+     <div id="resumen-envio"></div>
+     <div class="modal-actions">
+       <button class="btn-gray" onclick="cerrarModalConfirmar()">Cancelar</button>
+       <button class="btn-green" onclick="ejecutarEnvio()">Confirmar envío</button>
+     </div>
+   </div>
+ </div>
+
+ <div id="modal-spinner" class="modal-overlay" style="align-items: center;">
+   <div class="modal-content">
+     <div class="spinner" id="spinner-loader"></div>
+     <div id="spinner-text" style="font-size: 18px; font-weight: bold; text-align: center;">Enviando...</div>
+     <div id="spinner-actions" style="display: none; width: 100%; margin-top: 16px;">
+        <button class="btn-green" onclick="limpiarYVolverInicio()">Nueva toma</button>
+     </div>
+   </div>
+ </div>
+
+ <script>
+   // CONSTANTE GLOBAL
+   const WORKER_URL = 'https://piazza-operaciones.pablo-aranda.workers.dev';
+  const AREA = 'GENERAL';
+
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz9xmMY9en98uRjaNYIiSMiMVUu7xpELpAV5i2BulLxlSGxF6WMK06Ws7kNCvCvOrEpDQ/exec';
+   
+   // Variables de Estado
+   let sesionActiva = null;
+   let inventarioLocal = {};
+   let manualesLocal = [];
+   let currentChip = 'Todos';
+
+   // Grupos según requerimiento
+   let grupos = ['Todos', 'ABARROTES', 'CARNES', 'GENERAL', 'PRODUCTO TERMINADO', 'SUB RECETAS COCINA', 'VINO'];
+
+   document.addEventListener('DOMContentLoaded', () => {
+     // Setear fecha de hoy
+     document.getElementById('fecha-input').value = new Date().toISOString().split('T')[0];
+     
+     // Checar si hay sesión guardada en sessionStorage
+     const saved = sessionStorage.getItem('sesion_activa');
+     if (saved) {
+       const sesion = JSON.parse(saved);
+       const dataKey = `inventario_cocina_${sesion.fecha}`;
+       const dataMan = `manuales_cocina_${sesion.fecha}`;
+       
+       // Mostrar banner si hay datos en LocalStorage para esta fecha
+       if (localStorage.getItem(dataKey) || localStorage.getItem(dataMan)) {
+         sesionActiva = sesion;
+         document.getElementById('banner-text').textContent = `Sesión activa: ${sesion.operario} — ${sesion.area} — ${sesion.fecha}. ¿Continuar o iniciar nueva?`;
+         document.getElementById('banner-sesion').style.display = 'flex';
+         
+         // Pre-llenar campos
+         document.getElementById('operario-input').value = sesion.operario;
+         document.getElementById('area-input').value = sesion.area;
+         document.getElementById('fecha-input').value = sesion.fecha;
+       }
+     }
+     
+     renderChips();
+     
+     // Control botón flotante subir
+     window.addEventListener('scroll', () => {
+       if (window.scrollY > 300) document.getElementById('btn-top').style.display = 'block';
+       else document.getElementById('btn-top').style.display = 'none';
+     });
+   });
+
+   // ------ LOGICA DE INICIO Y SESIÓN ------
+
+   function iniciarNuevaToma(forzarNueva) {
+     const operario = document.getElementById('operario-input').value.trim();
+     const area = document.getElementById('area-input').value.trim();
+     const fecha = document.getElementById('fecha-input').value;
+
+     if (!operario || !area) {
+       alert("El nombre del operario y el área son requeridos.");
+       return;
+     }
+
+     if (forzarNueva && sesionActiva) {
+       // Limpiar localStorage de la sesión anterior
+       localStorage.removeItem(`inventario_cocina_${sesionActiva.fecha}`);
+       localStorage.removeItem(`manuales_cocina_${sesionActiva.fecha}`);
+     }
+
+     sesionActiva = { operario, area, fecha };
+     sessionStorage.setItem('sesion_activa', JSON.stringify(sesionActiva));
+     
+     prepararInventario();
+   }
+
+   function continuarSesion() {
+     prepararInventario();
+   }
+
+   function prepararInventario() {
+     // Ocultar inicio, mostrar inventario
+     document.getElementById('pantalla-inicio').style.display = 'none';
+     document.getElementById('pantalla-inventario').style.display = 'block';
+     
+     // Cargar datos del localStorage
+     const dataKey = `inventario_cocina_${sesionActiva.fecha}`;
+     const dataMan = `manuales_cocina_${sesionActiva.fecha}`;
+     
+     inventarioLocal = JSON.parse(localStorage.getItem(dataKey) || '{}');
+     manualesLocal = JSON.parse(localStorage.getItem(dataMan) || '[]');
+     
+     // Cargar catálogo desde Worker (o caché) y aplicar valores guardados
+     cargarCatalogo();
+
+     renderManuales();
+     actualizarHeader();
+     evaluarBotonEnviar();
+   }
+
+   // ------ LOGICA DEL INVENTARIO ------
+
+   function actualizarHeader() {
+     const prods = Object.values(inventarioLocal).filter(v => v > 0).length;
+     const mans = manualesLocal.length;
+     const total = prods + mans;
+     
+     document.getElementById('header-line1').textContent = `📦 GENERAL | ${sesionActiva.area} | ${sesionActiva.operario}`;
+     document.getElementById('header-line2').textContent = `${sesionActiva.fecha} | ${total} capturados`;
+   }
+
+   function cambiar(btn, delta) {
+     const input = btn.parentElement.querySelector('.qty-input');
+     let val = parseFloat(input.value) || 0;
+     val += delta;
+     if (val < 0) val = 0;
+     
+     input.value = (val % 1 === 0) ? val : val.toFixed(2);
+     guardar(input);
+   }
+
+   function guardar(input) {
+     const val = parseFloat(input.value) || 0;
+     const code = input.getAttribute('data-codigo');
+     const item = input.closest('.item');
+     
+     if (val > 0) {
+       inventarioLocal[code] = val;
+       item.classList.add('capturado');
+     } else {
+       delete inventarioLocal[code];
+       item.classList.remove('capturado');
+     }
+     
+     // Auto-guardado
+     localStorage.setItem(`inventario_cocina_${sesionActiva.fecha}`, JSON.stringify(inventarioLocal));
+     
+     actualizarHeader();
+     evaluarBotonEnviar();
+   }
+
+   function evaluarBotonEnviar() {
+     const total = Object.values(inventarioLocal).filter(v => v > 0).length + manualesLocal.length;
+     document.getElementById('btn-enviar').disabled = (total === 0);
+   }
+
+   function scrollToTop() {
+     window.scrollTo({ top: 0, behavior: 'smooth' });
+   }
+
+   // ------ FILTROS Y BÚSQUEDA ------
+
+   function renderChips() {
+     const container = document.getElementById('chips-container');
+     container.innerHTML = '';
+     grupos.forEach(g => {
+       const btn = document.createElement('button');
+       btn.className = `chip ${g === currentChip ? 'active' : ''}`;
+       btn.textContent = g;
+       btn.onclick = () => {
+         currentChip = g;
+         renderChips();
+         filtrarLista();
+       };
+       container.appendChild(btn);
+     });
+   }
+
+   function limpiarBusqueda() {
+     document.getElementById('search-input').value = '';
+     filtrarLista();
+   }
+
+   function filtrarLista() {
+     const query = document.getElementById('search-input').value.toLowerCase();
+     const items = document.querySelectorAll('#lista .item');
+     
+     items.forEach(item => {
+       const nombre = item.getAttribute('data-nombre').toLowerCase();
+       const codigo = item.getAttribute('data-codigo').toLowerCase();
+       const grupo = item.getAttribute('data-grupo');
+       
+       const textMatch = nombre.includes(query) || codigo.includes(query);
+       const chipMatch = (currentChip === 'Todos' || grupo === currentChip);
+       
+       if (textMatch && chipMatch) {
+         item.style.display = 'block';
+       } else {
+         item.style.display = 'none';
+       }
+
+   // ------ CATÁLOGO DINÁMICO (D1 via Worker) ------
+
+   async function cargarCatalogo() {
+     const CACHE_KEY = 'catalogo_' + AREA;
+     const CACHE_TS_KEY = 'catalogo_ts_' + AREA;
+     const CACHE_TTL = 7 * 24 * 3600 * 1000;
+
+     let articulos = null;
+     const ts = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0');
+     if (Date.now() - ts < CACHE_TTL) {
+       try { articulos = JSON.parse(localStorage.getItem(CACHE_KEY)); } catch(e) {}
+     }
+
+     if (!articulos) {
+       try {
+         const r = await fetch(WORKER_URL + '/articulos?almacen=' + AREA);
+         const data = await r.json();
+         if (data.ok && data.articulos && data.articulos.length > 0) {
+           articulos = data.articulos;
+           try {
+             localStorage.setItem(CACHE_KEY, JSON.stringify(articulos));
+             localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
+           } catch(e) {}
+         }
+       } catch(e) { console.error('Error cargando catálogo:', e); }
+     }
+
+     if (!articulos || articulos.length === 0) {
+       document.getElementById('catalogo-loading').innerHTML =
+         '<div style="font-size:32px;margin-bottom:12px">⚠️</div>' +
+         '<div style="font-size:15px">Sin conexión y sin caché.<br>Conéctate al menos una vez para descargar el catálogo.</div>';
+       return;
+     }
+     renderCatalogo(articulos);
+   }
+
+   function renderCatalogo(articulos) {
+     const gruposSet = new Set(articulos.map(a => a.tipo_producto).filter(Boolean));
+     grupos.length = 0;
+     grupos.push('Todos', ...Array.from(gruposSet).sort());
+     renderChips();
+
+     const lista = document.getElementById('lista');
+     lista.innerHTML = '';
+     articulos.forEach(art => {
+       const cod = (art.id_xetux || '').toUpperCase();
+       const nom = (art.nombre   || '').toUpperCase();
+       const gru = art.tipo_producto || 'GENERAL';
+       const uni = art.unidad    || '';
+       const alm = art.almacen   || AREA;
+       const div = document.createElement('div');
+       div.className = 'item';
+       div.setAttribute('data-grupo',  gru);
+       div.setAttribute('data-nombre', nom.toLowerCase());
+       div.setAttribute('data-codigo', cod.toLowerCase());
+       div.innerHTML =
+         `<div class="item-name">${nom}</div>` +
+         `<div class="item-code">${cod} | ${uni} | ${alm}</div>` +
+         `<button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>` +
+         `<input type="number" class="qty-input" inputmode="decimal" step="0.01"` +
+         ` data-codigo="${cod}" data-nombre="${nom}" data-unidad="${uni}" data-almacen="${alm}" data-grupo="${gru}"` +
+         ` value="0" oninput="guardar(this)" min="0">` +
+         `<button class="qty-btn plus" onclick="cambiar(this,1)" data-codigo="${cod}">+</button>`;
+       lista.appendChild(div);
+     });
+     aplicarInventarioLocal();
+     filtrarLista();
+   }
+
+   function aplicarInventarioLocal() {
+     document.querySelectorAll('#lista .item').forEach(item => {
+       const input = item.querySelector('.qty-input');
+       const code = input.getAttribute('data-codigo');
+       if (inventarioLocal[code]) {
+         input.value = inventarioLocal[code];
+         item.classList.add('capturado');
+       } else {
+         input.value = 0;
+         item.classList.remove('capturado');
+       }
+     });
+     actualizarHeader();
+     evaluarBotonEnviar();
+   }
+
+   // ------ ÍTEM MANUAL ------
+
+   function abrirModalManual() {
+     document.getElementById('modal-manual').style.display = 'flex';
+     document.getElementById('man-nombre').value = '';
+     document.getElementById('man-cantidad').value = '';
+     document.getElementById('man-unidad').value = '';
+     document.getElementById('man-desc').value = '';
+     document.getElementById('man-foto').value = '';
+     document.getElementById('preview-foto').style.display = 'none';
+     document.getElementById('preview-foto').src = '';
+   }
+
+   function cerrarModalManual() {
+     document.getElementById('modal-manual').style.display = 'none';
+   }
+
+   function previewImage(input) {
+     if (input.files && input.files[0]) {
+       const reader = new FileReader();
+       reader.onload = function(e) {
+         const tempImg = new Image();
+         tempImg.onload = function() {
+           const canvas = document.createElement('canvas');
+           const MAX = 1024;
+           let w = tempImg.width, h = tempImg.height;
+           if (w > MAX || h > MAX) {
+             if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+             else { w = Math.round(w * MAX / h); h = MAX; }
+           }
+           canvas.width = w;
+           canvas.height = h;
+           canvas.getContext('2d').drawImage(tempImg, 0, 0, w, h);
+           const compressed = canvas.toDataURL('image/jpeg', 0.75);
+           const preview = document.getElementById('preview-foto');
+           preview.src = compressed;
+           preview.style.display = 'block';
+         };
+         tempImg.src = e.target.result;
+       };
+       reader.readAsDataURL(input.files[0]);
+     }
+   }
+
+   function guardarManual() {
+     const nombre = document.getElementById('man-nombre').value.trim();
+     const cantidad = parseFloat(document.getElementById('man-cantidad').value);
+     const unidad = document.getElementById('man-unidad').value.trim();
+     const desc = document.getElementById('man-desc').value.trim();
+     const foto = document.getElementById('preview-foto').src;
+     
+     if (!nombre || isNaN(cantidad) || cantidad <= 0) {
+       alert("Por favor completa el nombre y la cantidad.");
+       return;
+     }
+     
+     cono nst consecutivo = manualesLocal.length + 1;
+     const codigo = `MANUAL-${consecutivo.toString().padStart(3, '0')}`;
+     
+     const nuevoManual = {
+       codigo: codigo,
+       nombre: nombre,
+       cantidad: cantidad,
+       unidad: unidad,
+       descripcion: desc,
+       foto_base64: foto,
+       catalogado: false
+     };
+     
+     manualesLocal.push(nuevoManual);
+     try {
+       localStorage.setItem(`manuales_cocina_${sesionActiva.fecha}`, JSON.stringify(manualesLocal));
+     } catch(e) { /* cuota excedida, datos en memoria */ }
+
+     renderManuales();
+     cerrarModalManual();
+     actualizarHeader();
+     evaluarBotonEnviar();
+   }
+
+   function renderManuales() {
+     const container = document.getElementById('lista-manuales');
+     container.innerHTML = '';
+
+     if (manualesLocal.length === 0) return;
+
+     const title = document.createElement('h3');
+     title.textContent = "Ítems No Catalogados";
+     title.style.margin = "8px 0";
+     container.appendChild(title);
+
+     manualesLocal.forEach(m => {
+       const d = document.createElement('div');
+       d.className = 'item capturado';
+       d.innerHTML = `
+         <div style="display:flex; justify-content:space-between; align-items:center;">
+           <div class="badge-manual">MANUAL</div>
+           <button onclick="borrarManual('${m.codigo}')" style="background:#ef4444; color:white; border-radius:6px; padding:2px 10px; font-size:18px; min-height:32px; line-height:1;">✕</button>
+         </div>
+         <div class="item-name">${m.nombre.toUpperCase()}</div>
+         <div class="item-code">${m.codigo} | ${m.unidad} | COCINA</div>
+         <div class="manual-row">
+           ${m.foto_base64 ? `<img src="${m.foto_base64}" alt="Foto">` : ''}
+           <div>
+             <strong>Cant: ${m.cantidad}</strong>
+             <div class="manual-desc">${m.descripcion}</div>
+           </div>
+         </div>
+       `;
+       container.appendChild(d);
+     });
+   }
+
+   function borrarManual(codigo) {
+     manualesLocal = manualesLocal.filter(m => m.codigo !== codigo);
+     try {
+       localStorage.setItem(`manuales_cocina_${sesionActiva.fecha}`, JSON.stringify(manualesLocal));
+     } catch(e) {}
+     renderManuales();
+     actualizarHeader();
+     evaluarBotonEnviar();
+   }
+
+   // ------ ENVÍO Y CONFIRMACIÓN ------
+
+   function abrirModalConfirmar() {
+     const keys = Object.keys(inventarioLocal).filter(k => inventarioLocal[k] > 0);
+     let htmlLista = '';
+     
+     // Tomar los primeros 5
+     keys.slice(0, 5).forEach(cod => {
+       const el = document.querySelector(`.qty-input[data-codigo="${cod}"]`);
+       const nombre = el ? el.getAttribute('data-nombre') : cod;
+       htmlLista += `<li>${nombre} (x${inventarioLocal[cod]})</li>`;
+     });
+     if(keys.length === 0 && manualesLocal.length > 0) {
+         htmlLista += `<li>(Solo ítems manuales)</li>`;
+     }
+     
+     document.getElementById('resumen-envio').innerHTML = `
+       <p><strong>Operario:</strong> ${sesionActiva.operario}</p>
+       <p><strong>Área:</strong> ${sesionActiva.area}</p>
+       <p><strong>Fecha:</strong> ${sesionActiva.fecha}</p>
+       <p><strong>Catálogo:</strong> ${keys.length} ítems</p>
+       <p><strong>Manuales:</strong> ${manualesLocal.length} ítems</p>
+       <div class="resumen-lista">
+         <strong>Primeros capturados:</strong><br>
+         <ul>${htmlLista}</ul>
+       </div>
+     `;
+     document.getElementById('modal-confirmar').style.display = 'flex';
+   }
+
+   function cerrarModalConfirmar() {
+     document.getElementById('modal-confirmar').style.display = 'none';
+   }
+
+   function ejecutarEnvio() {
+     cerrarModalConfirmar();
+     document.getElementById('modal-spinner').style.display = 'flex';
+     
+     // Armar Payload
+     const productos = [];
+     document.querySelectorAll('#lista .qty-input').forEach(input => {
+       const val = parseFloat(input.value) || 0;
+       if (val > 0) {
+         productos.push({
+           codigo: input.getAttribute('data-codigo'),
+           nombre: input.getAttribute('data-nombre'),
+           unidad: input.getAttribute('data-unidad'),
+           cantidad: val,
+           catalogado: true
+         });
+       }
+     });
+     
+     const payload = {
+       operario: sesionActiva.operario,
+       area: sesionActiva.area,
+       fecha: sesionActiva.fecha,
+       almacen: "GENERAL",
+       timestamp: new Date().toISOString(),
+       productos: productos,
+       manuales: manualesLocal
+     };
+     
+     // Enviar con mode: 'no-cors'
+     fetch(APPS_SCRIPT_URL, {
+       method: 'POST',
+       mode: 'no-cors',
+       headers: {'Content-Type': 'text/plain'},
+       body: JSON.stringify(payload)
+     }).then(() => {
+       // Por el CORS no podemos leer respuesta, usamos timeout de 3 seg para éxito
+       esperarYConfirmarExito();
+     }).catch(err => {
+       alert("Error de red. Intenta nuevamente.");
+       document.getElementById('modal-spinner').style.display = 'none';
+     });
+   }
+
+   function esperarYConfirmarExito() {
+     setTimeout(() => {
+       document.getElementById('spinner-loader').style.display = 'none';
+       document.getElementById('spinner-text').innerHTML = "✓ Inventario enviado correctamente.<br><br><span style='font-size:14px; color:#555;'>Puedes cerrar la app o iniciar una nueva toma.</span>";
+       document.getElementById('spinner-actions').style.display = 'block';
+       
+       // Limpiar el localStorage de esta sesión
+       localStorage.removeItem(`inventario_cocina_${sesionActiva.fecha}`);
+       localStorage.removeItem(`manuales_cocina_${sesionActiva.fecha}`);
+       
+     }, 3000);
+   }
+
+   function limpiarYVolverInicio() {
+     // Limpiar sessionStorage es opcional, pero lo dejamos si desean mantener el operario en memoria. 
+     // Reiniciamos todo reseteando la página.
+     window.location.reload();
+   }
+
+  // ── GROQ ──────────────────────────────────────────────────
+  function getGroqKey() { return localStorage.getItem('groq_api_key') || ''; }
+  let groqHistory = [];
+
+  function abrirGroq() { document.getElementById('groq-overlay').classList.add('active'); document.getElementById('groq-input').focus(); }
+  function cerrarGroq() { document.getElementById('groq-overlay').classList.remove('active'); }
+
+  async function enviarGroq() {
+    const input = document.getElementById('groq-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = '';
+    const msgs = document.getElementById('groq-messages');
+    msgs.innerHTML += '<div class="gmsg user">' + msg + '</div>';
+    msgs.innerHTML += '<div class="gmsg loading" id="groq-loading">Pensando...</div>';
+    msgs.scrollTop = msgs.scrollHeight;
+    groqHistory.push({ role: 'user', content: msg });
+
+    const capturados = Object.keys(inventarioLocal || {}).filter(k => inventarioLocal[k] > 0).length;
+    const sistema = 'Eres un asistente de inventario para Piazza Pasticcio, restaurante italiano en CDMX. El operario esta haciendo la toma de inventario del almacen GENERAL. Lleva ' + capturados + ' productos capturados. Ayuda con dudas sobre productos, unidades de medida (KG=kilogramos, LT=litros, PZA=pieza, B.750=botella 750ml) o como usar la app. Responde en espanol, de forma muy breve y practica.';
+
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + getGroqKey(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'system', content: sistema }, ...groqHistory], max_tokens: 300, temperature: 0.7 })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+      const reply = data.choices && data.choices[0] ? data.choices[0].message.content : 'Sin respuesta';
+      groqHistory.push({ role: 'assistant', content: reply });
+      document.getElementById('groq-loading').remove();
+      msgs.innerHTML += '<div class="gmsg ai">' + reply + '</div>';
+      msgs.scrollTop = msgs.scrollHeight;
+    } catch(e) {
+      document.getElementById('groq-loading').textContent = 'Error: ' + e.message;
+    }
+  }
+
+ </script>
+
+  <!-- GROQ CHAT -->
+  <button class="fab fab-groq" onclick="abrirGroq()" title="Asistente IA">🤖</button>
+  <div class="groq-overlay" id="groq-overlay">
+    <div class="groq-panel">
+      <div class="groq-header">
+        <div class="groq-title">🤖 Asistente de Inventario</div>
+        <button class="groq-close" onclick="cerrarGroq()">Cerrar</button>
+      </div>
+      <div class="groq-messages" id="groq-messages">
+        <div class="gmsg ai">Hola, soy tu asistente. Puedo ayudarte a encontrar productos, aclarar unidades de medida o resolver dudas de la toma. ¿En qué te ayudo?</div>
+      </div>
+      <div class="groq-input-row">
+        <input type="text" class="groq-input" id="groq-input" placeholder="Pregunta algo..." onkeyup="if(event.key==='Enter') enviarGroq()">
+        <button class="groq-send" onclick="enviarGroq()">➤</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
