@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Operaciones — Piazza Pasticcio</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+       background: #f0f2f5; color: #1a1a2e; min-height: 100vh; }
+button { cursor: pointer; border: none; font-family: inherit; font-weight: 600; }
+input, select, textarea { font-size: 16px; font-family: inherit; }
+
+/* ── Pantallas ── */
+.screen { display: none; min-height: 100vh; }
+.screen.active { display: flex; flex-direction: column; }
+
+/* ── Header ── */
+.app-header {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  color: white; padding: 16px 20px;
+  display: flex; align-items: center; gap: 12px;
+}
+.app-header .back-btn {
+  background: rgba(255,255,255,0.2); color: white;
+  width: 36px; height: 36px; border-radius: 50%;
+  font-size: 18px; flex-shrink: 0;
+}
+.app-header h1 { font-size: 18px; font-weight: 700; }
+.app-header .sub { font-size: 13px; opacity: 0.85; }
+
+/* ── Login ── */
+#pantalla-login { background: white; padding: 40px 24px; justify-content: center; gap: 0; }
+.login-logo { font-size: 48px; text-align: center; margin-bottom: 8px; }
+.login-title { font-size: 26px; font-weight: 800; text-align: center; color: #1a1a2e; }
+.login-sub { font-size: 15px; color: #6b7280; text-align: center; margin-bottom: 36px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.form-group label { font-size: 13px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: .5px; }
+.form-group input, .form-group select, .form-group textarea {
+  padding: 14px 16px; border: 2px solid #e5e7eb; border-radius: 12px;
+  font-size: 16px; transition: border-color .2s;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+  outline: none; border-color: #4f46e5;
+}
+.pin-input { letter-spacing: 8px; font-size: 24px !important; text-align: center; }
+.btn-primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  color: white; font-size: 16px; padding: 16px;
+  border-radius: 14px; width: 100%; margin-top: 8px;
+  transition: opacity .2s;
+}
+.btn-primary:active { opacity: .85; }
+.btn-secondary {
+  background: #f3f4f6; color: #374151; font-size: 15px;
+  padding: 14px; border-radius: 12px; width: 100%; margin-top: 8px;
+}
+.btn-danger {
+  background: #fee2e2; color: #dc2626; font-size: 15px;
+  padding: 14px; border-radius: 12px; width: 100%; margin-top: 8px;
+}
+.link-btn { background: none; color: #4f46e5; font-size: 14px; padding: 12px 0; width: 100%; text-align: center; }
+.error-msg { color: #dc2626; font-size: 14px; text-align: center; min-height: 20px; margin-top: 4px; }
+
+/* ── Home ── */
+#pantalla-home { background: #f0f2f5; }
+.home-welcome {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  color: white; padding: 24px 20px 32px;
+}
+.home-user { font-size: 22px; font-weight: 800; }
+.home-area { font-size: 14px; opacity: .85; margin-top: 2px; }
+.home-actions { padding: 20px 16px; display: flex; flex-direction: column; gap: 12px; }
+.action-card {
+  background: white; border-radius: 16px; padding: 20px;
+  display: flex; align-items: center; gap: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  width: 100%; text-align: left;
+  transition: transform .15s;
+}
+.action-card:active { transform: scale(.98); }
+.action-icon { font-size: 32px; width: 52px; text-align: center; flex-shrink: 0; }
+.action-text h3 { font-size: 17px; font-weight: 700; color: #1a1a2e; }
+.action-text p  { font-size: 13px; color: #6b7280; margin-top: 2px; }
+.action-arrow { margin-left: auto; color: #9ca3af; font-size: 20px; }
+.home-logout { margin: 4px 16px 24px; }
+
+/* ── Formularios de operación ── */
+.screen-body { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 100px; }
+.card { background: white; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+.card-title { font-size: 13px; font-weight: 700; color: #4f46e5; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
+
+/* Autocomplete */
+.autocomplete-wrap { position: relative; }
+.autocomplete-input {
+  width: 100%; padding: 13px 16px; border: 2px solid #e5e7eb;
+  border-radius: 12px; font-size: 16px;
+}
+.autocomplete-input:focus { outline: none; border-color: #4f46e5; }
+.autocomplete-dropdown {
+  position: absolute; top: 100%; left: 0; right: 0;
+  background: white; border: 1px solid #e5e7eb;
+  border-radius: 12px; z-index: 100; max-height: 220px; overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12); display: none; margin-top: 4px;
+}
+.autocomplete-item { padding: 12px 16px; border-bottom: 1px solid #f3f4f6; cursor: pointer; }
+.autocomplete-item:last-child { border-bottom: none; }
+.autocomplete-item:active { background: #f0f2f5; }
+.autocomplete-item .ac-name { font-size: 15px; font-weight: 600; }
+.autocomplete-item .ac-detail { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+.selected-item {
+  background: #ede9fe; border-radius: 10px; padding: 10px 14px;
+  display: flex; align-items: center; gap: 10px; margin-top: 8px;
+}
+.selected-item .si-name { font-size: 15px; font-weight: 600; color: #4f46e5; }
+.selected-item .si-detail { font-size: 12px; color: #7c3aed; margin-top: 2px; }
+.selected-item .si-clear { margin-left: auto; background: none; color: #9ca3af; font-size: 18px; padding: 0 4px; }
+
+/* Qty */
+.qty-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.qty-row input { flex: 1; padding: 14px; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 20px; text-align: center; font-weight: 700; }
+.qty-row input:focus { outline: none; border-color: #4f46e5; }
+.qty-btn { width: 52px; height: 52px; border-radius: 12px; font-size: 24px; background: #f3f4f6; color: #1a1a2e; }
+
+/* Mise en place */
+.mise-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.mise-table th { text-align: left; padding: 6px 8px; color: #6b7280; font-size: 12px; font-weight: 600; border-bottom: 1px solid #f3f4f6; }
+.mise-table td { padding: 8px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+.mise-table td:last-child { border-bottom: none; }
+.mise-input { width: 80px; padding: 6px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 14px; text-align: center; }
+.mise-input:focus { outline: none; border-color: #4f46e5; }
+.mise-expected { color: #6b7280; }
+
+/* FAB submit */
+.fab-submit {
+  position: fixed; bottom: 24px; left: 16px; right: 16px;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  color: white; font-size: 17px; padding: 18px;
+  border-radius: 16px; box-shadow: 0 4px 16px rgba(79,70,229,.35);
+  transition: opacity .2s;
+}
+.fab-submit:disabled { opacity: .5; }
+.fab-submit:active { opacity: .85; }
+
+/* Votar */
+.prod-card {
+  background: white; border-radius: 16px; padding: 16px; margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.07);
+}
+.prod-name { font-size: 18px; font-weight: 700; }
+.prod-meta { font-size: 13px; color: #6b7280; margin-top: 4px; }
+.prod-votes { font-size: 13px; color: #4f46e5; margin-top: 6px; font-weight: 600; }
+.vote-btns { display: flex; gap: 10px; margin-top: 12px; }
+.btn-approve { flex: 1; background: #dcfce7; color: #16a34a; padding: 12px; border-radius: 10px; font-size: 15px; }
+.btn-reject  { flex: 1; background: #fee2e2; color: #dc2626; padding: 12px; border-radius: 10px; font-size: 15px; }
+.vote-done { text-align: center; color: #9ca3af; font-size: 14px; padding: 40px 16px; }
+
+/* Admin */
+.tab-row { display: flex; background: white; border-bottom: 1px solid #e5e7eb; }
+.tab-btn { flex: 1; padding: 14px 8px; font-size: 14px; font-weight: 600; color: #6b7280; background: none; border-bottom: 3px solid transparent; }
+.tab-btn.active { color: #4f46e5; border-bottom-color: #4f46e5; }
+.tab-panel { display: none; padding: 16px; }
+.tab-panel.active { display: block; }
+
+.usuario-card { background: white; border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.usuario-info { flex: 1; }
+.usuario-nombre { font-size: 16px; font-weight: 600; }
+.usuario-meta { font-size: 12px; color: #6b7280; margin-top: 2px; }
+.toggle-btn { padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+.toggle-active { background: #fee2e2; color: #dc2626; }
+.toggle-inactive { background: #dcfce7; color: #16a34a; }
+
+.inv-card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.inv-meta { font-size: 12px; color: #6b7280; margin-top: 4px; }
+.inv-link { word-break: break-all; font-size: 13px; color: #4f46e5; background: #ede9fe; padding: 10px 12px; border-radius: 8px; margin-top: 10px; }
+.copy-btn { background: #4f46e5; color: white; padding: 8px 14px; border-radius: 8px; font-size: 13px; margin-top: 8px; width: 100%; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: #1a1a2e; color: white; padding: 12px 20px;
+  border-radius: 10px; font-size: 14px; z-index: 1000;
+  white-space: nowrap; opacity: 0; transition: opacity .3s;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; }
+
+/* Spinner overlay */
+.spinner-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.4);
+  display: none; align-items: center; justify-content: center; z-index: 500;
+}
+.spinner-overlay.show { display: flex; }
+.spinner { width: 48px; height: 48px; border: 4px solid #ffffff40; border-top-color: white; border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Empty state */
+.empty-state { text-align: center; padding: 48px 16px; color: #9ca3af; }
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state p { font-size: 15px; }
+
+/* Badge */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+.badge-pending  { background: #fef3c7; color: #d97706; }
+.badge-ok       { background: #dcfce7; color: #16a34a; }
+.badge-rejected { background: #fee2e2; color: #dc2626; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ SPINNER ═══════════════════════════════ -->
+<div class="spinner-overlay" id="spinner-overlay">
+  <div class="spinner"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- ═══════════════════════════ PANTALLA: LOGIN ═══════════════════════════ -->
+<div class="screen active" id="pantalla-login">
+  <div class="login-logo">🍽️</div>
+  <div class="login-title">Piazza Pasticcio</div>
+  <div class="login-sub">Operaciones</div>
+
+  <div class="form-group">
+    <label>Nombre</label>
+    <input type="text" id="login-nombre" placeholder="Tu nombre" autocomplete="given-name">
+  </div>
+  <div class="form-group">
+    <label>PIN</label>
+    <input type="password" inputmode="numeric" id="login-pin" class="pin-input" placeholder="••••••" maxlength="6">
+  </div>
+  <div class="error-msg" id="login-error"></div>
+  <button class="btn-primary" onclick="doLogin()">Entrar</button>
+  <button class="link-btn" onclick="mostrar('pantalla-registro')">Tengo un link de invitación</button>
+</div>
+
+<!-- ══════════════════════════ PANTALLA: REGISTRO ════════════════════════ -->
+<div class="screen" id="pantalla-registro">
+  <div class="app-header">
+    <button class="back-btn" onclick="mostrar('pantalla-login')">←</button>
+    <div><div class="sub">Crear cuenta</div></div>
+  </div>
+  <div style="flex:1;padding:20px;background:white;">
+    <div class="form-group">
+      <label>Token de invitación</label>
+      <input type="text" id="reg-token" placeholder="Pega el token aquí">
+    </div>
+    <div class="form-group">
+      <label>Tu nombre</label>
+      <input type="text" id="reg-nombre" placeholder="Como quieres que aparezca">
+    </div>
+    <div class="form-group">
+      <label>PIN (6 dígitos)</label>
+      <input type="password" inputmode="numeric" id="reg-pin" class="pin-input" placeholder="••••••" maxlength="6">
+    </div>
+    <div class="form-group">
+      <label>Confirmar PIN</label>
+      <input type="password" inputmode="numeric" id="reg-pin2" class="pin-input" placeholder="••••••" maxlength="6">
+    </div>
+    <div class="error-msg" id="reg-error"></div>
+    <button class="btn-primary" onclick="doRegistro()">Crear cuenta</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════ PANTALLA: HOME ══════════════════════════ -->
+<div class="screen" id="pantalla-home">
+  <div class="home-welcome">
+    <div class="home-user" id="home-nombre">Hola</div>
+    <div class="home-area" id="home-area">—</div>
+  </div>
+  <div class="home-actions" id="home-actions">
+    <!-- Se llena dinámicamente según el área/rol -->
+  </div>
+  <div class="home-logout">
+    <button class="btn-secondary" onclick="doLogout()">Cerrar sesión</button>
+  </div>
+</div>
+
+<!-- ══════════════════════ PANTALLA: NUEVA PRODUCCIÓN ════════════════════ -->
+<div class="screen" id="pantalla-produccion">
+  <div class="app-header">
+    <button class="back-btn" onclick="mostrar('pantalla-home')">←</button>
+    <div>
+      <h1>Nueva Producción</h1>
+      <div class="sub" id="prod-area-label">—</div>
+    </div>
+  </div>
+  <div class="screen-body">
+
+    <!-- Subreceta -->
+    <div class="card">
+      <div class="card-title">Subreceta</div>
+      <div class="autocomplete-wrap">
+        <input type="text" class="autocomplete-input" id="sub-search"
+          placeholder="Buscar subreceta..." oninput="buscarSubreceta(this.value)">
+        <div class="autocomplete-dropdown" id="sub-dropdown"></div>
+      </div>
+      <div id="sub-selected" style="display:none" class="selected-item">
+        <div>
+          <div class="si-name" id="sub-sel-nombre"></div>
+          <div class="si-detail" id="sub-sel-detail"></div>
+        </div>
+        <button class="si-clear" onclick="limpiarSubreceta()">✕</button>
+      </div>
+    </div>
+
+    <!-- Cantidad -->
+    <div class="card">
+      <div class="card-title">Cantidad</div>
+      <div class="qty-row">
+        <button class="qty-btn" onclick="cambiarCantProd(-1)">−</button>
+        <input type="number" id="prod-qty" value="1" min="0.01" step="0.01" inputmode="decimal">
+        <button class="qty-btn" onclick="cambiarCantProd(1)">+</button>
+      </div>
+      <div style="text-align:center;font-size:13px;color:#9ca3af;margin-top:6px" id="prod-unidad-label"></div>
+    </div>
+
+    <!-- Fecha -->
+    <div class="card">
+      <div class="card-title">Fecha de producción</div>
+      <div class="form-group" style="margin:0">
+        <input type="date" id="prod-fecha">
+      </div>
+    </div>
+
+    <!-- Mise en place (opcional) -->
+    <div class="card" id="mise-card" style="display:none">
+      <div class="card-title">Mise en place (opcional)</div>
+      <div style="font-size:13px;color:#6b7280;margin-bottom:10px">
+        Ingresa las cantidades reales usadas para auditar el rendimiento.
+      </div>
+      <table class="mise-table">
+        <thead>
+          <tr>
+            <th>Ingrediente</th>
+            <th>Esperado</th>
+            <th>Real</th>
+          </tr>
+        </thead>
+        <tbody id="mise-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Hora (opcional) -->
+    <div class="card">
+      <div class="card-title">Hora de inicio / fin (opcional)</div>
+      <div style="display:flex;gap:10px">
+        <div class="form-group" style="flex:1;margin:0">
+          <label style="font-size:12px;color:#6b7280">Inicio</label>
+          <input type="time" id="prod-hora-inicio">
+        </div>
+        <div class="form-group" style="flex:1;margin:0">
+          <label style="font-size:12px;color:#6b7280">Fin</label>
+          <input type="time" id="prod-hora-fin">
+        </div>
+      </div>
+    </div>
+
+    <!-- Notas -->
+    <div class="card">
+      <div class="card-title">Notas (opcional)</div>
+      <textarea id="prod-notas" rows="2" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px;resize:none" placeholder="Observaciones..."></textarea>
+    </div>
+  </div>
+
+  <button class="fab-submit" id="btn-submit-prod" onclick="submitProduccion()" disabled>
+    Enviar producción
+  </button>
+</div>
+
+<!-- ══════════════════════════ PANTALLA: MERMA ═══════════════════════════ -->
+<div class="screen" id="pantalla-merma">
+  <div class="app-header">
+    <button class="back-btn" onclick="mostrar('pantalla-home')">←</button>
+    <div>
+      <h1>Registrar Merma</h1>
+      <div class="sub" id="merma-area-label">—</div>
+    </div>
+  </div>
+  <div class="screen-body">
+
+    <!-- Artículo -->
+    <div class="card">
+      <div class="card-title">Artículo</div>
+      <div class="autocomplete-wrap">
+        <input type="text" class="autocomplete-input" id="art-search"
+          placeholder="Buscar artículo..." oninput="buscarArticulo(this.value)">
+        <div class="autocomplete-dropdown" id="art-dropdown"></div>
+      </div>
+      <div id="art-selected" style="display:none" class="selected-item">
+        <div>
+          <div class="si-name" id="art-sel-nombre"></div>
+          <div class="si-detail" id="art-sel-detail"></div>
+        </div>
+        <button class="si-clear" onclick="limpiarArticulo()">✕</button>
+      </div>
+    </div>
+
+    <!-- Cantidad -->
+    <div class="card">
+      <div class="card-title">Cantidad</div>
+      <div class="qty-row">
+        <button class="qty-btn" onclick="cambiarCantMerma(-1)">−</button>
+        <input type="number" id="merma-qty" value="1" min="0.001" step="0.001" inputmode="decimal">
+        <button class="qty-btn" onclick="cambiarCantMerma(1)">+</button>
+      </div>
+      <div style="text-align:center;font-size:13px;color:#9ca3af;margin-top:6px" id="merma-unidad-label"></div>
+    </div>
+
+    <!-- Motivo -->
+    <div class="card">
+      <div class="card-title">Motivo</div>
+      <select id="merma-motivo" class="form-group" style="width:100%;padding:14px;border:2px solid #e5e7eb;border-radius:12px;background:white">
+        <option value="">Selecciona motivo...</option>
+      </select>
+    </div>
+
+    <!-- Almacén -->
+    <div class="card">
+      <div class="card-title">Almacén de origen</div>
+      <select id="merma-almacen" style="width:100%;padding:14px;border:2px solid #e5e7eb;border-radius:12px;background:white;font-size:16px">
+        <option value="COCINA">COCINA</option>
+        <option value="BARRA">BARRA</option>
+        <option value="SALUMERIA">SALUMERIA</option>
+        <option value="CAVA">CAVA</option>
+        <option value="ALIMENTARI">ALIMENTARI</option>
+        <option value="GENERAL">GENERAL</option>
+      </select>
+    </div>
+
+    <!-- Fecha -->
+    <div class="card">
+      <div class="card-title">Fecha</div>
+      <input type="date" id="merma-fecha" style="width:100%;padding:14px;border:2px solid #e5e7eb;border-radius:12px;font-size:16px">
+    </div>
+
+    <!-- Notas -->
+    <div class="card">
+      <div class="card-title">Notas (opcional)</div>
+      <textarea id="merma-notas" rows="2" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px;resize:none" placeholder="Descripción adicional..."></textarea>
+    </div>
+  </div>
+
+  <button class="fab-submit" id="btn-submit-merma" onclick="submitMerma()" disabled>
+    Registrar merma
+  </button>
+</div>
+
+<!-- ══════════════════════════ PANTALLA: VOTAR ═══════════════════════════ -->
+<div class="screen" id="pantalla-votar">
+  <div class="app-header">
+    <button class="back-btn" onclick="mostrar('pantalla-home')">←</button>
+    <div>
+      <h1>Autorizar Producciones</h1>
+      <div class="sub">Pendientes de aprobación</div>
+    </div>
+  </div>
+  <div class="screen-body" id="votar-lista">
+    <div class="empty-state">
+      <div class="icon">⏳</div>
+      <p>Cargando...</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ PANTALLA: ADMIN ═══════════════════════════ -->
+<div class="screen" id="pantalla-admin">
+  <div class="app-header">
+    <button class="back-btn" onclick="mostrar('pantalla-home')">←</button>
+    <div><h1>Administración</h1></div>
+  </div>
+  <div class="tab-row">
+    <button class="tab-btn active" onclick="openTab('tab-usuarios', this)">Usuarios</button>
+    <button class="tab-btn" onclick="openTab('tab-invitaciones', this)">Invitaciones</button>
+    <button class="tab-btn" onclick="openTab('tab-historial', this)">Historial</button>
+  </div>
+
+  <!-- Tab Usuarios -->
+  <div class="tab-panel active" id="tab-usuarios">
+    <div id="usuarios-lista">
+      <div class="empty-state"><div class="icon">⏳</div><p>Cargando...</p></div>
+    </div>
+  </div>
+
+  <!-- Tab Invitaciones -->
+  <div class="tab-panel" id="tab-invitaciones">
+    <div class="card" style="margin:0 0 16px">
+      <div class="card-title">Nueva invitación</div>
+      <div class="form-group">
+        <label>Área</label>
+        <select id="inv-area" style="width:100%;padding:14px;border:2px solid #e5e7eb;border-radius:12px;background:white;font-size:16px">
+          <option value="COCINA">COCINA</option>
+          <option value="BARRA">BARRA</option>
+          <option value="SALUMERIA">SALUMERIA</option>
+          <option value="CAVA">CAVA</option>
+          <option value="ALIMENTARI">ALIMENTARI</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Rol</label>
+        <select id="inv-rol" style="width:100%;padding:14px;border:2px solid #e5e7eb;border-radius:12px;background:white;font-size:16px">
+          <option value="operario">Operario</option>
+          <option value="encargado">Encargado (puede votar)</option>
+        </select>
+      </div>
+      <button class="btn-primary" onclick="generarInvitacion()">Generar link</button>
+    </div>
+    <div id="inv-resultado" style="display:none" class="card">
+      <div class="card-title">Link generado</div>
+      <div class="inv-link" id="inv-link-text"></div>
+      <button class="copy-btn" onclick="copiarLink()">Copiar link</button>
+    </div>
+    <div id="inv-lista" style="margin-top:8px"></div>
+  </div>
+
+  <!-- Tab Historial producciones -->
+  <div class="tab-panel" id="tab-historial">
+    <div id="historial-lista">
+      <div class="empty-state"><div class="icon">⏳</div><p>Cargando...</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════ SCRIPT ═════════════════════════════════ -->
+<script>
+  const WORKER_URL = 'https://piazza-operaciones.pablo-aranda.workers.dev';
+  const APP_URL = window.location.origin + window.location.pathname;
+
+  let sesion = null;      // { token, usuario: { id, nombre, area, rol } }
+  let subrecetas = [];    // catálogo de subrecetas del área
+  let articulos = [];     // catálogo de artículos del área (para mermas)
+  let motivos = [];       // motivos de merma
+  let selectedSub = null; // subreceta seleccionada en form producción
+  let selectedArt = null; // artículo seleccionado en form merma
+  let miseData = [];      // mise en place de la subreceta seleccionada
+
+  // ── Auth helpers ──────────────────────────────────────────────────────────
+
+  async function api(method, path, body = null, useAuth = true) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (useAuth && sesion) headers['Authorization'] = 'Bearer ' + sesion.token;
+    const res = await fetch(WORKER_URL + path, {
+      method, headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return res.json();
+  }
+
+  function saveSession(data) {
+    sesion = data;
+    localStorage.setItem('op_sesion', JSON.stringify(data));
+  }
+
+  function clearSession() {
+    sesion = null;
+    localStorage.removeItem('op_sesion');
+  }
+
+  // ── Navegación ────────────────────────────────────────────────────────────
+
+  function mostrar(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    // Scroll to top
+    window.scrollTo(0, 0);
+  }
+
+  function openTab(tabId, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    btn.classList.add('active');
+    if (tabId === 'tab-usuarios') cargarUsuarios();
+    if (tabId === 'tab-historial') cargarHistorial();
+  }
+
+  // ── Toast / Spinner ───────────────────────────────────────────────────────
+
+  function toast(msg, dur = 2500) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), dur);
+  }
+
+  function showSpinner() { document.getElementById('spinner-overlay').classList.add('show'); }
+  function hideSpinner() { document.getElementById('spinner-overlay').classList.remove('show'); }
+
+  // ── Login / Logout ────────────────────────────────────────────────────────
+
+  async function doLogin() {
+    const nombre = document.getElementById('login-nombre').value.trim();
+    const pin    = document.getElementById('login-pin').value.trim();
+    document.getElementById('login-error').textContent = '';
+    if (!nombre || !pin) { document.getElementById('login-error').textContent = 'Completa todos los campos'; return; }
+    showSpinner();
+    try {
+      const data = await api('POST', '/auth/login', { nombre, pin }, false);
+      if (data.ok) {
+        saveSession({ token: data.token, usuario: data.usuario });
+        await postLogin();
+      } else {
+        document.getElementById('login-error').textContent = data.error || 'Nombre o PIN incorrecto';
+      }
+    } catch(e) {
+      document.getElementById('login-error').textContent = 'Sin conexión al servidor';
+    } finally { hideSpinner(); }
+  }
+
+  async function doRegistro() {
+    const token  = document.getElementById('reg-token').value.trim();
+    const nombre = document.getElementById('reg-nombre').value.trim();
+    const pin    = document.getElementById('reg-pin').value.trim();
+    const pin2   = document.getElementById('reg-pin2').value.trim();
+    document.getElementById('reg-error').textContent = '';
+    if (!token || !nombre || !pin) { document.getElementById('reg-error').textContent = 'Completa todos los campos'; return; }
+    if (pin !== pin2) { document.getElementById('reg-error').textContent = 'Los PINs no coinciden'; return; }
+    if (!/^\d{6}$/.test(pin)) { document.getElementById('reg-error').textContent = 'El PIN debe ser 6 dígitos'; return; }
+    showSpinner();
+    try {
+      const data = await api('POST', '/auth/registro', { token, nombre, pin }, false);
+      if (data.ok) {
+        toast('Cuenta creada. Ahora ingresa con tu nombre y PIN.');
+        mostrar('pantalla-login');
+        document.getElementById('login-nombre').value = nombre;
+      } else {
+        document.getElementById('reg-error').textContent = data.error || 'Error al registrar';
+      }
+    } catch(e) {
+      document.getElementById('reg-error').textContent = 'Sin conexión al servidor';
+    } finally { hideSpinner(); }
+  }
+
+  function doLogout() {
+    clearSession();
+    mostrar('pantalla-login');
+  }
+
+  async function postLogin() {
+    const u = sesion.usuario;
+    document.getElementById('home-nombre').textContent = 'Hola, ' + u.nombre;
+    document.getElementById('home-area').textContent = u.area + ' · ' + u.rol;
+
+    // Construir acciones según área/rol
+    const actions = document.getElementById('home-actions');
+    actions.innerHTML = '';
+
+    const addCard = (icon, title, desc, fn) => {
+      const btn = document.createElement('button');
+      btn.className = 'action-card';
+      btn.innerHTML = `<div class="action-icon">${icon}</div>
+        <div class="action-text"><h3>${title}</h3><p>${desc}</p></div>
+        <div class="action-arrow">›</div>`;
+      btn.onclick = fn;
+      actions.appendChild(btn);
+    };
+
+    if (['COCINA','BARRA','SALUMERIA','CAVA'].includes(u.area)) {
+      addCard('🏭', 'Registrar Producción', 'Subrecetas elaboradas hoy', abrirProduccion);
+    }
+    addCard('📉', 'Registrar Merma', 'Desperdicios y bajas de inventario', abrirMerma);
+
+    if (u.rol === 'encargado' || u.rol === 'admin') {
+      addCard('✅', 'Autorizar Producciones', 'Votar producciones pendientes', abrirVotar);
+    }
+    if (u.rol === 'admin') {
+      addCard('⚙️', 'Administración', 'Usuarios, invitaciones, historial', abrirAdmin);
+    }
+
+    // Pre-cargar catálogos
+    cargarCatalogos();
+    mostrar('pantalla-home');
+  }
+
+  // ── Catálogos ─────────────────────────────────────────────────────────────
+
+  async function cargarCatalogos() {
+    const area = sesion.usuario.area;
+    try {
+      const [subData, artData, motData] = await Promise.all([
+        api('GET', '/subrecetas?area=' + area),
+        fetch(WORKER_URL + '/articulos?almacen=' + area).then(r => r.json()),
+        api('GET', '/motivos-merma'),
+      ]);
+      if (subData.ok) subrecetas = subData.subrecetas;
+      if (artData.ok) articulos = artData.articulos;
+      if (motData.ok) {
+        motivos = motData.motivos;
+        const sel = document.getElementById('merma-motivo');
+        sel.innerHTML = '<option value="">Selecciona motivo...</option>';
+        motivos.forEach(m => {
+          const o = document.createElement('option');
+          o.value = m.id;
+          o.textContent = m.nombre;
+          sel.appendChild(o);
+        });
+      }
+    } catch(e) { console.error('Error cargando catálogos', e); }
+  }
+
+  // ── Producción ────────────────────────────────────────────────────────────
+
+  async function abrirProduccion() {
+    limpiarSubreceta();
+    document.getElementById('prod-fecha').value = new Date().toISOString().split('T')[0];
+    document.getElementById('prod-qty').value = 1;
+    document.getElementById('prod-notas').value = '';
+    document.getElementById('prod-hora-inicio').value = '';
+    document.getElementById('prod-hora-fin').value = '';
+    document.getElementById('prod-area-label').textContent = sesion.usuario.area;
+    document.getElementById('btn-submit-prod').disabled = true;
+    mostrar('pantalla-produccion');
+  }
+
+  function buscarSubreceta(q) {
+    const dropdown = document.getElementById('sub-dropdown');
+    if (q.length < 2) { dropdown.style.display = 'none'; return; }
+    const results = subrecetas.filter(s =>
+      s.nombre.toLowerCase().includes(q.toLowerCase())
+    ).slice(0, 8);
+    if (results.length === 0) { dropdown.style.display = 'none'; return; }
+    dropdown.innerHTML = results.map(s =>
+      `<div class="autocomplete-item" onclick="seleccionarSubreceta('${s.id_xetux}')">
+        <div class="ac-name">${s.nombre}</div>
+        <div class="ac-detail">${s.unidad} · ${s.area}</div>
+       </div>`
+    ).join('');
+    dropdown.style.display = 'block';
+  }
+
+  async function seleccionarSubreceta(id) {
+    const sub = subrecetas.find(s => s.id_xetux === id);
+    if (!sub) return;
+    selectedSub = sub;
+    document.getElementById('sub-search').value = '';
+    document.getElementById('sub-dropdown').style.display = 'none';
+    document.getElementById('sub-sel-nombre').textContent = sub.nombre;
+    document.getElementById('sub-sel-detail').textContent = sub.unidad + ' · rendimiento ' + (sub.rendimiento || 1);
+    document.getElementById('sub-selected').style.display = 'flex';
+    document.getElementById('prod-unidad-label').textContent = sub.unidad;
+    document.getElementById('btn-submit-prod').disabled = false;
+
+    // Cargar mise en place
+    try {
+      const data = await api('GET', '/subrecetas/' + id + '/mise');
+      if (data.ok && data.mise && data.mise.length > 0) {
+        miseData = data.mise;
+        const tbody = document.getElementById('mise-tbody');
+        tbody.innerHTML = miseData.map((m, i) => `
+          <tr>
+            <td>${m.ingrediente}</td>
+            <td class="mise-expected">${m.cantidad_por_unidad} ${m.unidad}</td>
+            <td><input type="number" class="mise-input" id="mise-${i}"
+              placeholder="${m.cantidad_por_unidad}" step="0.001" inputmode="decimal"></td>
+          </tr>`
+        ).join('');
+        document.getElementById('mise-card').style.display = 'block';
+      } else {
+        miseData = [];
+        document.getElementById('mise-card').style.display = 'none';
+      }
+    } catch(e) {
+      miseData = [];
+      document.getElementById('mise-card').style.display = 'none';
+    }
+  }
+
+  function limpiarSubreceta() {
+    selectedSub = null; miseData = [];
+    document.getElementById('sub-search').value = '';
+    document.getElementById('sub-selected').style.display = 'none';
+    document.getElementById('mise-card').style.display = 'none';
+    document.getElementById('prod-unidad-label').textContent = '';
+    document.getElementById('btn-submit-prod').disabled = true;
+  }
+
+  function cambiarCantProd(d) {
+    const input = document.getElementById('prod-qty');
+    let v = parseFloat(input.value) || 1;
+    v = Math.max(0.01, v + d);
+    input.value = (v % 1 === 0) ? v : v.toFixed(2);
+  }
+
+  async function submitProduccion() {
+    if (!selectedSub) { toast('Selecciona una subreceta'); return; }
+    const cantidad = parseFloat(document.getElementById('prod-qty').value);
+    const fecha    = document.getElementById('prod-fecha').value;
+    if (!fecha) { toast('Selecciona una fecha'); return; }
+
+    // Recolectar mise real
+    const mise_real = miseData.map((m, i) => {
+      const val = parseFloat(document.getElementById('mise-' + i)?.value);
+      if (!val) return null;
+      return {
+        ingrediente: m.ingrediente,
+        cantidad_esperada: m.cantidad_por_unidad,
+        cantidad_real: val,
+        unidad: m.unidad,
+      };
+    }).filter(Boolean);
+
+    showSpinner();
+    try {
+      const data = await api('POST', '/producciones', {
+        subreceta_id: selectedSub.id_xetux,
+        cantidad,
+        fecha,
+        hora_inicio: document.getElementById('prod-hora-inicio').value || null,
+        hora_fin:    document.getElementById('prod-hora-fin').value    || null,
+        notas:       document.getElementById('prod-notas').value.trim() || null,
+        mise_real:   mise_real.length > 0 ? mise_real : undefined,
+      });
+      if (data.ok) {
+        toast('Producción registrada. Pendiente de autorización.');
+        mostrar('pantalla-home');
+      } else {
+        toast('Error: ' + (data.error || 'intenta de nuevo'));
+      }
+    } catch(e) {
+      toast('Sin conexión al servidor');
+    } finally { hideSpinner(); }
+  }
+
+  // ── Merma ─────────────────────────────────────────────────────────────────
+
+  async function abrirMerma() {
+    limpiarArticulo();
+    document.getElementById('merma-fecha').value = new Date().toISOString().split('T')[0];
+    document.getElementById('merma-qty').value = 1;
+    document.getElementById('merma-notas').value = '';
+    document.getElementById('merma-area-label').textContent = sesion.usuario.area;
+    document.getElementById('btn-submit-merma').disabled = true;
+    // Pre-seleccionar el almacén del área del usuario
+    const sel = document.getElementById('merma-almacen');
+    if (sel.querySelector(`option[value="${sesion.usuario.area}"]`)) {
+      sel.value = sesion.usuario.area;
+    }
+    mostrar('pantalla-merma');
+  }
+
+  function buscarArticulo(q) {
+    const dropdown = document.getElementById('art-dropdown');
+    if (q.length < 2) { dropdown.style.display = 'none'; return; }
+    const results = articulos.filter(a =>
+      a.nombre.toLowerCase().includes(q.toLowerCase()) ||
+      a.id_xetux.toLowerCase().includes(q.toLowerCase())
+    ).slice(0, 8);
+    if (results.length === 0) { dropdown.style.display = 'none'; return; }
+    dropdown.innerHTML = results.map(a =>
+      `<div class="autocomplete-item" onclick="seleccionarArticulo('${a.id_xetux}')">
+        <div class="ac-name">${a.nombre}</div>
+        <div class="ac-detail">${a.id_xetux} · ${a.unidad} · ${a.almacen}</div>
+       </div>`
+    ).join('');
+    dropdown.style.display = 'block';
+  }
+
+  function seleccionarArticulo(id) {
+    const art = articulos.find(a => a.id_xetux === id);
+    if (!art) return;
+    selectedArt = art;
+    document.getElementById('art-search').value = '';
+    document.getElementById('art-dropdown').style.display = 'none';
+    document.getElementById('art-sel-nombre').textContent = art.nombre;
+    document.getElementById('art-sel-detail').textContent = art.id_xetux + ' · ' + art.unidad;
+    document.getElementById('art-selected').style.display = 'flex';
+    document.getElementById('merma-unidad-label').textContent = art.unidad;
+    document.getElementById('merma-almacen').value = art.almacen || sesion.usuario.area;
+    document.getElementById('btn-submit-merma').disabled = false;
+  }
+
+  function limpiarArticulo() {
+    selectedArt = null;
+    document.getElementById('art-search').value = '';
+    document.getElementById('art-selected').style.display = 'none';
+    document.getElementById('merma-unidad-label').textContent = '';
+    document.getElementById('btn-submit-merma').disabled = true;
+  }
+
+  function cambiarCantMerma(d) {
+    const input = document.getElementById('merma-qty');
+    let v = parseFloat(input.value) || 1;
+    v = Math.max(0.001, +(v + d).toFixed(3));
+    input.value = v;
+  }
+
+  async function submitMerma() {
+    if (!selectedArt) { toast('Selecciona un artículo'); return; }
+    const cantidad = parseFloat(document.getElementById('merma-qty').value);
+    const motivo_id = document.getElementById('merma-motivo').value;
+    const almacen   = document.getElementById('merma-almacen').value;
+    const fecha     = document.getElementById('merma-fecha').value;
+    if (!motivo_id) { toast('Selecciona un motivo'); return; }
+
+    showSpinner();
+    try {
+      const data = await api('POST', '/mermas', {
+        articulo_id:   selectedArt.id_xetux,
+        articulo_nombre: selectedArt.nombre,
+        cantidad,
+        unidad:  selectedArt.unidad,
+        almacen,
+        motivo_id,
+        fecha,
+        notas: document.getElementById('merma-notas').value.trim() || null,
+      });
+      if (data.ok) {
+        toast('Merma registrada y notificada.');
+        mostrar('pantalla-home');
+      } else {
+        toast('Error: ' + (data.error || 'intenta de nuevo'));
+      }
+    } catch(e) {
+      toast('Sin conexión al servidor');
+    } finally { hideSpinner(); }
+  }
+
+  // ── Votar ─────────────────────────────────────────────────────────────────
+
+  async function abrirVotar() {
+    mostrar('pantalla-votar');
+    document.getElementById('votar-lista').innerHTML =
+      '<div class="empty-state"><div class="icon">⏳</div><p>Cargando...</p></div>';
+    try {
+      const data = await api('GET', '/producciones?estado=pendiente');
+      if (!data.ok) throw new Error(data.error);
+      const prods = data.producciones;
+      if (prods.length === 0) {
+        document.getElementById('votar-lista').innerHTML =
+          '<div class="empty-state"><div class="icon">✅</div><p>No hay producciones pendientes de autorización.</p></div>';
+        return;
+      }
+      document.getElementById('votar-lista').innerHTML = prods.map(p => `
+        <div class="prod-card" id="prodcard-${p.id}">
+          <div class="prod-name">${p.subreceta_nombre}</div>
+          <div class="prod-meta">
+            ${p.cantidad} ${p.unidad} · ${p.fecha} · ${p.area}<br>
+            Por: ${p.encargado}
+          </div>
+          <div class="prod-votes">Pendiente de autorización</div>
+          ${p.notas ? `<div style="font-size:13px;color:#6b7280;margin-top:6px">📝 ${p.notas}</div>` : ''}
+          <div class="vote-btns">
+            <button class="btn-approve" onclick="votar('${p.id}', true)">✅ Autorizar</button>
+            <button class="btn-reject"  onclick="votar('${p.id}', false)">❌ Rechazar</button>
+          </div>
+        </div>`
+      ).join('');
+    } catch(e) {
+      document.getElementById('votar-lista').innerHTML =
+        '<div class="empty-state"><div class="icon">⚠️</div><p>Error al cargar: ' + e.message + '</p></div>';
+    }
+  }
+
+  async function votar(prodId, aprobar) {
+    showSpinner();
+    try {
+      const voto = aprobar ? 'autoriza' : 'rechaza';
+      const data = await api('POST', '/producciones/' + prodId + '/voto', { voto });
+      if (data.ok) {
+        const card = document.getElementById('prodcard-' + prodId);
+        if (card) {
+          if (data.estado === 'autorizado') {
+            card.innerHTML = `<div class="prod-name">${card.querySelector('.prod-name').textContent}</div>
+              <div class="badge badge-ok" style="margin-top:8px">Autorizada — cargando a xetux</div>`;
+          } else if (data.estado === 'rechazado') {
+            card.innerHTML = `<div class="prod-name">${card.querySelector('.prod-name').textContent}</div>
+              <div class="badge badge-rejected" style="margin-top:8px">Rechazada</div>`;
+          } else {
+            card.querySelector('.vote-btns').innerHTML =
+              `<div style="color:#d97706;font-size:14px;width:100%;text-align:center">Voto registrado (${data.autoriza} de 2)</div>`;
+          }
+        }
+        toast(data.estado === 'autorizado' ? 'Producción autorizada.' :
+              data.estado === 'rechazado'  ? 'Producción rechazada.'  : 'Voto registrado.');
+      } else {
+        toast('Error: ' + (data.error || 'intenta de nuevo'));
+      }
+    } catch(e) {
+      toast('Sin conexión');
+    } finally { hideSpinner(); }
+  }
+
+  // ── Admin ─────────────────────────────────────────────────────────────────
+
+  async function abrirAdmin() {
+    mostrar('pantalla-admin');
+    cargarUsuarios();
+  }
+
+  async function cargarUsuarios() {
+    try {
+      const data = await api('GET', '/admin/usuarios');
+      if (!data.ok) throw new Error(data.error);
+      document.getElementById('usuarios-lista').innerHTML = data.usuarios.map(u => `
+        <div class="usuario-card">
+          <div class="usuario-info">
+            <div class="usuario-nombre">${u.nombre}</div>
+            <div class="usuario-meta">${u.area} · ${u.rol} ${u.activo ? '' : '· <span style="color:#dc2626">Inactivo</span>'}</div>
+          </div>
+          <button class="toggle-btn ${u.activo ? 'toggle-active' : 'toggle-inactive'}"
+            onclick="toggleUsuario('${u.id}', ${!u.activo})">
+            ${u.activo ? 'Desactivar' : 'Activar'}
+          </button>
+        </div>`
+      ).join('') || '<div class="empty-state"><div class="icon">👥</div><p>Sin usuarios</p></div>';
+    } catch(e) {
+      document.getElementById('usuarios-lista').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Error cargando usuarios</p></div>';
+    }
+  }
+
+  async function toggleUsuario(id, activar) {
+    showSpinner();
+    try {
+      const data = await api('PATCH', '/admin/usuarios/' + id, { activo: activar });
+      if (data.ok) { cargarUsuarios(); toast(activar ? 'Usuario activado' : 'Usuario desactivado'); }
+      else toast('Error: ' + data.error);
+    } catch(e) { toast('Sin conexión'); }
+    finally { hideSpinner(); }
+  }
+
+  async function generarInvitacion() {
+    const area = document.getElementById('inv-area').value;
+    const rol  = document.getElementById('inv-rol').value;
+    showSpinner();
+    try {
+      const data = await api('POST', '/auth/invitacion', { area, rol });
+      if (data.ok) {
+        const link = APP_URL + '?inv=' + data.token;
+        document.getElementById('inv-link-text').textContent = link;
+        document.getElementById('inv-resultado').style.display = 'block';
+        document.getElementById('inv-resultado').scrollIntoView({ behavior: 'smooth' });
+        window._lastInvLink = link;
+      } else {
+        toast('Error: ' + data.error);
+      }
+    } catch(e) { toast('Sin conexión'); }
+    finally { hideSpinner(); }
+  }
+
+  function copiarLink() {
+    if (!window._lastInvLink) return;
+    navigator.clipboard.writeText(window._lastInvLink)
+      .then(() => toast('Link copiado'))
+      .catch(() => toast('No se pudo copiar — cópialo manualmente'));
+  }
+
+  async function cargarHistorial() {
+    try {
+      const data = await api('GET', '/producciones');
+      if (!data.ok) throw new Error(data.error);
+      const prods = data.producciones;
+      if (prods.length === 0) {
+        document.getElementById('historial-lista').innerHTML =
+          '<div class="empty-state"><div class="icon">📋</div><p>Sin producciones registradas.</p></div>';
+        return;
+      }
+      const estadoBadge = { autorizado: 'badge-ok', rechazado: 'badge-rejected', cargado: 'badge-ok', pendiente_votacion: 'badge-pending', error_carga: 'badge-rejected' };
+      document.getElementById('historial-lista').innerHTML = prods.map(p => `
+        <div class="prod-card">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+            <div class="prod-name">${p.subreceta_nombre}</div>
+            <span class="badge ${estadoBadge[p.estado] || 'badge-pending'}">${p.estado.replace('_',' ')}</span>
+          </div>
+          <div class="prod-meta">${p.cantidad} ${p.unidad} · ${p.fecha} · ${p.area} · ${p.encargado}</div>
+        </div>`
+      ).join('');
+    } catch(e) {
+      document.getElementById('historial-lista').innerHTML =
+        '<div class="empty-state"><div class="icon">⚠️</div><p>Error al cargar</p></div>';
+    }
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    // Checar token de invitación en URL
+    const params = new URLSearchParams(window.location.search);
+    const invToken = params.get('inv');
+    if (invToken) {
+      document.getElementById('reg-token').value = invToken;
+      mostrar('pantalla-registro');
+      return;
+    }
+
+    // Checar sesión guardada
+    try {
+      const saved = localStorage.getItem('op_sesion');
+      if (saved) {
+        const data = JSON.parse(saved);
+        sesion = data;
+        // Verificar token sigue válido
+        const me = await api('GET', '/auth/me');
+        if (me.ok) {
+          sesion.usuario = me.usuario;
+          await postLogin();
+          return;
+        }
+      }
+    } catch(e) {}
+    clearSession();
+    mostrar('pantalla-login');
+  });
+
+  // Cerrar dropdowns al tocar fuera
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.autocomplete-wrap')) {
+      document.getElementById('sub-dropdown').style.display = 'none';
+      document.getElementById('art-dropdown').style.display = 'none';
+    }
+  });
+
+  // Enter en login
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const active = document.querySelector('.screen.active');
+      if (active?.id === 'pantalla-login') doLogin();
+    }
+  });
+</script>
+</body>
+</html>

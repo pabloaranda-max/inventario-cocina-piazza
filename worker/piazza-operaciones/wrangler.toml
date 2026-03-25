@@ -1,0 +1,9 @@
+name = "piazza-operaciones"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+account_id = "ee88d3b7085fc0e166ee75e77918e6c6"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "piazza-operaciones-db"
+database_id = "PLACEHOLDER"

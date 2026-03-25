@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
- <title>📦 Inventario ALIMENTARI - Piazza Pasticcio</title>
+ <title>📦 Inventario CAVA - Piazza Pasticcio</title>
  <style>
    /* ESTILOS CRÍTICOS Y GLOBALES */
    * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -134,7 +133,7 @@
      </div>
    </div>
    
-   <div class="inicio-titulo">📦 Inventario ALIMENTARI</div>
+   <div class="inicio-titulo">📦 Inventario CAVA</div>
    <div class="inicio-sub">Piazza Pasticcio</div>
    
    <div class="form-group">
@@ -156,7 +155,7 @@
  <div id="pantalla-inventario">
    
    <div id="header-sticky">
-     <div id="header-line1">📦 ALIMENTARI | Área | Operario</div>
+     <div id="header-line1">📦 CAVA | Área | Operario</div>
      <div id="header-line2">Fecha | 0 capturados</div>
    </div>
    
@@ -248,9 +247,9 @@
  <script>
    // CONSTANTE GLOBAL
    const WORKER_URL = 'https://piazza-operaciones.pablo-aranda.workers.dev';
-  const AREA = 'ALIMENTARI';
+  const AREA = 'CAVA';
 
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxgmVa9zMMYy0eGe8zFEVnoUuZWPH1w9cgT2oxBXI307N5eMD6vLnfd88Aovo6n6spO/exec';
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzOtPJ5D0GpvfaV9VR4K3QxYva1OPwYl_bdIk9Ye6VVZlbsJS-5nGqVjaobn5ASUTxs/exec';
    
    // Variables de Estado
    let sesionActiva = null;
@@ -259,7 +258,7 @@
    let currentChip = 'Todos';
 
    // Grupos según requerimiento
-   let grupos = ['Todos','ABARROTES','BEBIDAS','BEBIDAS CON ALCOHOL','CAFE Y TE','CARNES','CERVEZA Y REFRESCO','EMPAQUE','FRUTA Y VERDURA','GENERAL','GRUPO DE PRODUCTO','LACTEOS Y EMBUTIDOS','PRODUCTO TERMINADO','SALSAS ALIMENTARI','SUB RECETAS COCINA','VINO'];
+   let grupos = ['Todos', 'ABARROTES', 'CARNES', 'GENERAL', 'PRODUCTO TERMINADO', 'SUB RECETAS COCINA', 'VINO'];
 
    document.addEventListener('DOMContentLoaded', () => {
      // Setear fecha de hoy
@@ -269,8 +268,8 @@
      const saved = sessionStorage.getItem('sesion_activa');
      if (saved) {
        const sesion = JSON.parse(saved);
-       const dataKey = `inventario_alimentari_${sesion.fecha}`;
-       const dataMan = `manuales_alimentari_${sesion.fecha}`;
+       const dataKey = `inventario_cocina_${sesion.fecha}`;
+       const dataMan = `manuales_cocina_${sesion.fecha}`;
        
        // Mostrar banner si hay datos en LocalStorage para esta fecha
        if (localStorage.getItem(dataKey) || localStorage.getItem(dataMan)) {
@@ -308,8 +307,8 @@
 
      if (forzarNueva && sesionActiva) {
        // Limpiar localStorage de la sesión anterior
-       localStorage.removeItem(`inventario_alimentari_${sesionActiva.fecha}`);
-       localStorage.removeItem(`manuales_alimentari_${sesionActiva.fecha}`);
+       localStorage.removeItem(`inventario_cocina_${sesionActiva.fecha}`);
+       localStorage.removeItem(`manuales_cocina_${sesionActiva.fecha}`);
      }
 
      sesionActiva = { operario, area, fecha };
@@ -328,8 +327,8 @@
      document.getElementById('pantalla-inventario').style.display = 'block';
      
      // Cargar datos del localStorage
-     const dataKey = `inventario_alimentari_${sesionActiva.fecha}`;
-     const dataMan = `manuales_alimentari_${sesionActiva.fecha}`;
+     const dataKey = `inventario_cocina_${sesionActiva.fecha}`;
+     const dataMan = `manuales_cocina_${sesionActiva.fecha}`;
      
      inventarioLocal = JSON.parse(localStorage.getItem(dataKey) || '{}');
      manualesLocal = JSON.parse(localStorage.getItem(dataMan) || '[]');
@@ -349,7 +348,7 @@
      const mans = manualesLocal.length;
      const total = prods + mans;
      
-     document.getElementById('header-line1').textContent = `📦 ALIMENTARI | ${sesionActiva.area} | ${sesionActiva.operario}`;
+     document.getElementById('header-line1').textContent = `📦 CAVA | ${sesionActiva.area} | ${sesionActiva.operario}`;
      document.getElementById('header-line2').textContent = `${sesionActiva.fecha} | ${total} capturados`;
    }
 
@@ -377,7 +376,7 @@
      }
      
      // Auto-guardado
-     localStorage.setItem(`inventario_alimentari_${sesionActiva.fecha}`, JSON.stringify(inventarioLocal));
+     localStorage.setItem(`inventario_cocina_${sesionActiva.fecha}`, JSON.stringify(inventarioLocal));
      
      actualizarHeader();
      evaluarBotonEnviar();
@@ -574,7 +573,7 @@
        return;
      }
      
-     const consecutivo = manualesLocal.length + 1;
+     cono nst consecutivo = manualesLocal.length + 1;
      const codigo = `MANUAL-${consecutivo.toString().padStart(3, '0')}`;
      
      const nuevoManual = {
@@ -589,7 +588,7 @@
      
      manualesLocal.push(nuevoManual);
      try {
-       localStorage.setItem(`manuales_alimentari_${sesionActiva.fecha}`, JSON.stringify(manualesLocal));
+       localStorage.setItem(`manuales_cocina_${sesionActiva.fecha}`, JSON.stringify(manualesLocal));
      } catch(e) { /* cuota excedida, datos en memoria */ }
 
      renderManuales();
@@ -634,7 +633,7 @@
    function borrarManual(codigo) {
      manualesLocal = manualesLocal.filter(m => m.codigo !== codigo);
      try {
-       localStorage.setItem(`manuales_alimentari_${sesionActiva.fecha}`, JSON.stringify(manualesLocal));
+       localStorage.setItem(`manuales_cocina_${sesionActiva.fecha}`, JSON.stringify(manualesLocal));
      } catch(e) {}
      renderManuales();
      actualizarHeader();
@@ -698,7 +697,7 @@
        operario: sesionActiva.operario,
        area: sesionActiva.area,
        fecha: sesionActiva.fecha,
-       almacen: "ALIMENTARI",
+       almacen: "CAVA",
        timestamp: new Date().toISOString(),
        productos: productos,
        manuales: manualesLocal
@@ -726,8 +725,8 @@
        document.getElementById('spinner-actions').style.display = 'block';
        
        // Limpiar el localStorage de esta sesión
-       localStorage.removeItem(`inventario_alimentari_${sesionActiva.fecha}`);
-       localStorage.removeItem(`manuales_alimentari_${sesionActiva.fecha}`);
+       localStorage.removeItem(`inventario_cocina_${sesionActiva.fecha}`);
+       localStorage.removeItem(`manuales_cocina_${sesionActiva.fecha}`);
        
      }, 3000);
    }
@@ -757,7 +756,7 @@
     groqHistory.push({ role: 'user', content: msg });
 
     const capturados = Object.keys(inventarioLocal || {}).filter(k => inventarioLocal[k] > 0).length;
-    const sistema = 'Eres un asistente de inventario para Piazza Pasticcio, restaurante italiano en CDMX. El operario esta haciendo la toma de inventario del almacen ALIMENTARI. Lleva ' + capturados + ' productos capturados. Ayuda con dudas sobre productos, unidades de medida (KG=kilogramos, LT=litros, PZA=pieza, B.750=botella 750ml) o como usar la app. Responde en espanol, de forma muy breve y practica.';
+    const sistema = 'Eres un asistente de inventario para Piazza Pasticcio, restaurante italiano en CDMX. El operario esta haciendo la toma de inventario del almacen CAVA. Lleva ' + capturados + ' productos capturados. Ayuda con dudas sobre productos, unidades de medida (KG=kilogramos, LT=litros, PZA=pieza, B.750=botella 750ml) o como usar la app. Responde en espanol, de forma muy breve y practica.';
 
     try {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {

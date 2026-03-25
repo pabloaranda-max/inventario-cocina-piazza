@@ -1,0 +1,44 @@
+name: Scraper diario — ventas, compras, inventario
+
+on:
+  schedule:
+    - cron: '0 9 * * *'   # 3am Ciudad de México (UTC-6)
+  workflow_dispatch:        # permite correr manualmente desde GitHub
+
+jobs:
+  scraper:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hackatongourmet/restaurant-app/scraper
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Instalar Playwright
+        run: playwright install chromium --with-deps
+
+      - name: Crear .env
+        run: |
+          cat > .env << EOF
+          POS_URL=${{ secrets.POS_URL }}
+          POS_USER=${{ secrets.POS_USER }}
+          POS_PASSWORD=${{ secrets.POS_PASSWORD }}
+          SLACK_BOT_TOKEN=${{ secrets.SLACK_BOT_TOKEN }}
+          WORKER_URL=${{ secrets.WORKER_URL }}
+          SYNC_TOKEN=${{ secrets.SYNC_TOKEN }}
+          EOF
+
+      - name: Descargar reportes diarios
+        run: python3 scraper_reportes.py
+
+      - name: Sincronizar con D1
+        run: python3 sync_d1.py --inventario --compras --ventas

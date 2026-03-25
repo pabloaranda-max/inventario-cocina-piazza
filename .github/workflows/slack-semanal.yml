@@ -1,0 +1,51 @@
+name: Reporte semanal de costos — Slack
+
+on:
+  schedule:
+    - cron: '0 14 * * 1'   # lunes 8am Ciudad de México (UTC-6)
+  workflow_dispatch:
+
+jobs:
+  reporte:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hackatongourmet/restaurant-app/scraper
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Instalar dependencias Python
+        run: pip install python-dotenv xlrd requests
+
+      - name: Crear .env
+        run: |
+          cat > .env << EOF
+          POS_URL=${{ secrets.POS_URL }}
+          POS_USER=${{ secrets.POS_USER }}
+          POS_PASSWORD=${{ secrets.POS_PASSWORD }}
+          SLACK_BOT_TOKEN=${{ secrets.SLACK_BOT_TOKEN }}
+          WORKER_URL=${{ secrets.WORKER_URL }}
+          SYNC_TOKEN=${{ secrets.SYNC_TOKEN }}
+          EOF
+
+      # Los XLS del scraper diario se descargan en el job de scraper.
+      # Para que estén disponibles aquí, el job diario sube los downloads como artifact.
+      # Por ahora: descargar el inventario actual + ventas/compras de la semana.
+      - name: Instalar Playwright
+        run: playwright install chromium --with-deps
+
+      - name: Descargar datos de la semana
+        run: |
+          # Descargar ventas y compras de lunes a domingo de la semana anterior
+          LUNES=$(date -d 'last monday - 7 days' +%Y-%m-%d)
+          DOMINGO=$(date -d 'last sunday' +%Y-%m-%d)
+          python3 scraper_reportes.py --from "$LUNES" --to "$DOMINGO"
+
+      - name: Enviar reporte semanal a Slack
+        run: python3 slack_reportes.py --semanal
