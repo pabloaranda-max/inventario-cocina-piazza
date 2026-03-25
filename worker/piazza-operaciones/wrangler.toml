@@ -6,4 +6,4 @@ account_id = "ee88d3b7085fc0e166ee75e77918e6c6"
 [[d1_databases]]
 binding = "DB"
 database_name = "piazza-operaciones-db"
-database_id = "PLACEHOLDER"
+database_id = "488b406f-0a98-4e05-a736-00c6455524bc"
