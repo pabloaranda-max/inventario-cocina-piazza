@@ -178,6 +178,11 @@ async def scrape_compras_detalle(page, d0: date, d1: date) -> Path | None:
 
     await set_dates(page, "widget_startDateInput", "widget_endDateInput", d0, d1)
 
+    # Forzar F. Documento (value=2) — el default de la página es F. Recepción
+    # pero las compras en Xetux se registran consistentemente por F. Documento
+    await page.evaluate("() => { try { PF('widget_fieldDateList').selectValue('2'); } catch(e) {} }")
+    await asyncio.sleep(0.3)
+
     # Agrupar por Almacen > Articulo
     await set_select(page, "groupField1List", "Almacén")
     await set_select(page, "groupField2List", "Artículo")
