@@ -37,8 +37,12 @@ jobs:
           SYNC_TOKEN=${{ secrets.SYNC_TOKEN }}
           EOF
 
-      - name: Descargar reportes diarios
-        run: python3 scraper_reportes.py
+      - name: Descargar y reportar día anterior
+        run: |
+          AYER=$(date -d 'yesterday' +%Y-%m-%d)
+          echo "Descargando: $AYER"
+          python3 scraper_reportes.py --from "$AYER" --to "$AYER"
+          python3 slack_reportes.py --semanal --desde "$AYER" --hasta "$AYER"
 
       - name: Sincronizar con D1
         run: python3 sync_d1.py --inventario --compras --ventas
