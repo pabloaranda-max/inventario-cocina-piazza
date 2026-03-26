@@ -178,6 +178,9 @@ async def scrape_compras_detalle(page, d0: date, d1: date) -> Path | None:
 
     await set_dates(page, "widget_startDateInput", "widget_endDateInput", d0, d1)
 
+    # Filtrar por Fecha de Recepción (no fecha de documento)
+    await set_select(page, "fieldDateList", "F. Recepción")
+
     # Agrupar por Almacen > Articulo
     await set_select(page, "groupField1List", "Almacén")
     await set_select(page, "groupField2List", "Artículo")
