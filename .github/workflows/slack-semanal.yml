@@ -38,7 +38,7 @@ jobs:
       # Para que estén disponibles aquí, el job diario sube los downloads como artifact.
       # Por ahora: descargar el inventario actual + ventas/compras de la semana.
       - name: Instalar Playwright
-        run: playwright install chromium --with-deps
+        run: python3 -m playwright install chromium --with-deps
 
       - name: Descargar datos de la semana
         run: |
