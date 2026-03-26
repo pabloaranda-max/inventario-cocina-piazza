@@ -21,7 +21,7 @@ jobs:
           cache: 'pip'
 
       - name: Instalar dependencias Python
-        run: pip install python-dotenv xlrd requests
+        run: pip install -r requirements.txt
 
       - name: Crear .env
         run: |
