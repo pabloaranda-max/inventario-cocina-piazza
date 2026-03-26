@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: hackatongourmet/restaurant-app/scraper
+        working-directory: scraper
 
     steps:
       - uses: actions/checkout@v4

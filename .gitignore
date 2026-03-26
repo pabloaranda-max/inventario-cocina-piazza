@@ -1,1 +1,19 @@
 worker/piazza-api/.wrangler/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
+
+# python
+__pycache__/
+*.pyc
+venv/
+sourcevenv/
+
+# scraper — datos descargados (no van al repo)
+hackatongourmet/restaurant-app/scraper/downloads/
+hackatongourmet/restaurant-app/scraper/explore_output/
+scraper/downloads/
