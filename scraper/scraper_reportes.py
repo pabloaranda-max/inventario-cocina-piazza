@@ -178,8 +178,12 @@ async def scrape_compras_detalle(page, d0: date, d1: date) -> Path | None:
 
     await set_dates(page, "widget_startDateInput", "widget_endDateInput", d0, d1)
 
-    # Filtrar por Fecha de Recepción (no fecha de documento)
-    await set_select(page, "fieldDateList", "F. Recepción")
+    # Filtrar por Fecha de Recepción (value=1) — evitar texto con acento
+    await page.evaluate("""() => {
+        var sel = document.getElementById('fieldDateList_input');
+        if (sel) { sel.value = '1'; sel.dispatchEvent(new Event('change', {bubbles:true})); }
+    }""")
+    await asyncio.sleep(0.3)
 
     # Agrupar por Almacen > Articulo
     await set_select(page, "groupField1List", "Almacén")
