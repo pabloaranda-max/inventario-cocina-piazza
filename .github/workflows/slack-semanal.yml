@@ -40,12 +40,12 @@ jobs:
       - name: Instalar Playwright
         run: python3 -m playwright install chromium --with-deps
 
-      - name: Descargar datos de la semana
+      - name: Descargar y reportar semana anterior
         run: |
-          # Descargar ventas y compras de lunes a domingo de la semana anterior
-          LUNES=$(date -d 'last monday - 7 days' +%Y-%m-%d)
+          # Semana anterior: domingo pasado y el lunes de esa semana
+          # Robusto tanto si corre lunes como cualquier otro día
           DOMINGO=$(date -d 'last sunday' +%Y-%m-%d)
+          LUNES=$(date -d "$DOMINGO - 6 days" +%Y-%m-%d)
+          echo "Semana: $LUNES → $DOMINGO"
           python3 scraper_reportes.py --from "$LUNES" --to "$DOMINGO"
-
-      - name: Enviar reporte semanal a Slack
-        run: python3 slack_reportes.py --semanal
+          python3 slack_reportes.py --semanal --desde "$LUNES" --hasta "$DOMINGO"
