@@ -59,10 +59,11 @@ async def login(page):
 async def set_pf_date(page, widget_name: str, value: str):
     """Setea un PrimeFaces Calendar. value en formato dd/mm/yyyy."""
     parts = value.split("/")
-    iso = f"{parts[2]}-{parts[1]}-{parts[0]}"
+    # Usar constructor local (año, mes-1, día) para evitar el desfase UTC-6
+    y, m, d = parts[2], int(parts[1]) - 1, parts[0]
     await page.evaluate(f"""(() => {{
         try {{
-            PF('{widget_name}').setDate(new Date('{iso}'));
+            PF('{widget_name}').setDate(new Date({y}, {m}, {d}));
         }} catch(e) {{
             var id = '{widget_name}'.replace('widget_','') + '_input';
             var el = document.getElementById(id);
