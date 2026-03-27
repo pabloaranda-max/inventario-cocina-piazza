@@ -42,7 +42,9 @@ jobs:
           AYER=$(date -d 'yesterday' +%Y-%m-%d)
           echo "Descargando: $AYER"
           python3 scraper_reportes.py --from "$AYER" --to "$AYER"
-          python3 slack_reportes.py --semanal --desde "$AYER" --hasta "$AYER"
+          python3 slack_reportes.py --diario --desde "$AYER" --hasta "$AYER"
 
       - name: Sincronizar con D1
-        run: python3 sync_d1.py --inventario --compras --ventas
+        run: |
+          AYER=$(date -d 'yesterday' +%Y-%m-%d)
+          python3 sync_d1.py --inventario --compras --ventas --transferencias --fecha "$AYER"

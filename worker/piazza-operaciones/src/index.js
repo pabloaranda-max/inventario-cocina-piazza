@@ -383,6 +383,23 @@ export default {
             }
           }]
         );
+
+        // Disparar GitHub Actions cuando se autoriza
+        if (nuevoEstado === 'autorizado' && env.GITHUB_TOKEN) {
+          await fetch(
+            'https://api.github.com/repos/pabloaranda-max/piazza-scraper/actions/workflows/cargar_produccion.yml/dispatches',
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
+                'Accept': 'application/vnd.github+json',
+                'Content-Type': 'application/json',
+                'X-GitHub-Api-Version': '2022-11-28',
+              },
+              body: JSON.stringify({ ref: 'main', inputs: { produccion_id: id } }),
+            }
+          );
+        }
       }
 
       return addCors(ok({ estado: nuevoEstado || 'pendiente', autoriza, rechaza }), cors);
@@ -618,6 +635,45 @@ export default {
         await env.DB.batch(stmts.slice(i, i + 100));
       }
       return addCors(ok({ insertados: ventas.length }), cors);
+    }
+
+    if (method === 'POST' && path === '/sync/transferencias') {
+      if (request.headers.get('X-Sync-Token') !== env.SYNC_TOKEN)
+        return addCors(err('No autorizado', 401), cors);
+      const { fecha, transferencias = [] } = body;
+      if (!fecha) return addCors(err('fecha requerida'), cors);
+      await env.DB.prepare(`DELETE FROM transferencias_diarias WHERE fecha = ?`).bind(fecha).run();
+      const stmts = transferencias.map(t =>
+        env.DB.prepare(
+          `INSERT INTO transferencias_diarias (fecha, almacen_origen, almacen_destino, nombre, cantidad, unidad, costo_unit, costo_total)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(fecha, t.almacen_origen, t.almacen_destino, t.nombre, t.cantidad, t.unidad, t.costo_unit, t.costo_total)
+      );
+      for (let i = 0; i < stmts.length; i += 100) {
+        await env.DB.batch(stmts.slice(i, i + 100));
+      }
+      return addCors(ok({ insertados: transferencias.length }), cors);
+    }
+
+    if (method === 'POST' && path === '/sync/inventario-cerrado') {
+      if (request.headers.get('X-Sync-Token') !== env.SYNC_TOKEN)
+        return addCors(err('No autorizado', 401), cors);
+      const { mes, almacen, articulos = [] } = body;
+      if (!mes || !almacen) return addCors(err('mes y almacen requeridos'), cors);
+      // Borrar y reinsertar para que sea idempotente
+      await env.DB.prepare(
+        `DELETE FROM inventario_cerrado_mensual WHERE mes = ? AND almacen = ?`
+      ).bind(mes, almacen).run();
+      const stmts = articulos.map(a =>
+        env.DB.prepare(
+          `INSERT INTO inventario_cerrado_mensual (mes, almacen, articulo_id, nombre, unidad, cantidad, costo_unit, costo_total)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(mes, almacen, a.articulo_id, a.nombre, a.unidad, a.cantidad, a.costo_unit, a.costo_total)
+      );
+      for (let i = 0; i < stmts.length; i += 100) {
+        await env.DB.batch(stmts.slice(i, i + 100));
+      }
+      return addCors(ok({ insertados: articulos.length }), cors);
     }
 
     // ── XETUX CALLBACKS (desde cargar_xetux.py) ──────────────────────────────

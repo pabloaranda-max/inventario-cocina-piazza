@@ -41,7 +41,7 @@ jobs:
         run: python3 scraper_reportes.py --force-monthly
 
       - name: Sincronizar con D1
-        run: python3 sync_d1.py --inventario --compras --ventas
+        run: python3 sync_d1.py --inventario --compras --ventas --transferencias --inventario-cerrado
 
       - name: Reporte mensual a Slack
         run: python3 slack_reportes.py --mensual

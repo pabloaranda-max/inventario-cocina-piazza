@@ -1,8 +1,8 @@
-name: Scraper sábados — catálogos y recetas
+name: Scraper domingos — catálogos, recetas e inventarios cerrados
 
 on:
   schedule:
-    - cron: '0 10 * * 6'   # sábados 4am Ciudad de México (UTC-6)
+    - cron: '0 4 * * 0'   # domingos 10pm Ciudad de México (UTC-6)
   workflow_dispatch:
 
 jobs:
@@ -40,5 +40,18 @@ jobs:
       - name: Descargar catálogos y recetas
         run: python3 scraper_catalogos.py
 
-      - name: Sincronizar catálogo con D1
-        run: python3 sync_d1.py --catalogo
+      - name: Descargar ventas consolidado de la semana
+        run: |
+          DOMINGO=$(date -d 'today' +%Y-%m-%d)
+          LUNES=$(date -d "$DOMINGO - 6 days" +%Y-%m-%d)
+          echo "Consolidado semana: $LUNES → $DOMINGO"
+          python3 scraper_reportes.py --from "$LUNES" --to "$DOMINGO"
+
+      - name: Sincronizar catálogo e inventarios cerrados con D1
+        run: python3 sync_d1.py --catalogo --inventario-cerrado
+
+      - name: Reporte semanal a Slack
+        run: |
+          DOMINGO=$(date -d 'today' +%Y-%m-%d)
+          LUNES=$(date -d "$DOMINGO - 6 days" +%Y-%m-%d)
+          python3 slack_reportes.py --semanal --desde "$LUNES" --hasta "$DOMINGO"

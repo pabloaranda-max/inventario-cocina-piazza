@@ -175,11 +175,40 @@ CREATE TABLE IF NOT EXISTS ventas_diarias (
 
 -- ── Índices ───────────────────────────────────────────────────────
 
-CREATE INDEX IF NOT EXISTS idx_producciones_area    ON producciones(area, fecha);
-CREATE INDEX IF NOT EXISTS idx_producciones_estado  ON producciones(estado);
-CREATE INDEX IF NOT EXISTS idx_mermas_area          ON mermas(area, fecha);
-CREATE INDEX IF NOT EXISTS idx_mermas_estado        ON mermas(estado);
-CREATE INDEX IF NOT EXISTS idx_sesiones_usuario     ON sesiones(usuario_id);
-CREATE INDEX IF NOT EXISTS idx_inv_snapshots_fecha  ON inventario_snapshots(fecha, almacen);
-CREATE INDEX IF NOT EXISTS idx_compras_fecha        ON compras_diarias(fecha, almacen);
-CREATE INDEX IF NOT EXISTS idx_ventas_fecha         ON ventas_diarias(fecha, tipo_producto);
+CREATE TABLE IF NOT EXISTS transferencias_diarias (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  fecha           TEXT NOT NULL,
+  almacen_origen  TEXT NOT NULL,
+  almacen_destino TEXT NOT NULL,
+  nombre          TEXT NOT NULL,
+  cantidad        REAL NOT NULL,
+  unidad          TEXT NOT NULL,
+  costo_unit      REAL NOT NULL DEFAULT 0,
+  costo_total     REAL NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS inventario_cerrado_mensual (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  mes         TEXT NOT NULL,   -- YYYY-MM
+  almacen     TEXT NOT NULL,
+  articulo_id TEXT NOT NULL,
+  nombre      TEXT NOT NULL,
+  unidad      TEXT NOT NULL,
+  cantidad    REAL NOT NULL,   -- Cantidad Total (contada + receta)
+  costo_unit  REAL NOT NULL DEFAULT 0,  -- Costo Promedio
+  costo_total REAL NOT NULL DEFAULT 0,  -- Total Costo Promedio
+  UNIQUE(mes, almacen, articulo_id)
+);
+
+-- ── Índices ───────────────────────────────────────────────────────
+
+CREATE INDEX IF NOT EXISTS idx_producciones_area       ON producciones(area, fecha);
+CREATE INDEX IF NOT EXISTS idx_producciones_estado     ON producciones(estado);
+CREATE INDEX IF NOT EXISTS idx_mermas_area             ON mermas(area, fecha);
+CREATE INDEX IF NOT EXISTS idx_mermas_estado           ON mermas(estado);
+CREATE INDEX IF NOT EXISTS idx_sesiones_usuario        ON sesiones(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_inv_snapshots_fecha     ON inventario_snapshots(fecha, almacen);
+CREATE INDEX IF NOT EXISTS idx_compras_fecha           ON compras_diarias(fecha, almacen);
+CREATE INDEX IF NOT EXISTS idx_ventas_fecha            ON ventas_diarias(fecha, tipo_producto);
+CREATE INDEX IF NOT EXISTS idx_transferencias_fecha    ON transferencias_diarias(fecha, almacen_origen);
+CREATE INDEX IF NOT EXISTS idx_inv_cerrado_mes         ON inventario_cerrado_mensual(mes, almacen);

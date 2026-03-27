@@ -1,3 +1,12 @@
 name = "piazza-api"
 main = "src/index.js"
 compatibility_date = "2024-01-01"
+account_id = "ee88d3b7085fc0e166ee75e77918e6c6"
+
+[triggers]
+crons = ["0 6 * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "piazza-db"
+database_id = "b6ca7ddc-9c26-4053-bc8e-c2f0de4cc8fa"

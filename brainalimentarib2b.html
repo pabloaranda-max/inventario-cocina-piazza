@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Alimentari – Pedidos B2B</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 /* vietnamese */
 @font-face { font-family: 'Barlow'; font-style: normal; font-weight: 400; src: url(https://fonts.gstatic.com/s/barlow/v13/7cHpv4kjgoGqM7E_DMs5.woff2) format('woff2'); }
@@ -68,6 +69,36 @@
     color: var(--dark);
     min-height: 100vh;
     transition: background 0.3s, color 0.3s;
+  }
+
+  /* LOGIN */
+  #login-overlay {
+    position: fixed; inset: 0;
+    background: var(--dark);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 10000;
+    gap: 24px;
+  }
+  #login-overlay.hidden { display: none; }
+  .login-logo {
+    font-family: 'Great Vibes', cursive;
+    font-size: 2.5rem;
+    color: var(--cream);
+  }
+  .login-logo span { color: var(--gold); }
+  .login-subtitle {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .login-error {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--cochinilla);
+    display: none;
   }
 
   /* LOADING OVERLAY */
@@ -529,11 +560,32 @@
 
     /* Cards grid clientes/productos */
     .cards-grid { grid-template-columns: 1fr; }
+
+    /* Resumen ranking grid — columna única en mobile */
+    #resumen-ranking-grid { grid-template-columns: 1fr !important; }
   }
 
 </style>
 </head>
 <body>
+
+<!-- LOGIN OVERLAY -->
+<div id="login-overlay">
+  <div class="login-logo">Aliment<span>ari</span></div>
+  <div class="login-subtitle">Pedidos B2B — Acceso restringido</div>
+  <div id="g_id_onload"
+    data-client_id="550919074991-q1dfht8j6jj0ra3r5koq2jh5g30vo3ac.apps.googleusercontent.com"
+    data-callback="onGoogleLogin"
+    data-auto_prompt="false">
+  </div>
+  <div class="g_id_signin"
+    data-type="icon"
+    data-theme="outline"
+    data-shape="circle"
+    data-size="large">
+  </div>
+  <div class="login-error" id="login-error">No tienes acceso. Contacta al administrador.</div>
+</div>
 
 <!-- LOADING OVERLAY -->
 <div id="loading-overlay">
@@ -546,18 +598,23 @@
 <div id="toast"></div>
 
 <header>
-  <div class="logo">
-    <a href="https://docs.google.com/spreadsheets/d/18G9oj6AN6JBrl4t3Rwga1NANzpnL7LW8JFDekdZh_bw" target="_blank" title="Abrir Google Sheets" style="display:block;border-radius:50%;overflow:hidden;width:44px;height:44px;flex-shrink:0"><img class="logo-img" src="data:image/jpeg;base64,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" alt="Alimentari Pasticcio"></a>
+  <div class="logo" style="display:flex;flex-direction:column;align-items:center;gap:3px">
+    <a href="https://docs.google.com/spreadsheets/d/18G9oj6AN6JBrl4t3Rwga1NANzpnL7LW8JFDekdZh_bw" target="_blank" title="Abrir Google Sheets" onclick="generarMaster()" style="display:block;border-radius:50%;overflow:hidden;width:44px;height:44px;flex-shrink:0"><img class="logo-img" src="data:image/jpeg;base64,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" alt="Alimentari Pasticcio"></a>
+    <span id="sync-ts" style="font-family:'DM Mono',monospace;font-size:0.5rem;color:rgba(245,240,232,0.4);letter-spacing:0.05em;text-align:center;line-height:1"></span>
   </div>
   <div style="display:flex;align-items:center;gap:12px">
     <div class="nav-tabs">
       <button class="tab-btn active" onclick="showTab('pedidos', this)">Pedidos</button>
       <button class="tab-btn" onclick="showTab('clientes', this)">Clientes</button>
       <button class="tab-btn" onclick="showTab('productos', this)">Productos</button>
+      <button class="tab-btn" onclick="showTab('resumen', this)">Resumen</button>
     </div>
-    <button id="modo-btn" onclick="toggleModo()"
-      style="background:none;border:1px solid rgba(245,240,232,0.3);color:var(--cream);font-family:'DM Mono',monospace;font-size:0.7rem;letter-spacing:0.08em;padding:8px 12px;cursor:pointer;transition:all 0.2s"
-      title="Cambiar modo">☀</button>
+<button id="modo-btn" onclick="toggleModo()"
+      style="background:none;border:1px solid rgba(245,240,232,0.3);color:#F2EDE4;font-family:'DM Mono',monospace;font-size:0.7rem;letter-spacing:0.08em;padding:8px 12px;cursor:pointer;transition:all 0.2s"
+      title="Cambiar modo">Light mode</button>
+    <button onclick="logout()"
+      style="background:none;border:1px solid rgba(245,240,232,0.3);color:#C4B8A8;font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.08em;padding:8px 12px;cursor:pointer;transition:all 0.2s"
+      title="Cerrar sesión">Log out</button>
   </div>
 </header>
 
@@ -570,6 +627,9 @@
   </button>
   <button class="bottom-tab" id="btab-productos" onclick="showTab('productos',null)">
     <span class="tab-icon">◈</span>Productos
+  </button>
+  <button class="bottom-tab" id="btab-resumen" onclick="showTab('resumen',null)">
+    <span class="tab-icon">◉</span>Resumen
   </button>
 </nav>
 
@@ -590,7 +650,7 @@
         <div class="stat-num" id="stat-cobrar" style="font-size:1.5rem">—</div>
         <div class="stat-label">Por cobrar</div>
       </div>
-      <div class="stat-card stat-clickable" onclick="showTab('clientes',document.querySelectorAll('.tab-btn')[2])">
+      <div class="stat-card stat-clickable" onclick="showTab('clientes',document.querySelectorAll('.tab-btn')[1])">
         <div class="stat-num" id="stat-clientes">—</div>
         <div class="stat-label">Clientes activos</div>
       </div>
@@ -617,6 +677,8 @@
         <option value="todos">Todos los meses</option>
       </select>
     </div>
+    <input id="busqueda-pedidos" type="search" placeholder="Buscar cliente…" oninput="busquedaPedidos=this.value;renderPedidos()"
+      style="width:100%;padding:9px 14px;border:1px solid var(--light-border);border-radius:8px;background:var(--input-bg);color:var(--dark);font-family:'Barlow',sans-serif;font-size:0.85rem;margin-bottom:16px">
 
     <div class="table-wrap">
       <table>
@@ -641,12 +703,15 @@
         <div class="section-title">Clientes</div>
         <div class="section-sub">Restaurantes y distribuidores</div>
       </div>
-      <button class="btn btn-primary" onclick="openModal('modal-cliente')">+ Nuevo cliente</button>
+      <button class="btn btn-primary" id="btn-nuevo-cliente" onclick="openNuevoCliente()">+ Nuevo cliente</button>
     </div>
-    <div class="filters" style="margin-bottom:16px">
+    <div class="filters" style="margin-bottom:12px">
       <button class="filter-btn cli-filter active" onclick="filtrarClientes('activos',this)">Activos</button>
       <button class="filter-btn cli-filter" onclick="filtrarClientes('archivados',this)" style="color:var(--cochinilla)">Archivados</button>
+      <button class="filter-btn cli-filter" onclick="filtrarClientes('potenciales',this)" style="color:var(--gold)">Potenciales</button>
     </div>
+    <input id="busqueda-clientes" type="search" placeholder="Buscar cliente…" oninput="busquedaClientes=this.value;renderClientes()"
+      style="width:100%;padding:9px 14px;border:1px solid var(--light-border);border-radius:8px;background:var(--input-bg);color:var(--dark);font-family:'Barlow',sans-serif;font-size:0.85rem;margin-bottom:16px">
     <div class="cards-grid" id="clientes-grid">
       <div class="empty-state" style="grid-column:1/-1">
         <span class="emoji">🍽️</span>Agrega tu primer cliente B2B
@@ -663,10 +728,12 @@
       </div>
       <button class="btn btn-primary" onclick="openModal('modal-producto')">+ Nuevo producto</button>
     </div>
-    <div class="filters" style="margin-bottom:16px">
+    <div class="filters" style="margin-bottom:12px">
       <button class="filter-btn prod-filter active" onclick="filtrarProductos('disponibles',this)">Disponibles</button>
       <button class="filter-btn prod-filter" onclick="filtrarProductos('deshabilitados',this)" style="color:var(--cochinilla)">No disponibles</button>
     </div>
+    <input id="busqueda-productos" type="search" placeholder="Buscar producto…" oninput="busquedaProductos=this.value;renderProductos()"
+      style="width:100%;padding:9px 14px;border:1px solid var(--light-border);border-radius:8px;background:var(--input-bg);color:var(--dark);font-family:'Barlow',sans-serif;font-size:0.85rem;margin-bottom:16px">
     <div class="cards-grid" id="productos-grid">
       <div class="empty-state" style="grid-column:1/-1">
         <span class="emoji">🧀</span>Agrega tu primer producto
@@ -674,6 +741,103 @@
     </div>
   </div>
 
+  <!-- RESUMEN -->
+  <div class="section" id="tab-resumen">
+    <div class="pedidos-header" style="margin-bottom:24px">
+      <div>
+        <div class="section-title">Resumen</div>
+        <div class="section-sub">Totales y tendencias B2B</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+        <select id="resumen-periodo" onchange="renderResumen()"
+          style="font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.08em;border:1px solid var(--light-border);padding:8px 12px;background:var(--input-bg);color:var(--dark);cursor:pointer">
+          <option value="mes">Este mes</option>
+          <option value="3meses">Últimos 3 meses</option>
+          <option value="anio">Este año</option>
+          <option value="todo">Todo el tiempo</option>
+          <option disabled>──────────</option>
+        </select>
+        <select id="resumen-cliente" onchange="renderResumen()"
+          style="font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.08em;border:1px solid var(--light-border);padding:8px 12px;background:var(--input-bg);color:var(--dark);cursor:pointer">
+          <option value="">Todos los clientes</option>
+        </select>
+        <select id="resumen-producto" onchange="renderResumen()"
+          style="font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.08em;border:1px solid var(--light-border);padding:8px 12px;background:var(--input-bg);color:var(--dark);cursor:pointer">
+          <option value="">Todos los productos</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="stats-row" id="resumen-stats" style="margin-bottom:32px">
+      <div class="stat-card" style="background:var(--stat1-bg)">
+        <div class="stat-num" id="res-total-ventas" style="font-size:1.6rem">—</div>
+        <div class="stat-label">Total facturado</div>
+      </div>
+      <div class="stat-card" style="background:var(--stat2-bg)">
+        <div class="stat-num" id="res-num-pedidos">—</div>
+        <div class="stat-label">Pedidos</div>
+      </div>
+      <div class="stat-card" style="background:var(--stat3-bg)">
+        <div class="stat-num" id="res-promedio" style="font-size:1.6rem">—</div>
+        <div class="stat-label">Promedio por pedido</div>
+      </div>
+      <div class="stat-card" style="background:var(--stat4-bg)">
+        <div class="stat-num" id="res-clientes-unicos">—</div>
+        <div class="stat-label">Clientes con pedidos</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px" id="resumen-ranking-grid">
+      <!-- Top clientes -->
+      <div style="background:var(--card-bg);border:1px solid var(--light-border);padding:24px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-bottom:16px">Top clientes</div>
+        <div id="resumen-top-clientes"></div>
+      </div>
+      <!-- Top productos -->
+      <div style="background:var(--card-bg);border:1px solid var(--light-border);padding:24px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-bottom:16px">Top productos</div>
+        <div id="resumen-top-productos"></div>
+      </div>
+    </div>
+
+    <!-- Tabla mensual -->
+    <div style="background:var(--card-bg);border:1px solid var(--light-border);padding:24px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-bottom:16px">Ventas por mes</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Mes</th><th>Pedidos</th><th>Total</th><th>Pagado</th><th>Por cobrar</th>
+            </tr>
+          </thead>
+          <tbody id="resumen-tabla-meses"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL: HISTORIAL CLIENTE -->
+<div class="modal-overlay" id="modal-historial">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-title">
+      <span id="historial-cliente-nombre">Historial</span>
+      <button class="close-btn" onclick="closeModal('modal-historial')">×</button>
+    </div>
+    <div id="historial-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px"></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Pedido</th><th>Fecha</th><th>Productos</th><th>Total</th><th>Estado</th></tr>
+        </thead>
+        <tbody id="historial-tbody"></tbody>
+      </table>
+      <div id="historial-empty" class="empty-state" style="display:none">
+        <span class="emoji">📋</span>Sin pedidos para este cliente
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL: NUEVO PEDIDO -->
@@ -732,7 +896,14 @@
     <div class="form-section" style="padding:0;border:none;background:none">
       <div class="form-grid">
         <div class="form-group full">
-          <label>Nombre del restaurante</label>
+          <label>Tipo</label>
+          <select id="cli-tipo" onchange="toggleCamposProspecto(this.value)">
+            <option value="cliente">Cliente B2B</option>
+            <option value="potencial">Prospecto / Cliente potencial</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label>Nombre del restaurante / empresa</label>
           <input type="text" id="cli-nombre" placeholder="ej. Restaurante Noma">
         </div>
         <div class="form-group">
@@ -751,13 +922,33 @@
           <label>RFC</label>
           <input type="text" id="cli-rfc" placeholder="XAXX010101000">
         </div>
-        <div class="form-group full">
-          <label>Dirección de entrega</label>
-          <input type="text" id="cli-dir" placeholder="Calle, colonia, CDMX">
+        <div class="form-group full" style="position:relative">
+          <label>Dirección</label>
+          <input type="text" id="cli-dir" placeholder="Empieza a escribir la dirección…" autocomplete="off">
+          <input type="hidden" id="cli-mapsUrl">
         </div>
-        <div class="form-group full">
+        <div class="form-group full" id="campo-dias">
           <label>Días de entrega</label>
           <input type="text" id="cli-dias" placeholder="ej. Lunes y jueves">
+        </div>
+        <!-- Campos extra para prospectos -->
+        <div class="form-group full" id="campos-prospecto" style="display:none;grid-column:1/-1">
+          <div class="form-grid" style="grid-column:1/-1">
+            <div class="form-group">
+              <label>Estatus del prospecto</label>
+              <select id="cli-estatus-prospecto">
+                <option value="Por contactar">Por contactar</option>
+                <option value="Contactado">Contactado</option>
+                <option value="Interesado">Interesado</option>
+                <option value="En negociación">En negociación</option>
+                <option value="No interesado">No interesado</option>
+              </select>
+            </div>
+            <div class="form-group full">
+              <label>Productos de interés</label>
+              <textarea id="cli-interes" placeholder="ej. Pasta fresca, prosciutto, quesos italianos…" style="min-height:60px"></textarea>
+            </div>
+          </div>
         </div>
       </div>
       <div class="form-actions">
@@ -794,9 +985,11 @@
           <label>Unidad</label>
           <select id="pro-unidad">
             <option value="kg">kg</option>
+            <option value="gramo">gramo</option>
             <option value="pieza">pieza</option>
             <option value="paquete">paquete</option>
             <option value="litro">litro</option>
+            <option value="ml">ml</option>
           </select>
         </div>
         <div class="form-group">
@@ -828,26 +1021,146 @@ let productos = [];
 let pedidos   = [];
 
 // ================================================================
-//  API — fetch con credentials:omit (evita cookies Google → sin redirect login)
+//  AUTH — Google Identity Services
 // ================================================================
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz2ofRxbXayOnxnl4LGri9Mcq4UEcN-H_TDgo2wVfpl_vhbu1VuzV6Zxu9sc-drpU9I/exec';
+const API_URL = 'https://piazza-api.pablo-aranda.workers.dev';
+let sessionToken = localStorage.getItem('sessionToken') || '';
+let idToken = ''; // solo se usa durante el login
 
+async function onGoogleLogin(response) {
+  const token = response.credential;
+  try {
+    const r = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'login', idToken: token })
+    });
+    const data = await r.json();
+    if (!data.ok) {
+      document.getElementById('login-error').style.display = 'block';
+      return;
+    }
+    sessionToken = data.sessionToken;
+    localStorage.setItem('sessionToken', sessionToken);
+    document.getElementById('login-overlay').classList.add('hidden');
+    iniciarApp();
+  } catch (e) {
+    document.getElementById('login-error').style.display = 'block';
+  }
+}
+
+function logout() {
+  localStorage.removeItem('sessionToken');
+  sessionToken = '';
+  location.reload();
+}
+
+function compartirDireccion(clienteId) {
+  const cli = getCliente(clienteId);
+  if (!cli || !cli.dir) return;
+  const mapsUrl = cli.mapsUrl || 'https://maps.google.com/?q=' + encodeURIComponent(cli.dir);
+  const texto = `📍 *${cli.nombre}*\n${cli.dir}\n${mapsUrl}`;
+  window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+}
+
+(function initDirAutocomplete() {
+  const PLACES_KEY = 'AIzaSyDe1XwADgLj5zZXLHjRAmQR57Yfred7V2w';
+  const input = document.getElementById('cli-dir');
+  if (!input) return;
+
+  // Crear dropdown
+  const box = document.createElement('div');
+  box.id = 'dir-suggestions';
+  box.style.cssText = 'position:absolute;top:100%;left:0;right:0;background:var(--card-bg);border:1px solid var(--light-border);border-radius:8px;z-index:1000;display:none;max-height:220px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15)';
+  input.parentNode.appendChild(box);
+
+  let _timer = null;
+  let _preds = [];
+
+  input.addEventListener('input', () => {
+    document.getElementById('cli-mapsUrl').value = '';
+    const q = input.value.trim();
+    if (q.length < 4) { box.style.display = 'none'; return; }
+    clearTimeout(_timer);
+    _timer = setTimeout(async () => {
+      try {
+        const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': PLACES_KEY },
+          body: JSON.stringify({ input: q, includedRegionCodes: ['mx'] }),
+        });
+        const data = await res.json();
+        _preds = (data.suggestions || []).map(s => s.placePrediction).filter(Boolean);
+        if (!_preds.length) { box.style.display = 'none'; return; }
+        box.innerHTML = _preds.map((p, i) =>
+          `<div data-i="${i}" style="padding:10px 12px;cursor:pointer;font-size:0.75rem;border-bottom:1px solid var(--light-border);line-height:1.3"
+            onmouseover="this.style.background='rgba(0,0,0,0.06)'" onmouseout="this.style.background=''">
+            📍 ${p.text?.text || ''}
+          </div>`
+        ).join('');
+        box.querySelectorAll('div').forEach(el => {
+          el.addEventListener('click', () => {
+            const p = _preds[+el.dataset.i];
+            if (!p) return;
+            input.value = p.text?.text || input.value;
+            document.getElementById('cli-mapsUrl').value = `https://www.google.com/maps/search/?api=1&query_place_id=${p.placeId}`;
+            box.style.display = 'none';
+          });
+        });
+        box.style.display = 'block';
+      } catch(e) { box.style.display = 'none'; }
+    }, 400);
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#cli-dir') && !e.target.closest('#dir-suggestions')) {
+      box.style.display = 'none';
+    }
+  });
+})();
+
+function mostrarSyncTs() {
+  const ts = localStorage.getItem('syncTs');
+  const el = document.getElementById('sync-ts');
+  if (!el) return;
+  if (!ts) { el.textContent = ''; return; }
+  const d = new Date(ts);
+  el.textContent = d.toLocaleString('es-MX', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+async function generarMaster() {
+  try {
+    const res = await api('syncSheets');
+    if (res.ok) {
+      localStorage.setItem('syncTs', new Date().toISOString());
+      mostrarSyncTs();
+    } else {
+      console.error('syncSheets error:', res.error);
+    }
+  } catch(e) {
+    console.error('syncSheets catch:', e);
+  }
+}
+
+// ================================================================
+//  API
+// ================================================================
 async function api(action, body = {}) {
+  const headers = { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken };
   if (action === 'getAll') {
-    const r = await fetch(SCRIPT_URL + '?action=getAll', { credentials: 'omit' });
+    const r = await fetch(API_URL + '?action=getAll', { headers });
+    if (r.status === 401 || r.status === 403) { logout(); return; }
     const data = await r.json();
     if (data.error) throw new Error('BD: ' + data.error);
     return data;
   }
-  // Escrituras: no-cors + credentials omit
-  fetch(SCRIPT_URL, {
+  const r = await fetch(API_URL, {
     method: 'POST',
-    mode: 'no-cors',
-    credentials: 'omit',
-    headers: { 'Content-Type': 'text/plain' },
+    headers,
     body: JSON.stringify({ action, ...body })
-  }).catch(() => {});
-  return { ok: true };
+  });
+  if (r.status === 401 || r.status === 403) { logout(); return; }
+  return r.json();
 }
 
 // Carga inicial — trae los tres catálogos de una vez
@@ -858,11 +1171,12 @@ async function cargarTodo() {
   productos = (data.productos || []).filter(p => p.id && p.disponible !== 'borrado');
   pedidos   = (data.pedidos  || []).filter(p => p.id && p.estado !== 'borrado');
   // Normalizar tipos
-  clientes.forEach(c => { c.id = String(c.id); });
+  clientes.forEach(c => { c.id = String(c.id); if (!c.tipo) c.tipo = 'cliente'; });
   productos.forEach(p => { p.id = String(p.id); p.precio = Number(p.precio); p.disponible = p.disponible === '1' || p.disponible === 1 || p.disponible === true || p.disponible === 'true' ? 1 : 0; });
   pedidos.forEach(p => {
     p.id = String(p.id);
     p.clienteId = String(p.clienteId);
+    if (typeof p.items === 'string') { try { p.items = JSON.parse(p.items); } catch(e) { p.items = []; } }
     if (!Array.isArray(p.items)) p.items = [];
     p.items.forEach(i => { i.productoId = String(i.productoId); i.qty = Number(i.qty); });
     if (!p.factura)     p.factura     = 'Sin factura';
@@ -891,7 +1205,7 @@ function toast(msg, tipo = 'ok') {
 // ================================================================
 //  UTILS
 // ================================================================
-function esClienteActivo(c) { return c.activo !== 'false' && String(c.activo) !== '0'; }
+function esClienteActivo(c) { return c.activo !== 'false' && String(c.activo) !== '0' && c.tipo !== 'potencial'; }
 function getCliente(id)  { return clientes.find(c => c.id === String(id)); }
 function getProducto(id) { return productos.find(p => p.id === String(id)); }
 
@@ -911,7 +1225,7 @@ function formatMXN(n) {
 // ================================================================
 function toggleModo() {
   const dark = document.body.classList.toggle('dark');
-  document.getElementById('modo-btn').textContent = dark ? '☾' : '☀';
+  document.getElementById('modo-btn').textContent = dark ? 'Light mode' : 'Dark mode';
   localStorage.setItem('modo', dark ? 'dark' : 'light');
 }
 
@@ -920,7 +1234,7 @@ function toggleModo() {
     document.body.classList.add('dark');
     document.addEventListener('DOMContentLoaded', () => {
       const btn = document.getElementById('modo-btn');
-      if (btn) btn.textContent = '☾';
+      if (btn) btn.textContent = 'Light mode';
     });
   }
 })();
@@ -974,6 +1288,9 @@ let filtroActivo = 'activos';
 let filtroMesActivo = 'todos';
 let filtroClientesActivo = 'activos';
 let filtroProductosActivo = 'disponibles';
+let busquedaPedidos = '';
+let busquedaClientes = '';
+let busquedaProductos = '';
 let editandoPedidoId = null;
 
 function filtrarEstado(filtro, btn) {
@@ -1034,6 +1351,10 @@ function renderPedidos() {
   else if (filtroActivo === 'por-cobrar')   lista = activos.filter(p => p.pago !== 'Pagado');
   else                                       lista = pedidos.filter(p => p.estado === filtroActivo);
   if (filtroMesActivo !== 'todos') lista = lista.filter(p => p.mes === filtroMesActivo);
+  if (busquedaPedidos.trim()) {
+    const q = busquedaPedidos.trim().toLowerCase();
+    lista = lista.filter(p => { const c = getCliente(p.clienteId); return c && c.nombre.toLowerCase().includes(q); });
+  }
 
   if (lista.length === 0) {
     tbody.innerHTML = '';
@@ -1083,6 +1404,7 @@ function renderPedidos() {
       </td>
       <td style="white-space:nowrap">
         <button class="btn btn-sm" onclick="editarPedido('${p.id}')" style="margin-right:4px">✎</button>
+        ${cli && cli.dir ? `<button class="btn btn-sm" onclick="compartirDireccion('${p.clienteId}')" style="margin-right:4px;border-color:#25D366;color:#25D366" title="Compartir dirección por WhatsApp">📍</button>` : ''}
         <button class="btn btn-sm" onclick="eliminarPedido('${p.id}')" style="border-color:var(--cochinilla);color:var(--cochinilla)">✕</button>
       </td>
     </tr>`;
@@ -1151,33 +1473,57 @@ function filtrarClientes(filtro, btn) {
 
 function renderClientes() {
   const grid = document.getElementById('clientes-grid');
-  const lista = filtroClientesActivo === 'activos'
-    ? clientes.filter(esClienteActivo)
-    : clientes.filter(c => !esClienteActivo(c));
+  const btnNuevo = document.getElementById('btn-nuevo-cliente');
+  let lista;
+  if (filtroClientesActivo === 'activos') {
+    lista = clientes.filter(esClienteActivo);
+    if (btnNuevo) btnNuevo.textContent = '+ Nuevo cliente';
+  } else if (filtroClientesActivo === 'potenciales') {
+    lista = clientes.filter(c => c.tipo === 'potencial');
+    if (btnNuevo) btnNuevo.textContent = '+ Nuevo prospecto';
+  } else {
+    lista = clientes.filter(c => !esClienteActivo(c) && c.tipo !== 'potencial');
+    if (btnNuevo) btnNuevo.textContent = '+ Nuevo cliente';
+  }
+  if (busquedaClientes.trim()) {
+    const q = busquedaClientes.trim().toLowerCase();
+    lista = lista.filter(c => c.nombre.toLowerCase().includes(q) || (c.contacto||'').toLowerCase().includes(q));
+  }
+  const emptyMsgs = { activos: 'Agrega tu primer cliente B2B', archivados: 'No hay clientes archivados', potenciales: 'No hay prospectos registrados' };
   if (lista.length === 0) {
-    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><span class="emoji">🍽️</span>${filtroClientesActivo === 'activos' ? 'Agrega tu primer cliente B2B' : 'No hay clientes archivados'}</div>`;
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><span class="emoji">🍽️</span>${emptyMsgs[filtroClientesActivo]||''}</div>`;
     return;
   }
-  grid.innerHTML = lista.map(c => `
+  const estatusColor = { 'Por contactar':'var(--muted)', 'Contactado':'var(--gold)', 'Interesado':'#5C8A30', 'En negociación':'var(--olive)', 'No interesado':'var(--cochinilla)' };
+  grid.innerHTML = lista.map(c => {
+    const esActivo = esClienteActivo(c);
+    const esProspecto = c.tipo === 'potencial';
+    return `
     <div class="card">
-      <div class="card-label">Restaurante B2B</div>
+      <div class="card-label">${esProspecto ? 'Prospecto B2B' : 'Restaurante B2B'}</div>
       <div class="card-name">${c.nombre}</div>
-      <div class="card-detail">👤 ${c.contacto}</div>
-      <div class="card-detail">📱 ${c.tel}</div>
-      <div class="card-detail">📧 ${c.email}</div>
-      <div class="card-detail">🧾 RFC: ${c.rfc}</div>
-      <div class="card-detail">📍 ${c.dir}</div>
-      <div class="card-detail">📅 ${c.dias}</div>
+      ${esProspecto && c.estatus_prospecto ? `<div style="margin:4px 0"><span style="font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;padding:3px 8px;border-radius:2px;font-weight:500;background:rgba(201,147,58,0.15);color:${estatusColor[c.estatus_prospecto]||'var(--muted)'}">${c.estatus_prospecto}</span></div>` : ''}
+      ${c.contacto ? `<div class="card-detail">👤 ${c.contacto}</div>` : ''}
+      ${c.tel ? `<div class="card-detail">📱 ${c.tel}</div>` : ''}
+      ${c.email ? `<div class="card-detail">📧 ${c.email}</div>` : ''}
+      ${!esProspecto && c.rfc ? `<div class="card-detail">🧾 RFC: ${c.rfc}</div>` : ''}
+      ${c.dir ? `<div class="card-detail">📍 ${c.dir}</div>` : ''}
+      ${!esProspecto && c.dias ? `<div class="card-detail">📅 ${c.dias}</div>` : ''}
+      ${esProspecto && c.interes ? `<div class="card-detail" style="margin-top:6px;font-style:italic;color:var(--muted)">Interés: ${c.interes}</div>` : ''}
       <div class="card-actions">
-        ${esClienteActivo(c) ? `<button class="btn btn-sm btn-primary" onclick="nuevoPedidoCliente('${c.id}')">Nuevo pedido</button>` : ''}
+        ${esActivo ? `<button class="btn btn-sm btn-primary" onclick="nuevoPedidoCliente('${c.id}')">Nuevo pedido</button>` : ''}
+        ${esActivo ? `<button class="btn btn-sm" onclick="abrirHistorial('${c.id}')">Historial</button>` : ''}
+        ${esProspecto ? `<button class="btn btn-sm" onclick="convertirACliente('${c.id}')" style="border-color:var(--olive);color:var(--olive)">Convertir</button>` : ''}
         <button class="btn btn-sm" onclick="editarCliente('${c.id}')">Editar</button>
-        ${esClienteActivo(c)
+        ${esActivo
           ? `<button class="btn btn-sm" onclick="eliminarCliente('${c.id}')" style="border-color:var(--cochinilla);color:var(--cochinilla)">Archivar</button>`
-          : `<button class="btn btn-sm" onclick="restaurarCliente('${c.id}')" style="border-color:var(--verde,#4a7c59);color:var(--verde,#4a7c59)">Restaurar</button>`
+          : esProspecto
+            ? `<button class="btn btn-sm" onclick="eliminarProspecto('${c.id}')" style="border-color:var(--cochinilla);color:var(--cochinilla)">Eliminar</button>`
+            : `<button class="btn btn-sm" onclick="restaurarCliente('${c.id}')" style="border-color:var(--olive);color:var(--olive)">Restaurar</button>`
         }
       </div>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 async function eliminarCliente(id) {
@@ -1232,9 +1578,13 @@ function filtrarProductos(filtro, btn) {
 
 function renderProductos() {
   const grid = document.getElementById('productos-grid');
-  const lista = filtroProductosActivo === 'disponibles'
+  let lista = filtroProductosActivo === 'disponibles'
     ? productos.filter(p => p.disponible)
     : productos.filter(p => !p.disponible);
+  if (busquedaProductos.trim()) {
+    const q = busquedaProductos.trim().toLowerCase();
+    lista = lista.filter(p => p.nombre.toLowerCase().includes(q) || (p.cat||'').toLowerCase().includes(q));
+  }
   if (lista.length === 0) {
     grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><span class="emoji">🧀</span>${filtroProductosActivo === 'disponibles' ? 'Agrega tu primer producto' : 'No hay productos deshabilitados'}</div>`;
     return;
@@ -1290,13 +1640,18 @@ function editarCliente(id) {
   editandoClienteId = id;
   document.querySelector('#modal-cliente .modal-title').childNodes[0].textContent = 'Editar Cliente ';
   document.getElementById('btn-guardar-cliente').textContent = 'Actualizar cliente';
-  document.getElementById('cli-nombre').value   = c.nombre   || '';
-  document.getElementById('cli-contacto').value = c.contacto || '';
-  document.getElementById('cli-tel').value      = c.tel      || '';
-  document.getElementById('cli-email').value    = c.email    || '';
-  document.getElementById('cli-rfc').value      = c.rfc      || '';
-  document.getElementById('cli-dir').value      = c.dir      || '';
-  document.getElementById('cli-dias').value     = c.dias     || '';
+  document.getElementById('cli-nombre').value              = c.nombre              || '';
+  document.getElementById('cli-contacto').value            = c.contacto            || '';
+  document.getElementById('cli-tel').value                 = c.tel                 || '';
+  document.getElementById('cli-email').value               = c.email               || '';
+  document.getElementById('cli-rfc').value                 = c.rfc                 || '';
+  document.getElementById('cli-dir').value                 = c.dir                 || '';
+  document.getElementById('cli-mapsUrl').value             = c.mapsUrl             || '';
+  document.getElementById('cli-dias').value                = c.dias                || '';
+  document.getElementById('cli-tipo').value                = c.tipo                || 'cliente';
+  document.getElementById('cli-estatus-prospecto').value   = c.estatus_prospecto   || 'Por contactar';
+  document.getElementById('cli-interes').value             = c.interes             || '';
+  toggleCamposProspecto(c.tipo || 'cliente');
   openModal('modal-cliente');
 }
 
@@ -1310,12 +1665,16 @@ async function guardarCliente() {
 
   const campos = {
     nombre,
-    contacto: document.getElementById('cli-contacto').value,
-    tel:      document.getElementById('cli-tel').value,
-    email:    document.getElementById('cli-email').value,
-    rfc:      document.getElementById('cli-rfc').value,
-    dir:      document.getElementById('cli-dir').value,
-    dias:     document.getElementById('cli-dias').value,
+    contacto:           document.getElementById('cli-contacto').value,
+    tel:                document.getElementById('cli-tel').value,
+    email:              document.getElementById('cli-email').value,
+    rfc:                document.getElementById('cli-rfc').value,
+    dir:                document.getElementById('cli-dir').value,
+    mapsUrl:            document.getElementById('cli-mapsUrl').value,
+    dias:               document.getElementById('cli-dias').value,
+    tipo:               document.getElementById('cli-tipo').value,
+    estatus_prospecto:  document.getElementById('cli-estatus-prospecto').value,
+    interes:            document.getElementById('cli-interes').value,
   };
 
   try {
@@ -1333,7 +1692,11 @@ async function guardarCliente() {
     }
     closeModal('modal-cliente');
     renderClientes();
-    document.querySelectorAll('#modal-cliente input').forEach(i => i.value = '');
+    document.querySelectorAll('#modal-cliente input:not([type=hidden])').forEach(i => i.value = '');
+    document.getElementById('cli-mapsUrl').value = '';
+    document.getElementById('cli-interes').value = '';
+    document.getElementById('cli-tipo').value = 'cliente';
+    toggleCamposProspecto('cliente');
   } catch (e) {
     toast('Error al guardar: ' + e.message, 'error');
   } finally {
@@ -1437,9 +1800,9 @@ function renderProductosPedidoList(items) {
         <option value="">Producto...</option>
         ${disponibles.map(p => `<option value="${p.id}" ${p.id===item.productoId?'selected':''}>${p.nombre} – ${formatMXN(p.precio)}/${p.unidad}</option>`).join('')}
       </select>
-      <input type="number" min="1" value="${item.qty}"
-        style="width:60px;font-family:'DM Mono',monospace;font-size:0.75rem;border:1px solid var(--light-border);padding:6px;background:var(--cream)"
-        onchange="itemsPedido[${idx}].qty=parseInt(this.value)||1">
+      <input type="number" min="0.001" step="0.001" value="${item.qty}"
+        style="width:70px;font-family:'DM Mono',monospace;font-size:0.75rem;border:1px solid var(--light-border);padding:6px;background:var(--cream)"
+        onchange="itemsPedido[${idx}].qty=parseFloat(this.value)||0.001">
       <button class="remove-btn" onclick="quitarItem(${idx})">✕</button>
     </div>
   `).join('');
@@ -1556,6 +1919,302 @@ async function guardarPedido() {
 }
 
 // ================================================================
+//  CLIENTES — helpers adicionales
+// ================================================================
+function toggleCamposProspecto(tipo) {
+  const campos = document.getElementById('campos-prospecto');
+  const campoDias = document.getElementById('campo-dias');
+  if (!campos) return;
+  if (tipo === 'potencial') {
+    campos.style.display = 'block';
+    if (campoDias) campoDias.style.display = 'none';
+  } else {
+    campos.style.display = 'none';
+    if (campoDias) campoDias.style.display = '';
+  }
+}
+
+function openNuevoCliente() {
+  // Resetear el modal
+  editandoClienteId = null;
+  document.querySelector('#modal-cliente .modal-title').childNodes[0].textContent = 'Nuevo Cliente ';
+  document.getElementById('btn-guardar-cliente').textContent = 'Guardar cliente';
+  document.querySelectorAll('#modal-cliente input:not([type=hidden])').forEach(i => i.value = '');
+  document.getElementById('cli-mapsUrl').value = '';
+  document.getElementById('cli-interes').value = '';
+  // Preseleccionar tipo según el filtro activo
+  const tipo = filtroClientesActivo === 'potenciales' ? 'potencial' : 'cliente';
+  document.getElementById('cli-tipo').value = tipo;
+  toggleCamposProspecto(tipo);
+  document.querySelector('#modal-cliente .modal-title').childNodes[0].textContent = tipo === 'potencial' ? 'Nuevo Prospecto ' : 'Nuevo Cliente ';
+  openModal('modal-cliente');
+}
+
+async function convertirACliente(id) {
+  if (!confirm('¿Convertir este prospecto a cliente B2B activo?')) return;
+  const c = clientes.find(x => x.id === id);
+  if (!c) return;
+  const prevTipo = c.tipo;
+  c.tipo = 'cliente';
+  c.activo = 'true';
+  renderClientes();
+  renderStats();
+  try {
+    await api('updateCliente', { id, cambios: { tipo: 'cliente', activo: 'true' } });
+    toast('Prospecto convertido a cliente ✓');
+  } catch (e) {
+    c.tipo = prevTipo;
+    renderClientes();
+    toast('Error al convertir', 'error');
+  }
+}
+
+async function eliminarProspecto(id) {
+  if (!confirm('¿Eliminar este prospecto definitivamente?')) return;
+  const idx = clientes.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  const [removed] = clientes.splice(idx, 1);
+  renderClientes();
+  try {
+    await api('deleteCliente', { id });
+    toast('Prospecto eliminado');
+  } catch (e) {
+    clientes.splice(idx, 0, removed);
+    renderClientes();
+    toast('Error al eliminar', 'error');
+  }
+}
+
+// ================================================================
+//  HISTORIAL POR CLIENTE
+// ================================================================
+function abrirHistorial(clienteId) {
+  const c = getCliente(clienteId);
+  if (!c) return;
+  document.getElementById('historial-cliente-nombre').textContent = c.nombre;
+
+  const pedidosCli = pedidos
+    .filter(p => p.clienteId === clienteId && p.estado !== 'Cancelado')
+    .sort((a, b) => (b.fechaPedido || '').localeCompare(a.fechaPedido || ''));
+
+  const totalAcumulado = pedidosCli.reduce((s, p) => s + calcTotal(p.items), 0);
+  const totalPagado    = pedidosCli.filter(p => p.pago === 'Pagado').reduce((s, p) => s + calcTotal(p.items), 0);
+  const porCobrar      = totalAcumulado - totalPagado;
+
+  document.getElementById('historial-stats').innerHTML = `
+    <div style="background:var(--stat1-bg);padding:14px 18px;color:#F2EDE4">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:1.5rem">${formatMXN(totalAcumulado)}</div>
+      <div style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(242,237,228,0.6);margin-top:4px">Total acumulado</div>
+    </div>
+    <div style="background:var(--stat3-bg);padding:14px 18px;color:#F2EDE4">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:1.5rem">${pedidosCli.length}</div>
+      <div style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(242,237,228,0.6);margin-top:4px">Pedidos totales</div>
+    </div>
+    <div style="background:var(--stat2-bg);padding:14px 18px;color:#F2EDE4">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:1.5rem">${formatMXN(porCobrar)}</div>
+      <div style="font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(242,237,228,0.6);margin-top:4px">Por cobrar</div>
+    </div>
+  `;
+
+  const empty = document.getElementById('historial-empty');
+  const tbody = document.getElementById('historial-tbody');
+  if (pedidosCli.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    // Agrupar por mes
+    const grupos = {};
+    pedidosCli.forEach(p => {
+      const mes = p.mes || (p.fechaPedido ? p.fechaPedido.slice(0,7) : 'Sin fecha');
+      if (!grupos[mes]) grupos[mes] = [];
+      grupos[mes].push(p);
+    });
+    const nombres = { '01':'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio',
+                      '07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre' };
+    const mesesOrdenados = Object.keys(grupos).sort().reverse();
+    tbody.innerHTML = mesesOrdenados.flatMap(mes => {
+      const rows = grupos[mes];
+      const totalMes = rows.reduce((s, p) => s + calcTotal(p.items), 0);
+      const [y, mo] = mes.split('-');
+      const mesLabel = (nombres[mo] || mo) + (y ? ' ' + y : '');
+      const header = `<tr style="background:rgba(92,107,48,0.08)">
+        <td colspan="5" style="font-family:'Barlow Condensed',sans-serif;font-size:0.65rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);padding:8px 14px">
+          ${mesLabel} — ${rows.length} pedido${rows.length !== 1 ? 's' : ''} — <strong style="color:var(--dark)">${formatMXN(totalMes)}</strong>
+        </td>
+      </tr>`;
+      const filas = rows.map(p => {
+        const resumen = p.resumen || p.items.map(i => { const pr = getProducto(i.productoId); return pr ? `${pr.nombre} ×${i.qty}` : ''; }).filter(Boolean).join(', ');
+        const total   = calcTotal(p.items);
+        const estadoClass = { 'Recibido':'status-recibido','Preparando':'status-preparando','Entregado':'status-entregado' }[p.estado] || 'status-recibido';
+        const fechaFmt = p.fechaPedido ? p.fechaPedido.split('-').reverse().join('/') : '—';
+        return `<tr>
+          <td style="font-size:0.7rem;color:var(--muted)">P-${String(pedidos.indexOf(p)+1).padStart(3,'0')}</td>
+          <td style="font-size:0.72rem">${fechaFmt}</td>
+          <td style="font-size:0.72rem;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${resumen}</td>
+          <td><strong>${formatMXN(total)}</strong></td>
+          <td><span class="status-badge ${estadoClass}">${p.estado}</span></td>
+        </tr>`;
+      });
+      return [header, ...filas];
+    }).join('');
+  }
+  openModal('modal-historial');
+}
+
+// ================================================================
+//  RESUMEN / DASHBOARD
+// ================================================================
+function populateResumenFiltros() {
+  const activos = pedidos.filter(p => p.estado !== 'Cancelado');
+  const nombres = { '01':'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio',
+                    '07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre' };
+
+  const selPeriodo = document.getElementById('resumen-periodo');
+  const currentPeriodo = selPeriodo?.value || 'mes';
+  const mesesDisp = [...new Set(activos.map(p => p.mes).filter(Boolean))].sort().reverse();
+  // Mantener las 5 opciones fijas + separador, luego agregar meses
+  selPeriodo.innerHTML =
+    '<option value="mes">Este mes</option>' +
+    '<option value="3meses">Últimos 3 meses</option>' +
+    '<option value="anio">Este año</option>' +
+    '<option value="todo">Todo el tiempo</option>' +
+    '<option disabled>──────────</option>' +
+    mesesDisp.map(m => {
+      const [y, mo] = m.split('-');
+      return `<option value="${m}"${m === currentPeriodo ? ' selected' : ''}>${(nombres[mo]||mo)} ${y}</option>`;
+    }).join('');
+  // Restaurar selección si era una opción fija
+  if (['mes','3meses','anio','todo'].includes(currentPeriodo)) {
+    selPeriodo.value = currentPeriodo;
+  }
+
+  const selCli = document.getElementById('resumen-cliente');
+  const currentCli = selCli?.value || '';
+  selCli.innerHTML = '<option value="">Todos los clientes</option>' +
+    clientes.filter(c => c.activo).sort((a,b) => a.nombre.localeCompare(b.nombre))
+      .map(c => `<option value="${c.id}"${c.id === currentCli ? ' selected' : ''}>${c.nombre}</option>`)
+      .join('');
+
+  const selProd = document.getElementById('resumen-producto');
+  const currentProd = selProd?.value || '';
+  selProd.innerHTML = '<option value="">Todos los productos</option>' +
+    productos.filter(p => p.disponible !== 'borrado').sort((a,b) => a.nombre.localeCompare(b.nombre))
+      .map(p => `<option value="${p.id}"${p.id === currentProd ? ' selected' : ''}>${p.nombre}</option>`)
+      .join('');
+}
+
+function renderResumen() {
+  const periodo      = (document.getElementById('resumen-periodo')?.value)  || 'mes';
+  const filtroCliente= document.getElementById('resumen-cliente')?.value    || '';
+  const filtroProducto = document.getElementById('resumen-producto')?.value || '';
+  const esMesEspecifico = /^\d{4}-\d{2}$/.test(periodo);
+  const hoy = new Date();
+  const mesActual = hoy.toISOString().slice(0, 7);
+  const anioActual = hoy.getFullYear().toString();
+
+  const activos = pedidos.filter(p => p.estado !== 'Cancelado');
+
+  let lista;
+  if (esMesEspecifico) {
+    lista = activos.filter(p => p.mes === periodo);
+  } else if (periodo === 'mes') {
+    lista = activos.filter(p => p.mes === mesActual);
+  } else if (periodo === '3meses') {
+    const hace3 = new Date(hoy); hace3.setMonth(hoy.getMonth() - 2);
+    const desde = hace3.toISOString().slice(0, 7);
+    lista = activos.filter(p => p.mes >= desde);
+  } else if (periodo === 'anio') {
+    lista = activos.filter(p => p.mes && p.mes.startsWith(anioActual));
+  } else {
+    lista = activos;
+  }
+
+  if (filtroCliente)  lista = lista.filter(p => p.clienteId === filtroCliente);
+  if (filtroProducto) lista = lista.filter(p => p.items.some(i => i.productoId === filtroProducto));
+
+  const totalVentas = lista.reduce((s, p) => s + calcTotal(p.items), 0);
+  const numPedidos  = lista.length;
+  const promedio    = numPedidos > 0 ? totalVentas / numPedidos : 0;
+  const clientesUnicos = new Set(lista.map(p => p.clienteId)).size;
+
+  document.getElementById('res-total-ventas').textContent = formatMXN(totalVentas);
+  document.getElementById('res-num-pedidos').textContent  = numPedidos;
+  document.getElementById('res-promedio').textContent     = formatMXN(promedio);
+  document.getElementById('res-clientes-unicos').textContent = clientesUnicos;
+
+  // Top clientes
+  const porCliente = {};
+  lista.forEach(p => {
+    const c = getCliente(p.clienteId);
+    const nombre = c ? c.nombre : 'Desconocido';
+    if (!porCliente[nombre]) porCliente[nombre] = 0;
+    porCliente[nombre] += calcTotal(p.items);
+  });
+  const topCli = Object.entries(porCliente).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const maxCli = topCli[0]?.[1] || 1;
+  document.getElementById('resumen-top-clientes').innerHTML = topCli.length === 0
+    ? '<div style="color:var(--muted);font-size:0.78rem">Sin datos</div>'
+    : topCli.map(([nombre, total]) => `
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:4px">
+          <span>${nombre}</span><strong>${formatMXN(total)}</strong>
+        </div>
+        <div style="height:4px;background:var(--light-border);border-radius:2px">
+          <div style="height:4px;background:var(--cochinilla);border-radius:2px;width:${Math.round(total/maxCli*100)}%"></div>
+        </div>
+      </div>`).join('');
+
+  // Top productos
+  const porProd = {};
+  lista.forEach(p => {
+    p.items.forEach(i => {
+      const pr = getProducto(i.productoId);
+      const nombre = pr ? pr.nombre : 'Desconocido';
+      if (!porProd[nombre]) porProd[nombre] = { qty: 0, total: 0 };
+      porProd[nombre].qty   += i.qty;
+      porProd[nombre].total += pr ? pr.precio * i.qty : 0;
+    });
+  });
+  const topProd = Object.entries(porProd).sort((a, b) => b[1].total - a[1].total).slice(0, 5);
+  const maxProd = topProd[0]?.[1].total || 1;
+  document.getElementById('resumen-top-productos').innerHTML = topProd.length === 0
+    ? '<div style="color:var(--muted);font-size:0.78rem">Sin datos</div>'
+    : topProd.map(([nombre, d]) => `
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:4px">
+          <span>${nombre}</span><span style="color:var(--muted)">${d.qty % 1 === 0 ? d.qty : d.qty.toFixed(3)} uds — <strong style="color:var(--dark)">${formatMXN(d.total)}</strong></span>
+        </div>
+        <div style="height:4px;background:var(--light-border);border-radius:2px">
+          <div style="height:4px;background:var(--olive);border-radius:2px;width:${Math.round(d.total/maxProd*100)}%"></div>
+        </div>
+      </div>`).join('');
+
+  // Tabla de meses
+  const meses = [...new Set(lista.map(p => p.mes).filter(Boolean))].sort().reverse().slice(0, 12);
+  const nombres = { '01':'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio',
+                    '07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre' };
+  const tbody = document.getElementById('resumen-tabla-meses');
+  if (meses.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">Sin datos</td></tr>';
+    return;
+  }
+  tbody.innerHTML = meses.map(mes => {
+    const rowPedidos = lista.filter(p => p.mes === mes);
+    const total   = rowPedidos.reduce((s, p) => s + calcTotal(p.items), 0);
+    const pagado  = rowPedidos.filter(p => p.pago === 'Pagado').reduce((s, p) => s + calcTotal(p.items), 0);
+    const [y, mo] = mes.split('-');
+    return `<tr>
+      <td><strong>${(nombres[mo]||mo)} ${y}</strong></td>
+      <td>${rowPedidos.length}</td>
+      <td><strong>${formatMXN(total)}</strong></td>
+      <td style="color:#3D4A18">${formatMXN(pagado)}</td>
+      <td style="color:var(--cochinilla)">${formatMXN(total - pagado)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ================================================================
 //  RENDER ALL
 // ================================================================
 function renderAll() {
@@ -1564,12 +2223,15 @@ function renderAll() {
   renderPedidos();
   renderClientes();
   renderProductos();
+  populateResumenFiltros();
+  renderResumen();
 }
 
 // ================================================================
 //  INIT — carga datos al abrir
 // ================================================================
-(async () => {
+async function iniciarApp() {
+  mostrarSyncTs();
   const overlay = document.getElementById('loading-overlay');
   try {
     await cargarTodo();
@@ -1578,10 +2240,19 @@ function renderAll() {
     document.querySelector('.loading-text').textContent = 'Error al conectar con la base de datos';
     document.querySelector('.loading-text').style.color = '#C4613A';
     console.error(e);
-    return; // no ocultar overlay si hay error de conexión
+    return;
   }
   overlay.classList.add('hidden');
-  setTimeout(() => overlay.style.display = 'none', 400);
+}
+
+(async () => {
+  if (sessionToken) {
+    // ya hay sesión guardada → iniciar directo
+    iniciarApp();
+  } else {
+    // mostrar login, ocultar loading
+    document.getElementById('loading-overlay').classList.add('hidden');
+  }
 })();
 </script>
 </body>

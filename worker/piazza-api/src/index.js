@@ -1,13 +1,62 @@
-const SPREADSHEET_ID = '18G9oj6AN6JBrl4t3Rwga1NANzpnL7LW8JFDekdZh_bw';
-
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Token',
 };
 
-// ── OAuth: obtiene access token desde refresh token ──────────────
-async function getAccessToken(env) {
+const SPREADSHEET_ID = '18G9oj6AN6JBrl4t3Rwga1NANzpnL7LW8JFDekdZh_bw';
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+  });
+}
+
+function newId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+// ── Auth: verifica Google ID token ────────────────────────────────
+async function verifyGoogleToken(token) {
+  const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (data.error) return null;
+  return data; // { email, name, ... }
+}
+
+async function getUsuario(db, email) {
+  const row = await db.prepare('SELECT * FROM usuarios WHERE email = ?').bind(email).first();
+  return row || null;
+}
+
+function generateToken() {
+  const arr = new Uint8Array(32);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function createSession(db, email) {
+  const token = generateToken();
+  const expiry = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 días
+  await db.prepare('INSERT INTO sessions (token, email, expiry) VALUES (?, ?, ?)').bind(token, email, expiry).run();
+  return token;
+}
+
+async function getSessionEmail(db, token) {
+  if (!token) return null;
+  const row = await db.prepare('SELECT email, expiry FROM sessions WHERE token = ?').bind(token).first();
+  if (!row) return null;
+  if (Date.now() > row.expiry) {
+    await db.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
+    return null;
+  }
+  return row.email;
+}
+
+// ── Sheets OAuth2: obtiene access token con refresh token ─────────
+async function getSheetsToken(env) {
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -23,163 +72,233 @@ async function getAccessToken(env) {
   return data.access_token;
 }
 
-// ── Sheets helpers ────────────────────────────────────────────────
-async function sheetsGet(token, range) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}`;
-  const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
-  const data = await res.json();
-  return data.values || [];
+// ── Sync D1 → Sheets ──────────────────────────────────────────────
+async function syncToSheets(db, env) {
+  const token = await getSheetsToken(env);
+
+  const [clientes, productos, pedidos] = await Promise.all([
+    db.prepare('SELECT * FROM clientes').all(),
+    db.prepare('SELECT * FROM productos').all(),
+    db.prepare('SELECT * FROM pedidos').all(),
+  ]);
+
+  const sheets = [
+    {
+      range: 'clientes!A1',
+      values: [
+        ['id','nombre','contacto','tel','email','rfc','dir','dias','activo'],
+        ...clientes.results.map(r => [r.id, r.nombre, r.contacto, r.tel, r.email, r.rfc, r.dir, r.dias, r.activo ? 'true' : 'false']),
+      ],
+    },
+    {
+      range: 'productos!A1',
+      values: [
+        ['id','nombre','cat','unidad','precio','disponible'],
+        ...productos.results.map(r => [r.id, r.nombre, r.cat, r.unidad, r.precio, r.disponible]),
+      ],
+    },
+    {
+      range: 'pedidos!A1',
+      values: [
+        ['id','clienteId','items','resumen','fechaPedido','mes','fecha','estado','pago','factura','notas'],
+        ...pedidos.results.map(r => [r.id, r.clienteId, r.items, r.resumen, r.fechaPedido, r.mes, r.fecha, r.estado, r.pago, r.factura, r.notas]),
+      ],
+    },
+  ];
+
+  // Limpiar y reescribir cada hoja
+  for (const sheet of sheets) {
+    const sheetName = sheet.range.split('!')[0];
+
+    // Limpiar hoja
+    await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheetName}!A1:Z10000:clear`,
+      { method: 'POST', headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    // Escribir datos
+    await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheet.range}?valueInputOption=RAW`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: sheet.values }),
+      }
+    );
+  }
+
+  return { ok: true, clientes: clientes.results.length, productos: productos.results.length, pedidos: pedidos.results.length };
 }
 
-async function sheetsAppend(token, range, values) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values }),
-  });
-  return res.json();
-}
-
-async function sheetsUpdate(token, range, values) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?valueInputOption=RAW`;
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values }),
-  });
-  return res.json();
-}
-
-async function sheetsBatchGet(token) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchGet?ranges=clientes&ranges=productos&ranges=pedidos`;
-  const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
-  return res.json();
-}
-
-// ── Parsear filas a objetos ───────────────────────────────────────
-function parseSheet(rows, headers) {
-  if (!rows || rows.length < 2) return [];
-  return rows.slice(1).map(row => {
-    const obj = {};
-    headers.forEach((h, i) => obj[h] = row[i] ?? '');
-    return obj;
-  });
-}
-
-const HEADERS = {
-  clientes:  ['id','nombre','contacto','tel','email','rfc','dir','dias','activo'],
-  productos: ['id','nombre','cat','unidad','precio','disponible'],
-  pedidos:   ['id','clienteId','items','resumen','fechaPedido','mes','fecha','estado','pago','factura','notas'],
-};
-
-// ── Handlers ──────────────────────────────────────────────────────
-async function handleGetAll(token) {
-  const batch = await sheetsBatchGet(token);
-  const [c, p, pe] = batch.valueRanges || [];
+// ── Handlers GET ──────────────────────────────────────────────────
+async function handleGetAll(db) {
+  const [clientes, productos, pedidos] = await Promise.all([
+    db.prepare('SELECT * FROM clientes').all(),
+    db.prepare('SELECT * FROM productos').all(),
+    db.prepare('SELECT * FROM pedidos').all(),
+  ]);
   return {
-    clientes:  parseSheet(c?.values,  HEADERS.clientes),
-    productos: parseSheet(p?.values,  HEADERS.productos),
-    pedidos:   parseSheet(pe?.values, HEADERS.pedidos),
+    clientes:  clientes.results.map(r => ({ ...r, activo: r.activo ? 'true' : 'false' })),
+    productos: productos.results,
+    pedidos:   pedidos.results,
   };
 }
 
-function newId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-}
-
-async function handlePost(token, body) {
+// ── Handlers POST ─────────────────────────────────────────────────
+async function handlePost(db, body, env) {
   const { action, data, id, cambios } = body;
 
+  // ── Sync manual ──
+  if (action === 'syncSheets') {
+    return syncToSheets(db, env);
+  }
+
+  // ── Clientes ──
   if (action === 'addCliente') {
-    const newClienteId = newId();
-    const row = [newClienteId, data.nombre, data.contacto, data.tel, data.email, data.rfc, data.dir, data.dias, 'true'];
-    await sheetsAppend(token, 'clientes', [row]);
-    return { ok: true, id: newClienteId };
+    const newId_ = newId();
+    await db.prepare(
+      'INSERT INTO clientes (id,nombre,contacto,tel,email,rfc,dir,dias,activo,tipo,estatus_prospecto,interes) VALUES (?,?,?,?,?,?,?,?,1,?,?,?)'
+    ).bind(newId_, data.nombre, data.contacto||'', data.tel||'', data.email||'',
+            data.rfc||'', data.dir||'', data.dias||'',
+            data.tipo||'cliente', data.estatus_prospecto||'', data.interes||'').run();
+    return { ok: true, id: newId_ };
   }
 
+  if (action === 'updateCliente') {
+    const fields = Object.keys(cambios).map(k => `${k}=?`).join(',');
+    const vals = Object.values(cambios);
+    await db.prepare(`UPDATE clientes SET ${fields} WHERE id=?`).bind(...vals, id).run();
+    return { ok: true };
+  }
+
+  if (action === 'deleteCliente') {
+    await db.prepare('UPDATE clientes SET activo=0 WHERE id=?').bind(id).run();
+    return { ok: true };
+  }
+
+  // ── Productos ──
   if (action === 'addProducto') {
-    const newProductoId = newId();
-    const row = [newProductoId, data.nombre, data.cat, data.unidad, data.precio, 'true'];
-    await sheetsAppend(token, 'productos', [row]);
-    return { ok: true, id: newProductoId };
+    const newId_ = newId();
+    await db.prepare(
+      'INSERT INTO productos (id,nombre,cat,unidad,precio,disponible) VALUES (?,?,?,?,?,?)'
+    ).bind(newId_, data.nombre, data.cat||'', data.unidad||'', data.precio||'', 'true').run();
+    return { ok: true, id: newId_ };
   }
 
+  if (action === 'updateProducto') {
+    const fields = Object.keys(cambios).map(k => `${k}=?`).join(',');
+    const vals = Object.values(cambios);
+    await db.prepare(`UPDATE productos SET ${fields} WHERE id=?`).bind(...vals, id).run();
+    return { ok: true };
+  }
+
+  if (action === 'deleteProducto') {
+    await db.prepare("UPDATE productos SET disponible='borrado' WHERE id=?").bind(id).run();
+    return { ok: true };
+  }
+
+  // ── Pedidos ──
   if (action === 'addPedido') {
-    const newPedidoId = newId();
-    const row = [newPedidoId, data.clienteId, JSON.stringify(data.items), data.resumen,
-      data.fechaPedido, data.mes, data.fecha, data.estado || 'pendiente', data.pago || '', data.factura || '', data.notas || ''];
-    await sheetsAppend(token, 'pedidos', [row]);
-    return { ok: true, id: newPedidoId };
+    const newId_ = newId();
+    const items = typeof data.items === 'string' ? data.items : JSON.stringify(data.items);
+    await db.prepare(
+      'INSERT INTO pedidos (id,clienteId,items,resumen,fechaPedido,mes,fecha,estado,pago,factura,notas) VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+    ).bind(newId_, data.clienteId, items, data.resumen||'', data.fechaPedido||'',
+            data.mes||'', data.fecha||'', data.estado||'pendiente',
+            data.pago||'', data.factura||'', data.notas||'').run();
+    return { ok: true, id: newId_ };
   }
 
-  if (action === 'updateCliente' || action === 'deleteCliente') {
-    return await updateRow(token, 'clientes', HEADERS.clientes, id, cambios, action === 'deleteCliente' ? { activo: 'false' } : cambios);
+  if (action === 'updatePedido') {
+    const updates = { ...cambios };
+    if (updates.items && typeof updates.items !== 'string') {
+      updates.items = JSON.stringify(updates.items);
+    }
+    const fields = Object.keys(updates).map(k => `${k}=?`).join(',');
+    const vals = Object.values(updates);
+    await db.prepare(`UPDATE pedidos SET ${fields} WHERE id=?`).bind(...vals, id).run();
+    return { ok: true };
   }
 
-  if (action === 'updateProducto' || action === 'deleteProducto') {
-    return await updateRow(token, 'productos', HEADERS.productos, id, cambios, action === 'deleteProducto' ? { disponible: 'borrado' } : cambios);
+  if (action === 'deletePedido') {
+    await db.prepare("UPDATE pedidos SET estado='Cancelado' WHERE id=?").bind(id).run();
+    return { ok: true };
   }
 
-  if (action === 'updatePedido' || action === 'deletePedido') {
-    return await updateRow(token, 'pedidos', HEADERS.pedidos, id, cambios, action === 'deletePedido' ? { estado: 'borrado' } : cambios);
+  // ── Usuarios ──
+  if (action === 'addUsuario') {
+    await db.prepare(
+      'INSERT OR IGNORE INTO usuarios (email,nombre,rol) VALUES (?,?,?)'
+    ).bind(data.email, data.nombre||'', data.rol||'usuario').run();
+    return { ok: true };
+  }
+
+  if (action === 'deleteUsuario') {
+    await db.prepare('DELETE FROM usuarios WHERE email=?').bind(id).run();
+    return { ok: true };
   }
 
   return { error: 'Acción no reconocida: ' + action };
 }
 
-async function updateRow(token, sheet, headers, id, cambios, overrideCambios) {
-  const rows = await sheetsGet(token, sheet);
-  const idx = rows.findIndex((r, i) => i > 0 && r[0] === id);
-  if (idx === -1) return { error: 'No encontrado: ' + id };
-  const row = [...rows[idx]];
-  const updates = overrideCambios || cambios;
-  Object.entries(updates).forEach(([k, v]) => {
-    const col = headers.indexOf(k);
-    if (col !== -1) row[col] = (k === 'items' && typeof v !== 'string') ? JSON.stringify(v) : v;
-  });
-  const rowNum = idx + 1;
-  await sheetsUpdate(token, `${sheet}!A${rowNum}`, [row]);
-  return { ok: true };
-}
-
 // ── Entry point ───────────────────────────────────────────────────
 export default {
+  // Cron diario: dispara sync automático a las 6am UTC (1am Ciudad de México)
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(syncToSheets(env.DB, env));
+  },
+
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: CORS });
     }
 
+    const url = new URL(request.url);
+    const action = url.searchParams.get('action');
+
     try {
-      const token = await getAccessToken(env);
-
-      if (request.method === 'GET') {
-        const url = new URL(request.url);
-        const action = url.searchParams.get('action');
-        if (action === 'getAll') {
-          const result = await handleGetAll(token);
-          return new Response(JSON.stringify(result), {
-            headers: { ...CORS, 'Content-Type': 'application/json' },
-          });
-        }
-        return new Response(JSON.stringify({ error: 'Acción no válida' }), { status: 400, headers: CORS });
-      }
-
+      // ── Login: antes del middleware de auth ──
       if (request.method === 'POST') {
         const body = await request.json();
-        const result = await handlePost(token, body);
-        return new Response(JSON.stringify(result), {
-          headers: { ...CORS, 'Content-Type': 'application/json' },
-        });
+        if (body.action === 'login') {
+          const googleUser = await verifyGoogleToken(body.idToken);
+          if (!googleUser) return json({ error: 'Token inválido' }, 401);
+          const usuario = await getUsuario(env.DB, googleUser.email);
+          if (!usuario) return json({ error: 'Acceso denegado' }, 403);
+          const sessionToken = await createSession(env.DB, googleUser.email);
+          return json({ ok: true, sessionToken, usuario: { ...usuario, nombre: googleUser.name } });
+        }
+
+        // ── Auth para el resto de POSTs ──
+        const sessionToken = request.headers.get('X-Session-Token') || '';
+        const email = await getSessionEmail(env.DB, sessionToken);
+        if (!email) return json({ error: 'Sesión inválida o expirada' }, 401);
+        const usuario = await getUsuario(env.DB, email);
+        if (!usuario) return json({ error: 'Acceso denegado' }, 403);
+
+        return json(await handlePost(env.DB, body, env));
+      }
+
+      // ── Auth para GETs ──
+      const sessionToken = request.headers.get('X-Session-Token') || '';
+      const email = await getSessionEmail(env.DB, sessionToken);
+      if (!email) return json({ error: 'Sesión inválida o expirada' }, 401);
+      const usuario = await getUsuario(env.DB, email);
+      if (!usuario) return json({ error: 'Acceso denegado' }, 403);
+
+      if (request.method === 'GET') {
+        if (action === 'getAll') return json(await handleGetAll(env.DB));
+        if (action === 'getUsuarios') {
+          const rows = await env.DB.prepare('SELECT email,nombre,rol FROM usuarios').all();
+          return json(rows.results);
+        }
+        return json({ error: 'Acción no válida' }, 400);
       }
 
       return new Response('Method not allowed', { status: 405, headers: CORS });
 
     } catch (err) {
-      return new Response(JSON.stringify({ error: err.message }), {
-        status: 500,
-        headers: { ...CORS, 'Content-Type': 'application/json' },
-      });
+      return json({ error: err.message }, 500);
     }
   }
 };
