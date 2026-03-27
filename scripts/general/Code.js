@@ -63,7 +63,6 @@ function procesarInventario(payload) {
   const maestra = obtenerOCrearHoja(ss, SHEET_MAESTRA, HEADERS_MAESTRA);
   const nombreDetalle = generarNombreDetalle(area, fecha);
   const detalle = obtenerOCrearHoja(ss, nombreDetalle, HEADERS_DETALLE);
-  const carpetaFotos = obtenerOCrearCarpeta(fecha);
 
   const filasCatalogados = (productos || []).map(p => [
     timestamp, fecha, operario, area, almacen,
@@ -73,12 +72,14 @@ function procesarInventario(payload) {
 
   const filasManualesTotales = [];
   const filasDetalleManuales = [];
+  let carpetaFotos = null;
 
   for (const m of (manuales || [])) {
     let urlFoto   = '';
     let miniatura = '';
     if (m.foto_base64) {
       try {
+        if (!carpetaFotos) carpetaFotos = obtenerOCrearCarpeta(fecha);
         const { url, id } = subirFotoDrive(m.foto_base64, m.nombre, carpetaFotos);
         urlFoto   = url;
         miniatura = `=IMAGE("https://drive.google.com/thumbnail?id=${id}&sz=w120")`;
