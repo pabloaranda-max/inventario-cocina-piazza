@@ -28,6 +28,8 @@
  *   POST /sync/ventas              — recibe ventas del día del scraper
  *   POST /sync/catalogo            — recibe catálogo (artículos + subrecetas) del scraper
  *
+ *   GET  /reportes/mtd             — acumulado mensual desde D1 (ventas, compras, transferencias)
+ *
  *   POST /xetux/produccion-cargada — marca producción como cargada (desde cargar_xetux.py)
  *   POST /xetux/merma-cargada      — marca merma como cargada
  */
@@ -519,6 +521,42 @@ export default {
       return addCors(ok({
         pendientes: { producciones: prodsPend.n, mermas: mermasPend.n },
         este_mes:   { producciones: prodsMes.results, mermas: mermasMes.results },
+      }), cors);
+    }
+
+    // ── REPORTES MTD (llamado por slack_reportes.py) ─────────────────────────
+
+    if (method === 'GET' && path === '/reportes/mtd') {
+      if (request.headers.get('X-Sync-Token') !== env.SYNC_TOKEN)
+        return addCors(err('No autorizado', 401), cors);
+      const desde = url.searchParams.get('desde');
+      const hasta  = url.searchParams.get('hasta');
+      if (!desde || !hasta) return addCors(err('desde y hasta requeridos'), cors);
+
+      const [ventasRows, comprasRows, transEnvRows, transRecRows] = await Promise.all([
+        env.DB.prepare(
+          `SELECT tipo_producto, SUM(venta_neta) as total_ventas, SUM(costo_teorico) as total_costo
+           FROM ventas_diarias WHERE fecha BETWEEN ? AND ? GROUP BY tipo_producto`
+        ).bind(desde, hasta).all(),
+        env.DB.prepare(
+          `SELECT almacen, SUM(subtotal) as total
+           FROM compras_diarias WHERE fecha BETWEEN ? AND ? GROUP BY almacen`
+        ).bind(desde, hasta).all(),
+        env.DB.prepare(
+          `SELECT almacen_origen as almacen, SUM(costo_total) as total
+           FROM transferencias_diarias WHERE fecha BETWEEN ? AND ? GROUP BY almacen_origen`
+        ).bind(desde, hasta).all(),
+        env.DB.prepare(
+          `SELECT almacen_destino as almacen, SUM(costo_total) as total
+           FROM transferencias_diarias WHERE fecha BETWEEN ? AND ? GROUP BY almacen_destino`
+        ).bind(desde, hasta).all(),
+      ]);
+
+      return addCors(ok({
+        ventas_por_tipo:          ventasRows.results,
+        compras_por_almacen:      comprasRows.results,
+        transferencias_enviadas:  transEnvRows.results,
+        transferencias_recibidas: transRecRows.results,
       }), cors);
     }
 
