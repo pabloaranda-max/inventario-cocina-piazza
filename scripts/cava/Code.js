@@ -15,6 +15,11 @@ const HEADERS_MAESTRA = [
   'Descripción', 'URL Foto'
 ];
 
+const HEADERS_RESUMEN = [
+  'Timestamp', 'Fecha', 'Operario', 'Área', 'Almacén',
+  'Catalogados', 'No Catalogados', 'Total', 'Hoja Detalle'
+];
+
 const HEADERS_DETALLE = [
   'Timestamp', 'Fecha', 'Operario', 'Área', 'Almacén',
   'Código', 'Nombre', 'Unidad', 'Cantidad', 'Catalogado',
@@ -57,7 +62,7 @@ function doGet(e) {
 
 function procesarInventario(payload) {
   const ss        = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const timestamp = new Date().toISOString();
+  const timestamp = Utilities.formatDate(new Date(), 'America/Mexico_City', "yyyy-MM-dd'T'HH:mm:ss");
   const { operario, area, fecha, almacen, productos, manuales } = payload;
 
   const maestra = obtenerOCrearHoja(ss, SHEET_MAESTRA, HEADERS_MAESTRA);

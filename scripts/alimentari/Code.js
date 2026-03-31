@@ -71,7 +71,7 @@ function doGet(e) {
 // ── PROCESAMIENTO PRINCIPAL ─────────────────────────────────
 function procesarInventario(payload) {
   const ss        = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const timestamp = new Date().toISOString();
+  const timestamp = Utilities.formatDate(new Date(), 'America/Mexico_City', "yyyy-MM-dd'T'HH:mm:ss");
   const { operario, area, fecha, almacen, productos, manuales } = payload;
 
   // 1. Asegurar que existe la pestaña MAESTRA
