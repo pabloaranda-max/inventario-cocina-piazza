@@ -125,11 +125,23 @@ function procesarInventario(payload) {
     detalle.getRange(1, 1, 1, HEADERS_DETALLE.length).setFontWeight('bold');
   }
 
+  // Actualizar hoja RESUMEN
+  actualizarResumen(ss, timestamp, fecha, operario, area, almacen,
+    filasCatalogados.length, filasManualesTotales.length, nombreDetalle);
+
   return {
     catalogados: filasCatalogados.length,
     manuales: filasManualesTotales.length,
     hoja_detalle: nombreDetalle
   };
+}
+
+function actualizarResumen(ss, timestamp, fecha, operario, area, almacen, catalogados, noCatalogados, hojaDetalle) {
+  const resumen = obtenerOCrearHoja(ss, 'RESUMEN', HEADERS_RESUMEN);
+  resumen.getRange(resumen.getLastRow() + 1, 1, 1, HEADERS_RESUMEN.length).setValues([[
+    timestamp, fecha, operario, area, almacen,
+    catalogados, noCatalogados, catalogados + noCatalogados, hojaDetalle
+  ]]);
 }
 
 function listarTomas() {
