@@ -242,6 +242,11 @@
         <button class="btn-green" onclick="limpiarYVolverInicio()" style="margin-bottom:8px;">Nueva toma</button>
         <button onclick="descargarPDF()" style="width:100%;background:#3b82f6;color:white;padding:14px;border-radius:8px;font-size:15px;font-weight:bold;border:none;cursor:pointer;">📄 Descargar PDF</button>
      </div>
+     <div id="spinner-error" style="display:none; width:100%; margin-top:16px; text-align:center;">
+       <p style="font-size:14px; color:#555; margin-bottom:16px;">Tu inventario está guardado en este dispositivo.<br>Espera mejor señal e intenta de nuevo.</p>
+       <button onclick="ejecutarEnvio()" style="width:100%;background:#22c55e;color:white;padding:14px;border-radius:8px;font-size:15px;font-weight:bold;border:none;cursor:pointer;margin-bottom:8px;">🔄 Reintentar</button>
+       <button onclick="document.getElementById('modal-spinner').style.display='none'" style="width:100%;background:#e2e8f0;color:#475569;padding:14px;border-radius:8px;font-size:15px;font-weight:bold;border:none;cursor:pointer;">Cerrar y seguir capturando</button>
+     </div>
    </div>
  </div>
 
@@ -681,9 +686,8 @@
 
    function ejecutarEnvio() {
      cerrarModalConfirmar();
-     document.getElementById('modal-spinner').style.display = 'flex';
-     
-     // Armar Payload
+     mostrarSpinnerEnviando();
+
      const productos = [];
      document.querySelectorAll('#lista .qty-input').forEach(input => {
        const val = parseFloat(input.value) || 0;
@@ -697,7 +701,7 @@
          });
        }
      });
-     
+
      const payload = {
        operario: sesionActiva.operario,
        area: sesionActiva.area,
@@ -707,20 +711,31 @@
        productos: productos,
        manuales: manualesLocal
      };
-     
-     // Enviar con mode: 'no-cors'
+
      fetch(APPS_SCRIPT_URL, {
        method: 'POST',
        mode: 'no-cors',
        headers: {'Content-Type': 'text/plain'},
        body: JSON.stringify(payload)
      }).then(() => {
-       // Por el CORS no podemos leer respuesta, usamos timeout de 3 seg para éxito
        esperarYConfirmarExito();
-     }).catch(err => {
-       alert("Error de red. Intenta nuevamente.");
-       document.getElementById('modal-spinner').style.display = 'none';
+     }).catch(() => {
+       mostrarErrorRed();
      });
+   }
+
+   function mostrarSpinnerEnviando() {
+     document.getElementById('modal-spinner').style.display = 'flex';
+     document.getElementById('spinner-loader').style.display = 'block';
+     document.getElementById('spinner-text').innerHTML = 'Enviando...';
+     document.getElementById('spinner-actions').style.display = 'none';
+     document.getElementById('spinner-error').style.display = 'none';
+   }
+
+   function mostrarErrorRed() {
+     document.getElementById('spinner-loader').style.display = 'none';
+     document.getElementById('spinner-text').innerHTML = '⚠️ No se pudo enviar';
+     document.getElementById('spinner-error').style.display = 'block';
    }
 
    function esperarYConfirmarExito() {

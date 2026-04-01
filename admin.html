@@ -293,10 +293,28 @@ function filtrarAlmacen(almacen, btn) {
   renderTomas();
 }
 
+function detectarDuplicados(tomas) {
+  // Marca como duplicado si hay otra toma del mismo operario+area+almacen+fecha en un rango de 60 min
+  const duplicados = new Set();
+  for (let i = 0; i < tomas.length; i++) {
+    for (let j = i + 1; j < tomas.length; j++) {
+      const a = tomas[i], b = tomas[j];
+      if (a.operario === b.operario && a.area === b.area && a.almacen_nombre === b.almacen_nombre && a.fecha === b.fecha) {
+        const diffMin = Math.abs(new Date(a.timestamp) - new Date(b.timestamp)) / 60000;
+        if (diffMin <= 60) {
+          duplicados.add(a.timestamp);
+          duplicados.add(b.timestamp);
+        }
+      }
+    }
+  }
+  return duplicados;
+}
+
 function renderTomas() {
   const container = document.getElementById('tomas-container');
-  const tomas = filtroActual === 'TODOS' 
-    ? todasLasTomas 
+  const tomas = filtroActual === 'TODOS'
+    ? todasLasTomas
     : todasLasTomas.filter(t => t.almacen_nombre === filtroActual);
 
   if (tomas.length === 0) {
@@ -304,10 +322,14 @@ function renderTomas() {
     return;
   }
 
-  container.innerHTML = tomas.map(t => `
-    <div class="toma-card" id="toma-${t.timestamp.replace(/[:.]/g,'-')}">
+  const duplicados = detectarDuplicados(tomas);
+
+  container.innerHTML = tomas.map(t => {
+    const esDuplicado = duplicados.has(t.timestamp);
+    return `
+    <div class="toma-card" id="toma-${t.timestamp.replace(/[:.]/g,'-')}" style="border-left-color:${esDuplicado ? '#f59e0b' : '#667eea'}">
       <div class="toma-header">
-        <div class="toma-operario">${t.operario || 'Sin nombre'}</div>
+        <div class="toma-operario">${t.operario || 'Sin nombre'}${esDuplicado ? ' <span style="background:#fef3c7;color:#92400e;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">⚠️ Posible duplicado</span>' : ''}</div>
         <div class="toma-almacen">${t.almacen_nombre}</div>
       </div>
       <div class="toma-meta">📍 ${t.area || '—'} &nbsp;·&nbsp; 📅 ${t.fecha} &nbsp;·&nbsp; 🕐 ${new Date(t.timestamp).toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'})}</div>
@@ -320,7 +342,7 @@ function renderTomas() {
         </div>
       </div>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 async function borrarToma(timestamp, area, fecha, almacen, scriptUrl) {
