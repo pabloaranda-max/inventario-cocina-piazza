@@ -29,6 +29,28 @@ export async function uploadOptionalFile(
   return path
 }
 
+export async function uploadOptionalFiles(
+  supabase: SupabaseClient,
+  files: FormDataEntryValue[],
+  folder: string
+) {
+  const paths: string[] = []
+
+  for (const file of files) {
+    const path = await uploadOptionalFile(supabase, file, folder)
+    if (path) paths.push(path)
+  }
+
+  return paths
+}
+
+export async function removeStorageFiles(supabase: SupabaseClient, paths: Array<string | null | undefined>) {
+  const validPaths = paths.filter((path): path is string => Boolean(path))
+  if (!validPaths.length) return
+
+  await supabase.storage.from(BUCKET).remove(validPaths)
+}
+
 export async function createSignedUrl(supabase: SupabaseClient, path: string | null) {
   if (!path) return null
 

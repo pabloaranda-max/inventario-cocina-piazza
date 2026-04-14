@@ -18,8 +18,18 @@ export function ProveedorForm({ proveedor }: { proveedor?: Proveedor }) {
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Nombre" name="nombre" defaultValue={proveedor?.nombre} required />
-        <Field label="Telefono" name="telefono" defaultValue={proveedor?.telefono} />
-        <Field label="Contacto" name="contacto" defaultValue={proveedor?.contacto} />
+        <Field label="Contacto principal" name="contacto" defaultValue={proveedor?.contacto} />
+        <Field label="Teléfono principal" name="telefono" defaultValue={proveedor?.telefono} />
+        <Field
+          label="Contacto secundario"
+          name="contacto_secundario"
+          defaultValue={proveedor?.contacto_secundario}
+        />
+        <Field
+          label="Teléfono secundario"
+          name="telefono_secundario"
+          defaultValue={proveedor?.telefono_secundario}
+        />
       </div>
 
       <MultipleDefinedCheckboxes

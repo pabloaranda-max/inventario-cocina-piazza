@@ -77,6 +77,11 @@ export function MantenimientoForm({
         </label>
       </div>
 
+      <label className="flex items-start gap-2 rounded-md border border-slate-200 p-3 text-sm text-slate-700">
+        <input name="marcar_operativo" type="checkbox" className="mt-1 h-4 w-4 rounded border-slate-300" />
+        <span>Marcar equipo como operativo al registrar este mantenimiento</span>
+      </label>
+
       <label className="block">
         <span className="text-sm font-medium text-slate-700">Descripcion</span>
         <textarea
@@ -92,6 +97,17 @@ export function MantenimientoForm({
         <textarea
           name="repuestos_notas"
           rows={3}
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+        />
+      </label>
+
+      <label className="block">
+        <span className="text-sm font-medium text-slate-700">Fotos opcionales</span>
+        <input
+          name="fotos"
+          type="file"
+          accept="image/*"
+          multiple
           className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
         />
       </label>

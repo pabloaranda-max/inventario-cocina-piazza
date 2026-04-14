@@ -124,7 +124,10 @@ export default async function DashboardPage() {
             <ul className="space-y-3">
               {(urgentes as unknown as DashboardIncidencia[]).map((incidencia) => (
                 <li key={incidencia.id} className="border-b border-slate-100 pb-3 last:border-0">
-                  <Link href="/incidencias" className="font-medium text-slate-950 hover:underline">
+                  <Link
+                    href={`/incidencias/${incidencia.id}`}
+                    className="font-medium text-slate-950 hover:underline"
+                  >
                     {incidencia.descripcion}
                   </Link>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -164,7 +167,10 @@ export default async function DashboardPage() {
           <ul className="grid gap-3 md:grid-cols-2">
             {(incidencias as unknown as DashboardIncidencia[]).map((incidencia) => (
               <li key={incidencia.id} className="rounded-md border border-slate-200 p-3">
-                <Link href="/incidencias" className="font-medium text-slate-950 hover:underline">
+                <Link
+                  href={`/incidencias/${incidencia.id}`}
+                  className="font-medium text-slate-950 hover:underline"
+                >
                   {incidencia.descripcion}
                 </Link>
                 <div className="mt-2 flex flex-wrap items-center gap-2">

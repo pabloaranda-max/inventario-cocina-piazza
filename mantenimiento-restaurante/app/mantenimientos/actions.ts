@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { removeStorageFiles, uploadOptionalFiles } from '@/lib/storage'
 import { emptyToNull } from '@/lib/utils'
 import type { FormState } from '@/lib/form-state'
 import type { TipoMantenimiento } from '@/lib/types'
@@ -16,38 +17,33 @@ export async function crearMantenimiento(_state: FormState, formData: FormData):
     emptyToNull(formData.get('fecha_realizacion')) ?? new Date().toISOString().slice(0, 10)
   const proximaFecha = emptyToNull(formData.get('proxima_fecha_sugerida'))
   const costoValue = emptyToNull(formData.get('costo'))
+  const fotosUrls: string[] = []
 
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.from('mantenimientos').insert({
-    tipo: String(formData.get('tipo') ?? 'preventivo') as TipoMantenimiento,
-    equipo_id: equipoId,
-    descripcion,
-    realizado_por: emptyToNull(formData.get('realizado_por')),
-    costo: costoValue ? Number(costoValue) : null,
-    repuestos_notas: emptyToNull(formData.get('repuestos_notas')),
-    fecha_realizacion: fechaRealizacion,
-    proxima_fecha_sugerida: proximaFecha
+
+  try {
+    fotosUrls.push(...(await uploadOptionalFiles(supabase, formData.getAll('fotos'), 'mantenimientos')))
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'No se pudieron subir las fotos.' }
+  }
+
+  const { error } = await supabase.rpc('registrar_mantenimiento', {
+    p_tipo: String(formData.get('tipo') ?? 'preventivo') as TipoMantenimiento,
+    p_equipo_id: equipoId,
+    p_descripcion: descripcion,
+    p_realizado_por: emptyToNull(formData.get('realizado_por')),
+    p_costo: costoValue ? Number(costoValue) : null,
+    p_repuestos_notas: emptyToNull(formData.get('repuestos_notas')),
+    p_fotos_urls: fotosUrls,
+    p_fecha_realizacion: fechaRealizacion,
+    p_proxima_fecha_sugerida: proximaFecha,
+    p_marcar_operativo: formData.get('marcar_operativo') === 'on'
   })
 
-  if (error) return { error: error.message }
-
-  const equipoUpdate: {
-    fecha_ultimo_mantenimiento: string
-    fecha_proximo_mantenimiento?: string
-  } = {
-    fecha_ultimo_mantenimiento: fechaRealizacion
+  if (error) {
+    await removeStorageFiles(supabase, fotosUrls)
+    return { error: error.message }
   }
-
-  if (proximaFecha) {
-    equipoUpdate.fecha_proximo_mantenimiento = proximaFecha
-  }
-
-  const { error: equipoError } = await supabase
-    .from('equipos')
-    .update(equipoUpdate)
-    .eq('id', equipoId)
-
-  if (equipoError) return { error: equipoError.message }
 
   revalidatePath('/')
   revalidatePath('/mantenimientos')

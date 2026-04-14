@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { emptyToNull } from '@/lib/utils'
-import { uploadOptionalFile } from '@/lib/storage'
+import { removeStorageFiles, uploadOptionalFile } from '@/lib/storage'
 import type { FormState } from '@/lib/form-state'
 import type { EstadoEquipo } from '@/lib/types'
 import {
@@ -104,12 +104,23 @@ export async function actualizarEquipo(
   const payload = getEquipoPayload(formData)
   if (!('nombre' in payload)) return payload
 
-  const fotoUrl = await uploadOptionalFile(supabase, formData.get('foto'), 'equipos')
-  const fotoPlacaUrl = await uploadOptionalFile(
-    supabase,
-    formData.get('foto_placa'),
-    'equipos/placas'
-  )
+  const { data: currentEquipo, error: currentError } = await supabase
+    .from('equipos')
+    .select('foto_url, foto_placa_url')
+    .eq('id', id)
+    .single()
+
+  if (currentError) return { error: currentError.message }
+
+  let fotoUrl: string | null = null
+  let fotoPlacaUrl: string | null = null
+
+  try {
+    fotoUrl = await uploadOptionalFile(supabase, formData.get('foto'), 'equipos')
+    fotoPlacaUrl = await uploadOptionalFile(supabase, formData.get('foto_placa'), 'equipos/placas')
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'No se pudieron subir las fotos.' }
+  }
 
   const updatePayload: EquipoPayload = { ...payload }
   if (fotoUrl) updatePayload.foto_url = fotoUrl
@@ -118,8 +129,14 @@ export async function actualizarEquipo(
   const { error } = await supabase.from('equipos').update(updatePayload).eq('id', id)
 
   if (error) {
+    await removeStorageFiles(supabase, [fotoUrl, fotoPlacaUrl])
     return { error: error.message }
   }
+
+  await removeStorageFiles(supabase, [
+    fotoUrl ? currentEquipo?.foto_url : null,
+    fotoPlacaUrl ? currentEquipo?.foto_placa_url : null
+  ])
 
   revalidatePath('/equipos')
   revalidatePath(`/equipos/${id}`)

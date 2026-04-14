@@ -55,7 +55,12 @@ export default async function IncidenciasPage({
                     <StatusBadge type="incidencia" value={incidencia.estado} />
                     <StatusBadge type="prioridad" value={incidencia.prioridad} />
                   </div>
-                  <p className="mt-3 font-medium text-slate-950">{incidencia.descripcion}</p>
+                  <Link
+                    href={`/incidencias/${incidencia.id}`}
+                    className="mt-3 block font-medium text-slate-950 hover:underline"
+                  >
+                    {incidencia.descripcion}
+                  </Link>
                   <p className="mt-2 text-sm text-slate-600">
                     {incidencia.equipo?.nombre ?? 'Sin equipo'} · {formatDate(incidencia.fecha_reporte)}
                     {incidencia.reportado_por ? ` · ${incidencia.reportado_por}` : ''}

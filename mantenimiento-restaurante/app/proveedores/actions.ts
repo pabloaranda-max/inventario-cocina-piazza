@@ -12,6 +12,8 @@ function getProveedorPayload(formData: FormData): FormState | {
   especialidad: string | null
   telefono: string | null
   contacto: string | null
+  telefono_secundario: string | null
+  contacto_secundario: string | null
   notas: string | null
 } {
   const nombre = String(formData.get('nombre') ?? '').trim()
@@ -30,6 +32,8 @@ function getProveedorPayload(formData: FormData): FormState | {
     especialidad,
     telefono: emptyToNull(formData.get('telefono')),
     contacto: emptyToNull(formData.get('contacto')),
+    telefono_secundario: emptyToNull(formData.get('telefono_secundario')),
+    contacto_secundario: emptyToNull(formData.get('contacto_secundario')),
     notas: emptyToNull(formData.get('notas'))
   }
 }

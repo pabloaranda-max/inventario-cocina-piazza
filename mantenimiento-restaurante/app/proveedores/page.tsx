@@ -47,11 +47,19 @@ export default async function ProveedoresPage({
                   <h2 className="font-semibold text-slate-950">{proveedor.nombre}</h2>
                   <p className="mt-1 text-sm text-slate-600">
                     {proveedor.especialidad ?? 'Sin especialidad'}
-                    {proveedor.telefono ? ` · ${proveedor.telefono}` : ''}
                   </p>
-                  {proveedor.contacto ? (
-                    <p className="mt-1 text-sm text-slate-600">Contacto: {proveedor.contacto}</p>
-                  ) : null}
+                  <div className="mt-3 space-y-1 text-sm text-slate-600">
+                    <ContactLine
+                      label="Principal"
+                      contact={proveedor.contacto}
+                      phone={proveedor.telefono}
+                    />
+                    <ContactLine
+                      label="Secundario"
+                      contact={proveedor.contacto_secundario}
+                      phone={proveedor.telefono_secundario}
+                    />
+                  </div>
                 </div>
                 <Link
                   href={`/proveedores/${proveedor.id}/editar`}
@@ -87,5 +95,24 @@ export default async function ProveedoresPage({
         </div>
       )}
     </div>
+  )
+}
+
+function ContactLine({
+  label,
+  contact,
+  phone
+}: {
+  label: string
+  contact?: string | null
+  phone?: string | null
+}) {
+  if (!contact && !phone) return null
+
+  return (
+    <p>
+      {label}: {contact ?? 'Sin nombre'}
+      {phone ? ` · ${phone}` : ''}
+    </p>
   )
 }
