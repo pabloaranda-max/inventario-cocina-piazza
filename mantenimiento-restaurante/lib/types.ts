@@ -14,8 +14,10 @@ export type Proveedor = {
   especialidad: string | null
   telefono: string | null
   contacto: string | null
+  puesto_contacto: string | null
   telefono_secundario: string | null
   contacto_secundario: string | null
+  puesto_contacto_secundario: string | null
   notas: string | null
   created_at: string
   updated_at: string

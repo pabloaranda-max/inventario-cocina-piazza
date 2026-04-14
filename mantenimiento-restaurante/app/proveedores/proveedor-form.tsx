@@ -19,11 +19,17 @@ export function ProveedorForm({ proveedor }: { proveedor?: Proveedor }) {
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Nombre" name="nombre" defaultValue={proveedor?.nombre} required />
         <Field label="Contacto principal" name="contacto" defaultValue={proveedor?.contacto} />
+        <Field label="Puesto principal" name="puesto_contacto" defaultValue={proveedor?.puesto_contacto} />
         <Field label="Teléfono principal" name="telefono" defaultValue={proveedor?.telefono} />
         <Field
           label="Contacto secundario"
           name="contacto_secundario"
           defaultValue={proveedor?.contacto_secundario}
+        />
+        <Field
+          label="Puesto secundario"
+          name="puesto_contacto_secundario"
+          defaultValue={proveedor?.puesto_contacto_secundario}
         />
         <Field
           label="Teléfono secundario"

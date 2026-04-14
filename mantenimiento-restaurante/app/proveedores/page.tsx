@@ -52,11 +52,13 @@ export default async function ProveedoresPage({
                     <ContactLine
                       label="Principal"
                       contact={proveedor.contacto}
+                      role={proveedor.puesto_contacto}
                       phone={proveedor.telefono}
                     />
                     <ContactLine
                       label="Secundario"
                       contact={proveedor.contacto_secundario}
+                      role={proveedor.puesto_contacto_secundario}
                       phone={proveedor.telefono_secundario}
                     />
                   </div>
@@ -101,17 +103,20 @@ export default async function ProveedoresPage({
 function ContactLine({
   label,
   contact,
+  role,
   phone
 }: {
   label: string
   contact?: string | null
+  role?: string | null
   phone?: string | null
 }) {
-  if (!contact && !phone) return null
+  if (!contact && !role && !phone) return null
 
   return (
     <p>
       {label}: {contact ?? 'Sin nombre'}
+      {role ? ` · ${role}` : ''}
       {phone ? ` · ${phone}` : ''}
     </p>
   )

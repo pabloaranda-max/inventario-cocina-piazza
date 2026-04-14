@@ -39,8 +39,10 @@ create table if not exists proveedores (
   especialidad text,
   telefono text,
   contacto text,
+  puesto_contacto text,
   telefono_secundario text,
   contacto_secundario text,
+  puesto_contacto_secundario text,
   notas text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
