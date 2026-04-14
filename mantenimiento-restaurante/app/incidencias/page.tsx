@@ -2,7 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { cambiarEstadoIncidencia } from './actions'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { createSignedUrl } from '@/lib/storage'
+import { createSignedUrlMap } from '@/lib/storage'
 import type { Incidencia } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
 import { FlashMessage } from '@/components/ui/flash-message'
@@ -22,11 +22,15 @@ export default async function IncidenciasPage({
     .select('*, equipo:equipos(id,nombre,area)')
     .order('fecha_reporte', { ascending: false })
 
-  const incidencias = ((data as Incidencia[]) ?? []).map(async (incidencia) => ({
+  const incidencias = (data as Incidencia[]) ?? []
+  const fotoUrls = await createSignedUrlMap(
+    supabase,
+    incidencias.map((incidencia) => incidencia.foto_url)
+  )
+  const incidenciasConFoto = incidencias.map((incidencia) => ({
     incidencia,
-    foto: await createSignedUrl(supabase, incidencia.foto_url)
+    foto: incidencia.foto_url ? fotoUrls.get(incidencia.foto_url) ?? null : null
   }))
-  const incidenciasConFoto = await Promise.all(incidencias)
 
   return (
     <div className="space-y-5">

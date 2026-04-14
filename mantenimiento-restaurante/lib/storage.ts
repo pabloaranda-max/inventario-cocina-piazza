@@ -57,3 +57,19 @@ export async function createSignedUrl(supabase: SupabaseClient, path: string | n
   const { data } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60 * 60)
   return data?.signedUrl ?? null
 }
+
+export async function createSignedUrlMap(supabase: SupabaseClient, paths: Array<string | null>) {
+  const uniquePaths = Array.from(new Set(paths.filter((path): path is string => Boolean(path))))
+  if (!uniquePaths.length) return new Map<string, string>()
+
+  const { data } = await supabase.storage.from(BUCKET).createSignedUrls(uniquePaths, 60 * 60)
+  const urlMap = new Map<string, string>()
+
+  data?.forEach((item) => {
+    if (item.path && item.signedUrl) {
+      urlMap.set(item.path, item.signedUrl)
+    }
+  })
+
+  return urlMap
+}
