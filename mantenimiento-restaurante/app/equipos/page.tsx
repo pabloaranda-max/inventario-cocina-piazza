@@ -10,6 +10,7 @@ export default async function EquiposPage() {
     .from('equipos')
     .select('*, proveedor:proveedores(*)')
     .order('nombre', { ascending: true })
+    .limit(200)
 
   return (
     <div className="space-y-5">

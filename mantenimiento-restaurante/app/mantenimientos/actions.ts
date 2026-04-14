@@ -31,12 +31,20 @@ export async function crearMantenimiento(_state: FormState, formData: FormData):
 
   if (error) return { error: error.message }
 
+  const equipoUpdate: {
+    fecha_ultimo_mantenimiento: string
+    fecha_proximo_mantenimiento?: string
+  } = {
+    fecha_ultimo_mantenimiento: fechaRealizacion
+  }
+
+  if (proximaFecha) {
+    equipoUpdate.fecha_proximo_mantenimiento = proximaFecha
+  }
+
   const { error: equipoError } = await supabase
     .from('equipos')
-    .update({
-      fecha_ultimo_mantenimiento: fechaRealizacion,
-      fecha_proximo_mantenimiento: proximaFecha
-    })
+    .update(equipoUpdate)
     .eq('id', equipoId)
 
   if (equipoError) return { error: equipoError.message }
