@@ -99,8 +99,19 @@ create table if not exists mantenimientos (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists mapa_niveles (
+  id uuid primary key default gen_random_uuid(),
+  nombre text not null,
+  imagen_url text not null,
+  orden integer not null default 0,
+  visible boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists mapa_zonas (
   id uuid primary key default gen_random_uuid(),
+  nivel_id uuid not null references mapa_niveles(id) on delete cascade,
   area text not null,
   label text not null,
   x numeric(6, 3) not null,
@@ -119,6 +130,7 @@ create unique index if not exists idx_incidencias_ticket_numero on incidencias(t
 create index if not exists idx_mantenimientos_equipo_id on mantenimientos(equipo_id);
 create index if not exists idx_mantenimientos_incidencia_id on mantenimientos(incidencia_id);
 create index if not exists idx_mantenimientos_fecha on mantenimientos(fecha_realizacion desc);
+create index if not exists idx_mapa_zonas_nivel_id on mapa_zonas(nivel_id);
 
 -- UPDATED_AT
 create or replace function set_updated_at()
@@ -152,6 +164,11 @@ for each row execute function set_updated_at();
 drop trigger if exists set_mapa_zonas_updated_at on mapa_zonas;
 create trigger set_mapa_zonas_updated_at
 before update on mapa_zonas
+for each row execute function set_updated_at();
+
+drop trigger if exists set_mapa_niveles_updated_at on mapa_niveles;
+create trigger set_mapa_niveles_updated_at
+before update on mapa_niveles
 for each row execute function set_updated_at();
 
 -- RPC transaccional para registrar mantenimiento y actualizar equipo.
@@ -253,6 +270,7 @@ alter table proveedores enable row level security;
 alter table equipos enable row level security;
 alter table incidencias enable row level security;
 alter table mantenimientos enable row level security;
+alter table mapa_niveles enable row level security;
 alter table mapa_zonas enable row level security;
 
 drop policy if exists "Usuarios autenticados gestionan proveedores" on proveedores;
@@ -286,6 +304,13 @@ with check (true);
 drop policy if exists "Usuarios autenticados gestionan mapa_zonas" on mapa_zonas;
 create policy "Usuarios autenticados gestionan mapa_zonas"
 on mapa_zonas for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "Usuarios autenticados gestionan mapa_niveles" on mapa_niveles;
+create policy "Usuarios autenticados gestionan mapa_niveles"
+on mapa_niveles for all
 to authenticated
 using (true)
 with check (true);

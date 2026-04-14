@@ -78,12 +78,23 @@ export type Mantenimiento = {
 
 export type MapaZona = {
   id: string
+  nivel_id: string
   area: string
   label: string
   x: number
   y: number
   visible: boolean
   orden: number
+  created_at: string
+  updated_at: string
+}
+
+export type MapaNivel = {
+  id: string
+  nombre: string
+  imagen_url: string
+  orden: number
+  visible: boolean
   created_at: string
   updated_at: string
 }

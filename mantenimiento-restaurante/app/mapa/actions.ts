@@ -8,7 +8,7 @@ export async function guardarMapaZonas(_state: FormState, formData: FormData): P
   const raw = String(formData.get('zonas') ?? '')
   if (!raw) return { error: 'No hay zonas para guardar.' }
 
-  let zonas: Array<{ id: string; area: string; label: string; x: number; y: number }>
+  let zonas: Array<{ id: string; nivel_id: string; area: string; label: string; x: number; y: number }>
 
   try {
     zonas = JSON.parse(raw)
@@ -18,6 +18,7 @@ export async function guardarMapaZonas(_state: FormState, formData: FormData): P
 
   const payload = zonas.map((zona, index) => ({
     id: zona.id,
+    nivel_id: zona.nivel_id,
     area: zona.area.trim(),
     label: zona.label.trim(),
     x: Math.min(100, Math.max(0, Number(zona.x))),
@@ -26,7 +27,11 @@ export async function guardarMapaZonas(_state: FormState, formData: FormData): P
     visible: true
   }))
 
-  if (payload.some((zona) => !zona.id || !zona.area || !zona.label || Number.isNaN(zona.x) || Number.isNaN(zona.y))) {
+  if (
+    payload.some(
+      (zona) => !zona.id || !zona.nivel_id || !zona.area || !zona.label || Number.isNaN(zona.x) || Number.isNaN(zona.y)
+    )
+  ) {
     return { error: 'Revisa nombres, áreas y posiciones antes de guardar.' }
   }
 

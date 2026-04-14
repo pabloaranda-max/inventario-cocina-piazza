@@ -5,7 +5,7 @@ import { useFormState } from 'react-dom'
 import Image from 'next/image'
 import Link from 'next/link'
 import { guardarMapaZonas } from './actions'
-import type { Equipo, EstadoIncidencia, MapaZona, PrioridadIncidencia } from '@/lib/types'
+import type { Equipo, EstadoIncidencia, MapaNivel, MapaZona, PrioridadIncidencia } from '@/lib/types'
 import { initialFormState } from '@/lib/form-state'
 import { FormError } from '@/components/ui/flash-message'
 import { formatDate } from '@/lib/utils'
@@ -23,17 +23,22 @@ export type MapaIncidencia = {
 export function MapaOperativo({
   equipos,
   incidencias,
+  niveles,
   zonas
 }: {
   equipos: Equipo[]
   incidencias: MapaIncidencia[]
+  niveles: MapaNivel[]
   zonas: MapaZona[]
 }) {
+  const [selectedNivelId, setSelectedNivelId] = useState(niveles[1]?.id ?? niveles[0]?.id ?? '')
   const [selectedArea, setSelectedArea] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [editableZonas, setEditableZonas] = useState(zonas)
   const [state, formAction] = useFormState(guardarMapaZonas, initialFormState)
   const mapRef = useRef<HTMLDivElement>(null)
+  const selectedNivel = niveles.find((nivel) => nivel.id === selectedNivelId) ?? niveles[0]
+  const zonasNivel = editableZonas.filter((zona) => zona.nivel_id === selectedNivel?.id)
 
   const equiposPorArea = useMemo(() => {
     return equipos.reduce<Record<string, Equipo[]>>((acc, equipo) => {
@@ -63,6 +68,27 @@ export function MapaOperativo({
     ? equipos.filter((equipo) => (equipo.area ?? 'Sin área') === selectedArea)
     : equipos
 
+  function addZona() {
+    if (!selectedNivel) return
+
+    const area = selectedArea ?? areas[0] ?? 'Sin área'
+    setEditableZonas((current) => [
+      ...current,
+      {
+        id: crypto.randomUUID(),
+        nivel_id: selectedNivel.id,
+        area,
+        label: area,
+        x: 50,
+        y: 50,
+        visible: true,
+        orden: current.length * 10,
+        created_at: '',
+        updated_at: ''
+      }
+    ])
+  }
+
   function moveZona(id: string, clientX: number, clientY: number) {
     const rect = mapRef.current?.getBoundingClientRect()
     if (!rect) return
@@ -88,7 +114,7 @@ export function MapaOperativo({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-slate-950">Mapa operativo</h1>
-          <p className="text-sm text-slate-600">Plano del restaurante con equipos por área.</p>
+          <p className="text-sm text-slate-600">Planos del restaurante con equipos por área.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -107,18 +133,44 @@ export function MapaOperativo({
         </div>
       </div>
 
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {niveles.map((nivel) => (
+          <button
+            key={nivel.id}
+            type="button"
+            onClick={() => {
+              setSelectedNivelId(nivel.id)
+              setSelectedArea(null)
+            }}
+            className={`shrink-0 rounded-md border px-3 py-2 text-sm font-medium ${
+              selectedNivel?.id === nivel.id
+                ? 'border-slate-950 bg-slate-950 text-white'
+                : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100'
+            }`}
+          >
+            {nivel.nombre}
+          </button>
+        ))}
+      </div>
+
       <section className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
           <div ref={mapRef} className="relative">
-            <Image
-              src="/planos-layout-actual.png"
-              alt="Plano del restaurante"
-              width={1152}
-              height={768}
-              className="block w-full select-none"
-              priority
-            />
-            {editableZonas.map((zona) => {
+            {selectedNivel ? (
+              <Image
+                src={selectedNivel.imagen_url}
+                alt={selectedNivel.nombre}
+                width={1366}
+                height={768}
+                className="block w-full select-none"
+                priority
+              />
+            ) : (
+              <div className="flex h-96 items-center justify-center bg-slate-100 text-sm text-slate-500">
+                Sin láminas cargadas.
+              </div>
+            )}
+            {zonasNivel.map((zona) => {
               const total = equiposPorArea[zona.area]?.length ?? 0
               const active = equiposPorArea[zona.area]?.some(
                 (equipo) => (incidenciasPorEquipo[equipo.id]?.length ?? 0) > 0
@@ -164,11 +216,18 @@ export function MapaOperativo({
                 type="hidden"
                 name="zonas"
                 value={JSON.stringify(
-                  editableZonas.map(({ id, area, label, x, y }) => ({ id, area, label, x, y }))
+                  editableZonas.map(({ id, nivel_id, area, label, x, y }) => ({ id, nivel_id, area, label, x, y }))
                 )}
               />
+              <button
+                type="button"
+                onClick={addZona}
+                className="w-full rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
+              >
+                Agregar punto en esta lámina
+              </button>
               <div className="max-h-[520px] space-y-3 overflow-auto pr-1">
-                {editableZonas.map((zona) => (
+                {zonasNivel.map((zona) => (
                   <div key={zona.id} className="rounded-md border border-slate-200 p-3">
                     <label className="block">
                       <span className="text-xs font-medium text-slate-600">Texto visible</span>
