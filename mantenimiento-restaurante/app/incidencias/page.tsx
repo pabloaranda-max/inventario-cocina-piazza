@@ -56,6 +56,9 @@ export default async function IncidenciasPage({
               <div className="grid gap-4 md:grid-cols-[1fr_160px]">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                      {incidencia.ticket_numero}
+                    </span>
                     <StatusBadge type="incidencia" value={incidencia.estado} />
                     <StatusBadge type="prioridad" value={incidencia.prioridad} />
                   </div>

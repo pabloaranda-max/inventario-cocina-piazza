@@ -46,6 +46,7 @@ export type Equipo = {
 export type Incidencia = {
   id: string
   equipo_id: string | null
+  ticket_numero: string
   descripcion: string
   prioridad: PrioridadIncidencia
   foto_url: string | null
@@ -61,6 +62,7 @@ export type Mantenimiento = {
   id: string
   tipo: TipoMantenimiento
   equipo_id: string
+  incidencia_id: string | null
   descripcion: string
   realizado_por: string | null
   costo: number | null
@@ -71,4 +73,5 @@ export type Mantenimiento = {
   created_at: string
   updated_at: string
   equipo?: Pick<Equipo, 'id' | 'nombre' | 'area'> | null
+  incidencia?: Pick<Incidencia, 'id' | 'ticket_numero' | 'descripcion' | 'estado'> | null
 }

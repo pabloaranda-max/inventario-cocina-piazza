@@ -14,7 +14,7 @@ export default async function MantenimientosPage({
   const supabase = await createServerSupabaseClient()
   const { data } = await supabase
     .from('mantenimientos')
-    .select('*, equipo:equipos(id,nombre,area)')
+    .select('*, equipo:equipos(id,nombre,area), incidencia:incidencias(id,ticket_numero,descripcion,estado)')
     .order('fecha_realizacion', { ascending: false })
     .limit(100)
 
@@ -53,6 +53,17 @@ export default async function MantenimientosPage({
                 {mantenimiento.realizado_por ? ` · ${mantenimiento.realizado_por}` : ''}
                 {mantenimiento.costo ? ` · $${mantenimiento.costo}` : ''}
               </p>
+              {mantenimiento.incidencia ? (
+                <p className="mt-1 text-sm text-slate-600">
+                  Ticket:{' '}
+                  <Link
+                    href={`/incidencias/${mantenimiento.incidencia.id}`}
+                    className="font-medium text-slate-900 hover:underline"
+                  >
+                    {mantenimiento.incidencia.ticket_numero}
+                  </Link>
+                </p>
+              ) : null}
               {mantenimiento.proxima_fecha_sugerida ? (
                 <p className="mt-1 text-sm text-slate-600">
                   Proximo: {formatDate(mantenimiento.proxima_fecha_sugerida)}

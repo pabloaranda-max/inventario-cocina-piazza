@@ -6,12 +6,23 @@ import { crearMantenimiento } from './actions'
 import { FormError } from '@/components/ui/flash-message'
 import { initialFormState } from '@/lib/form-state'
 
+type IncidenciaOption = {
+  id: string
+  ticket_numero: string
+  descripcion: string
+  equipo?: Pick<Equipo, 'id' | 'nombre' | 'area'> | null
+}
+
 export function MantenimientoForm({
   equipos,
-  selectedEquipoId
+  incidencias,
+  selectedEquipoId,
+  selectedIncidenciaId
 }: {
   equipos: Pick<Equipo, 'id' | 'nombre' | 'area'>[]
+  incidencias: IncidenciaOption[]
   selectedEquipoId?: string
+  selectedIncidenciaId?: string
 }) {
   const [state, formAction] = useFormState(crearMantenimiento, initialFormState)
 
@@ -42,6 +53,23 @@ export function MantenimientoForm({
           <select name="tipo" defaultValue="preventivo" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2">
             <option value="preventivo">Preventivo</option>
             <option value="correctivo">Correctivo</option>
+          </select>
+        </label>
+
+        <label className="block md:col-span-2">
+          <span className="text-sm font-medium text-slate-700">Incidencia relacionada</span>
+          <select
+            name="incidencia_id"
+            defaultValue={selectedIncidenciaId ?? ''}
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+          >
+            <option value="">Sin incidencia relacionada</option>
+            {incidencias.map((incidencia) => (
+              <option key={incidencia.id} value={incidencia.id}>
+                {incidencia.ticket_numero} · {incidencia.equipo?.nombre ?? 'Sin equipo'} ·{' '}
+                {incidencia.descripcion}
+              </option>
+            ))}
           </select>
         </label>
 

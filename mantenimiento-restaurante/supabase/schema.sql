@@ -3,6 +3,8 @@
 
 create extension if not exists pgcrypto;
 
+create sequence if not exists incidencia_ticket_seq;
+
 -- ENUMS
 do $$
 begin
@@ -70,6 +72,7 @@ create table if not exists equipos (
 create table if not exists incidencias (
   id uuid primary key default gen_random_uuid(),
   equipo_id uuid references equipos(id) on delete set null,
+  ticket_numero text not null default 'INC-' || lpad(nextval('incidencia_ticket_seq')::text, 6, '0'),
   descripcion text not null,
   prioridad prioridad_incidencia not null default 'media',
   foto_url text,
@@ -84,6 +87,7 @@ create table if not exists mantenimientos (
   id uuid primary key default gen_random_uuid(),
   tipo tipo_mantenimiento not null,
   equipo_id uuid not null references equipos(id) on delete cascade,
+  incidencia_id uuid references incidencias(id) on delete set null,
   descripcion text not null,
   realizado_por text,
   costo numeric(10, 2),
@@ -99,7 +103,9 @@ create index if not exists idx_equipos_proveedor_id on equipos(proveedor_id);
 create index if not exists idx_equipos_proximo_mantenimiento on equipos(fecha_proximo_mantenimiento);
 create index if not exists idx_incidencias_estado on incidencias(estado);
 create index if not exists idx_incidencias_equipo_id on incidencias(equipo_id);
+create unique index if not exists idx_incidencias_ticket_numero on incidencias(ticket_numero);
 create index if not exists idx_mantenimientos_equipo_id on mantenimientos(equipo_id);
+create index if not exists idx_mantenimientos_incidencia_id on mantenimientos(incidencia_id);
 create index if not exists idx_mantenimientos_fecha on mantenimientos(fecha_realizacion desc);
 
 -- UPDATED_AT
@@ -142,7 +148,8 @@ create or replace function registrar_mantenimiento(
   p_fotos_urls text[] default '{}',
   p_fecha_realizacion date default current_date,
   p_proxima_fecha_sugerida date default null,
-  p_marcar_operativo boolean default false
+  p_marcar_operativo boolean default false,
+  p_incidencia_id uuid default null
 )
 returns uuid
 language plpgsql
@@ -152,9 +159,21 @@ as $$
 declare
   v_mantenimiento_id uuid;
 begin
+  if p_incidencia_id is not null then
+    update incidencias
+    set estado = 'en_progreso'
+    where id = p_incidencia_id
+      and (equipo_id = p_equipo_id or equipo_id is null);
+
+    if not found then
+      raise exception 'La incidencia no existe o no corresponde al equipo seleccionado';
+    end if;
+  end if;
+
   insert into mantenimientos (
     tipo,
     equipo_id,
+    incidencia_id,
     descripcion,
     realizado_por,
     costo,
@@ -166,6 +185,7 @@ begin
   values (
     p_tipo,
     p_equipo_id,
+    p_incidencia_id,
     p_descripcion,
     p_realizado_por,
     p_costo,
@@ -207,7 +227,8 @@ grant execute on function registrar_mantenimiento(
   text[],
   date,
   date,
-  boolean
+  boolean,
+  uuid
 ) to authenticated;
 
 -- RLS

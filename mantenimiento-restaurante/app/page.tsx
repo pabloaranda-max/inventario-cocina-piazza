@@ -6,6 +6,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 
 type DashboardIncidencia = {
   id: string
+  ticket_numero: string
   descripcion: string
   prioridad: PrioridadIncidencia
   estado: 'abierta' | 'en_progreso'
@@ -32,13 +33,13 @@ export default async function DashboardPage() {
     await Promise.all([
       supabase
         .from('incidencias')
-        .select('id, descripcion, prioridad, estado, fecha_reporte, equipo:equipos(id,nombre,area)')
+        .select('id, ticket_numero, descripcion, prioridad, estado, fecha_reporte, equipo:equipos(id,nombre,area)')
         .in('estado', ['abierta', 'en_progreso'])
         .order('fecha_reporte', { ascending: false })
         .limit(6),
       supabase
         .from('incidencias')
-        .select('id, descripcion, prioridad, estado, fecha_reporte, equipo:equipos(id,nombre,area)')
+        .select('id, ticket_numero, descripcion, prioridad, estado, fecha_reporte, equipo:equipos(id,nombre,area)')
         .in('estado', ['abierta', 'en_progreso'])
         .in('prioridad', ['alta', 'urgente'])
         .order('prioridad', { ascending: false })
@@ -131,6 +132,9 @@ export default async function DashboardPage() {
                     {incidencia.descripcion}
                   </Link>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                      {incidencia.ticket_numero}
+                    </span>
                     <StatusBadge type="prioridad" value={incidencia.prioridad} />
                     <StatusBadge type="incidencia" value={incidencia.estado} />
                   </div>
@@ -174,6 +178,9 @@ export default async function DashboardPage() {
                   {incidencia.descripcion}
                 </Link>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className="rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                    {incidencia.ticket_numero}
+                  </span>
                   <StatusBadge type="incidencia" value={incidencia.estado} />
                   <StatusBadge type="prioridad" value={incidencia.prioridad} />
                 </div>

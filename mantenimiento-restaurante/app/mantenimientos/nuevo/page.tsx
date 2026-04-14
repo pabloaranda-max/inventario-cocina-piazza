@@ -6,14 +6,19 @@ import type { Equipo } from '@/lib/types'
 export default async function NuevoMantenimientoPage({
   searchParams
 }: {
-  searchParams: Promise<{ equipo?: string }>
+  searchParams: Promise<{ equipo?: string; incidencia?: string }>
 }) {
-  const { equipo } = await searchParams
+  const { equipo, incidencia } = await searchParams
   const supabase = await createServerSupabaseClient()
-  const { data: equipos } = await supabase
-    .from('equipos')
-    .select('id,nombre,area')
-    .order('nombre', { ascending: true })
+  const [{ data: equipos }, { data: incidencias }] = await Promise.all([
+    supabase.from('equipos').select('id,nombre,area').order('nombre', { ascending: true }),
+    supabase
+      .from('incidencias')
+      .select('id,ticket_numero,descripcion,estado,equipo_id,equipo:equipos(id,nombre,area)')
+      .in('estado', ['abierta', 'en_progreso'])
+      .order('fecha_reporte', { ascending: false })
+      .limit(100)
+  ])
 
   return (
     <div className="space-y-5">
@@ -25,7 +30,9 @@ export default async function NuevoMantenimientoPage({
       </div>
       <MantenimientoForm
         equipos={(equipos as Pick<Equipo, 'id' | 'nombre' | 'area'>[]) ?? []}
+        incidencias={(incidencias as unknown as Parameters<typeof MantenimientoForm>[0]['incidencias']) ?? []}
         selectedEquipoId={equipo}
+        selectedIncidenciaId={incidencia}
       />
     </div>
   )

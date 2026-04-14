@@ -16,6 +16,7 @@ export async function crearMantenimiento(_state: FormState, formData: FormData):
   const fechaRealizacion =
     emptyToNull(formData.get('fecha_realizacion')) ?? new Date().toISOString().slice(0, 10)
   const proximaFecha = emptyToNull(formData.get('proxima_fecha_sugerida'))
+  const incidenciaId = emptyToNull(formData.get('incidencia_id'))
   const costoValue = emptyToNull(formData.get('costo'))
   const fotosUrls: string[] = []
 
@@ -37,7 +38,8 @@ export async function crearMantenimiento(_state: FormState, formData: FormData):
     p_fotos_urls: fotosUrls,
     p_fecha_realizacion: fechaRealizacion,
     p_proxima_fecha_sugerida: proximaFecha,
-    p_marcar_operativo: formData.get('marcar_operativo') === 'on'
+    p_marcar_operativo: formData.get('marcar_operativo') === 'on',
+    p_incidencia_id: incidenciaId
   })
 
   if (error) {
@@ -48,5 +50,6 @@ export async function crearMantenimiento(_state: FormState, formData: FormData):
   revalidatePath('/')
   revalidatePath('/mantenimientos')
   revalidatePath(`/equipos/${equipoId}`)
+  if (incidenciaId) revalidatePath(`/incidencias/${incidenciaId}`)
   redirect('/mantenimientos?flash=mantenimiento_creado')
 }
