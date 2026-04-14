@@ -99,6 +99,18 @@ create table if not exists mantenimientos (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists mapa_zonas (
+  id uuid primary key default gen_random_uuid(),
+  area text not null,
+  label text not null,
+  x numeric(6, 3) not null,
+  y numeric(6, 3) not null,
+  visible boolean not null default true,
+  orden integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists idx_equipos_proveedor_id on equipos(proveedor_id);
 create index if not exists idx_equipos_proximo_mantenimiento on equipos(fecha_proximo_mantenimiento);
 create index if not exists idx_incidencias_estado on incidencias(estado);
@@ -135,6 +147,11 @@ for each row execute function set_updated_at();
 drop trigger if exists set_mantenimientos_updated_at on mantenimientos;
 create trigger set_mantenimientos_updated_at
 before update on mantenimientos
+for each row execute function set_updated_at();
+
+drop trigger if exists set_mapa_zonas_updated_at on mapa_zonas;
+create trigger set_mapa_zonas_updated_at
+before update on mapa_zonas
 for each row execute function set_updated_at();
 
 -- RPC transaccional para registrar mantenimiento y actualizar equipo.
@@ -236,6 +253,7 @@ alter table proveedores enable row level security;
 alter table equipos enable row level security;
 alter table incidencias enable row level security;
 alter table mantenimientos enable row level security;
+alter table mapa_zonas enable row level security;
 
 drop policy if exists "Usuarios autenticados gestionan proveedores" on proveedores;
 create policy "Usuarios autenticados gestionan proveedores"
@@ -261,6 +279,13 @@ with check (true);
 drop policy if exists "Usuarios autenticados gestionan mantenimientos" on mantenimientos;
 create policy "Usuarios autenticados gestionan mantenimientos"
 on mantenimientos for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "Usuarios autenticados gestionan mapa_zonas" on mapa_zonas;
+create policy "Usuarios autenticados gestionan mapa_zonas"
+on mapa_zonas for all
 to authenticated
 using (true)
 with check (true);

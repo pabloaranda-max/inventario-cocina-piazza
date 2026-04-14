@@ -1,10 +1,10 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import type { Equipo } from '@/lib/types'
+import type { Equipo, MapaZona } from '@/lib/types'
 import { MapaOperativo, type MapaIncidencia } from './mapa-operativo'
 
 export default async function MapaPage() {
   const supabase = await createServerSupabaseClient()
-  const [{ data: equipos }, { data: incidencias }] = await Promise.all([
+  const [{ data: equipos }, { data: incidencias }, { data: zonas }] = await Promise.all([
     supabase
       .from('equipos')
       .select('id,nombre,area,categoria,estado,fecha_proximo_mantenimiento')
@@ -15,13 +15,19 @@ export default async function MapaPage() {
       .select('id,ticket_numero,descripcion,prioridad,estado,equipo_id,equipo:equipos(id,nombre,area)')
       .in('estado', ['abierta', 'en_progreso'])
       .order('fecha_reporte', { ascending: false })
-      .limit(200)
+      .limit(200),
+    supabase
+      .from('mapa_zonas')
+      .select('*')
+      .eq('visible', true)
+      .order('orden', { ascending: true })
   ])
 
   return (
     <MapaOperativo
       equipos={(equipos as Equipo[]) ?? []}
       incidencias={(incidencias as unknown as MapaIncidencia[]) ?? []}
+      zonas={(zonas as MapaZona[]) ?? []}
     />
   )
 }

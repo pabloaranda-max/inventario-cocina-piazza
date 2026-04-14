@@ -75,3 +75,15 @@ export type Mantenimiento = {
   equipo?: Pick<Equipo, 'id' | 'nombre' | 'area'> | null
   incidencia?: Pick<Incidencia, 'id' | 'ticket_numero' | 'descripcion' | 'estado'> | null
 }
+
+export type MapaZona = {
+  id: string
+  area: string
+  label: string
+  x: number
+  y: number
+  visible: boolean
+  orden: number
+  created_at: string
+  updated_at: string
+}
