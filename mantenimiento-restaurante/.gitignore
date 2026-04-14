@@ -1,0 +1,9 @@
+.next
+.vercel
+.env.local
+.env*.local
+node_modules
+.DS_Store
+.wrangler
+.open-next
+dist
