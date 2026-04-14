@@ -22,7 +22,8 @@ export const equipoCategorias = [
   'Eléctrico',
   'Plomería',
   'Climatización',
-  'Seguridad'
+  'Seguridad',
+  'Mobiliario'
 ]
 
 export const proveedorEspecialidades = [
