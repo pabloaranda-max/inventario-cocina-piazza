@@ -5,10 +5,17 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createSignedUrl } from '@/lib/storage'
 import type { Incidencia } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
+import { FlashMessage } from '@/components/ui/flash-message'
+import { StatusBadge } from '@/components/ui/status-badge'
 
 const estados = ['abierta', 'en_progreso', 'resuelta', 'cerrada']
 
-export default async function IncidenciasPage() {
+export default async function IncidenciasPage({
+  searchParams
+}: {
+  searchParams: Promise<{ flash?: string }>
+}) {
+  const { flash } = await searchParams
   const supabase = await createServerSupabaseClient()
   const { data } = await supabase
     .from('incidencias')
@@ -23,6 +30,8 @@ export default async function IncidenciasPage() {
 
   return (
     <div className="space-y-5">
+      <FlashMessage code={flash} />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-slate-950">Incidencias</h1>
@@ -43,12 +52,8 @@ export default async function IncidenciasPage() {
               <div className="grid gap-4 md:grid-cols-[1fr_160px]">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
-                      {incidencia.estado}
-                    </span>
-                    <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
-                      {incidencia.prioridad}
-                    </span>
+                    <StatusBadge type="incidencia" value={incidencia.estado} />
+                    <StatusBadge type="prioridad" value={incidencia.prioridad} />
                   </div>
                   <p className="mt-3 font-medium text-slate-950">{incidencia.descripcion}</p>
                   <p className="mt-2 text-sm text-slate-600">

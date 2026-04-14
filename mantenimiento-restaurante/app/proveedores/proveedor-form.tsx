@@ -1,17 +1,34 @@
+'use client'
+
+import { useFormState } from 'react-dom'
 import type { Proveedor } from '@/lib/types'
 import { actualizarProveedor, crearProveedor } from './actions'
+import { FormError } from '@/components/ui/flash-message'
+import { MultipleDefinedCheckboxes } from '@/components/ui/defined-fields'
+import { proveedorEspecialidades } from '@/lib/defined-options'
+import { initialFormState } from '@/lib/form-state'
 
 export function ProveedorForm({ proveedor }: { proveedor?: Proveedor }) {
   const action = proveedor ? actualizarProveedor.bind(null, proveedor.id) : crearProveedor
+  const [state, formAction] = useFormState(action, initialFormState)
 
   return (
-    <form action={action} className="space-y-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <form action={formAction} className="space-y-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <FormError message={state.error} />
+
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Nombre" name="nombre" defaultValue={proveedor?.nombre} required />
-        <Field label="Especialidad" name="especialidad" defaultValue={proveedor?.especialidad} />
         <Field label="Telefono" name="telefono" defaultValue={proveedor?.telefono} />
         <Field label="Contacto" name="contacto" defaultValue={proveedor?.contacto} />
       </div>
+
+      <MultipleDefinedCheckboxes
+        label="Especialidades"
+        name="especialidad"
+        otherName="especialidad_otro"
+        options={proveedorEspecialidades}
+        defaultValue={proveedor?.especialidad}
+      />
 
       <label className="block">
         <span className="text-sm font-medium text-slate-700">Notas</span>

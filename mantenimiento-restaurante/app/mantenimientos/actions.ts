@@ -4,12 +4,13 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { emptyToNull } from '@/lib/utils'
+import type { FormState } from '@/lib/form-state'
 import type { TipoMantenimiento } from '@/lib/types'
 
-export async function crearMantenimiento(formData: FormData) {
+export async function crearMantenimiento(_state: FormState, formData: FormData): Promise<FormState> {
   const equipoId = String(formData.get('equipo_id') ?? '').trim()
   const descripcion = String(formData.get('descripcion') ?? '').trim()
-  if (!equipoId || !descripcion) throw new Error('Equipo y descripcion son obligatorios.')
+  if (!equipoId || !descripcion) return { error: 'Equipo y descripción son obligatorios.' }
 
   const fechaRealizacion =
     emptyToNull(formData.get('fecha_realizacion')) ?? new Date().toISOString().slice(0, 10)
@@ -28,7 +29,7 @@ export async function crearMantenimiento(formData: FormData) {
     proxima_fecha_sugerida: proximaFecha
   })
 
-  if (error) throw new Error(error.message)
+  if (error) return { error: error.message }
 
   const { error: equipoError } = await supabase
     .from('equipos')
@@ -38,10 +39,10 @@ export async function crearMantenimiento(formData: FormData) {
     })
     .eq('id', equipoId)
 
-  if (equipoError) throw new Error(equipoError.message)
+  if (equipoError) return { error: equipoError.message }
 
   revalidatePath('/')
   revalidatePath('/mantenimientos')
   revalidatePath(`/equipos/${equipoId}`)
-  redirect('/mantenimientos')
+  redirect('/mantenimientos?flash=mantenimiento_creado')
 }

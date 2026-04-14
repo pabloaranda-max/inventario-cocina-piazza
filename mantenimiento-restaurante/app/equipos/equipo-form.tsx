@@ -1,5 +1,12 @@
+'use client'
+
+import { useFormState } from 'react-dom'
 import type { Equipo, Proveedor } from '@/lib/types'
 import { crearEquipo, actualizarEquipo } from './actions'
+import { FormError } from '@/components/ui/flash-message'
+import { MultipleDefinedCheckboxes, SingleDefinedSelect } from '@/components/ui/defined-fields'
+import { equipoAreas, equipoCategorias } from '@/lib/defined-options'
+import { initialFormState } from '@/lib/form-state'
 
 const estados = [
   ['operativo', 'Operativo'],
@@ -16,13 +23,30 @@ export function EquipoForm({
   proveedores: Proveedor[]
 }) {
   const action = equipo ? actualizarEquipo.bind(null, equipo.id) : crearEquipo
+  const [state, formAction] = useFormState(action, initialFormState)
 
   return (
-    <form action={action} className="space-y-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <form action={formAction} className="space-y-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <FormError message={state.error} />
+
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Nombre" name="nombre" defaultValue={equipo?.nombre} required />
-        <Field label="Area" name="area" defaultValue={equipo?.area} />
-        <Field label="Categoria" name="categoria" defaultValue={equipo?.categoria} />
+        <SingleDefinedSelect
+          label="Area"
+          name="area"
+          otherName="area_otro"
+          options={equipoAreas}
+          defaultValue={equipo?.area}
+        />
+        <div className="md:col-span-2">
+          <MultipleDefinedCheckboxes
+            label="Categorías"
+            name="categoria"
+            otherName="categoria_otro"
+            options={equipoCategorias}
+            defaultValue={equipo?.categoria}
+          />
+        </div>
         <Field label="Marca" name="marca" defaultValue={equipo?.marca} />
         <Field label="Modelo" name="modelo" defaultValue={equipo?.modelo} />
         <Field label="Numero de serie" name="numero_serie" defaultValue={equipo?.numero_serie} />

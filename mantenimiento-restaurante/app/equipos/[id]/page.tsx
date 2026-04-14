@@ -5,9 +5,18 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createSignedUrl } from '@/lib/storage'
 import type { Equipo, Incidencia, Mantenimiento } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
+import { FlashMessage } from '@/components/ui/flash-message'
+import { StatusBadge } from '@/components/ui/status-badge'
 
-export default async function EquipoDetallePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EquipoDetallePage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ flash?: string }>
+}) {
   const { id } = await params
+  const { flash } = await searchParams
   const supabase = await createServerSupabaseClient()
   const [
     { data: equipo },
@@ -37,6 +46,8 @@ export default async function EquipoDetallePage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6">
+      <FlashMessage code={flash} />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link href="/equipos" className="text-sm text-slate-600 hover:text-slate-950">
@@ -47,19 +58,38 @@ export default async function EquipoDetallePage({ params }: { params: Promise<{ 
             {typedEquipo.area ?? 'Sin area'} · {typedEquipo.categoria ?? 'Sin categoria'}
           </p>
         </div>
-        <Link
-          href={`/equipos/${typedEquipo.id}/editar`}
-          className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
-        >
-          Editar
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/incidencias/nueva?equipo=${typedEquipo.id}`}
+            className="rounded-md border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-800 hover:bg-rose-100"
+          >
+            Reportar incidencia
+          </Link>
+          <Link
+            href={`/mantenimientos/nuevo?equipo=${typedEquipo.id}`}
+            className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100"
+          >
+            Registrar mantenimiento
+          </Link>
+          <Link
+            href={`/equipos/${typedEquipo.id}/editar`}
+            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
+          >
+            Editar
+          </Link>
+        </div>
       </div>
 
       <section className="grid gap-4 lg:grid-cols-[1fr_280px]">
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-950">Datos</h2>
           <dl className="mt-4 grid gap-3 text-sm md:grid-cols-2">
-            <Info label="Estado" value={typedEquipo.estado} />
+            <div>
+              <dt className="text-slate-500">Estado</dt>
+              <dd className="mt-1">
+                <StatusBadge type="equipo" value={typedEquipo.estado} />
+              </dd>
+            </div>
             <Info label="Proveedor" value={typedEquipo.proveedor?.nombre} />
             <Info label="Marca" value={typedEquipo.marca} />
             <Info label="Modelo" value={typedEquipo.modelo} />
@@ -85,9 +115,11 @@ export default async function EquipoDetallePage({ params }: { params: Promise<{ 
               {(incidencias as Incidencia[]).map((incidencia) => (
                 <li key={incidencia.id} className="border-b border-slate-100 pb-3 last:border-0">
                   <p className="font-medium text-slate-950">{incidencia.descripcion}</p>
-                  <p className="text-sm text-slate-600">
-                    {incidencia.estado} · {incidencia.prioridad} · {formatDate(incidencia.fecha_reporte)}
-                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <StatusBadge type="incidencia" value={incidencia.estado} />
+                    <StatusBadge type="prioridad" value={incidencia.prioridad} />
+                    <span className="text-sm text-slate-600">{formatDate(incidencia.fecha_reporte)}</span>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -102,9 +134,10 @@ export default async function EquipoDetallePage({ params }: { params: Promise<{ 
               {(mantenimientos as Mantenimiento[]).map((mantenimiento) => (
                 <li key={mantenimiento.id} className="border-b border-slate-100 pb-3 last:border-0">
                   <p className="font-medium text-slate-950">{mantenimiento.descripcion}</p>
-                  <p className="text-sm text-slate-600">
-                    {mantenimiento.tipo} · {formatDate(mantenimiento.fecha_realizacion)}
-                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <StatusBadge type="mantenimiento" value={mantenimiento.tipo} />
+                    <span className="text-sm text-slate-600">{formatDate(mantenimiento.fecha_realizacion)}</span>
+                  </div>
                 </li>
               ))}
             </ul>

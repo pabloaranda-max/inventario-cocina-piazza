@@ -1,13 +1,33 @@
+'use client'
+
+import { useFormState } from 'react-dom'
 import type { Equipo } from '@/lib/types'
 import { crearMantenimiento } from './actions'
+import { FormError } from '@/components/ui/flash-message'
+import { initialFormState } from '@/lib/form-state'
 
-export function MantenimientoForm({ equipos }: { equipos: Pick<Equipo, 'id' | 'nombre' | 'area'>[] }) {
+export function MantenimientoForm({
+  equipos,
+  selectedEquipoId
+}: {
+  equipos: Pick<Equipo, 'id' | 'nombre' | 'area'>[]
+  selectedEquipoId?: string
+}) {
+  const [state, formAction] = useFormState(crearMantenimiento, initialFormState)
+
   return (
-    <form action={crearMantenimiento} className="space-y-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <form action={formAction} className="space-y-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <FormError message={state.error} />
+
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
           <span className="text-sm font-medium text-slate-700">Equipo</span>
-          <select name="equipo_id" required className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2">
+          <select
+            name="equipo_id"
+            required
+            defaultValue={selectedEquipoId ?? ''}
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+          >
             <option value="">Selecciona equipo</option>
             {equipos.map((equipo) => (
               <option key={equipo.id} value={equipo.id}>

@@ -1,12 +1,18 @@
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Equipo, Proveedor } from '@/lib/types'
+import { FlashMessage } from '@/components/ui/flash-message'
 
 type ProveedorConEquipos = Proveedor & {
   equipos?: Pick<Equipo, 'id' | 'nombre' | 'area'>[]
 }
 
-export default async function ProveedoresPage() {
+export default async function ProveedoresPage({
+  searchParams
+}: {
+  searchParams: Promise<{ flash?: string }>
+}) {
+  const { flash } = await searchParams
   const supabase = await createServerSupabaseClient()
   const { data } = await supabase
     .from('proveedores')
@@ -17,6 +23,8 @@ export default async function ProveedoresPage() {
 
   return (
     <div className="space-y-5">
+      <FlashMessage code={flash} />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-slate-950">Proveedores</h1>

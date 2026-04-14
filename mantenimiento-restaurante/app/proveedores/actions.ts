@@ -4,36 +4,62 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { emptyToNull } from '@/lib/utils'
+import type { FormState } from '@/lib/form-state'
+import { buildMultipleDefinedValue, proveedorEspecialidades } from '@/lib/defined-options'
 
-function getProveedorPayload(formData: FormData) {
+function getProveedorPayload(formData: FormData): FormState | {
+  nombre: string
+  especialidad: string | null
+  telefono: string | null
+  contacto: string | null
+  notas: string | null
+} {
   const nombre = String(formData.get('nombre') ?? '').trim()
-  if (!nombre) throw new Error('El nombre es obligatorio.')
+  if (!nombre) return { error: 'El nombre es obligatorio.' }
+
+  const especialidad = buildMultipleDefinedValue({
+    values: formData.getAll('especialidad'),
+    other: formData.get('especialidad_otro'),
+    options: proveedorEspecialidades,
+    fieldLabel: 'la especialidad'
+  })
+  if (typeof especialidad === 'object' && especialidad && 'error' in especialidad) return especialidad
 
   return {
     nombre,
-    especialidad: emptyToNull(formData.get('especialidad')),
+    especialidad,
     telefono: emptyToNull(formData.get('telefono')),
     contacto: emptyToNull(formData.get('contacto')),
     notas: emptyToNull(formData.get('notas'))
   }
 }
 
-export async function crearProveedor(formData: FormData) {
+export async function crearProveedor(_state: FormState, formData: FormData): Promise<FormState> {
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.from('proveedores').insert(getProveedorPayload(formData))
+  const payload = getProveedorPayload(formData)
+  if (!('nombre' in payload)) return payload
 
-  if (error) throw new Error(error.message)
+  const { error } = await supabase.from('proveedores').insert(payload)
+
+  if (error) return { error: error.message }
 
   revalidatePath('/proveedores')
-  redirect('/proveedores')
+  redirect('/proveedores?flash=proveedor_creado')
 }
 
-export async function actualizarProveedor(id: string, formData: FormData) {
+export async function actualizarProveedor(
+  id: string,
+  _state: FormState,
+  formData: FormData
+): Promise<FormState> {
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.from('proveedores').update(getProveedorPayload(formData)).eq('id', id)
+  const payload = getProveedorPayload(formData)
+  if (!('nombre' in payload)) return payload
 
-  if (error) throw new Error(error.message)
+  const { error } = await supabase.from('proveedores').update(payload).eq('id', id)
+
+  if (error) return { error: error.message }
 
   revalidatePath('/proveedores')
-  redirect('/proveedores')
+  redirect('/proveedores?flash=proveedor_actualizado')
 }

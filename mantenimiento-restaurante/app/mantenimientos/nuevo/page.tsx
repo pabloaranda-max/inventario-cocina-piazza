@@ -3,7 +3,12 @@ import { MantenimientoForm } from '../mantenimiento-form'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Equipo } from '@/lib/types'
 
-export default async function NuevoMantenimientoPage() {
+export default async function NuevoMantenimientoPage({
+  searchParams
+}: {
+  searchParams: Promise<{ equipo?: string }>
+}) {
+  const { equipo } = await searchParams
   const supabase = await createServerSupabaseClient()
   const { data: equipos } = await supabase
     .from('equipos')
@@ -18,7 +23,10 @@ export default async function NuevoMantenimientoPage() {
         </Link>
         <h1 className="mt-2 text-2xl font-semibold text-slate-950">Nuevo mantenimiento</h1>
       </div>
-      <MantenimientoForm equipos={(equipos as Pick<Equipo, 'id' | 'nombre' | 'area'>[]) ?? []} />
+      <MantenimientoForm
+        equipos={(equipos as Pick<Equipo, 'id' | 'nombre' | 'area'>[]) ?? []}
+        selectedEquipoId={equipo}
+      />
     </div>
   )
 }

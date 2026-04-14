@@ -5,7 +5,14 @@ import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { emptyToNull } from '@/lib/utils'
 import { uploadOptionalFile } from '@/lib/storage'
+import type { FormState } from '@/lib/form-state'
 import type { EstadoEquipo } from '@/lib/types'
+import {
+  buildMultipleDefinedValue,
+  buildSingleDefinedValue,
+  equipoAreas,
+  equipoCategorias
+} from '@/lib/defined-options'
 
 type EquipoPayload = {
   nombre: string
@@ -23,14 +30,30 @@ type EquipoPayload = {
   foto_placa_url?: string | null
 }
 
-function getEquipoPayload(formData: FormData): EquipoPayload {
+function getEquipoPayload(formData: FormData): EquipoPayload | FormState {
   const nombre = String(formData.get('nombre') ?? '').trim()
-  if (!nombre) throw new Error('El nombre es obligatorio.')
+  if (!nombre) return { error: 'El nombre es obligatorio.' }
+
+  const area = buildSingleDefinedValue({
+    value: formData.get('area'),
+    other: formData.get('area_otro'),
+    options: equipoAreas,
+    fieldLabel: 'el área'
+  })
+  if (typeof area === 'object' && area && 'error' in area) return area
+
+  const categoria = buildMultipleDefinedValue({
+    values: formData.getAll('categoria'),
+    other: formData.get('categoria_otro'),
+    options: equipoCategorias,
+    fieldLabel: 'la categoría'
+  })
+  if (typeof categoria === 'object' && categoria && 'error' in categoria) return categoria
 
   return {
     nombre,
-    area: emptyToNull(formData.get('area')),
-    categoria: emptyToNull(formData.get('categoria')),
+    area,
+    categoria,
     marca: emptyToNull(formData.get('marca')),
     modelo: emptyToNull(formData.get('modelo')),
     numero_serie: emptyToNull(formData.get('numero_serie')),
@@ -42,9 +65,10 @@ function getEquipoPayload(formData: FormData): EquipoPayload {
   }
 }
 
-export async function crearEquipo(formData: FormData) {
+export async function crearEquipo(_state: FormState, formData: FormData): Promise<FormState> {
   const supabase = await createServerSupabaseClient()
   const payload = getEquipoPayload(formData)
+  if (!('nombre' in payload)) return payload
 
   const fotoUrl = await uploadOptionalFile(supabase, formData.get('foto'), 'equipos')
   const fotoPlacaUrl = await uploadOptionalFile(
@@ -64,16 +88,21 @@ export async function crearEquipo(formData: FormData) {
     .single()
 
   if (error) {
-    throw new Error(error.message)
+    return { error: error.message }
   }
 
   revalidatePath('/equipos')
-  redirect(`/equipos/${data.id}`)
+  redirect(`/equipos/${data.id}?flash=equipo_creado`)
 }
 
-export async function actualizarEquipo(id: string, formData: FormData) {
+export async function actualizarEquipo(
+  id: string,
+  _state: FormState,
+  formData: FormData
+): Promise<FormState> {
   const supabase = await createServerSupabaseClient()
   const payload = getEquipoPayload(formData)
+  if (!('nombre' in payload)) return payload
 
   const fotoUrl = await uploadOptionalFile(supabase, formData.get('foto'), 'equipos')
   const fotoPlacaUrl = await uploadOptionalFile(
@@ -89,10 +118,10 @@ export async function actualizarEquipo(id: string, formData: FormData) {
   const { error } = await supabase.from('equipos').update(updatePayload).eq('id', id)
 
   if (error) {
-    throw new Error(error.message)
+    return { error: error.message }
   }
 
   revalidatePath('/equipos')
   revalidatePath(`/equipos/${id}`)
-  redirect(`/equipos/${id}`)
+  redirect(`/equipos/${id}?flash=equipo_actualizado`)
 }

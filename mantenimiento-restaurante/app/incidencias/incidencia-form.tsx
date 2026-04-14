@@ -1,14 +1,33 @@
+'use client'
+
+import { useFormState } from 'react-dom'
 import type { Equipo } from '@/lib/types'
 import { crearIncidencia } from './actions'
+import { FormError } from '@/components/ui/flash-message'
+import { initialFormState } from '@/lib/form-state'
 
 const prioridades = ['baja', 'media', 'alta', 'urgente']
 
-export function IncidenciaForm({ equipos }: { equipos: Pick<Equipo, 'id' | 'nombre' | 'area'>[] }) {
+export function IncidenciaForm({
+  equipos,
+  selectedEquipoId
+}: {
+  equipos: Pick<Equipo, 'id' | 'nombre' | 'area'>[]
+  selectedEquipoId?: string
+}) {
+  const [state, formAction] = useFormState(crearIncidencia, initialFormState)
+
   return (
-    <form action={crearIncidencia} className="space-y-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <form action={formAction} className="space-y-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <FormError message={state.error} />
+
       <label className="block">
         <span className="text-sm font-medium text-slate-700">Equipo</span>
-        <select name="equipo_id" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2">
+        <select
+          name="equipo_id"
+          defaultValue={selectedEquipoId ?? ''}
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+        >
           <option value="">Sin equipo especifico</option>
           {equipos.map((equipo) => (
             <option key={equipo.id} value={equipo.id}>

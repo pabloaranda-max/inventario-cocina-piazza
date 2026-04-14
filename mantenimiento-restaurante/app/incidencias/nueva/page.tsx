@@ -3,7 +3,12 @@ import { IncidenciaForm } from '../incidencia-form'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Equipo } from '@/lib/types'
 
-export default async function NuevaIncidenciaPage() {
+export default async function NuevaIncidenciaPage({
+  searchParams
+}: {
+  searchParams: Promise<{ equipo?: string }>
+}) {
+  const { equipo } = await searchParams
   const supabase = await createServerSupabaseClient()
   const { data: equipos } = await supabase
     .from('equipos')
@@ -18,7 +23,10 @@ export default async function NuevaIncidenciaPage() {
         </Link>
         <h1 className="mt-2 text-2xl font-semibold text-slate-950">Nueva incidencia</h1>
       </div>
-      <IncidenciaForm equipos={(equipos as Pick<Equipo, 'id' | 'nombre' | 'area'>[]) ?? []} />
+      <IncidenciaForm
+        equipos={(equipos as Pick<Equipo, 'id' | 'nombre' | 'area'>[]) ?? []}
+        selectedEquipoId={equipo}
+      />
     </div>
   )
 }
