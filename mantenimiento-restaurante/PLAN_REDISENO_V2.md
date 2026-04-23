@@ -367,7 +367,7 @@ alter table mapa_zonas
 
 ---
 
-## 12. Estado de Ejecución — al 2026-04-22
+## 12. Estado de Ejecución — al 2026-04-23
 
 ### Sprint 1A ✅ COMPLETO
 - `asignado_a`, `fecha_resuelta`, `validado_por` agregados a `incidencias`
@@ -384,25 +384,23 @@ alter table mapa_zonas
 - `guardarMapaZonas` mejorado: polígonos, soft-delete, nombres separados de labels
 - Guardrails de transición en `/incidencias/page.tsx` (solo UI por ahora)
 
-### Sprint 1C ❌ PENDIENTE — **próxima sesión arranca aquí**
+### Sprint 1C ✅ COMPLETO
+- `cambiarEstadoIncidencia` ya valida transiciones en server-side
+- Resolver incidencia `alta` o `urgente` exige evidencia
+- Modal de flujo disponible tanto en ficha como en bandeja de incidencias
+- Cierre restringido de forma pragmática por `ADMIN_EMAILS`
+- Al resolver se puede disparar directo a `mantenimientos/nuevo?tipo=correctivo`
 
-Items pendientes por orden de prioridad:
+### Sprint 1D ✅ COMPLETO
+- `/activos/[id]` ahora es una ficha operativa real, no un redirect
+- Historial cronológico combinado de incidencias + mantenimientos
+- Botón `Reportar incidencia` desde ficha de activo
+- CTA de mantenimiento y ubicación desde la misma ficha
 
-1. **Guardrails en server action** — `cambiarEstadoIncidencia` en `app/incidencias/actions.ts` no valida transiciones. Los guardrails están solo en la UI. Cualquier POST puede saltar estados. Agregar validación server-side con el mismo mapa de transiciones.
-
-2. **Modal de evidencia** al pasar a `resuelta` — foto obligatoria si prioridad es `urgente` o `alta`.
-
-3. **Botón "Cerrar incidencia"** — solo visible para admin. Transición `resuelta → cerrada`.
-
-4. **Modal "¿Registrar mantenimiento correctivo?"** al pasar a `resuelta` — modal opcional prellenado con `incidencia_id`, llama `crearMantenimiento`.
-
-División de trabajo sugerida:
-- **Codex:** guardrails server-side en `cambiarEstadoIncidencia` + botón admin para cierre
-- **Claude:** modal de evidencia + modal de mantenimiento correctivo al resolver
-
-### Sprint 1D ❌ PENDIENTE
-- `/activos/[id]` con historial cronológico de incidencias + mantenimientos
-- Botón "Reportar incidencia" desde ficha de activo
+### Próximo bloque sugerido
+- Pulir documentación y copy de `Sprint 1C`
+- Definir si `ADMIN_EMAILS` basta o si entra modelo real de roles en v2
+- Empezar bloque de mejoras posteriores sobre dashboard/mapa o pasar a v2
 
 ---
 
@@ -417,4 +415,4 @@ División de trabajo sugerida:
 ### ⚠️ Advertencia: crearIncidencia cambió semántica
 
 `crearIncidencia` fue reescrita para el flujo público. Ahora usa RPC y redirige a `/reportar/gracias`.
-El flujo admin desde `/incidencias/nueva` **no redirige a la lista**. Revisar si es problema antes de Sprint 1C.
+El flujo admin desde `/incidencias/nueva` **no redirige a la lista**. Sigue siendo una decisión pendiente de UX aunque `Sprint 1C` ya esté cerrado.
