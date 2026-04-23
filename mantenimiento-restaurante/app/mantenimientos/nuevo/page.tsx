@@ -27,7 +27,7 @@ export default async function NuevoMantenimientoPage({
     supabase
       .from('incidencias')
       .select('id,ticket_numero,descripcion,estado,activo_id,equipo_id,infraestructura_id,activo:activos(id,nombre,area,clase,tipo),equipo:equipos(id,nombre,area),infraestructura:infraestructura(id,nombre,area,tipo)')
-      .in('estado', ['abierta', 'en_progreso'])
+      .in('estado', ['abierta', 'en_progreso', 'resuelta'])
       .order('fecha_reporte', { ascending: false })
       .limit(100)
   ])

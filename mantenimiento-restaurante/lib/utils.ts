@@ -25,3 +25,15 @@ export function isSupabaseConfigured() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
 }
+
+export function getAdminEmails() {
+  return String(process.env.ADMIN_EMAILS ?? '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+}
+
+export function isAdminEmail(email?: string | null) {
+  if (!email) return false
+  return getAdminEmails().includes(email.trim().toLowerCase())
+}

@@ -1,21 +1,15 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { cambiarEstadoIncidencia } from './actions'
+import { EstadoFlowPanel } from './estado-flow-panel'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createSignedUrlMap } from '@/lib/storage'
 import type { Incidencia } from '@/lib/types'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateTime, isAdminEmail } from '@/lib/utils'
 import { FlashMessage } from '@/components/ui/flash-message'
 import { StatusBadge } from '@/components/ui/status-badge'
 
 const estados = ['pendiente_asignacion', 'abierta', 'en_progreso', 'resuelta', 'cerrada']
-const estadoTransitions: Record<string, string[]> = {
-  pendiente_asignacion: ['pendiente_asignacion', 'abierta'],
-  abierta: ['abierta', 'en_progreso', 'resuelta'],
-  en_progreso: ['en_progreso', 'resuelta'],
-  resuelta: ['resuelta', 'en_progreso', 'cerrada'],
-  cerrada: ['cerrada']
-}
 
 export default async function IncidenciasPage({
   searchParams
@@ -24,6 +18,10 @@ export default async function IncidenciasPage({
 }) {
   const { flash, estado, prioridad } = await searchParams
   const supabase = await createServerSupabaseClient()
+  const {
+    data: { user }
+  } = await supabase.auth.getUser()
+  const canCloseIncidencias = isAdminEmail(user?.email)
   let query = supabase
     .from('incidencias')
     .select('*, activo:activos(id,nombre,area,clase,tipo), equipo:equipos(id,nombre,area), infraestructura:infraestructura(id,nombre,area,tipo)')
@@ -52,6 +50,11 @@ export default async function IncidenciasPage({
     incidencia,
     foto: incidencia.foto_url ? fotoUrls.get(incidencia.foto_url) ?? null : null
   }))
+  const currentQuery = new URLSearchParams({
+    ...(estado ? { estado } : {}),
+    ...(prioridad ? { prioridad } : {})
+  }).toString()
+  const redirectTo = `/incidencias${currentQuery ? `?${currentQuery}` : ''}`
 
   return (
     <div className="space-y-5">
@@ -74,6 +77,7 @@ export default async function IncidenciasPage({
         <FilterLink href="/incidencias?estado=activas&prioridad=alta_urgente" active={estado === 'activas' && prioridad === 'alta_urgente'} label="Alta / urgente" />
         <FilterLink href="/incidencias?estado=abierta" active={estado === 'abierta'} label="Abiertas" />
         <FilterLink href="/incidencias?estado=en_progreso" active={estado === 'en_progreso'} label="En progreso" />
+        <FilterLink href="/incidencias?estado=resuelta" active={estado === 'resuelta'} label="Resueltas" />
       </div>
 
       <div className="brand-card flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm text-[color:var(--brand-muted)]">
@@ -133,25 +137,15 @@ export default async function IncidenciasPage({
                       Editar
                     </Link>
                   </div>
-                  <form action={cambiarEstadoIncidencia.bind(null, incidencia.id)} className="flex gap-2">
-                    <label className="flex-1 md:flex-none">
-                      <span className="sr-only">Estado</span>
-                      <select
-                        name="estado"
-                        defaultValue={incidencia.estado}
-                        className="brand-field w-full py-2 text-sm md:min-w-[11rem]"
-                      >
-                        {estadoTransitions[incidencia.estado].map((estadoPermitido) => (
-                          <option key={estadoPermitido} value={estadoPermitido}>
-                            {getEstadoLabel(estadoPermitido)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <button type="submit" className="brand-button-muted shrink-0">
-                      Guardar
-                    </button>
-                  </form>
+                  <EstadoFlowPanel
+                    incidenciaId={incidencia.id}
+                    currentEstado={incidencia.estado}
+                    canClose={canCloseIncidencias}
+                    requiereEvidencia={(incidencia.prioridad === 'alta' || incidencia.prioridad === 'urgente') && !incidencia.foto_url}
+                    cambiarEstadoAction={cambiarEstadoIncidencia.bind(null, incidencia.id)}
+                    redirectTo={redirectTo}
+                    compact
+                  />
                 </div>
               </div>
             </article>
@@ -164,15 +158,6 @@ export default async function IncidenciasPage({
       )}
     </div>
   )
-}
-
-function getEstadoLabel(estado: string) {
-  if (estado === 'pendiente_asignacion') return 'Sin asignar'
-  if (estado === 'abierta') return 'Abierta'
-  if (estado === 'en_progreso') return 'En progreso'
-  if (estado === 'resuelta') return 'Resuelta'
-  if (estado === 'cerrada') return 'Cerrada'
-  return estado
 }
 
 function FilterLink({ href, active, label, tone }: { href: string; active: boolean; label: string; tone?: 'orange' }) {

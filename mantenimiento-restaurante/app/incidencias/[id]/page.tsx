@@ -1,12 +1,13 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { eliminarIncidencia } from '../actions'
+import { cambiarEstadoIncidencia, eliminarIncidencia } from '../actions'
 import { AsignarPanel } from '../asignar-panel'
+import { EstadoFlowPanel } from '../estado-flow-panel'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createSignedUrl } from '@/lib/storage'
 import type { Activo, Cotizacion, Incidencia, Mantenimiento, MapaZona } from '@/lib/types'
-import { formatDate, formatDateTime, formatCurrency } from '@/lib/utils'
+import { formatDate, formatDateTime, formatCurrency, isAdminEmail } from '@/lib/utils'
 import { ConfirmDeleteButton } from '@/components/ui/confirm-delete-button'
 import { FlashMessage } from '@/components/ui/flash-message'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -39,6 +40,9 @@ export default async function IncidenciaDetallePage({
       .eq('incidencia_id', id)
       .order('created_at', { ascending: false })
   ])
+  const {
+    data: { user }
+  } = await supabase.auth.getUser()
 
   if (!data) notFound()
 
@@ -63,6 +67,8 @@ export default async function IncidenciaDetallePage({
     incidencia.equipo?.area ??
     incidencia.infraestructura?.area ??
     incidencia.zona_nombre
+  const canCloseIncidencia = isAdminEmail(user?.email)
+  const requiereEvidencia = (incidencia.prioridad === 'alta' || incidencia.prioridad === 'urgente') && !incidencia.foto_url
 
   return (
     <div className="space-y-6">
@@ -146,6 +152,48 @@ export default async function IncidenciaDetallePage({
           </form>
         </div>
       </div>
+
+      {!pendienteAsignacion ? (
+        <section className="brand-card rounded-lg p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-[color:var(--brand-ink)]">Acciones de flujo</h2>
+              <p className="mt-1 text-sm text-[color:var(--brand-muted)]">
+                Avanza la incidencia con transiciones válidas. El servidor ya bloquea saltos de estado.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <EstadoFlowPanel
+                incidenciaId={incidencia.id}
+                currentEstado={incidencia.estado}
+                canClose={canCloseIncidencia}
+                requiereEvidencia={requiereEvidencia}
+                cambiarEstadoAction={cambiarEstadoIncidencia.bind(null, incidencia.id)}
+              />
+            </div>
+          </div>
+          {requiereEvidencia ? (
+            <p className="mt-3 rounded-md border border-[rgba(239,169,30,0.22)] bg-[rgba(239,169,30,0.12)] px-3 py-2 text-sm text-[#8f5a00] dark:border-[rgba(239,169,30,0.24)] dark:bg-[rgba(90,65,24,0.84)] dark:text-[rgba(255,223,130,0.96)]">
+              Esta incidencia es alta/urgente. Debes subir una foto de evidencia antes de marcarla como resuelta.
+            </p>
+          ) : null}
+          {incidencia.estado === 'resuelta' ? (
+            <p className="mt-3 text-sm text-[color:var(--brand-muted)]">
+              Si no registraste el correctivo al resolver, todavía puedes crear uno desde esta ficha.
+            </p>
+          ) : null}
+          {incidencia.estado === 'resuelta' ? (
+            <div className="mt-3">
+              <Link
+                href={`/mantenimientos/nuevo?tipo=correctivo&incidencia=${incidencia.id}${incidencia.activo_id ? `&activo=${incidencia.activo_id}` : ''}${incidencia.zona_id ? `&zona=${incidencia.zona_id}` : ''}`}
+                className="brand-button-muted rounded-md px-4 py-2 text-sm font-medium"
+              >
+                Generar mantenimiento correctivo
+              </Link>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="brand-card rounded-lg p-5">

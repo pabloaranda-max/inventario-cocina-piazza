@@ -4,14 +4,31 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { removeStorageFiles, uploadOptionalFile } from '@/lib/storage'
-import { emptyToNull } from '@/lib/utils'
+import { emptyToNull, isAdminEmail } from '@/lib/utils'
 import type { FormState } from '@/lib/form-state'
 import type { EstadoIncidencia, PrioridadIncidencia } from '@/lib/types'
 import { notificarNuevoReporte } from '@/lib/email'
 
+const estadoTransitions: Record<EstadoIncidencia, EstadoIncidencia[]> = {
+  pendiente_asignacion: ['pendiente_asignacion', 'abierta'],
+  abierta: ['abierta', 'en_progreso', 'resuelta'],
+  en_progreso: ['en_progreso', 'resuelta'],
+  resuelta: ['resuelta', 'en_progreso', 'cerrada'],
+  cerrada: ['cerrada']
+}
+
 function getZonaNombre(activo: { zona?: { nombre?: string | null } | { nombre?: string | null }[] | null } | null) {
   const zona = Array.isArray(activo?.zona) ? activo.zona[0] : activo?.zona
   return zona?.nombre ?? null
+}
+
+function getEstadoRedirectTarget(formData: FormData, fallback = '/incidencias') {
+  const redirectTo = String(formData.get('redirect_to') ?? '').trim()
+  return redirectTo.startsWith('/') ? redirectTo : fallback
+}
+
+function canTransitionEstado(current: EstadoIncidencia, next: EstadoIncidencia) {
+  return estadoTransitions[current]?.includes(next) ?? false
 }
 
 function getIncidenciaPayload(formData: FormData) {
@@ -201,15 +218,91 @@ export async function actualizarIncidencia(
 
 export async function cambiarEstadoIncidencia(id: string, formData: FormData) {
   const estado = String(formData.get('estado') ?? 'abierta') as EstadoIncidencia
+  const redirectTarget = getEstadoRedirectTarget(formData, '/incidencias')
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.from('incidencias').update({ estado }).eq('id', id)
+  const {
+    data: { user }
+  } = await supabase.auth.getUser()
+  const { data: incidencia, error: incidenciaError } = await supabase
+    .from('incidencias')
+    .select('estado, prioridad, foto_url, activo_id, zona_id')
+    .eq('id', id)
+    .single()
 
-  if (error) redirect('/incidencias?flash=incidencia_error')
+  if (incidenciaError || !incidencia) redirect(`${redirectTarget}?flash=incidencia_error`)
+
+  if (!canTransitionEstado(incidencia.estado, estado)) {
+    redirect(`${redirectTarget}?flash=incidencia_transition_error`)
+  }
+
+  if (estado === 'cerrada' && !isAdminEmail(user?.email)) {
+    redirect(`${redirectTarget}?flash=incidencia_admin_error`)
+  }
+
+  let fotoUrl: string | null = null
+  try {
+    fotoUrl = await uploadOptionalFile(supabase, formData.get('foto'), 'incidencias')
+  } catch (error) {
+    redirect(`${redirectTarget}?flash=incidencia_error`)
+  }
+
+  if (
+    estado === 'resuelta' &&
+    (incidencia.prioridad === 'alta' || incidencia.prioridad === 'urgente') &&
+    !incidencia.foto_url &&
+    !fotoUrl
+  ) {
+    await removeStorageFiles(supabase, [fotoUrl])
+    redirect(`${redirectTarget}?flash=incidencia_evidencia_error`)
+  }
+
+  const updatePayload: Partial<{
+    estado: EstadoIncidencia
+    fecha_resuelta: string | null
+    validado_por: string | null
+  }> = { estado }
+
+  if (estado === 'resuelta') {
+    updatePayload.fecha_resuelta = new Date().toISOString()
+    updatePayload.validado_por = null
+  }
+
+  if (incidencia.estado === 'resuelta' && estado === 'en_progreso') {
+    updatePayload.fecha_resuelta = null
+    updatePayload.validado_por = null
+  }
+
+  if (estado === 'cerrada') {
+    updatePayload.validado_por = user?.email ?? user?.id ?? 'usuario_autenticado'
+  }
+
+  if (fotoUrl) {
+    Object.assign(updatePayload, { foto_url: fotoUrl })
+  }
+
+  const { error } = await supabase.from('incidencias').update(updatePayload).eq('id', id)
+
+  if (error) {
+    await removeStorageFiles(supabase, [fotoUrl])
+    redirect(`${redirectTarget}?flash=incidencia_error`)
+  }
 
   revalidatePath('/')
   revalidatePath('/mapa')
   revalidatePath('/incidencias')
-  redirect('/incidencias?flash=incidencia_actualizada')
+  revalidatePath(`/incidencias/${id}`)
+
+  if (estado === 'resuelta' && formData.get('crear_correctivo') === 'on') {
+    const params = new URLSearchParams({
+      tipo: 'correctivo',
+      incidencia: id
+    })
+    if (incidencia.activo_id) params.set('activo', incidencia.activo_id)
+    if (incidencia.zona_id) params.set('zona', incidencia.zona_id)
+    redirect(`/mantenimientos/nuevo?${params.toString()}`)
+  }
+
+  redirect(`${redirectTarget}?flash=incidencia_actualizada`)
 }
 
 export async function crearActivoRapido(_state: FormState, formData: FormData): Promise<FormState & { activo?: { id: string; nombre: string; area: string | null; clase: string; tipo: string } }> {
