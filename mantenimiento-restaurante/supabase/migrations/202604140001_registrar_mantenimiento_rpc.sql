@@ -62,7 +62,6 @@ begin
   return v_mantenimiento_id;
 end;
 $$;
-
 grant execute on function registrar_mantenimiento(
   tipo_mantenimiento,
   uuid,

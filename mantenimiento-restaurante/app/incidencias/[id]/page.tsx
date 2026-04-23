@@ -1,39 +1,97 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { eliminarIncidencia } from '../actions'
+import { AsignarPanel } from '../asignar-panel'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createSignedUrl } from '@/lib/storage'
-import type { Incidencia, Mantenimiento } from '@/lib/types'
-import { formatDate } from '@/lib/utils'
+import type { Activo, Cotizacion, Incidencia, Mantenimiento, MapaZona } from '@/lib/types'
+import { formatDate, formatDateTime, formatCurrency } from '@/lib/utils'
+import { ConfirmDeleteButton } from '@/components/ui/confirm-delete-button'
+import { FlashMessage } from '@/components/ui/flash-message'
 import { StatusBadge } from '@/components/ui/status-badge'
 
-export default async function IncidenciaDetallePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function IncidenciaDetallePage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ flash?: string }>
+}) {
   const { id } = await params
+  const { flash } = await searchParams
   const supabase = await createServerSupabaseClient()
-  const [{ data }, { data: mantenimientos }] = await Promise.all([
-    supabase.from('incidencias').select('*, equipo:equipos(id,nombre,area)').eq('id', id).single(),
+
+  const [{ data }, { data: mantenimientos }, { data: cotizaciones }] = await Promise.all([
+    supabase
+      .from('incidencias')
+      .select('*, activo:activos(id,nombre,area,clase,tipo), equipo:equipos(id,nombre,area), infraestructura:infraestructura(id,nombre,area,tipo)')
+      .eq('id', id)
+      .single(),
     supabase
       .from('mantenimientos')
       .select('*')
       .eq('incidencia_id', id)
-      .order('fecha_realizacion', { ascending: false })
+      .order('fecha_realizacion', { ascending: false }),
+    supabase
+      .from('cotizaciones')
+      .select('*, proveedor:proveedores(id,nombre)')
+      .eq('incidencia_id', id)
+      .order('created_at', { ascending: false })
   ])
 
   if (!data) notFound()
 
   const incidencia = data as Incidencia
+  const pendienteAsignacion = incidencia.estado === 'pendiente_asignacion'
+
+  const [activosData, zonasData] = pendienteAsignacion
+    ? await Promise.all([
+        supabase.from('activos').select('id,nombre,area,clase,tipo').order('nombre', { ascending: true }),
+        supabase.from('mapa_zonas').select('id,nombre,area,label').eq('visible', true).order('area', { ascending: true })
+      ])
+    : [{ data: null }, { data: null }]
+
   const foto = await createSignedUrl(supabase, incidencia.foto_url)
+  const destinoNombre =
+    incidencia.activo?.nombre ??
+    incidencia.equipo?.nombre ??
+    incidencia.infraestructura?.nombre ??
+    incidencia.zona_nombre
+  const destinoArea =
+    incidencia.activo?.area ??
+    incidencia.equipo?.area ??
+    incidencia.infraestructura?.area ??
+    incidencia.zona_nombre
 
   return (
     <div className="space-y-6">
+      <FlashMessage code={flash} />
+
+      {pendienteAsignacion && (
+        <section className="brand-card rounded-lg border-[rgba(239,169,30,0.22)] bg-[rgba(239,169,30,0.12)] p-5 dark:border-[rgba(239,169,30,0.24)] dark:bg-[rgba(239,169,30,0.16)]">
+          <h2 className="text-base font-semibold text-[#8f5a00] dark:text-[#ffd982]">Pendiente de asignación</h2>
+          <p className="mt-1 text-sm text-[#8f5a00] dark:text-[#ffd982]">
+            Este reporte no está asignado a ningún activo o zona. Asígnalo para que quede activo en el mapa y en el seguimiento.
+          </p>
+          <div className="mt-4">
+            <AsignarPanel
+              incidenciaId={incidencia.id}
+              activos={(activosData.data ?? []) as Pick<Activo, 'id' | 'nombre' | 'area' | 'clase' | 'tipo'>[]}
+              zonas={(zonasData.data ?? []) as Pick<MapaZona, 'id' | 'nombre' | 'area' | 'label'>[]}
+            />
+          </div>
+        </section>
+      )}
+
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Link href="/incidencias" className="text-sm text-slate-600 hover:text-slate-950">
+          <Link href="/incidencias" className="brand-inline-link text-sm">
             Volver a incidencias
           </Link>
-          <h1 className="mt-2 text-2xl font-semibold text-slate-950">Incidencia</h1>
+          <h1 className="mt-2 text-2xl font-semibold">Incidencia</h1>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+            <span className="brand-subtle-chip rounded-md px-2 py-1 text-xs font-medium">
               {incidencia.ticket_numero}
             </span>
             <StatusBadge type="incidencia" value={incidencia.estado} />
@@ -43,14 +101,22 @@ export default async function IncidenciaDetallePage({ params }: { params: Promis
         <div className="flex flex-wrap gap-2">
           <Link
             href={`/incidencias/${incidencia.id}/editar`}
-            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
+            className="brand-button rounded-md px-4 py-2 text-sm font-medium"
           >
             Editar incidencia
           </Link>
           {incidencia.equipo ? (
             <Link
               href={`/mantenimientos/nuevo?equipo=${incidencia.equipo.id}&incidencia=${incidencia.id}`}
-              className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              className="rounded-md border border-[rgba(47,62,30,0.16)] bg-[rgba(47,62,30,0.08)] px-4 py-2 text-sm font-medium text-[color:var(--brand-green)] hover:bg-[rgba(47,62,30,0.12)] dark:border-[rgba(238,227,202,0.14)] dark:bg-[rgba(47,62,30,0.2)] dark:text-[color:var(--brand-bone)]"
+            >
+              Mandar a mantenimiento
+            </Link>
+          ) : null}
+          {incidencia.infraestructura ? (
+            <Link
+              href={`/mantenimientos/nuevo?infraestructura=${incidencia.infraestructura.id}&incidencia=${incidencia.id}`}
+              className="rounded-md border border-[rgba(47,62,30,0.16)] bg-[rgba(47,62,30,0.08)] px-4 py-2 text-sm font-medium text-[color:var(--brand-green)] hover:bg-[rgba(47,62,30,0.12)] dark:border-[rgba(238,227,202,0.14)] dark:bg-[rgba(47,62,30,0.2)] dark:text-[color:var(--brand-bone)]"
             >
               Mandar a mantenimiento
             </Link>
@@ -58,28 +124,44 @@ export default async function IncidenciaDetallePage({ params }: { params: Promis
           {incidencia.equipo ? (
           <Link
             href={`/equipos/${incidencia.equipo.id}`}
-            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
+            className="brand-button-muted rounded-md px-4 py-2 text-sm font-medium"
           >
             Ver equipo
           </Link>
           ) : null}
+          {incidencia.infraestructura ? (
+            <Link
+              href={`/infraestructura/${incidencia.infraestructura.id}`}
+              className="brand-button-muted rounded-md px-4 py-2 text-sm font-medium"
+            >
+              Ver infraestructura
+            </Link>
+          ) : null}
+          <form action={eliminarIncidencia.bind(null, incidencia.id)}>
+            <ConfirmDeleteButton
+              label="Eliminar"
+              firstPrompt="Primera confirmación: ¿quieres eliminar esta incidencia?"
+              secondPrompt="Segunda confirmación: esta acción no se puede deshacer. ¿Eliminar incidencia?"
+            />
+          </form>
         </div>
       </div>
 
       <section className="grid gap-4 lg:grid-cols-[1fr_320px]">
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-950">Detalle</h2>
-          <p className="mt-4 whitespace-pre-line text-slate-800">{incidencia.descripcion}</p>
+        <div className="brand-card rounded-lg p-5">
+          <h2 className="text-lg font-semibold">Detalle</h2>
+          <p className="mt-4 whitespace-pre-line text-[color:var(--brand-green)] dark:text-[color:var(--brand-bone)]">{incidencia.descripcion}</p>
           <dl className="mt-5 grid gap-3 text-sm md:grid-cols-2">
-            <Info label="Equipo" value={incidencia.equipo?.nombre ?? 'Sin equipo'} />
-            <Info label="Area" value={incidencia.equipo?.area} />
+            <Info label="Destino" value={destinoNombre} />
+            <Info label="Clase" value={incidencia.activo?.clase} />
+            <Info label="Área o zona" value={destinoArea} />
             <Info label="Reportado por" value={incidencia.reportado_por} />
-            <Info label="Fecha" value={formatDate(incidencia.fecha_reporte)} />
+            <Info label="Fecha y hora" value={formatDateTime(incidencia.fecha_reporte)} />
           </dl>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-          <h2 className="mb-2 text-sm font-medium text-slate-700">Foto</h2>
+        <div className="brand-card rounded-lg p-3">
+          <h2 className="brand-label mb-2">Foto</h2>
           {foto ? (
             <Image
               src={foto}
@@ -89,21 +171,62 @@ export default async function IncidenciaDetallePage({ params }: { params: Promis
               className="h-60 w-full rounded-md object-cover"
             />
           ) : (
-            <div className="flex h-60 items-center justify-center rounded-md bg-slate-100 text-sm text-slate-500">
+            <div className="brand-hint flex h-60 items-center justify-center rounded-md bg-[rgba(47,62,30,0.06)] dark:bg-[rgba(238,227,202,0.08)]">
               Sin foto
             </div>
           )}
         </div>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-950">Mantenimientos vinculados</h2>
+      <section className="brand-card rounded-lg p-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Cotizaciones</h2>
+          <Link
+            href={`/cotizaciones/nueva?incidencia=${incidencia.id}${incidencia.activo?.id ? `&proveedor=` : ''}`}
+            className="brand-button-muted rounded-md px-3 py-1.5 text-sm font-medium"
+          >
+            + Agregar cotización
+          </Link>
+        </div>
+        {cotizaciones?.length ? (
+          <ul className="mt-4 space-y-3">
+            {(cotizaciones as Cotizacion[]).map((c) => (
+              <li key={c.id} className="border-b border-[rgba(47,62,30,0.08)] pb-3 last:border-0 dark:border-[rgba(238,227,202,0.08)]">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <Link href={`/cotizaciones/${c.id}`} className="font-medium text-[color:var(--brand-green)] hover:underline dark:text-[color:var(--brand-bone)]">
+                      {c.numero}
+                    </Link>
+                    {c.proveedor && (
+                      <span className="brand-hint ml-2 text-sm">{c.proveedor.nombre}</span>
+                    )}
+                  </div>
+                  <StatusBadge type="cotizacion" value={c.estado} />
+                </div>
+                <p className="brand-hint mt-1 text-sm">
+                  {c.monto != null ? formatCurrency(c.monto) : 'Sin monto'} · {formatDate(c.fecha_emision)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="brand-hint mt-4 text-sm">Sin cotizaciones registradas.</p>
+        )}
+      </section>
+
+      <section className="brand-card rounded-lg p-5">
+        <h2 className="text-lg font-semibold">Mantenimientos vinculados</h2>
         {mantenimientos?.length ? (
           <ul className="mt-4 space-y-3">
             {(mantenimientos as Mantenimiento[]).map((mantenimiento) => (
-              <li key={mantenimiento.id} className="border-b border-slate-100 pb-3 last:border-0">
-                <p className="font-medium text-slate-950">{mantenimiento.descripcion}</p>
-                <p className="mt-1 text-sm text-slate-600">
+              <li key={mantenimiento.id} className="border-b border-[rgba(47,62,30,0.08)] pb-3 last:border-0 dark:border-[rgba(238,227,202,0.08)]">
+                <Link
+                  href={`/mantenimientos/${mantenimiento.id}`}
+                  className="font-medium text-[color:var(--brand-green)] hover:underline dark:text-[color:var(--brand-bone)]"
+                >
+                  {mantenimiento.descripcion}
+                </Link>
+                <p className="brand-hint mt-1 text-sm">
                   {mantenimiento.tipo} · {formatDate(mantenimiento.fecha_realizacion)}
                   {mantenimiento.realizado_por ? ` · ${mantenimiento.realizado_por}` : ''}
                 </p>
@@ -111,7 +234,7 @@ export default async function IncidenciaDetallePage({ params }: { params: Promis
             ))}
           </ul>
         ) : (
-          <p className="mt-4 text-sm text-slate-500">Sin mantenimientos vinculados.</p>
+          <p className="brand-hint mt-4 text-sm">Sin mantenimientos vinculados.</p>
         )}
       </section>
     </div>
@@ -121,8 +244,8 @@ export default async function IncidenciaDetallePage({ params }: { params: Promis
 function Info({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="font-medium text-slate-900">{value || 'Sin dato'}</dd>
+      <dt className="brand-hint">{label}</dt>
+      <dd className="font-medium text-[color:var(--brand-green)] dark:text-[color:var(--brand-bone)]">{value || 'Sin dato'}</dd>
     </div>
   )
 }

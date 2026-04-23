@@ -5,6 +5,9 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   const isLogin = request.nextUrl.pathname === '/login'
+  const isPublic = request.nextUrl.pathname.startsWith('/reportar')
+
+  if (isPublic) return NextResponse.next()
 
   if (!supabaseUrl || !supabaseAnonKey) {
     if (isLogin) return NextResponse.next()

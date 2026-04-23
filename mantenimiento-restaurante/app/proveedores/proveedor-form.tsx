@@ -13,7 +13,7 @@ export function ProveedorForm({ proveedor }: { proveedor?: Proveedor }) {
   const [state, formAction] = useFormState(action, initialFormState)
 
   return (
-    <form action={formAction} className="space-y-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <form action={formAction} className="brand-shell space-y-5 rounded-lg p-5">
       <FormError message={state.error} />
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -47,18 +47,18 @@ export function ProveedorForm({ proveedor }: { proveedor?: Proveedor }) {
       />
 
       <label className="block">
-        <span className="text-sm font-medium text-slate-700">Notas</span>
+        <span className="brand-label">Notas</span>
         <textarea
           name="notas"
           defaultValue={proveedor?.notas ?? ''}
           rows={4}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+          className="brand-field mt-1"
         />
       </label>
 
       <button
         type="submit"
-        className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+        className="brand-button rounded-md px-4 py-2 text-sm font-medium"
       >
         {proveedor ? 'Guardar cambios' : 'Crear proveedor'}
       </button>
@@ -79,12 +79,12 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <span className="brand-label">{label}</span>
       <input
         name={name}
         defaultValue={defaultValue ?? ''}
         required={required}
-        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+        className="brand-field mt-1"
       />
     </label>
   )

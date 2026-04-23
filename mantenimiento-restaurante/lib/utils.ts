@@ -1,8 +1,16 @@
 export function formatDate(date: string | null | undefined) {
   if (!date) return 'Sin fecha'
-  return new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium' }).format(
-    new Date(`${date}T00:00:00`)
-  )
+  const d = date.includes('T') || date.includes('Z') ? new Date(date) : new Date(`${date}T00:00:00`)
+  return new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium' }).format(d)
+}
+
+export function formatDateTime(date: string | null | undefined) {
+  if (!date) return 'Sin fecha'
+  return new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(date))
+}
+
+export function formatCurrency(amount: number, currency = 'MXN') {
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency }).format(amount)
 }
 
 export function emptyToNull(value: FormDataEntryValue | null) {

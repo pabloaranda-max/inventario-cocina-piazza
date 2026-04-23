@@ -9,21 +9,17 @@ create table if not exists mapa_zonas (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 drop trigger if exists set_mapa_zonas_updated_at on mapa_zonas;
 create trigger set_mapa_zonas_updated_at
 before update on mapa_zonas
 for each row execute function set_updated_at();
-
 alter table mapa_zonas enable row level security;
-
 drop policy if exists "Usuarios autenticados gestionan mapa_zonas" on mapa_zonas;
 create policy "Usuarios autenticados gestionan mapa_zonas"
 on mapa_zonas for all
 to authenticated
 using (true)
 with check (true);
-
 insert into mapa_zonas (area, label, x, y, orden)
 values
   ('Hostess', 'Hostess', 9, 13, 10),

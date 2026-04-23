@@ -18,10 +18,10 @@ export default async function EditarProveedorPage({ params }: { params: Promise<
   return (
     <div className="space-y-5">
       <div>
-        <Link href="/proveedores" className="text-sm text-slate-600 hover:text-slate-950">
+        <Link href="/proveedores" className="brand-inline-link text-sm">
           Volver a proveedores
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-slate-950">Editar proveedor</h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[color:var(--brand-ink)]">Editar proveedor</h1>
       </div>
       <ProveedorForm proveedor={proveedor as Proveedor} />
     </div>

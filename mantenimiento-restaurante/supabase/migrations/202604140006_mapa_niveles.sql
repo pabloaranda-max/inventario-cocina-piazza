@@ -7,21 +7,17 @@ create table if not exists mapa_niveles (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 drop trigger if exists set_mapa_niveles_updated_at on mapa_niveles;
 create trigger set_mapa_niveles_updated_at
 before update on mapa_niveles
 for each row execute function set_updated_at();
-
 alter table mapa_niveles enable row level security;
-
 drop policy if exists "Usuarios autenticados gestionan mapa_niveles" on mapa_niveles;
 create policy "Usuarios autenticados gestionan mapa_niveles"
 on mapa_niveles for all
 to authenticated
 using (true)
 with check (true);
-
 insert into mapa_niveles (id, nombre, imagen_url, orden)
 values
   ('00000000-0000-4000-8000-000000000001', 'Portada', '/mapa/page-01.png', 10),
@@ -42,15 +38,11 @@ set nombre = excluded.nombre,
     imagen_url = excluded.imagen_url,
     orden = excluded.orden,
     visible = true;
-
 alter table mapa_zonas
   add column if not exists nivel_id uuid references mapa_niveles(id) on delete cascade;
-
 update mapa_zonas
 set nivel_id = '00000000-0000-4000-8000-000000000002'
 where nivel_id is null;
-
 alter table mapa_zonas
   alter column nivel_id set not null;
-
 create index if not exists idx_mapa_zonas_nivel_id on mapa_zonas(nivel_id);

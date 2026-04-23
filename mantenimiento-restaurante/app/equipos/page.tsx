@@ -4,65 +4,82 @@ import type { Equipo } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 
-export default async function EquiposPage() {
+type MantenimientoFilter = 'vencido' | 'proximo'
+
+export default async function EquiposPage({
+  searchParams
+}: {
+  searchParams: Promise<{ mantenimiento?: MantenimientoFilter }>
+}) {
+  const { mantenimiento } = await searchParams
   const supabase = await createServerSupabaseClient()
-  const { data: equipos } = await supabase
+  const today = new Date().toISOString().slice(0, 10)
+  const nextLimit = new Date()
+  nextLimit.setDate(nextLimit.getDate() + 14)
+  const nextLimitDate = nextLimit.toISOString().slice(0, 10)
+
+  let query = supabase
     .from('equipos')
     .select('*, proveedor:proveedores(*)')
     .order('nombre', { ascending: true })
     .limit(200)
 
+  if (mantenimiento === 'vencido') {
+    query = query.lt('fecha_proximo_mantenimiento', today)
+  } else if (mantenimiento === 'proximo') {
+    query = query.gte('fecha_proximo_mantenimiento', today).lte('fecha_proximo_mantenimiento', nextLimitDate)
+  }
+
+  const { data: equipos } = await query
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-950">Equipos</h1>
-          <p className="text-sm text-slate-600">Maquinas e instalaciones del restaurante.</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-[color:var(--brand-ink)]">Equipos</h1>
+          <p className="brand-hint">Maquinas e instalaciones del restaurante.</p>
         </div>
-        <Link
-          href="/equipos/nuevo"
-          className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-        >
+        <Link href="/equipos/nuevo" className="brand-button">
           Nuevo equipo
         </Link>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <FilterLink href="/equipos" active={!mantenimiento} label="Todos" />
+        <FilterLink href="/equipos?mantenimiento=vencido" active={mantenimiento === 'vencido'} label="Vencidos" />
+        <FilterLink href="/equipos?mantenimiento=proximo" active={mantenimiento === 'proximo'} label="Próximos 14 días" />
       </div>
 
       {equipos?.length ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {(equipos as Equipo[]).map((equipo) => (
-            <article
-              key={equipo.id}
-              className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-400"
-            >
+            <article key={equipo.id} className="brand-card space-y-4 p-5">
               <Link href={`/equipos/${equipo.id}`} className="block">
-                <h2 className="font-semibold text-slate-950 hover:underline">{equipo.nombre}</h2>
+                <h2 className="font-semibold text-[color:var(--brand-ink)] hover:underline">{equipo.nombre}</h2>
               </Link>
-              <p className="mt-1 text-sm text-slate-600">
+              <p className="brand-hint">
                 {equipo.area ?? 'Sin area'} · {equipo.categoria ?? 'Sin categoria'}
               </p>
-              <div className="mt-3">
+              <div>
                 <StatusBadge type="equipo" value={equipo.estado} />
               </div>
-              <p className="mt-3 text-sm text-slate-600">
+              <p className="text-sm text-[color:var(--brand-olive)]">
                 Proximo: {formatDate(equipo.fecha_proximo_mantenimiento)}
               </p>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Link
                   href={`/incidencias/nueva?equipo=${equipo.id}`}
-                  className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800 hover:bg-rose-100"
+                  className="rounded-md border border-[color:color-mix(in_srgb,var(--brand-wine)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-wine)_10%,white)] px-3 py-2 text-sm font-medium text-[color:var(--brand-wine)] transition hover:bg-[color:color-mix(in_srgb,var(--brand-wine)_18%,white)] dark:bg-[color:color-mix(in_srgb,var(--brand-wine)_22%,transparent)]"
                 >
                   Reportar
                 </Link>
                 <Link
                   href={`/mantenimientos/nuevo?equipo=${equipo.id}`}
-                  className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100"
+                  className="rounded-md border border-[color:color-mix(in_srgb,var(--brand-olive)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-olive)_10%,white)] px-3 py-2 text-sm font-medium text-[color:var(--brand-olive)] transition hover:bg-[color:color-mix(in_srgb,var(--brand-olive)_18%,white)] dark:bg-[color:color-mix(in_srgb,var(--brand-olive)_22%,transparent)]"
                 >
                   Mantto.
                 </Link>
-                <Link
-                  href={`/equipos/${equipo.id}/editar`}
-                  className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
-                >
+                <Link href={`/equipos/${equipo.id}/editar`} className="brand-button-muted">
                   Editar
                 </Link>
               </div>
@@ -70,10 +87,25 @@ export default async function EquiposPage() {
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+        <div className="brand-card p-6 text-sm text-[color:var(--brand-muted)]">
           No hay equipos registrados.
         </div>
       )}
     </div>
+  )
+}
+
+function FilterLink({ href, active, label }: { href: string; active: boolean; label: string }) {
+  return (
+    <Link
+      href={href}
+      className={`rounded-md border px-3 py-2 text-sm font-medium ${
+        active
+          ? 'border-[color:var(--brand-wine)] bg-[color:var(--brand-wine)] text-[color:var(--brand-bone)]'
+          : 'border-[color:color-mix(in_srgb,var(--brand-olive)_22%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-bone)_76%,white)] text-[color:var(--brand-olive)] hover:bg-[color:color-mix(in_srgb,var(--brand-bone)_92%,white)] dark:border-[rgba(101,127,68,0.22)] dark:bg-[rgba(31,43,23,0.9)] dark:text-[rgba(232,239,210,0.96)] dark:hover:bg-[rgba(39,54,28,0.96)]'
+      }`}
+    >
+      {label}
+    </Link>
   )
 }

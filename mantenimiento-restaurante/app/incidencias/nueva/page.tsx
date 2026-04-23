@@ -1,32 +1,19 @@
 import Link from 'next/link'
-import { IncidenciaForm } from '../incidencia-form'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-import type { Equipo } from '@/lib/types'
+import { ReporteRapidoForm } from '../incidencia-form'
 
-export default async function NuevaIncidenciaPage({
-  searchParams
-}: {
-  searchParams: Promise<{ equipo?: string }>
-}) {
-  const { equipo } = await searchParams
-  const supabase = await createServerSupabaseClient()
-  const { data: equipos } = await supabase
-    .from('equipos')
-    .select('id,nombre,area')
-    .order('nombre', { ascending: true })
-
+export default function NuevaIncidenciaPage() {
   return (
-    <div className="space-y-5">
+    <div className="mx-auto max-w-lg space-y-5">
       <div>
-        <Link href="/incidencias" className="text-sm text-slate-600 hover:text-slate-950">
+        <Link href="/incidencias" className="brand-inline-link text-sm">
           Volver a incidencias
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-slate-950">Nueva incidencia</h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[color:var(--brand-ink)]">Reportar incidencia</h1>
+        <p className="mt-1 text-sm text-[color:var(--brand-muted)]">
+          Describe el problema. La asignación y seguimiento se hace después.
+        </p>
       </div>
-      <IncidenciaForm
-        equipos={(equipos as Pick<Equipo, 'id' | 'nombre' | 'area'>[]) ?? []}
-        selectedEquipoId={equipo}
-      />
+      <ReporteRapidoForm />
     </div>
   )
 }

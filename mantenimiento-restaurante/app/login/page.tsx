@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import { login } from './actions'
 
 type LoginPageProps = {
@@ -19,48 +20,68 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const error = resolvedSearchParams.error ? errorMessages[resolvedSearchParams.error] : null
 
   return (
-    <div className="mx-auto mt-12 max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-      <h1 className="text-2xl font-semibold text-slate-950">Entrar</h1>
-      <p className="mt-2 text-sm text-slate-600">
-        Usa tu cuenta interna creada en Supabase.
-      </p>
+    <div className="mx-auto mt-10 max-w-md">
+      <div className="brand-shell rounded-lg p-7">
+        <div className="flex items-center gap-4">
+          <span className="flex h-14 w-14 items-center justify-center rounded-md border border-[rgba(155,30,33,0.18)] bg-[rgba(255,253,248,0.72)] p-1.5 dark:border-[rgba(238,227,202,0.14)] dark:bg-[rgba(238,227,202,0.08)]">
+            <Image
+              src="/branding/logo.png"
+              alt="Piazza Pasticcio"
+              width={48}
+              height={48}
+              className="h-11 w-11 object-contain"
+              priority
+            />
+          </span>
+          <div>
+            <p className="brand-accent text-xl leading-none text-[color:var(--brand-wine)] dark:text-[color:var(--brand-yellow)]">
+              Piazza Pasticcio
+            </p>
+            <h1 className="mt-1 text-3xl font-semibold">Entrar</h1>
+          </div>
+        </div>
 
-      <form action={login} className="mt-6 space-y-4">
-        <label className="block">
-          <span className="text-sm font-medium text-slate-700">Email</span>
-          <input
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-slate-700"
-          />
-        </label>
+        <p className="mt-4 text-sm text-[rgba(47,62,30,0.76)] dark:text-[rgba(238,227,202,0.74)]">
+          Usa tu cuenta interna para operar incidencias, activos y mantenimientos.
+        </p>
 
-        <label className="block">
-          <span className="text-sm font-medium text-slate-700">Contraseña</span>
-          <input
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-slate-700"
-          />
-        </label>
+        <form action={login} className="mt-6 space-y-4">
+          <label className="block">
+            <span className="text-sm font-medium text-[color:var(--brand-green)] dark:text-[color:var(--brand-bone)]">Email</span>
+            <input
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              className="mt-1 w-full rounded-md border border-[rgba(47,62,30,0.16)] bg-[rgba(255,253,248,0.8)] px-3 py-2 text-[color:var(--brand-green)] outline-none placeholder:text-[rgba(47,62,30,0.4)] focus:border-[color:var(--brand-yellow)] dark:border-[rgba(238,227,202,0.12)] dark:bg-[rgba(22,32,18,0.72)] dark:text-[color:var(--brand-bone)] dark:placeholder:text-[rgba(238,227,202,0.42)]"
+            />
+          </label>
 
-        {error ? (
-          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </p>
-        ) : null}
+          <label className="block">
+            <span className="text-sm font-medium text-[color:var(--brand-green)] dark:text-[color:var(--brand-bone)]">Contraseña</span>
+            <input
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              className="mt-1 w-full rounded-md border border-[rgba(47,62,30,0.16)] bg-[rgba(255,253,248,0.8)] px-3 py-2 text-[color:var(--brand-green)] outline-none placeholder:text-[rgba(47,62,30,0.4)] focus:border-[color:var(--brand-yellow)] dark:border-[rgba(238,227,202,0.12)] dark:bg-[rgba(22,32,18,0.72)] dark:text-[color:var(--brand-bone)] dark:placeholder:text-[rgba(238,227,202,0.42)]"
+            />
+          </label>
 
-        <button
-          type="submit"
-          className="w-full rounded-md bg-slate-950 px-4 py-2 font-medium text-white hover:bg-slate-800"
-        >
-          Iniciar sesión
-        </button>
-      </form>
+          {error ? (
+            <p className="rounded-md border border-[rgba(155,30,33,0.2)] bg-[rgba(155,30,33,0.08)] px-3 py-2 text-sm text-[color:var(--brand-wine)] dark:border-[rgba(239,169,30,0.2)] dark:bg-[rgba(155,30,33,0.18)] dark:text-[color:var(--brand-bone)]">
+              {error}
+            </p>
+          ) : null}
+
+          <button
+            type="submit"
+            className="brand-button w-full rounded-md px-4 py-2 font-medium"
+          >
+            Iniciar sesión
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

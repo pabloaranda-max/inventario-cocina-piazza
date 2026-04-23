@@ -1,18 +1,34 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import type { Equipo, MapaNivel, MapaZona } from '@/lib/types'
-import { MapaOperativo, type MapaIncidencia } from './mapa-operativo'
+import type { MapaNivel, MapaZona } from '@/lib/types'
+import {
+  MapaOperativo,
+  type MapaActivo,
+  type MapaIncidencia,
+  type MapaInfraestructura,
+  type MapaLimpieza,
+  type MapaPendiente
+} from './mapa-operativo'
 
 export default async function MapaPage() {
   const supabase = await createServerSupabaseClient()
-  const [{ data: equipos }, { data: incidencias }, { data: niveles }, { data: zonas }] = await Promise.all([
+  const [
+    { data: activos },
+    { data: incidencias },
+    { data: niveles },
+    { data: zonas },
+    { data: areas },
+    { data: infraestructura },
+    { data: limpiezas },
+    { data: pendientes }
+  ] = await Promise.all([
     supabase
-      .from('equipos')
-      .select('id,nombre,area,categoria,estado,fecha_proximo_mantenimiento')
+      .from('activos')
+      .select('id,nombre,tipo,area,clase,estado,criticidad,nivel_id,x,y,zona_id,fecha_proxima_revision,fecha_proxima_limpieza,limpieza_intervalo_dias')
       .order('nombre', { ascending: true })
       .limit(300),
     supabase
       .from('incidencias')
-      .select('id,ticket_numero,descripcion,prioridad,estado,equipo_id,equipo:equipos(id,nombre,area)')
+      .select('id,ticket_numero,descripcion,prioridad,estado,activo_id,equipo_id,infraestructura_id,zona_id,zona_nombre')
       .in('estado', ['abierta', 'en_progreso'])
       .order('fecha_reporte', { ascending: false })
       .limit(200),
@@ -25,15 +41,40 @@ export default async function MapaPage() {
       .from('mapa_zonas')
       .select('*')
       .eq('visible', true)
-      .order('orden', { ascending: true })
+      .order('orden', { ascending: true }),
+    supabase
+      .from('areas')
+      .select('nombre')
+      .order('nombre', { ascending: true }),
+    supabase
+      .from('infraestructura')
+      .select('id,nombre,tipo,area,estado,criticidad,nivel_id,x,y,fecha_proxima_revision')
+      .not('nivel_id', 'is', null)
+      .order('nombre', { ascending: true }),
+    supabase
+      .from('mantenimientos')
+      .select('id,descripcion,fecha_realizacion,realizado_por,activo_id,zona_id,zona_nombre,activo:activos(id,nombre,area)')
+      .eq('tipo', 'limpieza_profunda')
+      .order('fecha_realizacion', { ascending: false })
+      .limit(180),
+    supabase
+      .from('incidencias')
+      .select('id,ticket_numero,descripcion,prioridad,estado,fecha_reporte,zona_nombre')
+      .eq('estado', 'pendiente_asignacion')
+      .order('fecha_reporte', { ascending: true })
+      .limit(8)
   ])
 
   return (
     <MapaOperativo
-      equipos={(equipos as Equipo[]) ?? []}
+      activos={(activos as MapaActivo[]) ?? []}
       incidencias={(incidencias as unknown as MapaIncidencia[]) ?? []}
       niveles={(niveles as MapaNivel[]) ?? []}
       zonas={(zonas as MapaZona[]) ?? []}
+      areas={(areas ?? []).map((a) => a.nombre)}
+      infraestructura={(infraestructura as MapaInfraestructura[]) ?? []}
+      limpiezas={(limpiezas as unknown as MapaLimpieza[]) ?? []}
+      pendientes={(pendientes as MapaPendiente[]) ?? []}
     />
   )
 }

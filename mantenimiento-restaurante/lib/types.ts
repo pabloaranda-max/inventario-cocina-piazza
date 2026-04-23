@@ -5,8 +5,22 @@ export type EstadoEquipo =
   | 'pendiente_revision'
 
 export type PrioridadIncidencia = 'baja' | 'media' | 'alta' | 'urgente'
-export type EstadoIncidencia = 'abierta' | 'en_progreso' | 'resuelta' | 'cerrada'
-export type TipoMantenimiento = 'preventivo' | 'correctivo'
+export type EstadoIncidencia = 'pendiente_asignacion' | 'abierta' | 'en_progreso' | 'resuelta' | 'cerrada'
+export type TipoMantenimiento = 'preventivo' | 'correctivo' | 'limpieza_profunda'
+export type EjecucionMantenimiento = 'interno' | 'externo'
+export type EstadoCotizacion = 'pendiente_revision' | 'aprobada' | 'rechazada'
+export type EstadoInfraestructura =
+  | 'operativo'
+  | 'requiere_revision'
+  | 'obstruido'
+  | 'con_fuga'
+  | 'sin_acceso'
+  | 'fuera_de_servicio'
+export type CriticidadInfraestructura = 'baja' | 'media' | 'alta' | 'critica'
+export type ClaseActivo = 'equipo' | 'infraestructura' | 'mobiliario' | 'edificacion' | 'sistema'
+export type EstadoActivo =
+  | EstadoEquipo
+  | EstadoInfraestructura
 
 export type Proveedor = {
   id: string
@@ -21,6 +35,35 @@ export type Proveedor = {
   notas: string | null
   created_at: string
   updated_at: string
+}
+
+export type Activo = {
+  id: string
+  clase: ClaseActivo
+  nombre: string
+  tipo: string
+  sistema: string | null
+  area: string | null
+  zona_id: string | null
+  estado: EstadoActivo
+  criticidad: CriticidadInfraestructura
+  proveedor_id: string | null
+  nivel_id: string | null
+  x: number | null
+  y: number | null
+  foto_url: string | null
+  notas: string | null
+  fecha_ultima_revision: string | null
+  fecha_proxima_revision: string | null
+  limpieza_intervalo_dias: number | null
+  limpieza_tipo: 'interno' | 'contratado' | null
+  limpieza_proveedor_id: string | null
+  fecha_ultima_limpieza: string | null
+  fecha_proxima_limpieza: string | null
+  created_at: string
+  updated_at: string
+  proveedor?: Proveedor | null
+  nivel?: Pick<MapaNivel, 'id' | 'nombre'> | null
 }
 
 export type Equipo = {
@@ -43,28 +86,66 @@ export type Equipo = {
   proveedor?: Proveedor | null
 }
 
+export type Infraestructura = {
+  id: string
+  nombre: string
+  tipo: string
+  area: string | null
+  nivel_id: string | null
+  x: number | null
+  y: number | null
+  estado: EstadoInfraestructura
+  criticidad: CriticidadInfraestructura
+  descripcion_ubicacion: string | null
+  foto_url: string | null
+  notas: string | null
+  proveedor_id: string | null
+  fecha_ultima_revision: string | null
+  fecha_proxima_revision: string | null
+  created_at: string
+  updated_at: string
+  proveedor?: Proveedor | null
+  nivel?: Pick<MapaNivel, 'id' | 'nombre'> | null
+}
+
 export type Incidencia = {
   id: string
+  activo_id: string | null
   equipo_id: string | null
+  infraestructura_id: string | null
+  zona_id: string | null
+  zona_nombre: string | null
   ticket_numero: string
   descripcion: string
   prioridad: PrioridadIncidencia
   foto_url: string | null
   reportado_por: string | null
   fecha_reporte: string
+  asignado_a: string | null
+  fecha_resuelta: string | null
+  validado_por: string | null
   estado: EstadoIncidencia
   created_at: string
   updated_at: string
+  activo?: Pick<Activo, 'id' | 'nombre' | 'area' | 'clase' | 'tipo'> | null
   equipo?: Pick<Equipo, 'id' | 'nombre' | 'area'> | null
+  infraestructura?: Pick<Infraestructura, 'id' | 'nombre' | 'area' | 'tipo'> | null
 }
 
 export type Mantenimiento = {
   id: string
   tipo: TipoMantenimiento
-  equipo_id: string
+  activo_id: string | null
+  equipo_id: string | null
+  infraestructura_id: string | null
   incidencia_id: string | null
+  zona_id: string | null
+  zona_nombre: string | null
   descripcion: string
   realizado_por: string | null
+  ejecucion_tipo: EjecucionMantenimiento
+  requiere_material: boolean
+  proveedor_id: string | null
   costo: number | null
   repuestos_notas: string | null
   fotos_urls: string[]
@@ -72,15 +153,47 @@ export type Mantenimiento = {
   proxima_fecha_sugerida: string | null
   created_at: string
   updated_at: string
+  activo?: Pick<Activo, 'id' | 'nombre' | 'area' | 'clase' | 'tipo'> | null
   equipo?: Pick<Equipo, 'id' | 'nombre' | 'area'> | null
+  infraestructura?: Pick<Infraestructura, 'id' | 'nombre' | 'area' | 'tipo'> | null
   incidencia?: Pick<Incidencia, 'id' | 'ticket_numero' | 'descripcion' | 'estado'> | null
+  proveedor?: Pick<Proveedor, 'id' | 'nombre' | 'especialidad'> | null
+}
+
+export type Cotizacion = {
+  id: string
+  numero: string
+  activo_id: string | null
+  proveedor_id: string | null
+  incidencia_id: string | null
+  mantenimiento_id: string | null
+  monto: number | null
+  moneda: string
+  estado: EstadoCotizacion
+  fecha_emision: string
+  fecha_vencimiento: string | null
+  archivo_url: string | null
+  notas: string | null
+  created_at: string
+  updated_at: string
+  proveedor?: Pick<Proveedor, 'id' | 'nombre' | 'especialidad'> | null
+  activo?: Pick<Activo, 'id' | 'nombre' | 'area' | 'clase' | 'tipo'> | null
+  incidencia?: Pick<Incidencia, 'id' | 'ticket_numero' | 'descripcion'> | null
+  mantenimiento?: Pick<Mantenimiento, 'id' | 'tipo' | 'fecha_realizacion'> | null
 }
 
 export type MapaZona = {
   id: string
   nivel_id: string
+  parent_id: string | null
   area: string
   label: string
+  nombre: string
+  tipo: 'zona' | 'subzona'
+  geometry_tipo: 'point' | 'rect' | 'polygon'
+  geometry: Record<string, unknown> | null
+  color: string | null
+  descripcion: string | null
   x: number
   y: number
   visible: boolean

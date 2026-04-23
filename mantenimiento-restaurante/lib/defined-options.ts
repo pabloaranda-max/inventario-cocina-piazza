@@ -40,6 +40,37 @@ export const proveedorEspecialidades = [
   'General'
 ]
 
+export const infraestructuraTipos = [
+  'Registro de desagüe',
+  'Trampa de grasa',
+  'Coladera',
+  'Tablero eléctrico',
+  'Breaker / circuito',
+  'Llave de paso de agua',
+  'Válvula de gas',
+  'Punto hidráulico',
+  'Punto sanitario',
+  'Cárcamo / bomba fija',
+  'Ducto / extracción',
+  'Acceso técnico'
+]
+
+export const limpiezaIntervalos: { label: string; dias: number }[] = [
+  { label: 'Semanal (7 días)', dias: 7 },
+  { label: 'Quincenal (15 días)', dias: 15 },
+  { label: 'Mensual (30 días)', dias: 30 },
+  { label: 'Bimestral (60 días)', dias: 60 },
+  { label: 'Trimestral (90 días)', dias: 90 },
+  { label: 'Semestral (180 días)', dias: 180 },
+  { label: 'Anual (365 días)', dias: 365 },
+]
+
+export const cotizacionEstados: { value: string; label: string }[] = [
+  { value: 'pendiente_revision', label: 'Pendiente de revisión' },
+  { value: 'aprobada', label: 'Aprobada' },
+  { value: 'rechazada', label: 'Rechazada' },
+]
+
 export const otherPrefix = 'Otro:'
 
 export function parseDefinedValues(value: string | null | undefined) {

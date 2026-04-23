@@ -1,23 +1,16 @@
 create sequence if not exists incidencia_ticket_seq;
-
 alter table incidencias
   add column if not exists ticket_numero text;
-
 update incidencias
 set ticket_numero = 'INC-' || lpad(nextval('incidencia_ticket_seq')::text, 6, '0')
 where ticket_numero is null;
-
 alter table incidencias
   alter column ticket_numero set default 'INC-' || lpad(nextval('incidencia_ticket_seq')::text, 6, '0'),
   alter column ticket_numero set not null;
-
 create unique index if not exists idx_incidencias_ticket_numero on incidencias(ticket_numero);
-
 alter table mantenimientos
   add column if not exists incidencia_id uuid references incidencias(id) on delete set null;
-
 create index if not exists idx_mantenimientos_incidencia_id on mantenimientos(incidencia_id);
-
 drop function if exists registrar_mantenimiento(
   tipo_mantenimiento,
   uuid,
@@ -30,7 +23,6 @@ drop function if exists registrar_mantenimiento(
   date,
   boolean
 );
-
 create or replace function registrar_mantenimiento(
   p_tipo tipo_mantenimiento,
   p_equipo_id uuid,
@@ -109,7 +101,6 @@ begin
   return v_mantenimiento_id;
 end;
 $$;
-
 grant execute on function registrar_mantenimiento(
   tipo_mantenimiento,
   uuid,
