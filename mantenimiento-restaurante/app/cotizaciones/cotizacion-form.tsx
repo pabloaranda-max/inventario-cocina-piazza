@@ -6,6 +6,7 @@ import { crearCotizacion, actualizarCotizacion } from './actions'
 import { FormError } from '@/components/ui/flash-message'
 import { initialFormState } from '@/lib/form-state'
 import { cotizacionEstados } from '@/lib/defined-options'
+import { todayMX } from '@/lib/utils'
 
 export function CotizacionForm({
   proveedores,
@@ -31,7 +32,7 @@ export function CotizacionForm({
   const action = cotizacion ? actualizarCotizacion.bind(null, cotizacion.id) : crearCotizacion
   const [state, formAction] = useFormState(action, initialFormState)
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayMX()
 
   return (
     <form

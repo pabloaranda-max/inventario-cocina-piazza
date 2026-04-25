@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { emptyToNull } from '@/lib/utils'
+import { addDaysToDateInput, emptyToNull } from '@/lib/utils'
 import { removeStorageFiles, uploadOptionalFile } from '@/lib/storage'
 import type { FormState } from '@/lib/form-state'
 import type { CriticidadInfraestructura, EstadoInfraestructura } from '@/lib/types'
@@ -11,10 +11,8 @@ import type { CriticidadInfraestructura, EstadoInfraestructura } from '@/lib/typ
 type InfraestructuraPayload = {
   nombre: string
   tipo: string
+  zona_id: string
   area: string | null
-  nivel_id: string | null
-  x: number | null
-  y: number | null
   estado: EstadoInfraestructura
   criticidad: CriticidadInfraestructura
   descripcion_ubicacion: string | null
@@ -30,37 +28,13 @@ type InfraestructuraPayload = {
   fecha_proxima_limpieza: string | null
 }
 
-function addDays(dateString: string, days: number) {
-  const date = new Date(`${dateString}T00:00:00.000Z`)
-  date.setUTCDate(date.getUTCDate() + days)
-  return date.toISOString().slice(0, 10)
-}
-
-function parsePercent(value: FormDataEntryValue | null) {
-  const raw = emptyToNull(value)
-  if (!raw) return null
-  const parsed = Number(raw)
-  if (Number.isNaN(parsed)) return NaN
-  return Number(Math.min(100, Math.max(0, parsed)).toFixed(3))
-}
-
 function getPayload(formData: FormData): InfraestructuraPayload | FormState {
   const nombre = String(formData.get('nombre') ?? '').trim()
   const tipo = String(formData.get('tipo') ?? '').trim()
+  const zonaId = emptyToNull(formData.get('zona_id'))
   if (!nombre) return { error: 'El nombre es obligatorio.' }
   if (!tipo) return { error: 'El tipo es obligatorio.' }
-
-  const nivelId = emptyToNull(formData.get('nivel_id'))
-  const x = parsePercent(formData.get('x'))
-  const y = parsePercent(formData.get('y'))
-
-  if (Number.isNaN(x) || Number.isNaN(y)) {
-    return { error: 'Las coordenadas del mapa deben ser números entre 0 y 100.' }
-  }
-
-  if ((nivelId && (x === null || y === null)) || (!nivelId && (x !== null || y !== null))) {
-    return { error: 'Para ubicar en mapa selecciona lámina, X y Y.' }
-  }
+  if (!zonaId) return { error: 'Selecciona una zona.' }
 
   const limpiezaEnabled = formData.get('limpieza_enabled') === 'on'
   const limpiezaIntervaloRaw = emptyToNull(formData.get('limpieza_intervalo_dias'))
@@ -74,7 +48,7 @@ function getPayload(formData: FormData): InfraestructuraPayload | FormState {
   const fechaUltimaLimpieza = limpiezaEnabled ? emptyToNull(formData.get('fecha_ultima_limpieza')) : null
   const fechaProximaLimpieza = limpiezaEnabled
     ? emptyToNull(formData.get('fecha_proxima_limpieza')) ??
-      (fechaUltimaLimpieza && limpiezaIntervalo ? addDays(fechaUltimaLimpieza, limpiezaIntervalo) : null)
+      (fechaUltimaLimpieza && limpiezaIntervalo ? addDaysToDateInput(fechaUltimaLimpieza, limpiezaIntervalo) : null)
     : null
 
   if (limpiezaEnabled && !fechaProximaLimpieza) {
@@ -84,10 +58,8 @@ function getPayload(formData: FormData): InfraestructuraPayload | FormState {
   return {
     nombre,
     tipo,
+    zona_id: zonaId,
     area: emptyToNull(formData.get('area')),
-    nivel_id: nivelId,
-    x,
-    y,
     estado: String(formData.get('estado') ?? 'operativo') as EstadoInfraestructura,
     criticidad: String(formData.get('criticidad') ?? 'media') as CriticidadInfraestructura,
     descripcion_ubicacion: emptyToNull(formData.get('descripcion_ubicacion')),
@@ -114,6 +86,14 @@ export async function crearInfraestructura(_state: FormState, formData: FormData
   if (!('nombre' in payload)) return payload
 
   const supabase = await createServerSupabaseClient()
+  const { data: zona, error: zonaError } = await supabase
+    .from('mapa_zonas')
+    .select('id,nivel_id,area,nombre')
+    .eq('id', payload.zona_id)
+    .single()
+
+  if (zonaError) return { error: zonaError.message }
+  const resolvedArea = zona.area ?? zona.nombre ?? payload.area
   let fotoUrl: string | null = null
 
   try {
@@ -128,13 +108,14 @@ export async function crearInfraestructura(_state: FormState, formData: FormData
       clase: 'infraestructura',
       nombre: payload.nombre,
       tipo: payload.tipo,
-      area: payload.area,
+      area: resolvedArea,
       estado: payload.estado,
       criticidad: payload.criticidad,
       proveedor_id: payload.proveedor_id,
-      nivel_id: payload.nivel_id,
-      x: payload.x,
-      y: payload.y,
+      zona_id: payload.zona_id,
+      nivel_id: zona.nivel_id,
+      x: null,
+      y: null,
       foto_url: fotoUrl,
       notas: payload.notas,
       fecha_ultima_revision: payload.fecha_ultima_revision,
@@ -163,7 +144,7 @@ export async function crearInfraestructura(_state: FormState, formData: FormData
   } = payload
   const { error: infraestructuraError } = await supabase
     .from('infraestructura')
-    .insert({ id: data.id, ...infraPayload, foto_url: fotoUrl })
+    .insert({ id: data.id, ...infraPayload, area: resolvedArea, nivel_id: zona.nivel_id, x: null, y: null, foto_url: fotoUrl })
 
   if (infraestructuraError) {
     await removeStorageFiles(supabase, [fotoUrl])
@@ -177,7 +158,7 @@ export async function crearInfraestructura(_state: FormState, formData: FormData
 
   if (detalleError) return { error: detalleError.message }
 
-  const areaResult = await upsertAreaIfNeeded(payload.area)
+  const areaResult = await upsertAreaIfNeeded(resolvedArea)
   if (areaResult?.error) return { error: areaResult.error.message }
 
   revalidatePath('/infraestructura')
@@ -195,6 +176,14 @@ export async function actualizarInfraestructura(
   if (!('nombre' in payload)) return payload
 
   const supabase = await createServerSupabaseClient()
+  const { data: zona, error: zonaError } = await supabase
+    .from('mapa_zonas')
+    .select('id,nivel_id,area,nombre')
+    .eq('id', payload.zona_id)
+    .single()
+
+  if (zonaError) return { error: zonaError.message }
+  const resolvedArea = zona.area ?? zona.nombre ?? payload.area
   const { data: current, error: currentError } = await supabase
     .from('infraestructura')
     .select('foto_url')
@@ -225,13 +214,14 @@ export async function actualizarInfraestructura(
     .update({
       nombre: payload.nombre,
       tipo: payload.tipo,
-      area: payload.area,
+      area: resolvedArea,
       estado: payload.estado,
       criticidad: payload.criticidad,
       proveedor_id: payload.proveedor_id,
-      nivel_id: payload.nivel_id,
-      x: payload.x,
-      y: payload.y,
+      zona_id: payload.zona_id,
+      nivel_id: zona.nivel_id,
+      x: null,
+      y: null,
       ...(fotoUrl ? { foto_url: fotoUrl } : {}),
       notas: payload.notas,
       fecha_ultima_revision: payload.fecha_ultima_revision,
@@ -249,7 +239,10 @@ export async function actualizarInfraestructura(
     return { error: activoError.message }
   }
 
-  const { error } = await supabase.from('infraestructura').update(infraUpdatePayload).eq('id', id)
+  const { error } = await supabase
+    .from('infraestructura')
+    .update({ ...infraUpdatePayload, area: resolvedArea, nivel_id: zona.nivel_id, x: null, y: null })
+    .eq('id', id)
 
   if (error) {
     await removeStorageFiles(supabase, [fotoUrl])
@@ -264,7 +257,7 @@ export async function actualizarInfraestructura(
 
   if (fotoUrl) await removeStorageFiles(supabase, [current?.foto_url])
 
-  const areaResult = await upsertAreaIfNeeded(payload.area)
+  const areaResult = await upsertAreaIfNeeded(resolvedArea)
   if (areaResult?.error) return { error: areaResult.error.message }
 
   revalidatePath('/infraestructura')

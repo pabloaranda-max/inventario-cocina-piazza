@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { uploadOptionalFile, removeStorageFiles } from '@/lib/storage'
-import { emptyToNull } from '@/lib/utils'
+import { emptyToNull, todayMX } from '@/lib/utils'
 import type { FormState } from '@/lib/form-state'
 import type { EstadoCotizacion } from '@/lib/types'
 
@@ -34,7 +34,7 @@ function getPayload(formData: FormData): CotizacionPayload | FormState {
   const monto = montoRaw ? Number(montoRaw) : null
   if (monto !== null && Number.isNaN(monto)) return { error: 'El monto debe ser numérico.' }
 
-  const fechaEmision = emptyToNull(formData.get('fecha_emision')) ?? new Date().toISOString().slice(0, 10)
+  const fechaEmision = emptyToNull(formData.get('fecha_emision')) ?? todayMX()
 
   return {
     activo_id: emptyToNull(formData.get('activo_id')),

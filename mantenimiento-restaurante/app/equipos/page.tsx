@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Equipo } from '@/lib/types'
-import { formatDate } from '@/lib/utils'
+import { formatDate, todayMX, daysFromNowMX } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 
 type MantenimientoFilter = 'vencido' | 'proximo'
@@ -13,10 +13,8 @@ export default async function EquiposPage({
 }) {
   const { mantenimiento } = await searchParams
   const supabase = await createServerSupabaseClient()
-  const today = new Date().toISOString().slice(0, 10)
-  const nextLimit = new Date()
-  nextLimit.setDate(nextLimit.getDate() + 14)
-  const nextLimitDate = nextLimit.toISOString().slice(0, 10)
+  const today = todayMX()
+  const nextLimitDate = daysFromNowMX(14)
 
   let query = supabase
     .from('equipos')

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { removeStorageFiles, uploadOptionalFiles } from '@/lib/storage'
-import { emptyToNull } from '@/lib/utils'
+import { addDaysToDateInput, emptyToNull, todayMX } from '@/lib/utils'
 import type { FormState } from '@/lib/form-state'
 import type { EjecucionMantenimiento, TipoMantenimiento } from '@/lib/types'
 
@@ -31,12 +31,6 @@ const tiposEjecucion: EjecucionMantenimiento[] = ['interno', 'externo']
 function getZonaNombre(activo: { zona?: { nombre?: string | null } | { nombre?: string | null }[] | null } | null) {
   const zona = Array.isArray(activo?.zona) ? activo.zona[0] : activo?.zona
   return zona?.nombre ?? null
-}
-
-function addDays(dateString: string, days: number) {
-  const date = new Date(`${dateString}T00:00:00.000Z`)
-  date.setUTCDate(date.getUTCDate() + days)
-  return date.toISOString().slice(0, 10)
 }
 
 function getPayload(formData: FormData): MantenimientoPayload | FormState {
@@ -72,7 +66,7 @@ function getPayload(formData: FormData): MantenimientoPayload | FormState {
     proveedor_id: proveedorId,
     costo,
     repuestos_notas: emptyToNull(formData.get('repuestos_notas')),
-    fecha_realizacion: emptyToNull(formData.get('fecha_realizacion')) ?? new Date().toISOString().slice(0, 10),
+    fecha_realizacion: emptyToNull(formData.get('fecha_realizacion')) ?? todayMX(),
     proxima_fecha_sugerida: emptyToNull(formData.get('proxima_fecha_sugerida')),
     marcar_operativo: formData.get('marcar_operativo') === 'on'
   }
@@ -314,7 +308,7 @@ export async function actualizarMantenimiento(
         .from('activos')
         .update({
           fecha_ultima_limpieza: payload.fecha_realizacion,
-          fecha_proxima_limpieza: intervalo ? addDays(payload.fecha_realizacion, intervalo) : null
+          fecha_proxima_limpieza: intervalo ? addDaysToDateInput(payload.fecha_realizacion, intervalo) : null
         })
         .eq('id', payload.activo_id)
     }

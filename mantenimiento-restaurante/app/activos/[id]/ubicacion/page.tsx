@@ -4,7 +4,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Activo, MapaNivel, MapaZona } from '@/lib/types'
 import { UbicacionActivoForm } from './ubicacion-activo-form'
 
-type UbicacionActivo = Pick<Activo, 'id' | 'nombre' | 'tipo' | 'area' | 'clase' | 'nivel_id' | 'x' | 'y' | 'zona_id'>
+type UbicacionActivo = Pick<Activo, 'id' | 'nombre' | 'tipo' | 'area' | 'clase' | 'nivel_id' | 'zona_id'>
 
 export default async function UbicacionActivoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -12,7 +12,7 @@ export default async function UbicacionActivoPage({ params }: { params: Promise<
   const [{ data: activo }, { data: niveles }, { data: zonas }] = await Promise.all([
     supabase
       .from('activos')
-      .select('id,nombre,tipo,area,clase,nivel_id,x,y,zona_id')
+      .select('id,nombre,tipo,area,clase,nivel_id,zona_id')
       .eq('id', id)
       .single(),
     supabase
@@ -35,9 +35,9 @@ export default async function UbicacionActivoPage({ params }: { params: Promise<
         <Link href={`/activos/${id}`} className="brand-inline-link text-sm">
           Volver al activo
         </Link>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[color:var(--brand-ink)]">Ubicar en mapa</h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[color:var(--brand-ink)]">Asignar zona</h1>
         <p className="text-sm text-[color:var(--brand-muted)]">
-          Selecciona el nivel y marca el punto exacto en el plano.
+          Selecciona la zona del plano donde se encuentra este activo.
         </p>
       </div>
 

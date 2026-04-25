@@ -82,7 +82,7 @@ export default async function EquipoDetallePage({
             href={`/activos/${typedEquipo.id}/ubicacion`}
             className="brand-button-muted rounded-md px-4 py-2 text-sm font-medium"
           >
-            Ubicar en mapa
+            Asignar zona
           </Link>
           <Link
             href={`/equipos/${typedEquipo.id}/editar`}

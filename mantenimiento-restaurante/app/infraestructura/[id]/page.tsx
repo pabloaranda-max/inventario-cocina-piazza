@@ -80,7 +80,7 @@ export default async function InfraestructuraDetallePage({
             href={`/activos/${infraestructura.id}/ubicacion`}
             className="brand-button-muted rounded-md px-4 py-2 text-sm font-medium"
           >
-            Ubicar en mapa
+            Asignar zona
           </Link>
           <Link
             href={`/infraestructura/${infraestructura.id}/editar`}

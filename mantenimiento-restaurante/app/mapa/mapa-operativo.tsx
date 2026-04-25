@@ -1,91 +1,37 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { useFormState } from 'react-dom'
+import { useActionState, useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { guardarMapaZonas } from './actions'
+import { crearLimpiezaMapa, guardarMapaZonas } from './actions'
 import { crearActivoRapido } from '../incidencias/actions'
 import { equipoAreas } from '@/lib/defined-options'
 import type {
-  ClaseActivo,
-  CriticidadInfraestructura,
-  EstadoActivo,
-  EstadoIncidencia,
-  EstadoInfraestructura,
   MapaNivel,
   MapaZona,
-  PrioridadIncidencia
+  MapaActivo,
+  MapaIncidencia,
+  MapaInfraestructura,
+  MapaLimpieza,
+  MapaPendiente,
+  ZonaAggregate,
+  ZonaStatusTone,
+  PanelView
 } from '@/lib/types'
+import {
+  UnifiedOperationPanel,
+  PanelViewButton,
+  HudStat,
+  mutedButtonClass,
+  wineButtonClass,
+  oliveButtonClass,
+  goldButtonClass
+} from './panel-operativo'
 import { initialFormState } from '@/lib/form-state'
 import { FormError } from '@/components/ui/flash-message'
-import { formatDate } from '@/lib/utils'
+import { formatDate, todayMX, daysFromNowMX } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
-
-export type MapaIncidencia = {
-  id: string
-  ticket_numero: string
-  descripcion: string
-  prioridad: PrioridadIncidencia
-  estado: EstadoIncidencia
-  activo_id: string | null
-  equipo_id: string | null
-  infraestructura_id: string | null
-  zona_id: string | null
-  zona_nombre: string | null
-}
-
-export type MapaActivo = {
-  id: string
-  nombre: string
-  tipo: string
-  area: string | null
-  clase: ClaseActivo
-  estado: EstadoActivo
-  criticidad: CriticidadInfraestructura
-  nivel_id: string | null
-  x: number | null
-  y: number | null
-  zona_id: string | null
-  fecha_proxima_revision: string | null
-  fecha_proxima_limpieza: string | null
-  limpieza_intervalo_dias: number | null
-}
-
-export type MapaInfraestructura = {
-  id: string
-  nombre: string
-  tipo: string
-  area: string | null
-  estado: EstadoInfraestructura
-  criticidad: CriticidadInfraestructura
-  nivel_id: string | null
-  x: number | null
-  y: number | null
-  fecha_proxima_revision: string | null
-}
-
-export type MapaLimpieza = {
-  id: string
-  descripcion: string
-  fecha_realizacion: string
-  realizado_por: string | null
-  activo_id: string | null
-  zona_id: string | null
-  zona_nombre: string | null
-  activo?: Pick<MapaActivo, 'id' | 'nombre' | 'area'> | null
-}
-
-export type MapaPendiente = {
-  id: string
-  ticket_numero: string
-  descripcion: string
-  prioridad: PrioridadIncidencia
-  estado: 'pendiente_asignacion'
-  fecha_reporte: string
-  zona_nombre: string | null
-}
 
 type ZonaGeometry = {
   x: number
@@ -118,21 +64,9 @@ type ZonaRenderData = {
 }
 
 type NuevaZonaDraft = {
-  area: string
   nombre: string
   tipo: MapaZona['tipo']
   geometryTipo: MapaZona['geometry_tipo']
-}
-
-type ZonaStatusTone = 'critical' | 'warning' | 'ok'
-
-type ZonaAggregate = {
-  activos: number
-  incidencias: number
-  urgentes: number
-  limpiezas: number
-  preventivos: number
-  tone: ZonaStatusTone
 }
 
 type ZonaAggregateSets = {
@@ -152,18 +86,15 @@ type ZonaAggregateRow = {
   preventivos: number
 }
 
-const mutedButtonClass = 'brand-button-muted'
-const wineButtonClass =
-  'rounded-md border border-[color:color-mix(in_srgb,var(--brand-wine)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-wine)_10%,white)] px-3 py-2 text-sm font-medium text-[color:var(--brand-wine)] transition hover:bg-[color:color-mix(in_srgb,var(--brand-wine)_18%,white)] dark:bg-[color:color-mix(in_srgb,var(--brand-wine)_22%,transparent)]'
-const oliveButtonClass =
-  'rounded-md border border-[color:color-mix(in_srgb,var(--brand-olive)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-olive)_10%,white)] px-3 py-2 text-sm font-medium text-[color:var(--brand-olive)] transition hover:bg-[color:color-mix(in_srgb,var(--brand-olive)_18%,white)] dark:bg-[color:color-mix(in_srgb,var(--brand-olive)_22%,transparent)]'
-const goldButtonClass =
-  'rounded-md border border-[color:color-mix(in_srgb,var(--brand-gold)_34%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-gold)_14%,white)] px-3 py-2 text-sm font-medium text-[color:var(--brand-olive)] transition hover:bg-[color:color-mix(in_srgb,var(--brand-gold)_22%,white)] dark:bg-[color:color-mix(in_srgb,var(--brand-gold)_22%,transparent)]'
 const defaultNuevaZonaDraft: NuevaZonaDraft = {
-  area: '',
   nombre: '',
   tipo: 'zona',
   geometryTipo: 'rect'
+}
+
+function getZonaLegacyArea(zona: Pick<MapaZona, 'area' | 'nombre' | 'label'> | null | undefined) {
+  if (!zona) return null
+  return zona.area?.trim() || zona.nombre?.trim() || zona.label?.trim() || null
 }
 
 function getDueSoon(date: string | null, today: string, windowEnd: string) {
@@ -305,6 +236,30 @@ function getPolygonMetrics(points: ZonaPoint[]): ZonaGeometry {
   }
 }
 
+function getPointerHudAnchor(point: ZonaPoint | null) {
+  if (!point) return null
+
+  const placeLeft = point.x > 72
+  const placeAbove = point.y > 70
+
+  return {
+    left: Math.min(86, Math.max(14, Number((placeLeft ? point.x - 4 : point.x + 4).toFixed(3)))),
+    top: Math.min(84, Math.max(14, Number((placeAbove ? point.y - 4 : point.y + 4).toFixed(3)))),
+    translateX: placeLeft ? '-100%' : '0%',
+    translateY: placeAbove ? '-100%' : '0%'
+  }
+}
+
+function getNivelShortLabel(name: string) {
+  const normalized = name.trim().toLowerCase()
+  if (normalized === 'planta baja' || normalized.includes('planta baja')) return 'PB'
+  if (normalized.includes('primer')) return '1N'
+  if (normalized.includes('segundo')) return '2N'
+  if (normalized.includes('paliller')) return 'PAL'
+  if (normalized.includes('techo') || normalized.includes('azotea')) return 'TCH'
+  return name.trim().slice(0, 3).toUpperCase()
+}
+
 function serializePolygonPoints(points: ZonaPoint[]) {
   return points.map((point) => `${point.x.toFixed(2)}, ${point.y.toFixed(2)}`).join('\n')
 }
@@ -360,12 +315,28 @@ function addPolygonMidpoint(points: ZonaPoint[]): ZonaPoint[] {
   ]
 }
 
+function insertPolygonPointAfterIndex(points: ZonaPoint[], insertAfterIndex: number): ZonaPoint[] {
+  if (points.length < 2) return points
+
+  const safeIndex = ((insertAfterIndex % points.length) + points.length) % points.length
+  const currentPoint = points[safeIndex]
+  const nextPoint = points[(safeIndex + 1) % points.length]
+
+  return [
+    ...points.slice(0, safeIndex + 1),
+    {
+      x: Number((((currentPoint.x + nextPoint.x) / 2)).toFixed(3)),
+      y: Number((((currentPoint.y + nextPoint.y) / 2)).toFixed(3))
+    },
+    ...points.slice(safeIndex + 1)
+  ]
+}
+
 export function MapaOperativo({
   activos,
   incidencias,
   niveles,
   zonas,
-  areas: areasProp,
   infraestructura,
   limpiezas,
   pendientes
@@ -374,19 +345,28 @@ export function MapaOperativo({
   incidencias: MapaIncidencia[]
   niveles: MapaNivel[]
   zonas: MapaZona[]
-  areas: string[]
   infraestructura: MapaInfraestructura[]
   limpiezas: MapaLimpieza[]
   pendientes: MapaPendiente[]
 }) {
   const router = useRouter()
-  const [selectedNivelId, setSelectedNivelId] = useState(niveles[1]?.id ?? niveles[0]?.id ?? '')
+  const defaultNivelId =
+    niveles.find((nivel) => nivel.nombre?.trim().toLowerCase() === 'planta baja')?.id ??
+    niveles.find((nivel) => nivel.nombre?.trim().toLowerCase().includes('planta baja'))?.id ??
+    niveles[0]?.id ??
+    ''
+  const [selectedNivelId, setSelectedNivelId] = useState(defaultNivelId)
   const [selectedZonaId, setSelectedZonaId] = useState<string | null>(null)
+  const [hoveredZonaId, setHoveredZonaId] = useState<string | null>(null)
+  const [hoveredZonaPoint, setHoveredZonaPoint] = useState<ZonaPoint | null>(null)
   const [selectedActivoId, setSelectedActivoId] = useState<string | null>(null)
   const [selectedInfraestructuraId, setSelectedInfraestructuraId] = useState<string | null>(null)
-  const [zoom, setZoom] = useState(1)
+  const [zoom, setZoom] = useState(1.1)
   const [editing, setEditing] = useState(false)
-  const [viewMode, setViewMode] = useState<'operativo' | 'arquitectonico'>('operativo')
+  const [showMapFilters, setShowMapFilters] = useState(false)
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false)
+  const [panelView, setPanelView] = useState<PanelView>('summary')
+  const viewMode: 'arquitectonico' = 'arquitectonico'
   const [showZonas, setShowZonas] = useState(true)
   const [showActivos, setShowActivos] = useState(true)
   const [showInfraestructura, setShowInfraestructura] = useState(true)
@@ -394,15 +374,28 @@ export function MapaOperativo({
   const [deletedZonaIds, setDeletedZonaIds] = useState<string[]>([])
   const [editingZonaId, setEditingZonaId] = useState<string | null>(null)
   const [newZonaDraft, setNewZonaDraft] = useState<NuevaZonaDraft>(defaultNuevaZonaDraft)
-  const [state, formAction] = useFormState(guardarMapaZonas, initialFormState)
+  const [saveConfirmation, setSaveConfirmation] = useState<string | null>(null)
+  const [state, formAction] = useActionState(guardarMapaZonas, initialFormState)
 
   useEffect(() => {
     if (state.success) {
       setEditing(false)
+      setEditingZonaId(null)
       setDeletedZonaIds([])
+      setSaveConfirmation('Mapa guardado. Saliste del modo edición.')
       router.refresh()
     }
   }, [state.success, router])
+
+  useEffect(() => {
+    if (!saveConfirmation) return
+
+    const timeoutId = window.setTimeout(() => {
+      setSaveConfirmation(null)
+    }, 2800)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [saveConfirmation])
 
   useEffect(() => {
     if (!editing) setEditableZonas(zonas)
@@ -416,8 +409,8 @@ export function MapaOperativo({
   const dragRectHandleRef = useRef<{ zonaId: string; corner: RectHandleCorner } | null>(null)
   const [activePolygonVertex, setActivePolygonVertex] = useState<{ zonaId: string; pointIndex: number } | null>(null)
   const [activeRectHandle, setActiveRectHandle] = useState<{ zonaId: string; corner: RectHandleCorner } | null>(null)
-  const today = new Date().toISOString().slice(0, 10)
-  const weekAhead = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const today = todayMX()
+  const weekAhead = daysFromNowMX(7)
   const selectedNivel = niveles.find((nivel) => nivel.id === selectedNivelId) ?? niveles[0]
   const zonasById = useMemo(
     () => editableZonas.reduce<Record<string, MapaZona>>((acc, zona) => ({ ...acc, [zona.id]: zona }), {}),
@@ -440,14 +433,6 @@ export function MapaOperativo({
       return acc
     }, {})
   }, [zonasById, zonasNivel])
-  const zonasIdsByArea = useMemo(() => {
-    return zonasNivel.reduce<Record<string, string[]>>((acc, zona) => {
-      const area = zona.area || 'Sin área'
-      acc[area] = acc[area] ?? []
-      acc[area].push(zona.id)
-      return acc
-    }, {})
-  }, [zonasNivel])
   const activosPorId = useMemo(
     () => activos.reduce<Record<string, MapaActivo>>((acc, activo) => ({ ...acc, [activo.id]: activo }), {}),
     [activos]
@@ -457,18 +442,9 @@ export function MapaOperativo({
     [infraestructura]
   )
 
-  const areas = useMemo(() => {
-    const extra = editableZonas.map((z) => z.area).filter((a) => a && !areasProp.includes(a))
-    return Array.from(new Set([...areasProp, ...extra])).sort((a, b) => a.localeCompare(b, 'es'))
-  }, [areasProp, editableZonas])
-
   const activosNivelBase = useMemo(
     () => activos.filter((activo) => activo.nivel_id === selectedNivel?.id),
     [activos, selectedNivel?.id]
-  )
-  const activosNivel = useMemo(
-    () => activosNivelBase.filter((activo) => activo.x !== null && activo.y !== null),
-    [activosNivelBase]
   )
   const infraestructuraNivelBase = useMemo(
     () => infraestructura.filter((item) => item.nivel_id === selectedNivel?.id),
@@ -522,16 +498,12 @@ export function MapaOperativo({
   const selectedZona = selectedZonaId
     ? editableZonas.find((zona) => zona.id === selectedZonaId) ?? zonas.find((zona) => zona.id === selectedZonaId) ?? null
     : null
+  const hoveredZona = hoveredZonaId
+    ? editableZonas.find((zona) => zona.id === hoveredZonaId) ?? zonas.find((zona) => zona.id === hoveredZonaId) ?? null
+    : null
   const editingZona = editingZonaId
     ? editableZonas.find((zona) => zona.id === editingZonaId) ?? null
     : null
-
-  useEffect(() => {
-    setNewZonaDraft((current) => ({
-      ...current,
-      area: selectedZona?.area ?? current.area
-    }))
-  }, [selectedZona?.area])
 
   const selectedZonaIds = useMemo(() => {
     if (!selectedZona) return null
@@ -579,24 +551,18 @@ export function MapaOperativo({
     })
   }, [zonasNivel])
 
-  const selectedZoneArea = selectedZona?.area ?? null
-
   const visibleActivos = useMemo(() => {
-    if (!selectedZonaIds || !selectedZoneArea) return activosNivelBase
-
-    return activosNivelBase.filter((activo) => {
-      if (activo.zona_id) return selectedZonaIds.has(activo.zona_id)
-      return (activo.area ?? 'Sin área') === selectedZoneArea
-    })
-  }, [activosNivelBase, selectedZonaIds, selectedZoneArea])
+    if (!selectedZonaIds) return activosNivelBase
+    return activosNivelBase.filter((activo) => !!activo.zona_id && selectedZonaIds.has(activo.zona_id))
+  }, [activosNivelBase, selectedZonaIds])
 
   const visibleInfraestructura = useMemo(() => {
-    if (!selectedZoneArea) return infraestructuraNivelBase
-    return infraestructuraNivelBase.filter((item) => (item.area ?? 'Sin área') === selectedZoneArea)
-  }, [infraestructuraNivelBase, selectedZoneArea])
+    if (!selectedZonaIds) return infraestructuraNivelBase
+    return infraestructuraNivelBase.filter((item) => !!item.zona_id && selectedZonaIds.has(item.zona_id))
+  }, [infraestructuraNivelBase, selectedZonaIds])
 
   const visibleLimpiezas = useMemo(() => {
-    if (!selectedZonaIds || !selectedZoneArea) return limpiezasNivel.filter((limpieza) => limpieza.activo_id || limpieza.zona_id)
+    if (!selectedZonaIds) return limpiezasNivel.filter((limpieza) => limpieza.activo_id || limpieza.zona_id)
 
     return limpiezasNivel.filter((limpieza) => {
       if (limpieza.zona_id && selectedZonaIds.has(limpieza.zona_id)) return true
@@ -604,13 +570,12 @@ export function MapaOperativo({
       const activo = limpieza.activo_id ? activosPorId[limpieza.activo_id] ?? null : null
       if (activo?.zona_id) return selectedZonaIds.has(activo.zona_id)
 
-      const activoArea = activo?.area ?? limpieza.activo?.area ?? null
-      return activoArea === selectedZoneArea
+      return false
     })
-  }, [activosPorId, limpiezasNivel, selectedZonaIds, selectedZoneArea])
+  }, [activosPorId, limpiezasNivel, selectedZonaIds])
 
   const visibleIncidencias = useMemo(() => {
-    if (!selectedZonaIds || !selectedZoneArea) {
+    if (!selectedZonaIds) {
       return incidenciasNivel.filter(
         (incidencia) => incidencia.activo_id || incidencia.equipo_id || incidencia.infraestructura_id || incidencia.zona_id
       )
@@ -621,12 +586,13 @@ export function MapaOperativo({
 
       const activo = incidencia.activo_id ? activosPorId[incidencia.activo_id] ?? null : null
       if (activo?.zona_id) return selectedZonaIds.has(activo.zona_id)
-      if (activo?.area === selectedZoneArea) return true
 
       const item = incidencia.infraestructura_id ? infraestructuraPorId[incidencia.infraestructura_id] ?? null : null
-      return item?.area === selectedZoneArea
+      if (item?.zona_id) return selectedZonaIds.has(item.zona_id)
+
+      return false
     })
-  }, [activosPorId, incidenciasNivel, infraestructuraPorId, selectedZonaIds, selectedZoneArea])
+  }, [activosPorId, incidenciasNivel, infraestructuraPorId, selectedZonaIds])
 
   const selectedInfraestructura = selectedInfraestructuraId
     ? infraestructura.find((item) => item.id === selectedInfraestructuraId) ?? null
@@ -634,9 +600,31 @@ export function MapaOperativo({
   const selectedActivo = selectedActivoId
     ? activos.find((activo) => activo.id === selectedActivoId) ?? null
     : null
+
+  useEffect(() => {
+    if (editing) {
+      setPanelView('editing')
+      return
+    }
+
+    if (selectedActivo || selectedInfraestructura) {
+      setPanelView('assets')
+    }
+  }, [editing, selectedActivo, selectedInfraestructura])
+
   const zoomPercent = Math.round(zoom * 100)
   const urgentes = useMemo(
     () => incidenciasNivel.filter((incidencia) => incidencia.prioridad === 'alta' || incidencia.prioridad === 'urgente'),
+    [incidenciasNivel]
+  )
+  const atorados = useMemo(
+    () =>
+      incidenciasNivel.filter((incidencia) => {
+        if (incidencia.estado !== 'en_progreso') return false
+        const referenceTime = incidencia.updated_at || incidencia.fecha_reporte
+        const ageMs = Date.now() - new Date(referenceTime).getTime()
+        return Number.isFinite(ageMs) && ageMs >= 48 * 60 * 60 * 1000
+      }),
     [incidenciasNivel]
   )
   const revisionesVencidasCount = useMemo(
@@ -679,7 +667,7 @@ export function MapaOperativo({
       return acc
     }, {})
 
-    const collectZonaTargets = (zonaId?: string | null, area?: string | null) => {
+    const collectZonaTargets = (zonaId?: string | null) => {
       const ids = new Set<string>()
 
       if (zonaId && accumulators[zonaId]) {
@@ -688,14 +676,6 @@ export function MapaOperativo({
           if (accumulators[ancestorId]) ids.add(ancestorId)
         })
       }
-
-      const normalizedArea = area ?? 'Sin área'
-      ;(zonasIdsByArea[normalizedArea] ?? []).forEach((candidateId) => {
-        if (accumulators[candidateId]) ids.add(candidateId)
-        ;(zonaAncestorsById[candidateId] ?? []).forEach((ancestorId) => {
-          if (accumulators[ancestorId]) ids.add(ancestorId)
-        })
-      })
 
       return ids
     }
@@ -711,7 +691,7 @@ export function MapaOperativo({
     }
 
     activosNivelBase.forEach((activo) => {
-      const targets = collectZonaTargets(activo.zona_id, activo.area)
+      const targets = collectZonaTargets(activo.zona_id)
       registerOnTargets(targets, 'activos', activo.id)
 
       const hasPreventivoVencido =
@@ -727,7 +707,7 @@ export function MapaOperativo({
     })
 
     infraestructuraNivelBase.forEach((item) => {
-      const targets = collectZonaTargets(null, item.area)
+      const targets = collectZonaTargets(item.zona_id)
       const hasPreventivoVencido = item.fecha_proxima_revision && item.fecha_proxima_revision < today
       const hasPreventivoProximo = getDueSoon(item.fecha_proxima_revision, today, weekAhead)
 
@@ -739,7 +719,7 @@ export function MapaOperativo({
     incidenciasNivel.forEach((incidencia) => {
       const activo = incidencia.activo_id ? activosPorId[incidencia.activo_id] ?? null : null
       const item = incidencia.infraestructura_id ? infraestructuraPorId[incidencia.infraestructura_id] ?? null : null
-      const targets = collectZonaTargets(incidencia.zona_id ?? activo?.zona_id ?? null, activo?.area ?? item?.area ?? null)
+      const targets = collectZonaTargets(incidencia.zona_id ?? activo?.zona_id ?? item?.zona_id ?? null)
       registerOnTargets(targets, 'incidencias', incidencia.id)
 
       if (incidencia.prioridad === 'alta' || incidencia.prioridad === 'urgente') {
@@ -749,7 +729,7 @@ export function MapaOperativo({
 
     limpiezasNivel.forEach((limpieza) => {
       const activo = limpieza.activo_id ? activosPorId[limpieza.activo_id] ?? null : null
-      const targets = collectZonaTargets(limpieza.zona_id ?? activo?.zona_id ?? null, activo?.area ?? limpieza.activo?.area ?? null)
+      const targets = collectZonaTargets(limpieza.zona_id ?? activo?.zona_id ?? null)
       registerOnTargets(targets, 'limpiezas', limpieza.id)
     })
 
@@ -771,7 +751,6 @@ export function MapaOperativo({
     today,
     weekAhead,
     zonaAncestorsById,
-    zonasIdsByArea,
     zonasNivel
   ])
   const zonaAggregatesById = useMemo(
@@ -786,20 +765,23 @@ export function MapaOperativo({
       infraestructura: infraestructuraNivelBase.length,
       incidencias: incidenciasNivel.length,
       incidenciasUrgentes: urgentes.length,
+      urgentes,
       pendientes,
+      atorados,
       revisionesVencidas: revisionesVencidasCount,
       preventivosProximos: preventivosProximosCount,
       limpiezasAtrasadas: limpiezasAtrasadasCount
     }),
     [
       activosNivelBase.length,
+      atorados,
       incidenciasNivel.length,
       infraestructuraNivelBase.length,
       limpiezasAtrasadasCount,
       pendientes,
       preventivosProximosCount,
       revisionesVencidasCount,
-      urgentes.length,
+      urgentes,
       zonasNivel.length
     ]
   )
@@ -881,6 +863,35 @@ export function MapaOperativo({
     )
   }, [])
 
+  const insertPolygonVertexAtEdge = useCallback((id: string, insertAfterIndex: number) => {
+    let insertedIndex: number | null = null
+
+    setEditableZonas((current) =>
+      current.map((zona) => {
+        if (zona.id !== id || zona.geometry_tipo !== 'polygon') return zona
+
+        const nextPoints = insertPolygonPointAfterIndex(getZonaPolygonPoints(zona), insertAfterIndex)
+        const geometry = getPolygonMetrics(nextPoints)
+        insertedIndex = Math.min(insertAfterIndex + 1, nextPoints.length - 1)
+
+        return {
+          ...zona,
+          geometry: {
+            x: geometry.x,
+            y: geometry.y,
+            points: nextPoints
+          },
+          x: geometry.x,
+          y: geometry.y
+        }
+      })
+    )
+
+    if (insertedIndex !== null) {
+      setActivePolygonVertex({ zonaId: id, pointIndex: insertedIndex })
+    }
+  }, [])
+
   const removePolygonVertex = useCallback((id: string, pointIndex: number | null = null) => {
     let didUpdate = false
     let nextActiveIndex: number | null = null
@@ -929,7 +940,7 @@ export function MapaOperativo({
     const trimmedNombre = draft.nombre.trim()
     const fallbackName = `${draft.tipo === 'subzona' ? 'Subzona' : 'Zona'} ${zonasNivel.length + 1}`
     const nombre = trimmedNombre || fallbackName
-    const area = draft.area.trim() || nombre
+    const area = nombre
     const newId = crypto.randomUUID()
     const rectGeometry = { x: 50, y: 50, width: 18, height: 12 }
     const geometry =
@@ -971,7 +982,6 @@ export function MapaOperativo({
     setSelectedZonaId(newId)
     setNewZonaDraft((current) => ({
       ...current,
-      area: selectedZona?.area ?? current.area,
       nombre: '',
       tipo: current.tipo,
       geometryTipo: current.geometryTipo
@@ -1247,142 +1257,16 @@ export function MapaOperativo({
   ])
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-[color:var(--brand-ink)]">Centro operativo</h1>
-          <p className="brand-hint">El mapa limpio ya funciona como dashboard visual del restaurante.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setEditing((value) => !value)}
-            className={mutedButtonClass}
-          >
-            {editing ? 'Salir de edición' : 'Editar mapa'}
-          </button>
-          <Link href="/activos/nuevo" className="brand-button">
-            Nuevo activo
-          </Link>
-        </div>
-      </div>
-
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <ResumenCard
-          title="Sin asignar"
-          value={resumenNivel.pendientes.length}
-          detail="Reportes que aún no están ubicados"
-          tone="orange"
-          href="/incidencias?estado=sin_asignar"
-        />
-        <ResumenCard
-          title="Urgentes activas"
-          value={resumenNivel.incidenciasUrgentes}
-          detail={`${resumenNivel.incidencias} incidencias abiertas en ${selectedNivel?.nombre ?? 'el nivel'}`}
-          tone="red"
-          href="/incidencias?estado=activas&prioridad=alta_urgente"
-        />
-        <ResumenCard
-          title="Revisiones vencidas"
-          value={resumenNivel.revisionesVencidas}
-          detail="Activos o infraestructura fuera de fecha"
-          tone="yellow"
-          href="/activos"
-        />
-        <ResumenCard
-          title="Preventivos próximos"
-          value={resumenNivel.preventivosProximos}
-          detail={`${resumenNivel.limpiezasAtrasadas} limpiezas atrasadas en el nivel`}
-          tone="teal"
-          href="/activos?limpieza=atrasadas"
-        />
-      </section>
-
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {niveles.map((nivel) => (
-          <button
-            key={nivel.id}
-            type="button"
-              onClick={() => {
-                setSelectedNivelId(nivel.id)
-                setSelectedZonaId(null)
-                setSelectedActivoId(null)
-                setSelectedInfraestructuraId(null)
-              }}
-            className={`shrink-0 rounded-md border px-3 py-2 text-sm font-medium ${
-              selectedNivel?.id === nivel.id
-                ? 'border-[color:var(--brand-wine)] bg-[color:var(--brand-wine)] text-[color:var(--brand-bone)]'
-                : 'border-[color:color-mix(in_srgb,var(--brand-olive)_22%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-bone)_76%,white)] text-[color:var(--brand-olive)] hover:bg-[color:color-mix(in_srgb,var(--brand-bone)_92%,white)]'
-            }`}
-          >
-            {nivel.nombre}
-          </button>
-        ))}
-      </div>
-
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="overflow-hidden rounded-[28px] border border-[color:color-mix(in_srgb,var(--brand-olive)_14%,transparent)] bg-[linear-gradient(145deg,rgba(255,253,248,0.98),rgba(244,245,240,0.96))] shadow-[0_24px_80px_-48px_rgba(47,62,30,0.55)] dark:bg-[linear-gradient(145deg,rgba(24,31,22,0.98),rgba(14,18,13,0.98))]">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:color-mix(in_srgb,var(--brand-olive)_12%,transparent)] bg-[linear-gradient(90deg,rgba(47,62,30,0.05),rgba(255,253,248,0.25),rgba(155,30,33,0.05))] px-4 py-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-[color:color-mix(in_srgb,var(--brand-olive)_20%,transparent)] bg-[rgba(255,253,248,0.75)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-olive)] dark:bg-[rgba(24,31,22,0.72)]">
-                {selectedNivel?.nombre ?? 'Sin nivel'}
-              </span>
-              <span className="text-sm font-medium text-[color:var(--brand-olive)]">Zoom {zoomPercent}%</span>
-              <div className="flex rounded-md border border-[color:var(--brand-border)] bg-[rgba(255,253,248,0.72)] p-1 dark:bg-[rgba(22,32,18,0.72)]">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('operativo')}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                    viewMode === 'operativo'
-                      ? 'bg-[color:var(--brand-green)] text-[color:var(--brand-bone)]'
-                      : 'text-[color:var(--brand-green)] dark:text-[color:var(--brand-bone)]'
-                  }`}
-                >
-                  Operativo
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('arquitectonico')}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                    viewMode === 'arquitectonico'
-                      ? 'bg-[color:var(--brand-green)] text-[color:var(--brand-bone)]'
-                      : 'text-[color:var(--brand-green)] dark:text-[color:var(--brand-bone)]'
-                  }`}
-                >
-                  Referencia
-                </button>
-              </div>
-              <LayerToggle label="Zonas" active={showZonas} onClick={() => setShowZonas((value) => !value)} />
-              <LayerToggle label="Activos" active={showActivos} onClick={() => setShowActivos((value) => !value)} />
-              <LayerToggle label="Infra" active={showInfraestructura} onClick={() => setShowInfraestructura((value) => !value)} />
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => updateZoom(zoom - 0.25)}
-                className={`${mutedButtonClass} px-3 py-1.5 disabled:opacity-40`}
-                disabled={zoom <= 1}
-              >
-                -
-              </button>
-              <button
-                type="button"
-                onClick={() => updateZoom(1)}
-                className={`${mutedButtonClass} px-3 py-1.5`}
-              >
-                100%
-              </button>
-              <button
-                type="button"
-                onClick={() => updateZoom(zoom + 0.25)}
-                className={`${mutedButtonClass} px-3 py-1.5 disabled:opacity-40`}
-                disabled={zoom >= 2.5}
-              >
-                +
-              </button>
-            </div>
-          </div>
-          <div className="max-h-[72vh] overflow-auto bg-[radial-gradient(circle_at_top_left,rgba(239,169,30,0.06),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(155,30,33,0.08),transparent_32%)]">
+    <div
+      className={`grid gap-3 lg:min-h-[calc(100dvh-7.5rem)] ${
+        rightPanelCollapsed
+          ? 'lg:grid-cols-[minmax(0,1fr)_32px]'
+          : 'lg:grid-cols-[minmax(0,1fr)_320px]'
+      }`}
+    >
+      <section className="overflow-hidden rounded-[30px] border border-[color:color-mix(in_srgb,var(--brand-olive)_14%,transparent)] bg-[linear-gradient(180deg,rgba(18,23,18,0.98),rgba(18,23,18,0.98)_15%,rgba(255,253,248,0.98)_15.2%,rgba(244,245,240,0.96)_100%)] shadow-[0_24px_80px_-48px_rgba(47,62,30,0.55)] dark:bg-[linear-gradient(180deg,rgba(12,16,12,0.98),rgba(12,16,12,0.98)_15%,rgba(14,18,13,0.98)_100%)]">
+        <div className="overflow-hidden rounded-[30px] border border-[color:color-mix(in_srgb,var(--brand-olive)_14%,transparent)] bg-[linear-gradient(180deg,rgba(18,23,18,0.98),rgba(18,23,18,0.98)_15%,rgba(255,253,248,0.98)_15.2%,rgba(244,245,240,0.96)_100%)] shadow-[0_24px_80px_-48px_rgba(47,62,30,0.55)] dark:bg-[linear-gradient(180deg,rgba(12,16,12,0.98),rgba(12,16,12,0.98)_15%,rgba(14,18,13,0.98)_100%)]">
+          <div className="max-h-[calc(100dvh-8.5rem)] min-h-[82vh] overflow-auto bg-[radial-gradient(circle_at_top_left,rgba(239,169,30,0.08),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(155,30,33,0.1),transparent_32%)]">
             <div
               ref={mapRef}
               className="relative min-w-full"
@@ -1390,42 +1274,53 @@ export function MapaOperativo({
               onClick={() => editing && setEditingZonaId(null)}
             >
               {selectedNivel ? (
-                viewMode === 'arquitectonico' ? (
-                  <Image
-                    src={selectedNivel.imagen_url}
-                    alt={selectedNivel.nombre}
-                    width={1366}
-                    height={768}
-                    className="block w-full select-none"
-                    priority
-                  />
-                ) : (
-                  <SchematicLevelCanvas
-                    nivelNombre={selectedNivel.nombre}
-                    totalZonas={resumenNivel.zonas}
-                    totalActivos={resumenNivel.activos}
-                    totalInfraestructura={resumenNivel.infraestructura}
-                    totalIncidencias={resumenNivel.incidencias}
-                    totalUrgentes={resumenNivel.incidenciasUrgentes}
-                  />
-                )
+                <Image
+                  src={selectedNivel.imagen_url}
+                  alt={selectedNivel.nombre}
+                  width={1366}
+                  height={768}
+                  className="block w-full select-none"
+                  priority
+                />
               ) : (
                 <div className="flex h-96 items-center justify-center bg-[color:color-mix(in_srgb,var(--brand-bone)_86%,white)] text-sm text-[color:var(--brand-muted)]">
                   Sin láminas cargadas.
                 </div>
               )}
-              <MapOperationalHud
-                nivelNombre={selectedNivel?.nombre ?? 'Sin nivel'}
-                selectedZona={selectedZona}
-                selectedZonaAggregate={selectedZonaAggregate}
-                visibleActivosCount={visibleActivos.length}
-                visibleIncidenciasCount={visibleIncidencias.length}
-                visibleLimpiezasCount={visibleLimpiezas.length}
-                visibleInfraCount={visibleInfraestructura.length}
-                preventivosProximosCount={resumenNivel.preventivosProximos}
-                editing={editing}
-                viewMode={viewMode}
-              />
+              <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex items-start justify-between px-3">
+                <FloatingLevelSelector
+                  niveles={niveles}
+                  selectedNivelId={selectedNivel?.id ?? ''}
+                  onSelectNivel={(nivelId) => {
+                    setSelectedNivelId(nivelId)
+                    setSelectedZonaId(null)
+                    setSelectedActivoId(null)
+                    setSelectedInfraestructuraId(null)
+                  }}
+                />
+                <FloatingMapControls
+                  zoomPercent={zoomPercent}
+                  zoom={zoom}
+                  showZonas={showZonas}
+                  showActivos={showActivos}
+                  showInfraestructura={showInfraestructura}
+                  showMapFilters={showMapFilters}
+                  onToggleFilters={() => setShowMapFilters((value) => !value)}
+                  onToggleZonas={() => setShowZonas((value) => !value)}
+                  onToggleActivos={() => setShowActivos((value) => !value)}
+                  onToggleInfra={() => setShowInfraestructura((value) => !value)}
+                  onZoomOut={() => updateZoom(zoom - 0.25)}
+                  onZoomReset={() => updateZoom(1)}
+                  onZoomIn={() => updateZoom(zoom + 0.25)}
+                />
+              </div>
+              {!selectedZona && hoveredZona ? (
+                <MapHoverHud
+                  zona={hoveredZona}
+                  aggregate={zonaAggregatesById[hoveredZona.id] ?? null}
+                  anchor={hoveredZonaPoint}
+                />
+              ) : null}
               {showZonas ? (
                 <MapaZonasOverlay
                   zonas={renderedZonas}
@@ -1446,6 +1341,11 @@ export function MapaOperativo({
                       setSelectedInfraestructuraId(null)
                     }
                   }}
+                  onZonaHover={(zonaId, point) => {
+                    if (editing && viewMode === 'arquitectonico') return
+                    setHoveredZonaId(zonaId)
+                    setHoveredZonaPoint(point)
+                  }}
                   onDragHandlePointerDown={(zonaId) => {
                     if (!editing) return
                     dragZonaIdRef.current = zonaId
@@ -1456,7 +1356,14 @@ export function MapaOperativo({
                     dragPolygonVertexRef.current = { zonaId, pointIndex }
                     isDragging.current = true
                     setEditingZonaId(zonaId)
+                    setSelectedZonaId(zonaId)
                     setActivePolygonVertex({ zonaId, pointIndex })
+                  }}
+                  onPolygonEdgePointerDown={(zonaId, insertAfterIndex) => {
+                    if (!editing) return
+                    setEditingZonaId(zonaId)
+                    setSelectedZonaId(zonaId)
+                    insertPolygonVertexAtEdge(zonaId, insertAfterIndex)
                   }}
                   onRectHandlePointerDown={(zonaId, corner) => {
                     if (!editing) return
@@ -1468,39 +1375,6 @@ export function MapaOperativo({
                   }}
                 />
               ) : null}
-            {!editing && showActivos && activosNivel.map((activo) => {
-              const active = (incidenciasPorActivo[activo.id]?.length ?? 0) > 0
-              const hasLimpieza = (limpiezasPorActivo[activo.id]?.length ?? 0) > 0
-              const selected = selectedActivoId === activo.id
-
-              return (
-                <button
-                  key={activo.id}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setSelectedZonaId(null)
-                    setSelectedInfraestructuraId(null)
-                    setSelectedActivoId(selected ? null : activo.id)
-                  }}
-                  className={`group absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 shadow-sm transition-transform hover:scale-125 ${
-                    selected
-                      ? 'h-5 w-5 border-[color:var(--brand-wine)] bg-[color:var(--brand-wine)] ring-2 ring-[rgba(255,253,248,0.9)]'
-                      : active
-                        ? 'h-4 w-4 border-rose-600 bg-rose-400'
-                        : hasLimpieza || activo.limpieza_intervalo_dias
-                          ? 'h-4 w-4 border-teal-600 bg-teal-400'
-                          : 'h-4 w-4 border-[color:var(--brand-gold)] bg-[color:var(--brand-gold)]'
-                  }`}
-                  style={{ left: `${activo.x}%`, top: `${activo.y}%` }}
-                  aria-label={activo.nombre}
-                >
-                  <span className="pointer-events-none absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-[color:color-mix(in_srgb,var(--brand-olive)_16%,transparent)] bg-[rgba(255,253,248,0.92)] px-2 py-1 text-xs font-semibold text-[color:var(--brand-ink)] shadow-sm group-hover:block">
-                    {activo.nombre}
-                  </span>
-                </button>
-              )
-            })}
             {!editing && showInfraestructura && infraestructuraNivel.map((item) => {
               const active = incidenciasNivel.some((incidencia) => incidencia.infraestructura_id === item.id)
               const selected = selectedInfraestructuraId === item.id
@@ -1534,18 +1408,101 @@ export function MapaOperativo({
           </div>
         </div>
 
-	        <aside className="brand-card p-4">
-          {editing ? (
-            <form action={formAction} className="space-y-4">
-              <div>
-                <h2 className="font-semibold text-[color:var(--brand-ink)]">Editar mapa</h2>
-                <p className="brand-hint">Selecciona una zona en la lámina o en la lista. La edición detallada vive aquí para que no se corte dentro del mapa.</p>
-              </div>
-              <section className="rounded-2xl border border-[color:color-mix(in_srgb,var(--brand-olive)_14%,transparent)] bg-[linear-gradient(180deg,rgba(255,253,248,0.76),rgba(244,245,240,0.9))] p-3 dark:bg-[linear-gradient(180deg,rgba(31,39,29,0.92),rgba(20,27,18,0.96))]">
+        {saveConfirmation ? (
+          <div className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 px-4">
+            <div className="rounded-full border border-[color:color-mix(in_srgb,var(--brand-olive)_22%,transparent)] bg-[rgba(19,28,18,0.92)] px-4 py-2 text-sm font-medium text-[color:var(--brand-bone)] shadow-[0_20px_50px_-28px_rgba(0,0,0,0.55)]">
+              {saveConfirmation}
+            </div>
+          </div>
+        ) : null}
+
+      </section>
+
+      <aside className={`${rightPanelCollapsed ? 'flex items-start justify-center bg-transparent p-0 shadow-none border-0 overflow-visible' : 'overflow-auto rounded-[30px] border border-[rgba(47,62,30,0.16)] bg-[linear-gradient(180deg,rgba(255,255,252,0.99),rgba(239,241,234,0.99))] p-4 shadow-[0_24px_80px_-52px_rgba(47,62,30,0.6)] dark:bg-[linear-gradient(180deg,rgba(18,24,17,0.98),rgba(13,18,13,0.98))] lg:max-h-[calc(100dvh-7.5rem)]'}`}>
+          <div className={`mb-4 rounded-[22px] border border-[rgba(47,62,30,0.14)] bg-[linear-gradient(145deg,rgba(255,255,252,0.98),rgba(244,240,228,0.98))] px-4 py-4 dark:border-white/10 dark:bg-[linear-gradient(145deg,rgba(28,35,25,0.94),rgba(20,27,18,0.98))] ${rightPanelCollapsed ? 'mb-0 border-0 bg-transparent p-0 dark:bg-transparent' : ''}`}>
+            {rightPanelCollapsed ? (
+              <button
+                type="button"
+                onClick={() => setRightPanelCollapsed(false)}
+                className="mt-4 rounded-full border border-[rgba(47,62,30,0.14)] bg-[rgba(255,255,255,0.78)] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand-muted)] shadow-[0_12px_30px_-18px_rgba(0,0,0,0.45)] dark:border-white/10 dark:bg-[rgba(18,24,17,0.82)]"
+                aria-label="Abrir centro de operación"
+              >
+                Panel
+              </button>
+            ) : (
+              <>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[color:var(--brand-muted)]">Centro de operación</p>
+                <div className="mt-2 flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-semibold tracking-[-0.03em] text-[color:var(--brand-ink)]">
+                      {panelView === 'editing'
+                        ? 'Edición'
+                        : panelView === 'assets'
+                          ? selectedActivo
+                            ? selectedActivo.nombre
+                            : selectedInfraestructura
+                              ? selectedInfraestructura.nombre
+                              : 'Activos e infraestructura'
+                          : panelView === 'incidents'
+                            ? 'Incidencias'
+                            : panelView === 'cleaning'
+                              ? 'Limpiezas'
+                              : selectedZona
+                                ? selectedZona.nombre || selectedZona.label
+                                : selectedNivel?.nombre ?? 'Resumen'}
+                    </h2>
+                    <p className="mt-1 text-sm leading-6 text-[color:var(--brand-muted)]">
+                      {panelView === 'editing'
+                        ? 'La edición y guardado viven aquí mientras ajustas el mapa.'
+                        : 'Panel único para resumen, navegación operativa y acciones del mapa.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRightPanelCollapsed(true)}
+                    className="rounded-full border border-[rgba(47,62,30,0.14)] bg-[rgba(255,255,255,0.72)] px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--brand-muted)]"
+                    aria-label="Colapsar centro de operación"
+                  >
+                    —
+                  </button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {!editing ? (
+                    <>
+                      <PanelViewButton active={panelView === 'summary'} label="Resumen" onClick={() => setPanelView('summary')} />
+                      <PanelViewButton active={panelView === 'assets'} label="Activos" onClick={() => setPanelView('assets')} />
+                      <PanelViewButton active={panelView === 'incidents'} label="Incidencias" onClick={() => setPanelView('incidents')} />
+                      <PanelViewButton active={panelView === 'cleaning'} label="Limpiezas" onClick={() => setPanelView('cleaning')} />
+                    </>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setEditing((value) => !value)}
+                    className={editing ? wineButtonClass : oliveButtonClass}
+                  >
+                    {editing ? 'Salir de edición' : 'Editar zonas'}
+                  </button>
+                  {selectedZona ? (
+                    <button type="button" onClick={() => setSelectedZonaId(null)} className={mutedButtonClass}>
+                      Limpiar selección
+                    </button>
+                  ) : null}
+                </div>
+              </>
+            )}
+          </div>
+          {rightPanelCollapsed ? null : editing ? (
+            <details open className="rounded-[24px] border border-[rgba(15,23,12,0.08)] bg-[color:color-mix(in_srgb,var(--brand-bone)_84%,white)] p-4 dark:bg-[rgba(19,25,17,0.94)]">
+            <summary className="cursor-pointer list-none text-sm font-semibold text-[color:var(--brand-ink)]">
+              Edición y guardado del mapa
+            </summary>
+            <form action={formAction} className="mt-4 space-y-4">
+              <section className="rounded-[24px] border border-[color:color-mix(in_srgb,var(--brand-olive)_14%,transparent)] bg-[linear-gradient(180deg,rgba(255,253,248,0.76),rgba(244,245,240,0.9))] p-4 dark:bg-[linear-gradient(180deg,rgba(31,39,29,0.92),rgba(20,27,18,0.96))]">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-[color:var(--brand-ink)]">Nueva zona</h3>
-                    <p className="mt-1 text-xs text-[color:var(--brand-muted)]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-muted)]">Paso 1</p>
+                    <h3 className="mt-1 text-sm font-semibold text-[color:var(--brand-ink)]">Plantilla de zona</h3>
+                    <p className="mt-1 text-xs leading-5 text-[color:var(--brand-muted)]">
                       {selectedZona
                         ? `Se propone dentro de ${selectedZona.nombre || selectedZona.label}.`
                         : 'Empieza con nombre, tipo y figura antes de dibujar.'}
@@ -1565,22 +1522,6 @@ export function MapaOperativo({
                       placeholder="Ej. Barra fría, cuarto técnico..."
                       className="brand-field mt-1 w-full px-3 py-2 text-sm"
                     />
-                  </label>
-                  <label className="block">
-                    <span className="text-xs font-medium text-[color:var(--brand-muted)]">Área</span>
-                    <input
-                      type="text"
-                      list="areas-nueva-zona"
-                      value={newZonaDraft.area}
-                      onChange={(e) => setNewZonaDraft((current) => ({ ...current, area: e.target.value }))}
-                      placeholder="Área operativa"
-                      className="brand-field mt-1 w-full px-3 py-2 text-sm"
-                    />
-                    <datalist id="areas-nueva-zona">
-                      {areas.map((area) => (
-                        <option key={area} value={area} />
-                      ))}
-                    </datalist>
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="block">
@@ -1631,11 +1572,12 @@ export function MapaOperativo({
                   </button>
                 </div>
               </section>
-              <section className="rounded-2xl border border-[color:color-mix(in_srgb,var(--brand-olive)_14%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-bone)_80%,white)] p-3 dark:bg-[rgba(19,25,17,0.94)]">
+              <section className="rounded-[24px] border border-[color:color-mix(in_srgb,var(--brand-olive)_14%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-bone)_80%,white)] p-4 dark:bg-[rgba(19,25,17,0.94)]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-[color:var(--brand-ink)]">Zonas del nivel</h3>
-                    <p className="mt-1 text-xs text-[color:var(--brand-muted)]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-muted)]">Paso 2</p>
+                    <h3 className="mt-1 text-sm font-semibold text-[color:var(--brand-ink)]">Zonas del nivel</h3>
+                    <p className="mt-1 text-xs leading-5 text-[color:var(--brand-muted)]">
                       {selectedNivel?.nombre ?? 'Sin nivel'} · {zonasNivelListadas.length} registradas
                     </p>
                   </div>
@@ -1653,7 +1595,7 @@ export function MapaOperativo({
                           setEditingZonaId(zona.id)
                           setSelectedZonaId(zona.id)
                         }}
-                        className={`w-full rounded-xl border px-3 py-2 text-left transition ${
+                        className={`w-full rounded-[18px] border px-3 py-2.5 text-left transition ${
                           editingZonaId === zona.id
                             ? 'border-[color:var(--brand-wine)] bg-[color:color-mix(in_srgb,var(--brand-wine)_9%,white)]'
                             : 'border-[color:color-mix(in_srgb,var(--brand-olive)_12%,transparent)] bg-[rgba(255,253,248,0.72)] hover:border-[color:color-mix(in_srgb,var(--brand-olive)_28%,transparent)] dark:bg-[rgba(28,35,25,0.88)]'
@@ -1665,7 +1607,7 @@ export function MapaOperativo({
                               {zona.parent_id ? '└ ' : ''}{zona.nombre || zona.label}
                             </p>
                             <p className="mt-1 truncate text-xs text-[color:var(--brand-muted)]">
-                              {zona.area} · {zona.tipo === 'subzona' ? 'Subzona' : 'Zona'} · {zona.geometry_tipo}
+                              {zona.tipo === 'subzona' ? 'Subzona' : 'Zona'} · {zona.geometry_tipo}
                             </p>
                           </div>
                           <span className="rounded-full bg-[color:color-mix(in_srgb,var(--brand-olive)_10%,white)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--brand-olive)]">
@@ -1680,11 +1622,12 @@ export function MapaOperativo({
                 </div>
               </section>
               {editingZona ? (
-                <section className="rounded-2xl border border-[color:color-mix(in_srgb,var(--brand-olive)_14%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-bone)_80%,white)] p-3 dark:bg-[rgba(19,25,17,0.94)]">
+                <section className="rounded-[24px] border border-[color:color-mix(in_srgb,var(--brand-olive)_14%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-bone)_80%,white)] p-4 dark:bg-[rgba(19,25,17,0.94)]">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-sm font-semibold text-[color:var(--brand-ink)]">Zona seleccionada</h3>
-                      <p className="mt-1 text-xs text-[color:var(--brand-muted)]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-muted)]">Paso 3</p>
+                      <h3 className="mt-1 text-sm font-semibold text-[color:var(--brand-ink)]">Zona seleccionada</h3>
+                      <p className="mt-1 text-xs leading-5 text-[color:var(--brand-muted)]">
                         Ajusta texto, jerarquía y geometría sin depender del popup sobre la lámina.
                       </p>
                     </div>
@@ -1699,27 +1642,12 @@ export function MapaOperativo({
                         type="text"
                         value={editingZona.nombre}
                         className="brand-field mt-1 w-full px-3 py-2 text-sm"
-                        onChange={(e) => updateZona(editingZona.id, { nombre: e.target.value, label: e.target.value })}
+                        onChange={(e) => updateZona(editingZona.id, {
+                          nombre: e.target.value,
+                          label: e.target.value,
+                          area: e.target.value
+                        })}
                       />
-                    </label>
-                    <label className="block">
-                      <span className="text-xs font-medium text-[color:var(--brand-muted)]">Área</span>
-                      <input
-                        type="text"
-                        list={`areas-${editingZona.id}`}
-                        value={editingZona.area}
-                        className="brand-field mt-1 w-full px-3 py-2 text-sm"
-                        onChange={(e) => updateZona(editingZona.id, { area: e.target.value })}
-                        onBlur={(e) => {
-                          const value = e.target.value.trim()
-                          updateZona(editingZona.id, { area: value || editingZona.nombre, label: editingZona.label || editingZona.nombre })
-                        }}
-                      />
-                      <datalist id={`areas-${editingZona.id}`}>
-                        {areas.map((area) => (
-                          <option key={area} value={area} />
-                        ))}
-                      </datalist>
                     </label>
                     <label className="block">
                       <span className="text-xs font-medium text-[color:var(--brand-muted)]">Descripción</span>
@@ -1855,7 +1783,7 @@ export function MapaOperativo({
                               if (points) updateZonaPolygon(editingZona.id, points)
                             }}
                           />
-                          <span className="brand-hint mt-1 block">Arrastra los vértices o edita una coordenada por línea: `x, y`.</span>
+                          <span className="brand-hint mt-1 block">Arrastra los vértices o toca un punto intermedio del contorno para insertar otro. También puedes editar una coordenada por línea: `x, y`.</span>
                         </label>
                       </div>
                     ) : null}
@@ -1869,7 +1797,7 @@ export function MapaOperativo({
                   </div>
                 </section>
               ) : (
-                <section className="rounded-2xl border border-dashed border-[color:color-mix(in_srgb,var(--brand-olive)_18%,transparent)] bg-[rgba(255,253,248,0.66)] p-4 text-sm text-[color:var(--brand-muted)] dark:bg-[rgba(19,25,17,0.9)]">
+                <section className="rounded-[24px] border border-dashed border-[color:color-mix(in_srgb,var(--brand-olive)_18%,transparent)] bg-[rgba(255,253,248,0.66)] p-4 text-sm leading-6 text-[color:var(--brand-muted)] dark:bg-[rgba(19,25,17,0.9)]">
                   Selecciona una zona del mapa o de la lista para editar su detalle completo.
                 </section>
               )}
@@ -1911,371 +1839,154 @@ export function MapaOperativo({
                 Guardar mapa
               </button>
             </form>
+            </details>
           ) : (
-            selectedActivo ? (
-              <ActivoPanel
-                activo={selectedActivo}
-                incidencias={incidenciasPorActivo[selectedActivo.id] ?? []}
-                limpiezas={limpiezasPorActivo[selectedActivo.id] ?? []}
-              />
-            ) : selectedInfraestructura ? (
-              <InfraestructuraPanel item={selectedInfraestructura} />
-            ) : (
-              <ActivoListaPanel
-                resumenNivel={resumenNivel}
-                activos={visibleActivos}
-                infraestructura={visibleInfraestructura}
-                incidencias={visibleIncidencias}
-                limpiezas={visibleLimpiezas}
-                zonas={selectedZonaIds ? editableZonas.filter((zona) => selectedZonaIds.has(zona.id)) : zonasNivel}
-                incidenciasSinUbicacion={selectedZona ? [] : incidenciasSinUbicacion}
-                limpiezasSinUbicacion={selectedZona ? [] : limpiezasSinUbicacion}
-                selectedZona={selectedZona}
-                selectedZonaAggregate={selectedZonaAggregate}
-                incidenciasPorActivo={incidenciasPorActivo}
-                limpiezasPorActivo={limpiezasPorActivo}
-                onClearZona={() => setSelectedZonaId(null)}
-              />
-            )
+            <UnifiedOperationPanel
+              view={panelView === 'editing' ? 'summary' : panelView}
+              resumenNivel={resumenNivel}
+              activos={visibleActivos}
+              infraestructura={visibleInfraestructura}
+              incidencias={visibleIncidencias}
+              limpiezas={visibleLimpiezas}
+              incidenciasSinUbicacion={selectedZona ? [] : incidenciasSinUbicacion}
+              limpiezasSinUbicacion={selectedZona ? [] : limpiezasSinUbicacion}
+              selectedZona={selectedZona}
+              selectedZonaAggregate={selectedZonaAggregate}
+              selectedActivo={selectedActivo}
+              selectedInfraestructura={selectedInfraestructura}
+              incidenciasPorActivo={incidenciasPorActivo}
+              limpiezasPorActivo={limpiezasPorActivo}
+            />
           )}
         </aside>
-      </section>
     </div>
   )
 }
 
-function ActivoListaPanel({
-  resumenNivel,
-  activos,
-  infraestructura,
-  incidencias,
-  limpiezas,
-  zonas,
-  incidenciasSinUbicacion,
-  limpiezasSinUbicacion,
-  selectedZona,
-  selectedZonaAggregate,
-  incidenciasPorActivo,
-  limpiezasPorActivo,
-  onClearZona
-}: {
-  resumenNivel: {
-    zonas: number
-    activos: number
-    infraestructura: number
-    incidencias: number
-    incidenciasUrgentes: number
-    pendientes: MapaPendiente[]
-    revisionesVencidas: number
-    preventivosProximos: number
-    limpiezasAtrasadas: number
-  }
-  activos: MapaActivo[]
-  infraestructura: MapaInfraestructura[]
-  incidencias: MapaIncidencia[]
-  limpiezas: MapaLimpieza[]
-  zonas: MapaZona[]
-  incidenciasSinUbicacion: MapaIncidencia[]
-  limpiezasSinUbicacion: MapaLimpieza[]
-  selectedZona: MapaZona | null
-  selectedZonaAggregate: ZonaAggregate | null
-  incidenciasPorActivo: Record<string, MapaIncidencia[]>
-  limpiezasPorActivo: Record<string, MapaLimpieza[]>
-  onClearZona: () => void
-}) {
-  const router = useRouter()
-  const [showNuevoActivo, setShowNuevoActivo] = useState(false)
-  const [nuevoActivoState, nuevoActivoAction] = useFormState(
-    async (state: typeof initialFormState, formData: FormData) => {
-      const result = await crearActivoRapido(state, formData)
-      if (result.activo) {
-        setShowNuevoActivo(false)
-        router.refresh()
-      }
-      return result
-    },
-    initialFormState
-  )
 
-  const primaryZona = zonas[0]
-  const heading = selectedZona ? selectedZona.nombre || selectedZona.label : 'Visión general'
-  const subtitle = selectedZona
-    ? `${selectedZona.tipo === 'subzona' ? 'Subzona' : 'Zona'} · ${selectedZona.area}`
-    : `${resumenNivel.activos} activos · ${resumenNivel.infraestructura} infraestructura · ${resumenNivel.incidencias} incidencias · ${resumenNivel.zonas} zonas`
+function FloatingLevelSelector({
+  niveles,
+  selectedNivelId,
+  onSelectNivel
+}: {
+  niveles: MapaNivel[]
+  selectedNivelId: string
+  onSelectNivel: (nivelId: string) => void
+}) {
+  const orderedNiveles = [...niveles].reverse()
 
   return (
-    <>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="font-semibold text-[color:var(--brand-ink)]">{heading}</h2>
-          <p className="text-sm text-[color:var(--brand-muted)]">{subtitle}</p>
-        </div>
-        {selectedZona ? (
-          <button
-            type="button"
-            onClick={onClearZona}
-            className={mutedButtonClass}
-          >
-            Ver todo
-          </button>
-        ) : null}
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Link href={selectedZona && primaryZona ? `/incidencias/nueva?zona=${primaryZona.id}` : '/incidencias/nueva'} className={wineButtonClass}>
-          Nueva incidencia
-        </Link>
-        <Link
-          href={selectedZona && primaryZona ? `/mantenimientos/nuevo?tipo=limpieza_profunda&zona=${primaryZona.id}` : '/mantenimientos/nuevo?tipo=limpieza_profunda'}
-          className={oliveButtonClass}
-        >
-          Nueva limpieza
-        </Link>
-        <Link href="/mantenimientos?tipo=limpieza_profunda" className={mutedButtonClass}>
-          Ver limpiezas
-        </Link>
-        {selectedZona && primaryZona ? (
-          <button type="button" onClick={() => setShowNuevoActivo(true)} className={oliveButtonClass}>
-            Nuevo activo aquí
-          </button>
-        ) : null}
-      </div>
-
-      {showNuevoActivo && primaryZona ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowNuevoActivo(false)}>
-          <div className="w-full max-w-md rounded-xl border border-[color:var(--brand-border)] bg-[color:var(--brand-paper)] p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-semibold text-[color:var(--brand-ink)]">Nuevo activo en {primaryZona.nombre || primaryZona.label}</h3>
-              <button type="button" onClick={() => setShowNuevoActivo(false)} className="text-[color:var(--brand-muted)] hover:text-[color:var(--brand-ink)]">✕</button>
-            </div>
-            {nuevoActivoState.error ? (
-              <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{nuevoActivoState.error}</p>
-            ) : null}
-            <form action={nuevoActivoAction} className="space-y-3">
-              <input type="hidden" name="zona_id" value={primaryZona.id} />
-              <label className="block">
-                <span className="text-xs font-medium text-[color:var(--brand-muted)]">Nombre *</span>
-                <input
-                  name="nombre"
-                  required
-                  placeholder="ej. Freidora principal"
-                  className="mt-0.5 w-full rounded-md border border-[color:var(--brand-border)] bg-white px-3 py-2 text-sm text-[color:var(--brand-ink)] placeholder-[color:var(--brand-muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--brand-olive)] dark:bg-slate-800 dark:text-white"
-                />
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="text-xs font-medium text-[color:var(--brand-muted)]">Clase *</span>
-                  <select
-                    name="clase"
-                    required
-                    className="mt-0.5 w-full rounded-md border border-[color:var(--brand-border)] bg-white px-3 py-2 text-sm text-[color:var(--brand-ink)] focus:outline-none focus:ring-2 focus:ring-[color:var(--brand-olive)] dark:bg-slate-800 dark:text-white"
-                  >
-                    <option value="">Seleccionar</option>
-                    {(['equipo', 'infraestructura', 'mobiliario', 'edificacion', 'sistema'] as const).map((c) => (
-                      <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="text-xs font-medium text-[color:var(--brand-muted)]">Tipo *</span>
-                  <input
-                    name="tipo"
-                    required
-                    placeholder="ej. Freidora"
-                    className="mt-0.5 w-full rounded-md border border-[color:var(--brand-border)] bg-white px-3 py-2 text-sm text-[color:var(--brand-ink)] placeholder-[color:var(--brand-muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--brand-olive)] dark:bg-slate-800 dark:text-white"
-                  />
-                </label>
-              </div>
-              <label className="block">
-                <span className="text-xs font-medium text-[color:var(--brand-muted)]">Área</span>
-                <select
-                  name="area"
-                  className="mt-0.5 w-full rounded-md border border-[color:var(--brand-border)] bg-white px-3 py-2 text-sm text-[color:var(--brand-ink)] focus:outline-none focus:ring-2 focus:ring-[color:var(--brand-olive)] dark:bg-slate-800 dark:text-white"
-                >
-                  <option value="">Sin área</option>
-                  {equipoAreas.map((a) => <option key={a} value={a}>{a}</option>)}
-                </select>
-              </label>
-              <div className="flex justify-end gap-2 pt-1">
-                <button type="button" onClick={() => setShowNuevoActivo(false)} className={mutedButtonClass}>
-                  Cancelar
-                </button>
-                <button type="submit" className={oliveButtonClass}>
-                  Crear activo
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="mt-4 space-y-3">
-        {!selectedZona ? (
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--brand-muted)]">Atención inmediata</h3>
-            {resumenNivel.pendientes.slice(0, 3).map((pendiente) => (
-              <Link
-                key={pendiente.id}
-                href={`/incidencias/${pendiente.id}`}
-                className="block rounded-md border border-[rgba(239,169,30,0.22)] bg-[rgba(239,169,30,0.12)] p-3 text-sm text-[#8f5a00] dark:border-[rgba(239,169,30,0.24)] dark:bg-[rgba(90,65,24,0.84)] dark:text-[rgba(255,223,130,0.96)]"
-              >
-                <span className="font-medium">{pendiente.ticket_numero} · {pendiente.descripcion}</span>
-                <span className="mt-1 block text-xs">
-                  Sin asignar · {formatDate(pendiente.fecha_reporte)}
-                </span>
-              </Link>
-            ))}
-            {incidencias
-              .filter((incidencia) => incidencia.prioridad === 'alta' || incidencia.prioridad === 'urgente')
-              .slice(0, 2)
-              .map((incidencia) => (
-              <IncidenciaLink key={incidencia.id} incidencia={incidencia} />
-            ))}
-            {(resumenNivel.pendientes.length === 0 &&
-              incidencias.every((incidencia) => incidencia.prioridad !== 'alta' && incidencia.prioridad !== 'urgente')) ? (
-              <p className="text-sm text-[color:var(--brand-muted)]">No hay alertas inmediatas.</p>
-            ) : null}
-          </div>
-        ) : null}
-
-        {!selectedZona ? (
-          <div className="grid grid-cols-2 gap-2">
-            <MiniMetric label="Sin asignar" value={resumenNivel.pendientes.length} tone="orange" />
-            <MiniMetric label="Urgentes" value={resumenNivel.incidenciasUrgentes} tone="red" />
-            <MiniMetric label="Vencidas" value={resumenNivel.revisionesVencidas} tone="yellow" />
-            <MiniMetric label="Preventivos" value={resumenNivel.preventivosProximos} tone="teal" />
-          </div>
-        ) : null}
-
-        {selectedZona && selectedZonaAggregate ? (
-          <div className="grid grid-cols-2 gap-2">
-            <MiniMetric label="Activos" value={selectedZonaAggregate.activos} tone="orange" />
-            <MiniMetric label="Incidencias" value={selectedZonaAggregate.incidencias} tone="red" />
-            <MiniMetric label="Limpiezas" value={selectedZonaAggregate.limpiezas} tone="teal" />
-            <MiniMetric label="Preventivos" value={selectedZonaAggregate.preventivos} tone="yellow" />
-          </div>
-        ) : null}
-
-        {incidencias.length ? (
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--brand-muted)]">Incidencias activas</h3>
-            {incidencias.slice(0, 5).map((incidencia) => (
-              <IncidenciaLink key={incidencia.id} incidencia={incidencia} />
-            ))}
-          </div>
-        ) : null}
-
-        {incidenciasSinUbicacion.length ? (
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--brand-muted)]">Incidencias sin ubicación</h3>
-            {incidenciasSinUbicacion.slice(0, 4).map((incidencia) => (
-              <IncidenciaLink key={incidencia.id} incidencia={incidencia} />
-            ))}
-          </div>
-        ) : null}
-
-        {limpiezas.length ? (
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--brand-muted)]">Limpiezas profundas</h3>
-            {limpiezas.slice(0, 5).map((limpieza) => (
-              <LimpiezaLink key={limpieza.id} limpieza={limpieza} />
-            ))}
-          </div>
-        ) : null}
-
-        {limpiezasSinUbicacion.length ? (
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--brand-muted)]">Sin ubicación</h3>
-            {limpiezasSinUbicacion.slice(0, 4).map((limpieza) => (
-              <LimpiezaLink key={limpieza.id} limpieza={limpieza} />
-            ))}
-          </div>
-        ) : null}
-
-        {infraestructura.length ? (
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--brand-muted)]">Infraestructura</h3>
-            {infraestructura.slice(0, 8).map((item) => (
-              <Link
-                key={item.id}
-                href={`/infraestructura/${item.id}`}
-                className="block rounded-md border border-[color:color-mix(in_srgb,var(--brand-olive)_14%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-bone)_72%,white)] p-3 transition hover:border-[color:var(--brand-wine)]"
-              >
-                <span className="font-medium text-[color:var(--brand-ink)]">{item.nombre}</span>
-                <span className="mt-1 block text-sm text-[color:var(--brand-muted)]">
-                  {item.area ?? 'Sin área'} · {item.tipo}
-                </span>
-              </Link>
-            ))}
-          </div>
-        ) : null}
-
-        {activos.length ? (
-          activos.map((activo) => {
-            const activoIncidencias = incidenciasPorActivo[activo.id] ?? []
-            const activoLimpiezas = limpiezasPorActivo[activo.id] ?? []
+    <div
+      className="pointer-events-auto rounded-[16px] border border-white/10 bg-[rgba(18,23,18,0.62)] px-2 py-2 shadow-[0_18px_40px_-28px_rgba(0,0,0,0.72)] backdrop-blur-md"
+      title="Selector de niveles"
+      aria-label="Selector de niveles"
+    >
+      <div className="flex min-w-[3.5rem] flex-col items-center justify-end gap-1">
+        {orderedNiveles.map((nivel, index) => {
+            const selected = nivel.id === selectedNivelId
+            const widthClass =
+              index === 0 ? 'w-8' : index === 1 ? 'w-10' : index === 2 ? 'w-12' : index === 3 ? 'w-14' : 'w-16'
 
             return (
-              <article
-                key={activo.id}
-                className="rounded-md border border-[color:color-mix(in_srgb,var(--brand-olive)_14%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-bone)_72%,white)] p-3"
+              <button
+                key={nivel.id}
+                type="button"
+                onClick={() => onSelectNivel(nivel.id)}
+                aria-label={`Ir a ${nivel.nombre}`}
+                title={nivel.nombre}
+                className={`${widthClass} flex h-6 items-center justify-center rounded-md border text-[9px] font-semibold uppercase tracking-[0.12em] transition ${
+                  selected
+                    ? 'border-[color:var(--brand-wine)] bg-[color:var(--brand-wine)] text-[color:var(--brand-bone)] shadow-[0_10px_24px_-14px_rgba(155,30,33,0.7)]'
+                    : 'border-white/10 bg-[rgba(255,255,255,0.08)] text-[rgba(238,227,202,0.9)] hover:border-[rgba(238,227,202,0.24)] hover:bg-[rgba(255,255,255,0.12)]'
+                }`}
               >
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatusBadge type={activo.clase === 'equipo' ? 'equipo' : 'infraestructura'} value={activo.estado} />
-                  {activoIncidencias.length ? (
-                    <span className="rounded-md border border-[color:color-mix(in_srgb,var(--brand-wine)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-wine)_10%,white)] px-2 py-1 text-xs font-medium text-[color:var(--brand-wine)]">
-                      {activoIncidencias.length} incidencia{activoIncidencias.length === 1 ? '' : 's'}
-                    </span>
-                  ) : null}
-                  {activoLimpiezas.length ? (
-                    <span className="rounded-md border border-[color:color-mix(in_srgb,var(--brand-olive)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-olive)_10%,white)] px-2 py-1 text-xs font-medium text-[color:var(--brand-olive)]">
-                      {activoLimpiezas.length} limpieza{activoLimpiezas.length === 1 ? '' : 's'}
-                    </span>
-                  ) : null}
-                </div>
-                <Link href={`/activos/${activo.id}`} className="mt-2 block font-medium text-[color:var(--brand-ink)] hover:underline">
-                  {activo.nombre}
-                </Link>
-                <p className="mt-1 text-sm text-[color:var(--brand-muted)]">
-                  {activo.area ?? 'Sin área'} · {activo.tipo}
-                </p>
-                <p className="mt-1 text-sm text-[color:var(--brand-muted)]">
-                  Próxima revisión: {formatDate(activo.fecha_proxima_revision)}
-                </p>
-                {activoIncidencias.length ? (
-                  <div className="mt-2 space-y-1">
-                    {activoIncidencias.slice(0, 2).map((incidencia) => (
-                      <Link
-                        key={incidencia.id}
-                        href={`/incidencias/${incidencia.id}`}
-                        className="block text-sm font-medium text-[color:var(--brand-wine)] hover:underline"
-                      >
-                        {incidencia.ticket_numero} · {incidencia.descripcion}
-                      </Link>
-                    ))}
-                  </div>
-                ) : null}
-                {activoLimpiezas.length ? (
-                  <div className="mt-2 space-y-1">
-                    {activoLimpiezas.slice(0, 2).map((limpieza) => (
-                      <Link
-                        key={limpieza.id}
-                        href={`/mantenimientos/${limpieza.id}`}
-                        className="block text-sm font-medium text-[color:var(--brand-olive)] hover:underline"
-                      >
-                        {formatDate(limpieza.fecha_realizacion)} · {limpieza.descripcion}
-                      </Link>
-                    ))}
-                  </div>
-                ) : null}
-              </article>
+                {getNivelShortLabel(nivel.nombre)}
+              </button>
             )
-          })
-        ) : (
-          <p className="text-sm text-[color:var(--brand-muted)]">No hay activos en esta área.</p>
-        )}
+        })}
       </div>
-    </>
+    </div>
+  )
+}
+
+function FloatingMapControls({
+  zoomPercent,
+  zoom,
+  showZonas,
+  showActivos,
+  showInfraestructura,
+  showMapFilters,
+  onToggleFilters,
+  onToggleZonas,
+  onToggleActivos,
+  onToggleInfra,
+  onZoomOut,
+  onZoomReset,
+  onZoomIn
+}: {
+  zoomPercent: number
+  zoom: number
+  showZonas: boolean
+  showActivos: boolean
+  showInfraestructura: boolean
+  showMapFilters: boolean
+  onToggleFilters: () => void
+  onToggleZonas: () => void
+  onToggleActivos: () => void
+  onToggleInfra: () => void
+  onZoomOut: () => void
+  onZoomReset: () => void
+  onZoomIn: () => void
+}) {
+  return (
+    <div className="pointer-events-auto flex items-start gap-2">
+      <div className="relative">
+        <button
+          type="button"
+          onClick={onToggleFilters}
+          className="rounded-full border border-white/10 bg-[rgba(18,23,18,0.68)] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[rgba(238,227,202,0.9)] shadow-[0_20px_45px_-28px_rgba(0,0,0,0.72)] backdrop-blur-md"
+        >
+          Capas
+        </button>
+        {showMapFilters ? (
+          <div className="absolute right-0 mt-2 w-44 rounded-[18px] border border-white/10 bg-[rgba(18,23,18,0.88)] p-3 shadow-[0_20px_45px_-28px_rgba(0,0,0,0.72)] backdrop-blur-md">
+            <div className="space-y-2">
+              <LayerToggle label="Zonas" active={showZonas} onClick={onToggleZonas} />
+              <LayerToggle label="Activos" active={showActivos} onClick={onToggleActivos} />
+              <LayerToggle label="Infra" active={showInfraestructura} onClick={onToggleInfra} />
+            </div>
+          </div>
+        ) : null}
+      </div>
+      <div className="flex items-center gap-1 rounded-full border border-white/10 bg-[rgba(18,23,18,0.68)] px-1.5 py-1.5 shadow-[0_20px_45px_-28px_rgba(0,0,0,0.72)] backdrop-blur-md">
+        <button
+          type="button"
+          onClick={onZoomOut}
+          className={`${mutedButtonClass} min-w-8 px-2 py-1.5 disabled:opacity-40`}
+          disabled={zoom <= 1}
+          aria-label="Alejar"
+        >
+          -
+        </button>
+        <button
+          type="button"
+          onClick={onZoomReset}
+          className={`${mutedButtonClass} min-w-[4.25rem] px-2 py-1.5 text-[11px] font-semibold`}
+          aria-label="Restablecer zoom"
+        >
+          {zoomPercent}%
+        </button>
+        <button
+          type="button"
+          onClick={onZoomIn}
+          className={`${mutedButtonClass} min-w-8 px-2 py-1.5 disabled:opacity-40`}
+          disabled={zoom >= 2.5}
+          aria-label="Acercar"
+        >
+          +
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -2286,8 +1997,10 @@ function MapaZonasOverlay({
   activePolygonVertex,
   activeRectHandle,
   onZonaClick,
+  onZonaHover,
   onDragHandlePointerDown,
   onPolygonVertexPointerDown,
+  onPolygonEdgePointerDown,
   onRectHandlePointerDown
 }: {
   zonas: ZonaRenderData[]
@@ -2296,8 +2009,10 @@ function MapaZonasOverlay({
   activePolygonVertex: { zonaId: string; pointIndex: number } | null
   activeRectHandle: { zonaId: string; corner: RectHandleCorner } | null
   onZonaClick: (zonaId: string, isEditingThis: boolean) => void
+  onZonaHover: (zonaId: string | null, point: ZonaPoint | null) => void
   onDragHandlePointerDown: (zonaId: string) => void
   onPolygonVertexPointerDown: (zonaId: string, pointIndex: number) => void
+  onPolygonEdgePointerDown: (zonaId: string, insertAfterIndex: number) => void
   onRectHandlePointerDown: (zonaId: string, corner: RectHandleCorner) => void
 }) {
   return (
@@ -2332,7 +2047,28 @@ function MapaZonasOverlay({
         const showAreaShape = zona.geometry_tipo === 'rect' || zona.geometry_tipo === 'polygon'
 
         return (
-          <g key={zona.id}>
+          <g
+            key={zona.id}
+            onMouseEnter={(event) => {
+              const svgRect = event.currentTarget.ownerSVGElement?.getBoundingClientRect()
+              if (!svgRect) return onZonaHover(zona.id, null)
+
+              onZonaHover(zona.id, {
+                x: Number((((event.clientX - svgRect.left) / svgRect.width) * 100).toFixed(3)),
+                y: Number((((event.clientY - svgRect.top) / svgRect.height) * 100).toFixed(3))
+              })
+            }}
+            onMouseMove={(event) => {
+              const svgRect = event.currentTarget.ownerSVGElement?.getBoundingClientRect()
+              if (!svgRect) return
+
+              onZonaHover(zona.id, {
+                x: Number((((event.clientX - svgRect.left) / svgRect.width) * 100).toFixed(3)),
+                y: Number((((event.clientY - svgRect.top) / svgRect.height) * 100).toFixed(3))
+              })
+            }}
+            onMouseLeave={() => onZonaHover(null, null)}
+          >
             {zona.geometry_tipo === 'rect' ? (
               <>
                 <rect
@@ -2407,11 +2143,21 @@ function MapaZonasOverlay({
             ) : null}
             {zona.geometry_tipo === 'polygon' ? (
               <>
+                {editing && isEditingThis ? (
+                  <polygon
+                    points={polygonPoints.map((point) => `${point.x},${point.y}`).join(' ')}
+                    fill="none"
+                    stroke="rgba(155,30,33,0.42)"
+                    strokeWidth={0.9}
+                    strokeDasharray="1.6 1.2"
+                    className="pointer-events-none"
+                  />
+                ) : null}
                 <polygon
                   points={polygonPoints.map((point) => `${point.x},${point.y}`).join(' ')}
                   fill={visual.rectFill}
                   stroke={visual.rectStroke}
-                  strokeWidth={isSelected ? 0.35 : 0.22}
+                  strokeWidth={editing && isEditingThis ? 0.46 : isSelected ? 0.35 : 0.22}
                   className="cursor-pointer"
                   onClick={(event) => {
                     event.stopPropagation()
@@ -2441,27 +2187,48 @@ function MapaZonasOverlay({
                   </text>
                 </g>
                 {editing && isEditingThis
-                  ? polygonPoints.map((point, pointIndex) => {
-                      const isActiveVertex =
-                        activePolygonVertex?.zonaId === zona.id && activePolygonVertex.pointIndex === pointIndex
+                  ? (
+                    <>
+                      {polygonPoints.map((point, pointIndex) => {
+                        const nextPoint = polygonPoints[(pointIndex + 1) % polygonPoints.length]
+                        const midX = Number((((point.x + nextPoint.x) / 2)).toFixed(3))
+                        const midY = Number((((point.y + nextPoint.y) / 2)).toFixed(3))
+                        const isActiveVertex =
+                          activePolygonVertex?.zonaId === zona.id && activePolygonVertex.pointIndex === pointIndex
 
-                      return (
-                        <circle
-                          key={`${zona.id}-vertex-${pointIndex}`}
-                          cx={point.x}
-                          cy={point.y}
-                          r={isActiveVertex ? 1.12 : 0.9}
-                          fill={isActiveVertex ? 'var(--brand-wine)' : 'rgba(255,253,248,0.98)'}
-                          stroke={isActiveVertex ? 'var(--brand-wine)' : visual.rectStroke}
-                          strokeWidth={0.28}
-                          className="cursor-grab"
-                          onPointerDown={(event) => {
-                            event.stopPropagation()
-                            onPolygonVertexPointerDown(zona.id, pointIndex)
-                          }}
-                        />
-                      )
-                    })
+                        return (
+                          <g key={`${zona.id}-vertex-group-${pointIndex}`}>
+                            <circle
+                              cx={midX}
+                              cy={midY}
+                              r={0.7}
+                              fill="rgba(255,253,248,0.92)"
+                              stroke="rgba(155,30,33,0.5)"
+                              strokeWidth={0.24}
+                              className="cursor-copy"
+                              onPointerDown={(event) => {
+                                event.stopPropagation()
+                                onPolygonEdgePointerDown(zona.id, pointIndex)
+                              }}
+                            />
+                            <circle
+                              cx={point.x}
+                              cy={point.y}
+                              r={isActiveVertex ? 1.3 : 1.02}
+                              fill={isActiveVertex ? 'var(--brand-wine)' : 'rgba(255,253,248,0.98)'}
+                              stroke={isActiveVertex ? 'var(--brand-wine)' : visual.rectStroke}
+                              strokeWidth={0.32}
+                              className="cursor-grab"
+                              onPointerDown={(event) => {
+                                event.stopPropagation()
+                                onPolygonVertexPointerDown(zona.id, pointIndex)
+                              }}
+                            />
+                          </g>
+                        )
+                      })}
+                    </>
+                  )
                   : null}
               </>
             ) : null}
@@ -2648,17 +2415,17 @@ function ResumenCard({
   tone: 'orange' | 'red' | 'yellow' | 'teal'
 }) {
   const toneClass = {
-    orange: 'border-[rgba(239,169,30,0.22)] bg-[rgba(239,169,30,0.12)] text-[#8f5a00] dark:border-[rgba(239,169,30,0.24)] dark:bg-[rgba(90,65,24,0.84)] dark:text-[rgba(255,223,130,0.96)]',
-    red: 'border-[rgba(155,30,33,0.2)] bg-[rgba(155,30,33,0.08)] text-[color:var(--brand-wine)] dark:border-[rgba(155,30,33,0.24)] dark:bg-[rgba(155,30,33,0.2)] dark:text-[color:var(--brand-bone)]',
-    yellow: 'border-[rgba(239,169,30,0.22)] bg-[rgba(255,247,224,0.9)] text-[#8b5e00] dark:border-[rgba(239,169,30,0.24)] dark:bg-[rgba(74,59,24,0.78)] dark:text-[#ffd982]',
-    teal: 'border-[rgba(47,62,30,0.18)] bg-[rgba(47,62,30,0.08)] text-[color:var(--brand-green)] dark:border-[rgba(101,127,68,0.22)] dark:bg-[rgba(39,54,28,0.9)] dark:text-[rgba(232,239,210,0.96)]'
+    orange: 'border-[rgba(255,255,255,0.1)] bg-[linear-gradient(145deg,rgba(239,169,30,0.22),rgba(255,255,255,0.06))] text-[rgba(255,239,196,0.98)]',
+    red: 'border-[rgba(255,255,255,0.1)] bg-[linear-gradient(145deg,rgba(155,30,33,0.26),rgba(255,255,255,0.04))] text-[rgba(255,232,225,0.98)]',
+    yellow: 'border-[rgba(255,255,255,0.1)] bg-[linear-gradient(145deg,rgba(239,169,30,0.18),rgba(255,255,255,0.05))] text-[rgba(255,242,209,0.98)]',
+    teal: 'border-[rgba(255,255,255,0.1)] bg-[linear-gradient(145deg,rgba(47,62,30,0.34),rgba(255,255,255,0.04))] text-[rgba(232,239,210,0.98)]'
   }[tone]
 
   return (
-    <Link href={href} className={`rounded-xl border p-4 transition hover:-translate-y-0.5 ${toneClass}`}>
-      <p className="text-sm font-medium">{title}</p>
-      <p className="mt-2 text-3xl font-semibold">{value}</p>
-      <p className="mt-1 text-xs opacity-80">{detail}</p>
+    <Link href={href} className={`rounded-[22px] border p-4 shadow-[0_18px_44px_-28px_rgba(0,0,0,0.75)] backdrop-blur-md transition hover:-translate-y-0.5 hover:bg-white/12 ${toneClass}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] opacity-80">{title}</p>
+      <p className="mt-3 text-3xl font-semibold tracking-[-0.04em]">{value}</p>
+      <p className="mt-2 text-xs leading-5 opacity-75">{detail}</p>
     </Link>
   )
 }
@@ -2676,10 +2443,10 @@ function LayerToggle({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md border px-3 py-1.5 text-sm font-medium ${
+      className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
         active
-          ? 'border-[color:var(--brand-olive)] bg-[color:var(--brand-olive)] text-[color:var(--brand-bone)]'
-          : 'border-[color:var(--brand-border)] bg-transparent text-[color:var(--brand-muted)]'
+          ? 'border-[rgba(238,227,202,0.16)] bg-[rgba(238,227,202,0.92)] text-[color:var(--brand-ink)]'
+          : 'border-white/10 bg-white/8 text-[rgba(238,227,202,0.72)]'
       }`}
     >
       {label}
@@ -2687,376 +2454,40 @@ function LayerToggle({
   )
 }
 
-function MapOperationalHud({
-  nivelNombre,
-  selectedZona,
-  selectedZonaAggregate,
-  visibleActivosCount,
-  visibleIncidenciasCount,
-  visibleLimpiezasCount,
-  visibleInfraCount,
-  preventivosProximosCount,
-  editing,
-  viewMode
+function MapHoverHud({
+  zona,
+  aggregate,
+  anchor
 }: {
-  nivelNombre: string
-  selectedZona: MapaZona | null
-  selectedZonaAggregate: ZonaAggregate | null
-  visibleActivosCount: number
-  visibleIncidenciasCount: number
-  visibleLimpiezasCount: number
-  visibleInfraCount: number
-  preventivosProximosCount: number
-  editing: boolean
-  viewMode: 'operativo' | 'arquitectonico'
+  zona: MapaZona
+  aggregate: ZonaAggregate | null
+  anchor: ZonaPoint | null
 }) {
-  return (
-    <>
-      <div className="pointer-events-none absolute left-4 top-4 z-10 max-w-[min(30rem,calc(100%-2rem))]">
-        <div className="rounded-2xl border border-white/60 bg-[rgba(255,253,248,0.84)] px-4 py-3 shadow-[0_18px_50px_-30px_rgba(26,33,23,0.7)] backdrop-blur-md dark:border-white/10 dark:bg-[rgba(18,23,16,0.82)]">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-[color:color-mix(in_srgb,var(--brand-olive)_12%,white)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-olive)]">
-              {nivelNombre}
-            </span>
-            <span className="rounded-full bg-[color:color-mix(in_srgb,var(--brand-gold)_16%,white)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#936100]">
-              {viewMode === 'operativo' ? 'Modo operativo' : 'Modo referencia'}
-            </span>
-            {editing ? (
-              <span className="rounded-full bg-[color:color-mix(in_srgb,var(--brand-wine)_12%,white)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-wine)]">
-                Edición activa
-              </span>
-            ) : null}
-          </div>
-          <div className="mt-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--brand-muted)]">
-              {selectedZona ? 'Foco actual' : 'Superficie activa'}
-            </p>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight text-[color:var(--brand-ink)] dark:text-[color:var(--brand-bone)]">
-              {selectedZona ? selectedZona.nombre || selectedZona.label : 'Mapa operativo'}
-            </h2>
-            <p className="mt-1 text-sm text-[color:var(--brand-muted)]">
-              {selectedZona
-                ? `${selectedZona.tipo === 'subzona' ? 'Subzona' : 'Zona'} · ${selectedZona.area}${selectedZonaAggregate ? ` · ${selectedZonaAggregate.incidencias} incidencias` : ''}`
-                : 'Incidencias, limpiezas y zonas principales integradas en una sola vista.'}
-            </p>
-          </div>
-        </div>
-      </div>
+  const hudAnchor = getPointerHudAnchor(anchor)
 
-      <div className="pointer-events-none absolute right-4 top-4 z-10 hidden max-w-[15rem] lg:block">
-        <div className="rounded-2xl border border-white/50 bg-[rgba(255,253,248,0.78)] p-3 shadow-[0_18px_50px_-30px_rgba(26,33,23,0.7)] backdrop-blur-md dark:border-white/10 dark:bg-[rgba(18,23,16,0.8)]">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--brand-muted)]">Lectura rápida</p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <HudStat label="Activos" value={visibleActivosCount} tone="olive" />
-            <HudStat label="Incidencias" value={visibleIncidenciasCount} tone="wine" />
-            <HudStat label="Limpiezas" value={visibleLimpiezasCount} tone="teal" />
-            <HudStat label="Infra" value={visibleInfraCount} tone="gold" />
-          </div>
-          {selectedZonaAggregate ? (
-            <div className="mt-3 rounded-xl border border-[rgba(47,62,30,0.12)] bg-[rgba(255,253,248,0.68)] px-3 py-2 dark:bg-[rgba(22,32,18,0.72)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand-muted)]">Zona</p>
-              <p className="mt-1 text-sm font-semibold text-[color:var(--brand-ink)] dark:text-[color:var(--brand-bone)]">
-                {selectedZonaAggregate.urgentes} urgentes · {selectedZonaAggregate.preventivos} preventivos
-              </p>
-            </div>
-          ) : (
-            <div className="mt-3 rounded-xl border border-[rgba(47,62,30,0.12)] bg-[rgba(255,253,248,0.68)] px-3 py-2 dark:bg-[rgba(22,32,18,0.72)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand-muted)]">Nivel</p>
-              <p className="mt-1 text-sm font-semibold text-[color:var(--brand-ink)] dark:text-[color:var(--brand-bone)]">
-                {preventivosProximosCount} preventivos próximos
-              </p>
-            </div>
-          )}
-          <div className="mt-3 flex flex-wrap gap-2">
-            <LegendPill label="Crítica" tone="wine" />
-            <LegendPill label="Atención" tone="gold" />
-            <LegendPill label="Estable" tone="olive" />
-            <LegendPill label="Selección" tone="ink" />
-          </div>
-        </div>
-      </div>
-    </>
-  )
-}
-
-function SchematicLevelCanvas({
-  nivelNombre,
-  totalZonas,
-  totalActivos,
-  totalInfraestructura,
-  totalIncidencias,
-  totalUrgentes
-}: {
-  nivelNombre: string
-  totalZonas: number
-  totalActivos: number
-  totalInfraestructura: number
-  totalIncidencias: number
-  totalUrgentes: number
-}) {
-  return (
-    <div className="relative aspect-[16/9] w-full overflow-hidden bg-[linear-gradient(135deg,rgba(255,249,238,0.98),rgba(247,244,235,0.96)_36%,rgba(236,241,230,0.96)_100%)] dark:bg-[linear-gradient(135deg,rgba(21,26,19,0.98),rgba(15,20,14,0.98)_42%,rgba(26,34,24,0.98)_100%)]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(239,169,30,0.16),transparent_24%),radial-gradient(circle_at_82%_14%,rgba(155,30,33,0.12),transparent_20%),radial-gradient(circle_at_84%_82%,rgba(47,62,30,0.14),transparent_22%)]" />
-      <svg
-        viewBox="0 0 160 90"
-        className="absolute inset-0 h-full w-full text-[rgba(47,62,30,0.1)] dark:text-[rgba(238,227,202,0.08)]"
-        aria-hidden="true"
-      >
-        <defs>
-          <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-            <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.38" />
-          </pattern>
-          <linearGradient id="laneFill" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="rgba(255,253,248,0.9)" />
-            <stop offset="100%" stopColor="rgba(228,234,219,0.78)" />
-          </linearGradient>
-          <linearGradient id="serviceFill" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="rgba(155,30,33,0.08)" />
-            <stop offset="100%" stopColor="rgba(239,169,30,0.04)" />
-          </linearGradient>
-        </defs>
-        <rect width="160" height="90" fill="url(#grid)" />
-        <rect x="10" y="12" width="140" height="66" rx="8" fill="rgba(255,255,255,0.16)" stroke="currentColor" strokeWidth="0.6" />
-        <rect x="18" y="18" width="124" height="50" rx="5.5" fill="url(#laneFill)" stroke="rgba(47,62,30,0.12)" strokeWidth="0.35" />
-        <rect x="24" y="24" width="54" height="14" rx="4" fill="rgba(47,62,30,0.08)" />
-        <rect x="84" y="24" width="48" height="14" rx="4" fill="rgba(239,169,30,0.12)" />
-        <rect x="24" y="44" width="34" height="18" rx="4" fill="rgba(155,30,33,0.08)" />
-        <rect x="64" y="44" width="32" height="18" rx="4" fill="rgba(47,62,30,0.1)" />
-        <rect x="102" y="44" width="30" height="18" rx="4" fill="rgba(15,118,110,0.12)" />
-        <rect x="24" y="70" width="108" height="4" rx="2" fill="url(#serviceFill)" />
-        <path d="M36 18 V68" stroke="rgba(47,62,30,0.12)" strokeWidth="0.3" strokeDasharray="1.5 1.8" />
-        <path d="M80 18 V68" stroke="rgba(47,62,30,0.12)" strokeWidth="0.3" strokeDasharray="1.5 1.8" />
-        <path d="M116 18 V68" stroke="rgba(47,62,30,0.12)" strokeWidth="0.3" strokeDasharray="1.5 1.8" />
-        <path d="M18 40 H142" stroke="rgba(47,62,30,0.1)" strokeWidth="0.3" strokeDasharray="1.5 2.2" />
-        <path d="M18 66 H142" stroke="rgba(47,62,30,0.1)" strokeWidth="0.3" strokeDasharray="1.5 2.2" />
-        <text x="28" y="33" fontSize="3.2" fontWeight="700" fill="rgba(47,62,30,0.46)">Operación</text>
-        <text x="88" y="33" fontSize="3.2" fontWeight="700" fill="rgba(143,90,0,0.58)">Servicio</text>
-        <text x="27" y="55" fontSize="2.8" fontWeight="600" fill="rgba(110,26,30,0.52)">Tickets</text>
-        <text x="68" y="55" fontSize="2.8" fontWeight="600" fill="rgba(47,62,30,0.5)">Equipos</text>
-        <text x="106" y="55" fontSize="2.8" fontWeight="600" fill="rgba(15,118,110,0.56)">Limpiezas</text>
-      </svg>
-      <div className="absolute left-4 bottom-4 rounded-2xl border border-[rgba(47,62,30,0.12)] bg-[rgba(255,253,248,0.82)] px-4 py-3 shadow-[0_24px_80px_-42px_rgba(26,33,23,0.7)] backdrop-blur-md dark:border-[rgba(238,227,202,0.12)] dark:bg-[rgba(22,32,18,0.82)]">
-        <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--brand-muted)]">Lámina operativa</p>
-        <h2 className="mt-1 text-xl font-semibold text-[color:var(--brand-ink)] dark:text-[color:var(--brand-bone)]">{nivelNombre}</h2>
-        <p className="mt-1 max-w-xs text-sm text-[color:var(--brand-muted)]">
-          Base simplificada para operar, ubicar zonas y leer alertas sin ruido arquitectónico.
-        </p>
-      </div>
-      <div className="absolute right-4 bottom-4 flex flex-wrap justify-end gap-2">
-        <span className="rounded-full border border-[rgba(47,62,30,0.12)] bg-[rgba(255,253,248,0.82)] px-3 py-1.5 text-xs font-semibold text-[color:var(--brand-olive)] shadow-sm backdrop-blur-md">{totalZonas} zonas</span>
-        <span className="rounded-full border border-[rgba(47,62,30,0.12)] bg-[rgba(255,253,248,0.82)] px-3 py-1.5 text-xs font-semibold text-[color:var(--brand-olive)] shadow-sm backdrop-blur-md">{totalActivos} activos</span>
-        <span className="rounded-full border border-[rgba(47,62,30,0.12)] bg-[rgba(255,253,248,0.82)] px-3 py-1.5 text-xs font-semibold text-[color:var(--brand-olive)] shadow-sm backdrop-blur-md">{totalInfraestructura} infraestructura</span>
-        <span className="rounded-full border border-[rgba(155,30,33,0.14)] bg-[rgba(155,30,33,0.1)] px-3 py-1.5 text-xs font-semibold text-[color:var(--brand-wine)] shadow-sm backdrop-blur-md">{totalIncidencias} incidencias</span>
-        <span className="rounded-full border border-[rgba(239,169,30,0.18)] bg-[rgba(239,169,30,0.12)] px-3 py-1.5 text-xs font-semibold text-[#936100] shadow-sm backdrop-blur-md">{totalUrgentes} urgentes</span>
-      </div>
-    </div>
-  )
-}
-
-function HudStat({
-  label,
-  value,
-  tone
-}: {
-  label: string
-  value: number
-  tone: 'olive' | 'wine' | 'teal' | 'gold'
-}) {
-  const toneClass = {
-    olive: 'bg-[rgba(47,62,30,0.08)] text-[color:var(--brand-green)]',
-    wine: 'bg-[rgba(155,30,33,0.08)] text-[color:var(--brand-wine)]',
-    teal: 'bg-[rgba(15,118,110,0.1)] text-[#0f766e]',
-    gold: 'bg-[rgba(239,169,30,0.12)] text-[#936100]'
-  }[tone]
+  if (!hudAnchor) return null
 
   return (
-    <div className={`rounded-xl px-3 py-2 ${toneClass}`}>
-      <p className="text-lg font-semibold leading-none">{value}</p>
-      <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em]">{label}</p>
-    </div>
-  )
-}
-
-function LegendPill({
-  label,
-  tone
-}: {
-  label: string
-  tone: 'olive' | 'wine' | 'gold' | 'ink'
-}) {
-  const dotClass = {
-    olive: 'bg-[color:var(--brand-green)]',
-    wine: 'bg-[color:var(--brand-wine)]',
-    gold: 'bg-[#f59e0b]',
-    ink: 'bg-[color:var(--brand-ink)]'
-  }[tone]
-
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-[color:color-mix(in_srgb,var(--brand-olive)_14%,transparent)] bg-[rgba(255,253,248,0.65)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--brand-muted)] dark:bg-[rgba(18,23,16,0.62)]">
-      <span className={`h-2.5 w-2.5 rounded-full ${dotClass}`} />
-      {label}
-    </span>
-  )
-}
-
-function MiniMetric({
-  label,
-  value,
-  tone
-}: {
-  label: string
-  value: number
-  tone: 'orange' | 'red' | 'yellow' | 'teal'
-}) {
-  const toneClass = {
-    orange: 'bg-[rgba(239,169,30,0.12)] text-[#8f5a00] dark:bg-[rgba(90,65,24,0.84)] dark:text-[rgba(255,223,130,0.96)]',
-    red: 'bg-[rgba(155,30,33,0.08)] text-[color:var(--brand-wine)] dark:bg-[rgba(155,30,33,0.2)] dark:text-[color:var(--brand-bone)]',
-    yellow: 'bg-[rgba(255,247,224,0.9)] text-[#8b5e00] dark:bg-[rgba(74,59,24,0.78)] dark:text-[#ffd982]',
-    teal: 'bg-[rgba(47,62,30,0.08)] text-[color:var(--brand-green)] dark:bg-[rgba(39,54,28,0.9)] dark:text-[rgba(232,239,210,0.96)]'
-  }[tone]
-
-  return (
-    <div className={`rounded-md px-3 py-2 ${toneClass}`}>
-      <p className="text-lg font-semibold">{value}</p>
-      <p className="text-[11px] font-medium">{label}</p>
-    </div>
-  )
-}
-
-function IncidenciaLink({ incidencia }: { incidencia: MapaIncidencia }) {
-  return (
-    <Link
-      href={`/incidencias/${incidencia.id}`}
-      className="block rounded-md border border-[color:color-mix(in_srgb,var(--brand-wine)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-wine)_10%,white)] p-2 text-sm text-[color:var(--brand-wine)] hover:bg-[color:color-mix(in_srgb,var(--brand-wine)_18%,white)]"
+    <div
+      className="pointer-events-none absolute z-10 hidden w-52 max-w-[14rem] lg:block"
+      style={{
+        left: `${hudAnchor.left}%`,
+        top: `${hudAnchor.top}%`,
+        transform: `translate(${hudAnchor.translateX}, ${hudAnchor.translateY})`
+      }}
     >
-      <span className="font-medium">{incidencia.ticket_numero} · {incidencia.descripcion}</span>
-      <span className="mt-1 block text-xs text-[color:var(--brand-wine)]">
-        {incidencia.zona_nombre ?? 'Sin ubicación'}
-      </span>
-    </Link>
-  )
-}
-
-function ActivoPanel({
-  activo,
-  incidencias,
-  limpiezas
-}: {
-  activo: MapaActivo
-  incidencias: MapaIncidencia[]
-  limpiezas: MapaLimpieza[]
-}) {
-  return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="font-semibold text-[color:var(--brand-ink)]">{activo.nombre}</h2>
-        <p className="text-sm text-[color:var(--brand-muted)]">
-          {activo.area ?? 'Sin área'} · {activo.tipo}
+      <div className="rounded-[20px] border border-white/12 bg-[rgba(18,23,18,0.88)] px-3 py-2.5 shadow-[0_18px_50px_-30px_rgba(26,33,23,0.82)] backdrop-blur-md">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[rgba(238,227,202,0.52)]">
+          {zona.tipo === 'subzona' ? 'Subzona' : 'Zona'}
         </p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <StatusBadge type={activo.clase === 'equipo' ? 'equipo' : 'infraestructura'} value={activo.estado} />
-        <StatusBadge type="criticidad" value={activo.criticidad} />
-        {incidencias.length ? (
-          <span className="rounded-md border border-[color:color-mix(in_srgb,var(--brand-wine)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-wine)_10%,white)] px-2 py-1 text-xs font-medium text-[color:var(--brand-wine)]">
-            {incidencias.length} incidencia{incidencias.length === 1 ? '' : 's'}
-          </span>
-        ) : null}
-        {limpiezas.length ? (
-          <span className="rounded-md border border-[color:color-mix(in_srgb,var(--brand-olive)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-olive)_10%,white)] px-2 py-1 text-xs font-medium text-[color:var(--brand-olive)]">
-            {limpiezas.length} limpieza{limpiezas.length === 1 ? '' : 's'}
-          </span>
-        ) : null}
-      </div>
-      <div className="space-y-1 text-sm text-[color:var(--brand-muted)]">
-        <p>Próxima revisión: {formatDate(activo.fecha_proxima_revision)}</p>
-        {activo.limpieza_intervalo_dias ? (
-          <p>Limpieza profunda: {formatDate(activo.fecha_proxima_limpieza)}</p>
-        ) : null}
-      </div>
-      {incidencias.length ? (
-        <div className="space-y-2">
-          {incidencias.slice(0, 3).map((incidencia) => (
-            <Link
-              key={incidencia.id}
-              href={`/incidencias/${incidencia.id}`}
-              className="block rounded-md border border-[color:color-mix(in_srgb,var(--brand-wine)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-wine)_10%,white)] p-2 text-sm font-medium text-[color:var(--brand-wine)] hover:bg-[color:color-mix(in_srgb,var(--brand-wine)_18%,white)]"
-            >
-              {incidencia.ticket_numero} · {incidencia.descripcion}
-            </Link>
-          ))}
+        <p className="mt-1 text-sm font-semibold text-[color:var(--brand-bone)]">{zona.nombre || zona.label}</p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <HudStat label="Incid." value={aggregate?.incidencias ?? 0} tone="wine" />
+          <HudStat label="Activos" value={aggregate?.activos ?? 0} tone="olive" />
         </div>
-      ) : null}
-      {limpiezas.length ? (
-        <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--brand-muted)]">Limpiezas</h3>
-          {limpiezas.slice(0, 3).map((limpieza) => (
-            <LimpiezaLink key={limpieza.id} limpieza={limpieza} />
-          ))}
-        </div>
-      ) : null}
-      <div className="flex flex-wrap gap-2">
-        <Link href={`/activos/${activo.id}`} className={mutedButtonClass}>
-          Ver ficha
-        </Link>
-        <Link href={`/incidencias/nueva?activo=${activo.id}`} className={wineButtonClass}>
-          Reportar
-        </Link>
-        <Link href={`/mantenimientos/nuevo?activo=${activo.id}&tipo=preventivo`} className={oliveButtonClass}>
-          Programado
-        </Link>
-        <Link href={`/mantenimientos/nuevo?activo=${activo.id}&tipo=limpieza_profunda`} className={oliveButtonClass}>
-          Limpieza
-        </Link>
-        <Link href={`/cotizaciones/nueva?activo=${activo.id}`} className={goldButtonClass}>
-          Cotizar
-        </Link>
-      </div>
-    </div>
-  )
-}
-
-function LimpiezaLink({ limpieza }: { limpieza: MapaLimpieza }) {
-  return (
-    <Link
-      href={`/mantenimientos/${limpieza.id}`}
-      className="block rounded-md border border-[color:color-mix(in_srgb,var(--brand-olive)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--brand-olive)_10%,white)] p-2 text-sm text-[color:var(--brand-olive)] hover:bg-[color:color-mix(in_srgb,var(--brand-olive)_18%,white)]"
-    >
-      <span className="font-medium">{formatDate(limpieza.fecha_realizacion)} · {limpieza.descripcion}</span>
-      <span className="mt-1 block text-xs text-[color:var(--brand-olive)]">
-        {limpieza.activo?.nombre ?? limpieza.zona_nombre ?? 'Sin ubicación'}
-        {limpieza.realizado_por ? ` · ${limpieza.realizado_por}` : ''}
-      </span>
-    </Link>
-  )
-}
-
-function InfraestructuraPanel({ item }: { item: MapaInfraestructura }) {
-  return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="font-semibold text-[color:var(--brand-ink)]">{item.nombre}</h2>
-        <p className="text-sm text-[color:var(--brand-muted)]">
-          {item.area ?? 'Sin área'} · {item.tipo}
+        <p className="mt-2 text-xs text-[rgba(238,227,202,0.68)]">
+          {aggregate ? `${aggregate.urgentes} urgentes · ${aggregate.preventivos} preventivos` : 'Sin actividad agregada'}
         </p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <StatusBadge type="infraestructura" value={item.estado} />
-        <StatusBadge type="criticidad" value={item.criticidad} />
-      </div>
-      <p className="text-sm text-[color:var(--brand-muted)]">
-        Próxima revisión: {formatDate(item.fecha_proxima_revision)}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <Link href={`/infraestructura/${item.id}`} className={mutedButtonClass}>
-          Ver ficha
-        </Link>
-        <Link href={`/incidencias/nueva?infraestructura=${item.id}`} className={wineButtonClass}>
-          Reportar
-        </Link>
-        <Link href={`/mantenimientos/nuevo?infraestructura=${item.id}`} className={oliveButtonClass}>
-          Mantto.
-        </Link>
       </div>
     </div>
   )

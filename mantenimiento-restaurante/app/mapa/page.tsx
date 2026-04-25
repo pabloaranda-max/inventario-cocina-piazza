@@ -1,13 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import type { MapaNivel, MapaZona } from '@/lib/types'
-import {
-  MapaOperativo,
-  type MapaActivo,
-  type MapaIncidencia,
-  type MapaInfraestructura,
-  type MapaLimpieza,
-  type MapaPendiente
-} from './mapa-operativo'
+import type { MapaNivel, MapaZona, MapaActivo, MapaIncidencia, MapaInfraestructura, MapaLimpieza, MapaPendiente } from '@/lib/types'
+import { MapaOperativo } from './mapa-operativo'
 
 export default async function MapaPage() {
   const supabase = await createServerSupabaseClient()
@@ -16,7 +9,6 @@ export default async function MapaPage() {
     { data: incidencias },
     { data: niveles },
     { data: zonas },
-    { data: areas },
     { data: infraestructura },
     { data: limpiezas },
     { data: pendientes }
@@ -28,7 +20,7 @@ export default async function MapaPage() {
       .limit(300),
     supabase
       .from('incidencias')
-      .select('id,ticket_numero,descripcion,prioridad,estado,activo_id,equipo_id,infraestructura_id,zona_id,zona_nombre')
+      .select('id,ticket_numero,descripcion,prioridad,estado,fecha_reporte,updated_at,activo_id,equipo_id,infraestructura_id,zona_id,zona_nombre')
       .in('estado', ['abierta', 'en_progreso'])
       .order('fecha_reporte', { ascending: false })
       .limit(200),
@@ -43,12 +35,8 @@ export default async function MapaPage() {
       .eq('visible', true)
       .order('orden', { ascending: true }),
     supabase
-      .from('areas')
-      .select('nombre')
-      .order('nombre', { ascending: true }),
-    supabase
       .from('infraestructura')
-      .select('id,nombre,tipo,area,estado,criticidad,nivel_id,x,y,fecha_proxima_revision')
+      .select('id,nombre,tipo,area,estado,criticidad,nivel_id,x,y,zona_id,fecha_proxima_revision')
       .not('nivel_id', 'is', null)
       .order('nombre', { ascending: true }),
     supabase
@@ -71,7 +59,6 @@ export default async function MapaPage() {
       incidencias={(incidencias as unknown as MapaIncidencia[]) ?? []}
       niveles={(niveles as MapaNivel[]) ?? []}
       zonas={(zonas as MapaZona[]) ?? []}
-      areas={(areas ?? []).map((a) => a.nombre)}
       infraestructura={(infraestructura as MapaInfraestructura[]) ?? []}
       limpiezas={(limpiezas as unknown as MapaLimpieza[]) ?? []}
       pendientes={(pendientes as MapaPendiente[]) ?? []}

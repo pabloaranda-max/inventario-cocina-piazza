@@ -7,7 +7,8 @@ import { FormError } from '@/components/ui/flash-message'
 import { ImageInput } from '@/components/ui/image-input'
 import { infraestructuraTipos, limpiezaIntervalos } from '@/lib/defined-options'
 import { initialFormState } from '@/lib/form-state'
-import type { Activo, Infraestructura, MapaNivel, Proveedor } from '@/lib/types'
+import type { Activo, Infraestructura, MapaZona, Proveedor } from '@/lib/types'
+import { addDaysToDateInput } from '@/lib/utils'
 
 const estados = [
   ['operativo', 'Operativo'],
@@ -27,22 +28,21 @@ const criticidades = [
 
 function computeNextCleaningDate(lastDate: string, intervalDays: string) {
   if (!lastDate || !intervalDays) return ''
-  const d = new Date(`${lastDate}T00:00:00`)
-  d.setDate(d.getDate() + Number(intervalDays))
-  return d.toISOString().slice(0, 10)
+  return addDaysToDateInput(lastDate, Number(intervalDays))
 }
 
 export function InfraestructuraForm({
   infraestructura,
   proveedores,
   areas,
+  zonas,
   activo
 }: {
   infraestructura?: Infraestructura
   proveedores: Proveedor[]
-  niveles: MapaNivel[]
   areas: string[]
-  activo?: Pick<Activo, 'limpieza_intervalo_dias' | 'limpieza_tipo' | 'limpieza_proveedor_id' | 'fecha_ultima_limpieza' | 'fecha_proxima_limpieza'>
+  zonas: Pick<MapaZona, 'id' | 'nombre' | 'label' | 'area'>[]
+  activo?: Pick<Activo, 'limpieza_intervalo_dias' | 'limpieza_tipo' | 'limpieza_proveedor_id' | 'fecha_ultima_limpieza' | 'fecha_proxima_limpieza' | 'zona_id'>
 }) {
   const action = infraestructura ? actualizarInfraestructura.bind(null, infraestructura.id) : crearInfraestructura
   const [state, formAction] = useFormState(action, initialFormState)
@@ -60,6 +60,18 @@ export function InfraestructuraForm({
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Nombre" name="nombre" defaultValue={infraestructura?.nombre} required />
+        <label className="block">
+          <span className="brand-label">Zona</span>
+          <select name="zona_id" defaultValue={activo?.zona_id ?? ''} required className="brand-field mt-1">
+            <option value="">Selecciona una zona</option>
+            {zonas.map((zona) => (
+              <option key={zona.id} value={zona.id}>
+                {(zona.nombre || zona.label) ?? 'Zona'}{zona.area ? ` · ${zona.area}` : ''}
+              </option>
+            ))}
+          </select>
+          <p className="brand-hint mt-1">La infraestructura se asigna por zona; no se captura punto exacto.</p>
+        </label>
 
         <label className="block">
           <span className="brand-label">Tipo</span>
@@ -152,24 +164,21 @@ export function InfraestructuraForm({
         />
       </div>
 
-      <input type="hidden" name="nivel_id" defaultValue={infraestructura?.nivel_id ?? ''} />
-      <input type="hidden" name="x" defaultValue={infraestructura?.x?.toString() ?? ''} />
-      <input type="hidden" name="y" defaultValue={infraestructura?.y?.toString() ?? ''} />
       <div className="brand-card rounded-md p-3">
-        <p className="brand-label">Ubicación en mapa</p>
+        <p className="brand-label">Asignación de zona</p>
         <p className="brand-hint mt-1 text-sm">
-          La ubicación se marca visualmente desde el plano.
+          Usa la zona para ubicar la infraestructura dentro del mapa operativo.
         </p>
         {infraestructura ? (
           <a
             href={`/activos/${infraestructura.id}/ubicacion`}
             className="brand-button-muted mt-3 inline-flex rounded-md px-3 py-2 text-sm font-medium"
           >
-            Ubicar en mapa
+            Asignar zona
           </a>
         ) : (
           <p className="brand-hint mt-2 text-sm">
-            Guarda la infraestructura y después selecciona su punto en el mapa.
+            Selecciona la zona desde este formulario.
           </p>
         )}
       </div>

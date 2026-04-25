@@ -3,6 +3,7 @@
 import { useFormState } from 'react-dom'
 import type { Activo, Incidencia, MapaZona } from '@/lib/types'
 import { actualizarIncidencia, crearIncidencia } from './actions'
+import { toDateInputMX } from '@/lib/utils'
 import { FormError } from '@/components/ui/flash-message'
 import { ImageInput } from '@/components/ui/image-input'
 import { initialFormState } from '@/lib/form-state'
@@ -175,7 +176,7 @@ export function IncidenciaForm({
           <input
             name="fecha_reporte"
             type="date"
-            defaultValue={incidencia.fecha_reporte ? new Date(incidencia.fecha_reporte).toISOString().slice(0, 10) : ''}
+            defaultValue={incidencia.fecha_reporte ? toDateInputMX(incidencia.fecha_reporte) : ''}
             className="brand-field mt-1"
           />
         </label>

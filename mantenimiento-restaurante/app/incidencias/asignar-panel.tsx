@@ -112,6 +112,7 @@ export function AsignarPanel({
           {nuevoActivoState.error && (
             <p className="text-xs text-red-600">{nuevoActivoState.error}</p>
           )}
+          <input type="hidden" name="zona_id" value={selectedZonaId} />
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="text-xs font-medium text-orange-700 dark:text-orange-400">Nombre *</span>
@@ -153,9 +154,12 @@ export function AsignarPanel({
               </select>
             </label>
           </div>
+          <p className="text-xs text-orange-700 dark:text-orange-400">
+            {selectedZonaId ? 'El activo se creará dentro de la zona seleccionada.' : 'Primero selecciona una zona del mapa para poder crear el activo.'}
+          </p>
           <button
             type="submit"
-            disabled={nuevoActivoPending}
+            disabled={nuevoActivoPending || !selectedZonaId}
             className="rounded-md bg-orange-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-800 disabled:opacity-50"
           >
             {nuevoActivoPending ? 'Guardando...' : 'Crear y seleccionar'}

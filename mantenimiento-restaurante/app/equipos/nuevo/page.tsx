@@ -1,13 +1,14 @@
 import Link from 'next/link'
 import { EquipoForm } from '../equipo-form'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import type { Proveedor } from '@/lib/types'
+import type { MapaZona, Proveedor } from '@/lib/types'
 
 export default async function NuevoEquipoPage() {
   const supabase = await createServerSupabaseClient()
-  const [{ data: proveedores }, { data: areas }] = await Promise.all([
+  const [{ data: proveedores }, { data: areas }, { data: zonas }] = await Promise.all([
     supabase.from('proveedores').select('*').order('nombre', { ascending: true }),
-    supabase.from('areas').select('nombre').order('nombre', { ascending: true })
+    supabase.from('areas').select('nombre').order('nombre', { ascending: true }),
+    supabase.from('mapa_zonas').select('id,nombre,label,area').eq('visible', true).order('orden', { ascending: true })
   ])
 
   return (
@@ -21,6 +22,7 @@ export default async function NuevoEquipoPage() {
       <EquipoForm
         proveedores={(proveedores as Proveedor[]) ?? []}
         areas={(areas ?? []).map((a) => a.nombre)}
+        zonas={(zonas as Pick<MapaZona, 'id' | 'nombre' | 'label' | 'area'>[]) ?? []}
       />
     </div>
   )

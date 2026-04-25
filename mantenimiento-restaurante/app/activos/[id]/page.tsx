@@ -134,7 +134,7 @@ export default async function ActivoDetallePage({
             href={`/activos/${activo.id}/ubicacion`}
             className="brand-button-muted rounded-md px-4 py-2 text-sm font-medium"
           >
-            Ubicar en mapa
+            Asignar zona
           </Link>
           {activo.clase === 'equipo' ? (
             <Link href={`/equipos/${activo.id}/editar`} className="brand-button rounded-md px-4 py-2 text-sm font-medium">

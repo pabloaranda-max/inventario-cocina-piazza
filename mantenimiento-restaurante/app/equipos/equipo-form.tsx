@@ -2,7 +2,7 @@
 
 import { useFormState } from 'react-dom'
 import { useTransition, useState } from 'react'
-import type { Activo, Equipo, Proveedor } from '@/lib/types'
+import type { Activo, Equipo, MapaZona, Proveedor } from '@/lib/types'
 import { crearEquipo, actualizarEquipo } from './actions'
 import { extraerDatosPlaca } from './actions-ocr'
 import { FormError } from '@/components/ui/flash-message'
@@ -10,6 +10,7 @@ import { MultipleDefinedCheckboxes, SingleDefinedSelect } from '@/components/ui/
 import { ImageInput } from '@/components/ui/image-input'
 import { equipoCategorias, limpiezaIntervalos } from '@/lib/defined-options'
 import { initialFormState } from '@/lib/form-state'
+import { addDaysToDateInput } from '@/lib/utils'
 
 const estados = [
   ['operativo', 'Operativo'],
@@ -20,21 +21,21 @@ const estados = [
 
 function computeNextCleaningDate(lastDate: string, intervalDays: string) {
   if (!lastDate || !intervalDays) return ''
-  const d = new Date(`${lastDate}T00:00:00`)
-  d.setDate(d.getDate() + Number(intervalDays))
-  return d.toISOString().slice(0, 10)
+  return addDaysToDateInput(lastDate, Number(intervalDays))
 }
 
 export function EquipoForm({
   equipo,
   proveedores,
   areas,
+  zonas,
   activo
 }: {
   equipo?: Equipo
   proveedores: Proveedor[]
   areas: string[]
-  activo?: Pick<Activo, 'limpieza_intervalo_dias' | 'limpieza_tipo' | 'limpieza_proveedor_id' | 'fecha_ultima_limpieza' | 'fecha_proxima_limpieza'>
+  zonas: Pick<MapaZona, 'id' | 'nombre' | 'label' | 'area'>[]
+  activo?: Pick<Activo, 'limpieza_intervalo_dias' | 'limpieza_tipo' | 'limpieza_proveedor_id' | 'fecha_ultima_limpieza' | 'fecha_proxima_limpieza' | 'zona_id'>
 }) {
   const action = equipo ? actualizarEquipo.bind(null, equipo.id) : crearEquipo
   const [state, formAction] = useFormState(action, initialFormState)
@@ -75,6 +76,18 @@ export function EquipoForm({
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Nombre" name="nombre" defaultValue={equipo?.nombre} required />
+        <label className="block">
+          <span className="brand-label">Zona</span>
+          <select name="zona_id" defaultValue={activo?.zona_id ?? ''} required className="brand-field mt-1">
+            <option value="">Selecciona una zona</option>
+            {zonas.map((zona) => (
+              <option key={zona.id} value={zona.id}>
+                {(zona.nombre || zona.label) ?? 'Zona'}{zona.area ? ` · ${zona.area}` : ''}
+              </option>
+            ))}
+          </select>
+          <p className="brand-hint mt-1">El activo se ubicará por zona; ya no se usa pin exacto.</p>
+        </label>
         <SingleDefinedSelect
           label="Area"
           name="area"

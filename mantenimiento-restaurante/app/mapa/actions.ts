@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { FormState } from '@/lib/form-state'
+import { todayMX } from '@/lib/utils'
 
 export async function guardarMapaZonas(_state: FormState, formData: FormData): Promise<FormState> {
   const raw = String(formData.get('zonas') ?? '')
@@ -178,5 +179,71 @@ export async function guardarMapaZonas(_state: FormState, formData: FormData): P
 
   revalidatePath('/mapa')
   revalidatePath('/equipos')
+  return { success: true }
+}
+
+export async function crearLimpiezaMapa(_state: FormState, formData: FormData): Promise<FormState> {
+  const descripcion = String(formData.get('descripcion') ?? '').trim()
+  const realizadoPor = String(formData.get('realizado_por') ?? '').trim() || null
+  const activoId = String(formData.get('activo_id') ?? '').trim() || null
+  const zonaId = String(formData.get('zona_id') ?? '').trim() || null
+  const fechaRealizacion = String(formData.get('fecha_realizacion') ?? '').trim() || todayMX()
+
+  if (!descripcion) return { error: 'La descripción es obligatoria.' }
+  if (!activoId && !zonaId) return { error: 'Selecciona una zona o un activo para registrar la limpieza.' }
+
+  const supabase = await createServerSupabaseClient()
+
+  let zonaNombre: string | null = null
+
+  if (zonaId) {
+    const { data: zona, error: zonaError } = await supabase
+      .from('mapa_zonas')
+      .select('nombre')
+      .eq('id', zonaId)
+      .single()
+
+    if (zonaError) return { error: zonaError.message }
+    zonaNombre = zona.nombre ?? null
+  }
+
+  const { data, error } = await supabase.rpc('registrar_mantenimiento', {
+    p_tipo: 'limpieza_profunda',
+    p_descripcion: descripcion,
+    p_equipo_id: null,
+    p_infraestructura_id: null,
+    p_realizado_por: realizadoPor,
+    p_costo: null,
+    p_repuestos_notas: null,
+    p_fotos_urls: [],
+    p_fecha_realizacion: fechaRealizacion,
+    p_proxima_fecha_sugerida: null,
+    p_marcar_operativo: false,
+    p_incidencia_id: null,
+    p_activo_id: activoId,
+    p_ejecucion_tipo: 'interno',
+    p_requiere_material: false,
+    p_proveedor_id: null
+  })
+
+  if (error) return { error: error.message }
+
+  if (data && zonaId) {
+    const { error: updateError } = await supabase
+      .from('mantenimientos')
+      .update({
+        zona_id: zonaId,
+        zona_nombre: zonaNombre
+      })
+      .eq('id', data)
+
+    if (updateError) return { error: updateError.message }
+  }
+
+  revalidatePath('/')
+  revalidatePath('/mapa')
+  revalidatePath('/mantenimientos')
+  if (activoId) revalidatePath('/activos')
+
   return { success: true }
 }

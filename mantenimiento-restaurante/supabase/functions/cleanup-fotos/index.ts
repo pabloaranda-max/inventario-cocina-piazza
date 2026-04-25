@@ -1,5 +1,56 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
+const TZ = 'America/Mexico_City'
+const mxDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: TZ,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+const mxOffsetFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: TZ,
+  timeZoneName: 'shortOffset',
+  hour: '2-digit',
+})
+
+function getMxDateParts(date: Date) {
+  const parts = mxDateFormatter.formatToParts(date)
+  const year = Number(parts.find((part) => part.type === 'year')?.value)
+  const month = Number(parts.find((part) => part.type === 'month')?.value)
+
+  if (Number.isNaN(year) || Number.isNaN(month)) {
+    throw new Error('No se pudo resolver la fecha de America/Mexico_City.')
+  }
+
+  return { year, month }
+}
+
+function getMxOffsetMinutes(date: Date) {
+  const value = mxOffsetFormatter
+    .formatToParts(date)
+    .find((part) => part.type === 'timeZoneName')
+    ?.value
+
+  const match = value?.match(/^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/)
+  if (!match) {
+    throw new Error(`Offset inválido para ${TZ}: ${value ?? 'desconocido'}`)
+  }
+
+  const [, signToken, rawHours, rawMinutes] = match
+  const hours = Number(rawHours)
+  const minutes = Number(rawMinutes ?? '0')
+  const sign = signToken === '+' ? 1 : -1
+
+  return sign * (hours * 60 + minutes)
+}
+
+function startOfCurrentMonthMXUtcIso(now = new Date()) {
+  const { year, month } = getMxDateParts(now)
+  const localMidnightUtcMs = Date.UTC(year, month - 1, 1, 0, 0, 0)
+  const offsetMinutes = getMxOffsetMinutes(new Date(localMidnightUtcMs))
+  return new Date(localMidnightUtcMs - offsetMinutes * 60_000).toISOString()
+}
+
 Deno.serve(async (req) => {
   const token = req.headers.get('x-cleanup-token')
   if (token !== Deno.env.get('CLEANUP_TOKEN')) {
@@ -11,7 +62,7 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   )
 
-  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
+  const startOfMonth = startOfCurrentMonthMXUtcIso()
 
   const { data: incidencias, error } = await supabase
     .from('incidencias')

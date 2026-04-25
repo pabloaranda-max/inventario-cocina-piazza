@@ -211,3 +211,85 @@ export type MapaNivel = {
   created_at: string
   updated_at: string
 }
+
+// --- Tipos del panel operativo del mapa ---
+
+export type MapaActivo = {
+  id: string
+  nombre: string
+  tipo: string
+  area: string | null
+  clase: ClaseActivo
+  estado: EstadoActivo
+  criticidad: CriticidadInfraestructura
+  nivel_id: string | null
+  x: number | null
+  y: number | null
+  zona_id: string | null
+  fecha_proxima_revision: string | null
+  fecha_proxima_limpieza: string | null
+  limpieza_intervalo_dias: number | null
+}
+
+export type MapaIncidencia = {
+  id: string
+  ticket_numero: string
+  descripcion: string
+  prioridad: PrioridadIncidencia
+  estado: EstadoIncidencia
+  fecha_reporte: string
+  updated_at: string
+  activo_id: string | null
+  equipo_id: string | null
+  infraestructura_id: string | null
+  zona_id: string | null
+  zona_nombre: string | null
+}
+
+export type MapaInfraestructura = {
+  id: string
+  nombre: string
+  tipo: string
+  area: string | null
+  estado: EstadoInfraestructura
+  criticidad: CriticidadInfraestructura
+  nivel_id: string | null
+  x: number | null
+  y: number | null
+  zona_id: string | null
+  fecha_proxima_revision: string | null
+}
+
+export type MapaLimpieza = {
+  id: string
+  descripcion: string
+  fecha_realizacion: string
+  realizado_por: string | null
+  activo_id: string | null
+  zona_id: string | null
+  zona_nombre: string | null
+  activo?: Pick<MapaActivo, 'id' | 'nombre' | 'area'> | null
+}
+
+export type MapaPendiente = {
+  id: string
+  ticket_numero: string
+  descripcion: string
+  prioridad: PrioridadIncidencia
+  estado: 'pendiente_asignacion'
+  fecha_reporte: string
+  zona_nombre: string | null
+}
+
+export type ZonaStatusTone = 'critical' | 'warning' | 'ok'
+
+export type ZonaAggregate = {
+  activos: number
+  incidencias: number
+  urgentes: number
+  limpiezas: number
+  preventivos: number
+  tone: ZonaStatusTone
+}
+
+export type PanelView = 'summary' | 'assets' | 'incidents' | 'cleaning' | 'editing'

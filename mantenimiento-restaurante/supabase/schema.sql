@@ -169,7 +169,7 @@ create table if not exists incidencias (
   prioridad prioridad_incidencia not null default 'media',
   foto_url text,
   reportado_por text,
-  fecha_reporte date not null default current_date,
+  fecha_reporte timestamptz not null default now(),
   asignado_a text,
   fecha_resuelta timestamptz,
   validado_por text,

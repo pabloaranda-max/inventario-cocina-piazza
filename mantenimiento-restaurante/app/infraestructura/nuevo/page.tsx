@@ -1,14 +1,14 @@
 import Link from 'next/link'
 import { InfraestructuraForm } from '../infraestructura-form'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import type { MapaNivel, Proveedor } from '@/lib/types'
+import type { MapaZona, Proveedor } from '@/lib/types'
 
 export default async function NuevaInfraestructuraPage() {
   const supabase = await createServerSupabaseClient()
-  const [{ data: proveedores }, { data: niveles }, { data: areas }] = await Promise.all([
+  const [{ data: proveedores }, { data: areas }, { data: zonas }] = await Promise.all([
     supabase.from('proveedores').select('*').order('nombre', { ascending: true }),
-    supabase.from('mapa_niveles').select('*').eq('visible', true).order('orden', { ascending: true }),
-    supabase.from('areas').select('nombre').order('nombre', { ascending: true })
+    supabase.from('areas').select('nombre').order('nombre', { ascending: true }),
+    supabase.from('mapa_zonas').select('id,nombre,label,area').eq('visible', true).order('orden', { ascending: true })
   ])
 
   return (
@@ -21,8 +21,8 @@ export default async function NuevaInfraestructuraPage() {
       </div>
       <InfraestructuraForm
         proveedores={(proveedores as Proveedor[]) ?? []}
-        niveles={(niveles as MapaNivel[]) ?? []}
         areas={(areas ?? []).map((a) => a.nombre)}
+        zonas={(zonas as Pick<MapaZona, 'id' | 'nombre' | 'label' | 'area'>[]) ?? []}
       />
     </div>
   )

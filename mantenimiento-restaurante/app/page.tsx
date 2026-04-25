@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Activo, Equipo, PrioridadIncidencia } from '@/lib/types'
-import { formatDate } from '@/lib/utils'
+import { formatDate, todayMX, daysFromNowMX } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 
 type DashboardIncidencia = {
@@ -18,10 +18,8 @@ type DashboardIncidencia = {
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient()
-  const today = new Date().toISOString().slice(0, 10)
-  const nextLimit = new Date()
-  nextLimit.setDate(nextLimit.getDate() + 14)
-  const nextLimitDate = nextLimit.toISOString().slice(0, 10)
+  const today = todayMX()
+  const nextLimitDate = daysFromNowMX(14)
 
   const [
     { data: pendientes },
@@ -587,7 +585,7 @@ function EmptyText({ text }: { text: string }) {
 }
 
 function EquipoDateList({ equipos }: { equipos: Equipo[] }) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayMX()
 
   return (
     <ul className="space-y-3">

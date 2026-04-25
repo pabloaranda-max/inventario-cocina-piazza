@@ -15,6 +15,10 @@
   --brand-font-body: var(--font-brand-body), "Avenir Next", "Segoe UI", serif;
   --brand-font-display: var(--font-brand-body), "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   --brand-font-accent: var(--font-brand-accent), "Brush Script MT", cursive;
+  /* Alias tokens usados en componentes */
+  --brand-olive: #3a5228;
+  --brand-gold: #c88a14;
+  --brand-muted: rgba(47, 62, 30, 0.52);
 }
 
 .dark {
@@ -23,6 +27,9 @@
   --brand-paper: #162012;
   --brand-border: rgba(238, 227, 202, 0.12);
   --brand-shadow: 0 20px 56px rgba(0, 0, 0, 0.28);
+  --brand-olive: #9bc47a;
+  --brand-gold: #f5c842;
+  --brand-muted: rgba(238, 227, 202, 0.56);
 }
 
 html {

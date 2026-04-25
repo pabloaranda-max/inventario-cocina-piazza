@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { removeStorageFiles, uploadOptionalFile } from '@/lib/storage'
-import { emptyToNull, isAdminEmail } from '@/lib/utils'
+import { emptyToNull, isAdminEmail, todayMX } from '@/lib/utils'
 import type { FormState } from '@/lib/form-state'
 import type { EstadoIncidencia, PrioridadIncidencia } from '@/lib/types'
 import { notificarNuevoReporte } from '@/lib/email'
@@ -41,7 +41,7 @@ function getIncidenciaPayload(formData: FormData) {
     descripcion,
     prioridad: String(formData.get('prioridad') ?? 'media') as PrioridadIncidencia,
     reportado_por: emptyToNull(formData.get('reportado_por')),
-    fecha_reporte: emptyToNull(formData.get('fecha_reporte')) ?? new Date().toISOString().slice(0, 10),
+    fecha_reporte: emptyToNull(formData.get('fecha_reporte')) ?? todayMX(),
     estado: String(formData.get('estado') ?? 'abierta') as EstadoIncidencia
   }
 }
@@ -56,7 +56,7 @@ function getCapturaPayload(formData: FormData) {
     descripcion,
     prioridad: String(formData.get('prioridad') ?? 'media') as PrioridadIncidencia,
     reportado_por,
-    fecha_reporte: new Date().toISOString().slice(0, 10)
+    fecha_reporte: todayMX()
   }
 }
 
@@ -315,11 +315,21 @@ export async function crearActivoRapido(_state: FormState, formData: FormData): 
   if (!nombre) return { error: 'El nombre es obligatorio.' }
   if (!clase) return { error: 'La clase es obligatoria.' }
   if (!tipo) return { error: 'El tipo es obligatorio.' }
+  if (!zona_id) return { error: 'Selecciona una zona para ubicar el activo.' }
 
   const supabase = await createServerSupabaseClient()
+  const { data: zona, error: zonaError } = await supabase
+    .from('mapa_zonas')
+    .select('id,nivel_id,area,nombre')
+    .eq('id', zona_id)
+    .single()
+
+  if (zonaError) return { error: zonaError.message }
+
+  const resolvedArea = zona.area ?? zona.nombre ?? area
   const { data, error } = await supabase
     .from('activos')
-    .insert({ nombre, clase, tipo, area, zona_id })
+    .insert({ nombre, clase, tipo, area: resolvedArea, zona_id, nivel_id: zona.nivel_id, x: null, y: null })
     .select('id, nombre, area, clase, tipo')
     .single()
 

@@ -2,16 +2,17 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { EquipoForm } from '../../equipo-form'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import type { Activo, Equipo, Proveedor } from '@/lib/types'
+import type { Activo, Equipo, MapaZona, Proveedor } from '@/lib/types'
 
 export default async function EditarEquipoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createServerSupabaseClient()
-  const [{ data: equipo }, { data: proveedores }, { data: areas }, { data: activo }] = await Promise.all([
+  const [{ data: equipo }, { data: proveedores }, { data: areas }, { data: activo }, { data: zonas }] = await Promise.all([
     supabase.from('equipos').select('*').eq('id', id).single(),
     supabase.from('proveedores').select('*').order('nombre', { ascending: true }),
     supabase.from('areas').select('nombre').order('nombre', { ascending: true }),
-    supabase.from('activos').select('limpieza_intervalo_dias,limpieza_tipo,limpieza_proveedor_id,fecha_ultima_limpieza,fecha_proxima_limpieza').eq('id', id).single()
+    supabase.from('activos').select('limpieza_intervalo_dias,limpieza_tipo,limpieza_proveedor_id,fecha_ultima_limpieza,fecha_proxima_limpieza,zona_id').eq('id', id).single(),
+    supabase.from('mapa_zonas').select('id,nombre,label,area').eq('visible', true).order('orden', { ascending: true })
   ])
 
   if (!equipo) notFound()
@@ -28,7 +29,8 @@ export default async function EditarEquipoPage({ params }: { params: Promise<{ i
         equipo={equipo as Equipo}
         proveedores={(proveedores as Proveedor[]) ?? []}
         areas={(areas ?? []).map((a) => a.nombre)}
-        activo={activo as Pick<Activo, 'limpieza_intervalo_dias' | 'limpieza_tipo' | 'limpieza_proveedor_id' | 'fecha_ultima_limpieza' | 'fecha_proxima_limpieza'> ?? undefined}
+        zonas={(zonas as Pick<MapaZona, 'id' | 'nombre' | 'label' | 'area'>[]) ?? []}
+        activo={activo as Pick<Activo, 'limpieza_intervalo_dias' | 'limpieza_tipo' | 'limpieza_proveedor_id' | 'fecha_ultima_limpieza' | 'fecha_proxima_limpieza' | 'zona_id'> ?? undefined}
       />
     </div>
   )

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { emptyToNull } from '@/lib/utils'
+import { addDaysToDateInput, emptyToNull } from '@/lib/utils'
 import { removeStorageFiles, uploadOptionalFile } from '@/lib/storage'
 import type { FormState } from '@/lib/form-state'
 import type { EstadoEquipo } from '@/lib/types'
@@ -15,6 +15,7 @@ import {
 
 type EquipoPayload = {
   nombre: string
+  zona_id: string
   area: string | null
   categoria: string | null
   marca: string | null
@@ -34,15 +35,11 @@ type EquipoPayload = {
   fecha_proxima_limpieza: string | null
 }
 
-function addDays(dateString: string, days: number) {
-  const date = new Date(`${dateString}T00:00:00.000Z`)
-  date.setUTCDate(date.getUTCDate() + days)
-  return date.toISOString().slice(0, 10)
-}
-
 function getEquipoPayload(formData: FormData, validAreas: string[]): EquipoPayload | FormState {
   const nombre = String(formData.get('nombre') ?? '').trim()
   if (!nombre) return { error: 'El nombre es obligatorio.' }
+  const zonaId = emptyToNull(formData.get('zona_id'))
+  if (!zonaId) return { error: 'Selecciona una zona.' }
 
   const area = buildSingleDefinedValue({
     value: formData.get('area'),
@@ -72,7 +69,7 @@ function getEquipoPayload(formData: FormData, validAreas: string[]): EquipoPaylo
   const fechaUltimaLimpieza = limpiezaEnabled ? emptyToNull(formData.get('fecha_ultima_limpieza')) : null
   const fechaProximaLimpieza = limpiezaEnabled
     ? emptyToNull(formData.get('fecha_proxima_limpieza')) ??
-      (fechaUltimaLimpieza && limpiezaIntervalo ? addDays(fechaUltimaLimpieza, limpiezaIntervalo) : null)
+      (fechaUltimaLimpieza && limpiezaIntervalo ? addDaysToDateInput(fechaUltimaLimpieza, limpiezaIntervalo) : null)
     : null
 
   if (limpiezaEnabled && !fechaProximaLimpieza) {
@@ -81,6 +78,7 @@ function getEquipoPayload(formData: FormData, validAreas: string[]): EquipoPaylo
 
   return {
     nombre,
+    zona_id: zonaId,
     area,
     categoria,
     marca: emptyToNull(formData.get('marca')),
@@ -106,6 +104,15 @@ export async function crearEquipo(_state: FormState, formData: FormData): Promis
   const payload = getEquipoPayload(formData, validAreas)
   if (!('nombre' in payload)) return payload
 
+  const { data: zona, error: zonaError } = await supabase
+    .from('mapa_zonas')
+    .select('id,nivel_id,area,nombre')
+    .eq('id', payload.zona_id)
+    .single()
+
+  if (zonaError) return { error: zonaError.message }
+  const resolvedArea = zona.area ?? zona.nombre ?? payload.area
+
   const fotoUrl = await uploadOptionalFile(supabase, formData.get('foto'), 'equipos')
   const fotoPlacaUrl = await uploadOptionalFile(
     supabase,
@@ -119,7 +126,9 @@ export async function crearEquipo(_state: FormState, formData: FormData): Promis
       clase: 'equipo',
       nombre: payload.nombre,
       tipo: payload.categoria ?? 'Equipo',
-      area: payload.area,
+      area: resolvedArea,
+      zona_id: payload.zona_id,
+      nivel_id: zona.nivel_id,
       estado: payload.estado,
       criticidad: 'media',
       proveedor_id: payload.proveedor_id,
@@ -152,6 +161,7 @@ export async function crearEquipo(_state: FormState, formData: FormData): Promis
   const { error: equipoError } = await supabase.from('equipos').insert({
     id: data.id,
     ...equipoPayload,
+    area: resolvedArea,
     foto_url: fotoUrl,
     foto_placa_url: fotoPlacaUrl
   })
@@ -173,8 +183,8 @@ export async function crearEquipo(_state: FormState, formData: FormData): Promis
 
   if (detalleError) return { error: detalleError.message }
 
-  if (payload.area) {
-    const { error: areaError } = await supabase.from('areas').upsert({ nombre: payload.area }, { onConflict: 'nombre' })
+  if (resolvedArea) {
+    const { error: areaError } = await supabase.from('areas').upsert({ nombre: resolvedArea }, { onConflict: 'nombre' })
     if (areaError) return { error: areaError.message }
   }
 
@@ -194,6 +204,15 @@ export async function actualizarEquipo(
   const validAreas = (areasData ?? []).map((a) => a.nombre)
   const payload = getEquipoPayload(formData, validAreas)
   if (!('nombre' in payload)) return payload
+
+  const { data: zona, error: zonaError } = await supabase
+    .from('mapa_zonas')
+    .select('id,nivel_id,area,nombre')
+    .eq('id', payload.zona_id)
+    .single()
+
+  if (zonaError) return { error: zonaError.message }
+  const resolvedArea = zona.area ?? zona.nombre ?? payload.area
 
   const { data: currentEquipo, error: currentError } = await supabase
     .from('equipos')
@@ -229,7 +248,11 @@ export async function actualizarEquipo(
     .update({
       nombre: payload.nombre,
       tipo: payload.categoria ?? 'Equipo',
-      area: payload.area,
+      area: resolvedArea,
+      zona_id: payload.zona_id,
+      nivel_id: zona.nivel_id,
+      x: null,
+      y: null,
       estado: payload.estado,
       proveedor_id: payload.proveedor_id,
       ...(fotoUrl ? { foto_url: fotoUrl } : {}),
@@ -249,7 +272,7 @@ export async function actualizarEquipo(
     return { error: activoError.message }
   }
 
-  const { error } = await supabase.from('equipos').update(equipoUpdatePayload).eq('id', id)
+  const { error } = await supabase.from('equipos').update({ ...equipoUpdatePayload, area: resolvedArea }).eq('id', id)
 
   if (error) {
     await removeStorageFiles(supabase, [fotoUrl, fotoPlacaUrl])
@@ -269,8 +292,8 @@ export async function actualizarEquipo(
 
   if (detalleError) return { error: detalleError.message }
 
-  if (payload.area) {
-    const { error: areaError } = await supabase.from('areas').upsert({ nombre: payload.area }, { onConflict: 'nombre' })
+  if (resolvedArea) {
+    const { error: areaError } = await supabase.from('areas').upsert({ nombre: resolvedArea }, { onConflict: 'nombre' })
     if (areaError) return { error: areaError.message }
   }
 

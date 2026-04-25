@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useFormState } from 'react-dom'
 import type { Activo, EjecucionMantenimiento, Equipo, Infraestructura, Mantenimiento, MapaZona, Proveedor } from '@/lib/types'
 import { actualizarMantenimiento, crearMantenimiento } from './actions'
+import { todayMX } from '@/lib/utils'
 import { FormError } from '@/components/ui/flash-message'
 import { ImageInput } from '@/components/ui/image-input'
 import { initialFormState } from '@/lib/form-state'
@@ -230,7 +231,7 @@ export function MantenimientoForm({
           <input
             name="fecha_realizacion"
             type="date"
-            defaultValue={mantenimiento?.fecha_realizacion ?? new Date().toISOString().slice(0, 10)}
+            defaultValue={mantenimiento?.fecha_realizacion ?? todayMX()}
             className="brand-field mt-1"
           />
         </label>
