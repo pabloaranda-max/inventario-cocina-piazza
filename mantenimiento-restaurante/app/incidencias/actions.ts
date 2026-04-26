@@ -319,7 +319,7 @@ export async function crearActivoRapido(_state: FormState, formData: FormData): 
   const supabase = await createServerSupabaseClient()
   const { data: zona, error: zonaError } = await supabase
     .from('mapa_zonas')
-    .select('id,nivel_id,area,nombre')
+    .select('id,nivel_id,area,nombre,x,y')
     .eq('id', zona_id)
     .single()
 
@@ -328,7 +328,7 @@ export async function crearActivoRapido(_state: FormState, formData: FormData): 
   const resolvedArea = zona.area ?? zona.nombre ?? null
   const { data, error } = await supabase
     .from('activos')
-    .insert({ nombre, clase, tipo, area: resolvedArea, zona_id, nivel_id: zona.nivel_id })
+    .insert({ nombre, clase, tipo, area: resolvedArea, zona_id, nivel_id: zona.nivel_id, x: zona.x, y: zona.y })
     .select('id, nombre, area, clase, tipo')
     .single()
 

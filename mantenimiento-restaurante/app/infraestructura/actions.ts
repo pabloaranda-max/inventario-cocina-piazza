@@ -88,7 +88,7 @@ export async function crearInfraestructura(_state: FormState, formData: FormData
   const supabase = await createServerSupabaseClient()
   const { data: zona, error: zonaError } = await supabase
     .from('mapa_zonas')
-    .select('id,nivel_id,area,nombre')
+    .select('id,nivel_id,area,nombre,x,y')
     .eq('id', payload.zona_id)
     .single()
 
@@ -114,6 +114,8 @@ export async function crearInfraestructura(_state: FormState, formData: FormData
       proveedor_id: payload.proveedor_id,
       zona_id: payload.zona_id,
       nivel_id: zona.nivel_id,
+      x: zona.x,
+      y: zona.y,
       foto_url: fotoUrl,
       notas: payload.notas,
       fecha_ultima_revision: payload.fecha_ultima_revision,
@@ -143,7 +145,7 @@ export async function crearInfraestructura(_state: FormState, formData: FormData
   } = payload
   const { error: infraestructuraError } = await supabase
     .from('infraestructura')
-    .insert({ id: data.id, ...infraPayload, area: resolvedArea, foto_url: fotoUrl })
+    .insert({ id: data.id, ...infraPayload, area: resolvedArea, nivel_id: zona.nivel_id, x: zona.x, y: zona.y, foto_url: fotoUrl })
 
   if (infraestructuraError) {
     await removeStorageFiles(supabase, [fotoUrl])
@@ -177,7 +179,7 @@ export async function actualizarInfraestructura(
   const supabase = await createServerSupabaseClient()
   const { data: zona, error: zonaError } = await supabase
     .from('mapa_zonas')
-    .select('id,nivel_id,area,nombre')
+    .select('id,nivel_id,area,nombre,x,y')
     .eq('id', payload.zona_id)
     .single()
 
@@ -220,8 +222,8 @@ export async function actualizarInfraestructura(
       proveedor_id: payload.proveedor_id,
       zona_id: payload.zona_id,
       nivel_id: zona.nivel_id,
-      x: null,
-      y: null,
+      x: zona.x,
+      y: zona.y,
       ...(fotoUrl ? { foto_url: fotoUrl } : {}),
       notas: payload.notas,
       fecha_ultima_revision: payload.fecha_ultima_revision,
@@ -241,7 +243,7 @@ export async function actualizarInfraestructura(
 
   const { error } = await supabase
     .from('infraestructura')
-    .update({ ...infraUpdatePayload, area: resolvedArea, nivel_id: zona.nivel_id, x: null, y: null })
+    .update({ ...infraUpdatePayload, area: resolvedArea, nivel_id: zona.nivel_id, x: zona.x, y: zona.y })
     .eq('id', id)
 
   if (error) {

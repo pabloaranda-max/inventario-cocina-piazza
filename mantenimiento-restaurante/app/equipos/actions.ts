@@ -93,7 +93,7 @@ export async function crearEquipo(_state: FormState, formData: FormData): Promis
 
   const { data: zona, error: zonaError } = await supabase
     .from('mapa_zonas')
-    .select('id,nivel_id,area,nombre')
+    .select('id,nivel_id,area,nombre,x,y')
     .eq('id', payload.zona_id)
     .single()
 
@@ -116,6 +116,8 @@ export async function crearEquipo(_state: FormState, formData: FormData): Promis
       area: resolvedArea,
       zona_id: payload.zona_id,
       nivel_id: zona.nivel_id,
+      x: zona.x,
+      y: zona.y,
       estado: payload.estado,
       criticidad: 'media',
       proveedor_id: payload.proveedor_id,
@@ -193,7 +195,7 @@ export async function actualizarEquipo(
 
   const { data: zona, error: zonaError } = await supabase
     .from('mapa_zonas')
-    .select('id,nivel_id,area,nombre')
+    .select('id,nivel_id,area,nombre,x,y')
     .eq('id', payload.zona_id)
     .single()
 
@@ -238,8 +240,8 @@ export async function actualizarEquipo(
       area: resolvedArea,
       zona_id: payload.zona_id,
       nivel_id: zona.nivel_id,
-      x: null,
-      y: null,
+      x: zona.x,
+      y: zona.y,
       estado: payload.estado,
       proveedor_id: payload.proveedor_id,
       ...(fotoUrl ? { foto_url: fotoUrl } : {}),

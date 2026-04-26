@@ -45,7 +45,7 @@ export async function actualizarUbicacionActivo(
   const { data: zona, error: zonaError } = zonaId
     ? await supabase
         .from('mapa_zonas')
-        .select('id,nivel_id,area,nombre')
+        .select('id,nivel_id,area,nombre,x,y')
         .eq('id', zonaId)
         .single()
     : { data: null, error: null }
@@ -55,7 +55,7 @@ export async function actualizarUbicacionActivo(
   const area = clearLocation ? null : zona?.area ?? zona?.nombre ?? null
   const locationPayload = clearLocation
     ? { nivel_id: null, x: null, y: null, zona_id: null }
-    : { nivel_id: zona?.nivel_id ?? null, x: null, y: null, zona_id: zonaId }
+    : { nivel_id: zona?.nivel_id ?? null, x: zona?.x ?? null, y: zona?.y ?? null, zona_id: zonaId }
   const areaPayload = { area }
 
   const { error } = await supabase
@@ -119,7 +119,7 @@ export async function actualizarActivoBase(
   const { data: zona, error: zonaError } = zonaId
     ? await supabase
         .from('mapa_zonas')
-        .select('id,nivel_id,area,nombre')
+        .select('id,nivel_id,area,nombre,x,y')
         .eq('id', zonaId)
         .single()
     : { data: null, error: null }
@@ -141,8 +141,8 @@ export async function actualizarActivoBase(
     criticidad,
     zona_id: zonaId,
     nivel_id: zona?.nivel_id ?? null,
-    x: null,
-    y: null,
+    x: zona?.x ?? null,
+    y: zona?.y ?? null,
     area: resolvedArea,
     sistema,
     proveedor_id: proveedorId,
@@ -180,8 +180,8 @@ export async function actualizarActivoBase(
         tipo,
         area: resolvedArea,
         nivel_id: zona?.nivel_id ?? null,
-        x: null,
-        y: null,
+        x: zona?.x ?? null,
+        y: zona?.y ?? null,
         estado,
         criticidad,
         proveedor_id: proveedorId,
