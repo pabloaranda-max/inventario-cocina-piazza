@@ -42,7 +42,7 @@ export default async function ActivoDetallePage({
 
   const { data: activoData } = await supabase
     .from('activos')
-    .select('*, proveedor:proveedores!proveedor_id(*), nivel:mapa_niveles(id,nombre), zona:mapa_zonas(id,nombre,area), limpieza_proveedor:proveedores!limpieza_proveedor_id(nombre)')
+    .select('*, proveedor:proveedores!proveedor_id(*), nivel:mapa_niveles(id,nombre), zona:mapa_zonas(id,nombre,area), limpieza_proveedor:proveedores!limpieza_proveedor_id(nombre), equipo:equipos(id), infraestructura:infraestructura(id)')
     .eq('id', id)
     .single()
 
@@ -51,7 +51,14 @@ export default async function ActivoDetallePage({
   const activo = activoData as Activo & {
     zona?: { id: string; nombre: string | null; area: string | null } | null
     limpieza_proveedor?: { nombre: string } | null
+    equipo?: { id: string }[] | { id: string } | null
+    infraestructura?: { id: string }[] | { id: string } | null
   }
+  const hasEquipo = Array.isArray(activo.equipo) ? activo.equipo.length > 0 : Boolean(activo.equipo)
+  const hasInfraestructura = Array.isArray(activo.infraestructura) ? activo.infraestructura.length > 0 : Boolean(activo.infraestructura)
+  const provisional =
+    (activo.clase === 'equipo' && !hasEquipo) ||
+    (activo.clase === 'infraestructura' && !hasInfraestructura)
 
   const [incidenciasData, mantenimientosData] = await Promise.all([
     supabase
@@ -112,7 +119,14 @@ export default async function ActivoDetallePage({
           <Link href="/activos" className="brand-inline-link text-sm">
             Volver a activos
           </Link>
-          <h1 className="mt-2 text-2xl font-semibold">{activo.nombre}</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold">{activo.nombre}</h1>
+            {provisional ? (
+              <span className="rounded-md border border-[rgba(239,169,30,0.24)] bg-[rgba(239,169,30,0.1)] px-2 py-1 text-xs font-semibold uppercase tracking-wide text-[#7a5500] dark:border-[rgba(239,169,30,0.28)] dark:bg-[rgba(90,65,24,0.56)] dark:text-[rgba(255,223,130,0.92)]">
+                Provisional
+              </span>
+            ) : null}
+          </div>
           <p className="brand-hint text-sm">
             {activo.area ?? 'Sin área'} · {activo.tipo} · {activo.clase}
           </p>
@@ -144,6 +158,11 @@ export default async function ActivoDetallePage({
 
       <section className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="brand-card rounded-lg p-5">
+          {provisional ? (
+            <div className="mb-4 rounded-lg border border-[rgba(239,169,30,0.24)] bg-[rgba(239,169,30,0.1)] px-4 py-3 text-sm text-[#7a5500] dark:border-[rgba(239,169,30,0.28)] dark:bg-[rgba(90,65,24,0.56)] dark:text-[rgba(255,223,130,0.92)]">
+              Este activo se creó con captura rápida. Todavía no tiene ficha técnica completa y conviene terminar de catalogarlo.
+            </div>
+          ) : null}
           <h2 className="text-lg font-semibold">Datos</h2>
           <dl className="mt-4 grid gap-3 text-sm md:grid-cols-2">
             <div>
