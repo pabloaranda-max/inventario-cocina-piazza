@@ -24,7 +24,8 @@ const ttNooks = localFont({
 
 export const metadata: Metadata = {
   title: 'Mantenimiento Restaurante',
-  description: 'App interna de mantenimiento para restaurante'
+  description: 'App interna de mantenimiento para restaurante',
+  icons: { icon: '/branding/logo.png' }
 }
 
 export default async function RootLayout({

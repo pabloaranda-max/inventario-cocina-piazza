@@ -329,7 +329,7 @@ export async function crearActivoRapido(_state: FormState, formData: FormData): 
   const resolvedArea = zona.area ?? zona.nombre ?? area
   const { data, error } = await supabase
     .from('activos')
-    .insert({ nombre, clase, tipo, area: resolvedArea, zona_id, nivel_id: zona.nivel_id, x: null, y: null })
+    .insert({ nombre, clase, tipo, area: resolvedArea, zona_id })
     .select('id, nombre, area, clase, tipo')
     .single()
 

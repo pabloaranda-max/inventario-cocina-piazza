@@ -113,9 +113,6 @@ export async function crearInfraestructura(_state: FormState, formData: FormData
       criticidad: payload.criticidad,
       proveedor_id: payload.proveedor_id,
       zona_id: payload.zona_id,
-      nivel_id: zona.nivel_id,
-      x: null,
-      y: null,
       foto_url: fotoUrl,
       notas: payload.notas,
       fecha_ultima_revision: payload.fecha_ultima_revision,
@@ -144,7 +141,7 @@ export async function crearInfraestructura(_state: FormState, formData: FormData
   } = payload
   const { error: infraestructuraError } = await supabase
     .from('infraestructura')
-    .insert({ id: data.id, ...infraPayload, area: resolvedArea, nivel_id: zona.nivel_id, x: null, y: null, foto_url: fotoUrl })
+    .insert({ id: data.id, ...infraPayload, area: resolvedArea, foto_url: fotoUrl })
 
   if (infraestructuraError) {
     await removeStorageFiles(supabase, [fotoUrl])
@@ -241,7 +238,7 @@ export async function actualizarInfraestructura(
 
   const { error } = await supabase
     .from('infraestructura')
-    .update({ ...infraUpdatePayload, area: resolvedArea, nivel_id: zona.nivel_id, x: null, y: null })
+    .update({ ...infraUpdatePayload, area: resolvedArea, nivel_id: null, x: null, y: null })
     .eq('id', id)
 
   if (error) {

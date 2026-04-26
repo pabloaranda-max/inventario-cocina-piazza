@@ -38,7 +38,7 @@ export async function actualizarUbicacionActivo(
   const area = clearLocation ? null : zona?.area ?? zona?.nombre ?? null
   const locationPayload = clearLocation
     ? { nivel_id: null, x: null, y: null, zona_id: null }
-    : { nivel_id: zona!.nivel_id, x: null, y: null, zona_id: zonaId }
+    : { nivel_id: null, x: null, y: null, zona_id: zonaId }
   const areaPayload = { area }
 
   const { error } = await supabase
