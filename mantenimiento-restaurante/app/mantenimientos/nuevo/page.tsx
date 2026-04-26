@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { MantenimientoForm } from '../mantenimiento-form'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import type { Activo, MapaZona, Proveedor, TipoMantenimiento } from '@/lib/types'
+import type { Activo, MapaNivel, MapaZona, Proveedor, TipoMantenimiento } from '@/lib/types'
 
 const tiposMantenimiento: TipoMantenimiento[] = ['preventivo', 'correctivo', 'limpieza_profunda']
 
@@ -20,9 +20,10 @@ export default async function NuevoMantenimientoPage({
   const { equipo, infraestructura, activo, incidencia, zona, tipo } = await searchParams
   const supabase = await createServerSupabaseClient()
   const selectedTipo = tiposMantenimiento.includes(tipo as TipoMantenimiento) ? (tipo as TipoMantenimiento) : undefined
-  const [{ data: activos }, { data: zonas }, { data: proveedores }, { data: incidencias }] = await Promise.all([
+  const [{ data: activos }, { data: zonas }, { data: niveles }, { data: proveedores }, { data: incidencias }] = await Promise.all([
     supabase.from('activos').select('id,nombre,area,clase,tipo').order('nombre', { ascending: true }),
-    supabase.from('mapa_zonas').select('id,nombre,area,label').eq('visible', true).order('area', { ascending: true }),
+    supabase.from('mapa_zonas').select('id,nombre,area,label,nivel_id').eq('visible', true).order('orden', { ascending: true }),
+    supabase.from('mapa_niveles').select('id,nombre,orden').eq('visible', true).order('orden', { ascending: true }),
     supabase.from('proveedores').select('id,nombre,especialidad').order('nombre', { ascending: true }),
     supabase
       .from('incidencias')
@@ -42,7 +43,8 @@ export default async function NuevoMantenimientoPage({
       </div>
       <MantenimientoForm
         activos={(activos as Pick<Activo, 'id' | 'nombre' | 'area' | 'clase' | 'tipo'>[]) ?? []}
-        zonas={(zonas as Pick<MapaZona, 'id' | 'nombre' | 'area' | 'label'>[]) ?? []}
+        zonas={(zonas as Pick<MapaZona, 'id' | 'nombre' | 'area' | 'label' | 'nivel_id'>[]) ?? []}
+        niveles={(niveles as Pick<MapaNivel, 'id' | 'nombre' | 'orden'>[]) ?? []}
         proveedores={(proveedores as Pick<Proveedor, 'id' | 'nombre' | 'especialidad'>[]) ?? []}
         incidencias={(incidencias as unknown as Parameters<typeof MantenimientoForm>[0]['incidencias']) ?? []}
         selectedActivoId={activo ?? equipo ?? infraestructura}

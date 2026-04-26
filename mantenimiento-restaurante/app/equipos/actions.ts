@@ -9,14 +9,12 @@ import type { FormState } from '@/lib/form-state'
 import type { EstadoEquipo } from '@/lib/types'
 import {
   buildMultipleDefinedValue,
-  buildSingleDefinedValue,
   equipoCategorias
 } from '@/lib/defined-options'
 
 type EquipoPayload = {
   nombre: string
   zona_id: string
-  area: string | null
   categoria: string | null
   marca: string | null
   modelo: string | null
@@ -35,19 +33,11 @@ type EquipoPayload = {
   fecha_proxima_limpieza: string | null
 }
 
-function getEquipoPayload(formData: FormData, validAreas: string[]): EquipoPayload | FormState {
+function getEquipoPayload(formData: FormData): EquipoPayload | FormState {
   const nombre = String(formData.get('nombre') ?? '').trim()
   if (!nombre) return { error: 'El nombre es obligatorio.' }
   const zonaId = emptyToNull(formData.get('zona_id'))
   if (!zonaId) return { error: 'Selecciona una zona.' }
-
-  const area = buildSingleDefinedValue({
-    value: formData.get('area'),
-    other: formData.get('area_otro'),
-    options: validAreas,
-    fieldLabel: 'el área'
-  })
-  if (typeof area === 'object' && area && 'error' in area) return area
 
   const categoria = buildMultipleDefinedValue({
     values: formData.getAll('categoria'),
@@ -79,7 +69,6 @@ function getEquipoPayload(formData: FormData, validAreas: string[]): EquipoPaylo
   return {
     nombre,
     zona_id: zonaId,
-    area,
     categoria,
     marca: emptyToNull(formData.get('marca')),
     modelo: emptyToNull(formData.get('modelo')),
@@ -99,9 +88,7 @@ function getEquipoPayload(formData: FormData, validAreas: string[]): EquipoPaylo
 
 export async function crearEquipo(_state: FormState, formData: FormData): Promise<FormState> {
   const supabase = await createServerSupabaseClient()
-  const { data: areasData } = await supabase.from('areas').select('nombre')
-  const validAreas = (areasData ?? []).map((a) => a.nombre)
-  const payload = getEquipoPayload(formData, validAreas)
+  const payload = getEquipoPayload(formData)
   if (!('nombre' in payload)) return payload
 
   const { data: zona, error: zonaError } = await supabase
@@ -111,7 +98,7 @@ export async function crearEquipo(_state: FormState, formData: FormData): Promis
     .single()
 
   if (zonaError) return { error: zonaError.message }
-  const resolvedArea = zona.area ?? zona.nombre ?? payload.area
+  const resolvedArea = zona.area ?? zona.nombre ?? null
 
   const fotoUrl = await uploadOptionalFile(supabase, formData.get('foto'), 'equipos')
   const fotoPlacaUrl = await uploadOptionalFile(
@@ -128,6 +115,7 @@ export async function crearEquipo(_state: FormState, formData: FormData): Promis
       tipo: payload.categoria ?? 'Equipo',
       area: resolvedArea,
       zona_id: payload.zona_id,
+      nivel_id: zona.nivel_id,
       estado: payload.estado,
       criticidad: 'media',
       proveedor_id: payload.proveedor_id,
@@ -155,6 +143,7 @@ export async function crearEquipo(_state: FormState, formData: FormData): Promis
     limpieza_proveedor_id: _c,
     fecha_ultima_limpieza: _d,
     fecha_proxima_limpieza: _e,
+    zona_id: _zona,
     ...equipoPayload
   } = payload
   const { error: equipoError } = await supabase.from('equipos').insert({
@@ -199,9 +188,7 @@ export async function actualizarEquipo(
   formData: FormData
 ): Promise<FormState> {
   const supabase = await createServerSupabaseClient()
-  const { data: areasData } = await supabase.from('areas').select('nombre')
-  const validAreas = (areasData ?? []).map((a) => a.nombre)
-  const payload = getEquipoPayload(formData, validAreas)
+  const payload = getEquipoPayload(formData)
   if (!('nombre' in payload)) return payload
 
   const { data: zona, error: zonaError } = await supabase
@@ -211,7 +198,7 @@ export async function actualizarEquipo(
     .single()
 
   if (zonaError) return { error: zonaError.message }
-  const resolvedArea = zona.area ?? zona.nombre ?? payload.area
+  const resolvedArea = zona.area ?? zona.nombre ?? null
 
   const { data: currentEquipo, error: currentError } = await supabase
     .from('equipos')
@@ -237,6 +224,7 @@ export async function actualizarEquipo(
     limpieza_proveedor_id: _c,
     fecha_ultima_limpieza: _d,
     fecha_proxima_limpieza: _e,
+    zona_id: _zona,
     ...equipoUpdatePayload
   } = payload
   if (fotoUrl) equipoUpdatePayload.foto_url = fotoUrl
@@ -249,7 +237,7 @@ export async function actualizarEquipo(
       tipo: payload.categoria ?? 'Equipo',
       area: resolvedArea,
       zona_id: payload.zona_id,
-      nivel_id: null,
+      nivel_id: zona.nivel_id,
       x: null,
       y: null,
       estado: payload.estado,

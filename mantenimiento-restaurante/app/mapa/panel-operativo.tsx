@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { useActionState } from 'react'
 import { crearLimpiezaMapa } from './actions'
 import { crearActivoRapido } from '../incidencias/actions'
-import { equipoAreas } from '@/lib/defined-options'
 import { initialFormState } from '@/lib/form-state'
 import { formatDate, todayMX } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -291,13 +290,6 @@ function NuevoActivoModal({
               <input name="tipo" required placeholder="ej. Freidora" className="mt-0.5 w-full rounded-md border border-[color:var(--brand-border)] bg-white px-3 py-2 text-sm text-[color:var(--brand-ink)] placeholder-[color:var(--brand-muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--brand-olive)] dark:bg-slate-800 dark:text-white" />
             </label>
           </div>
-          <label className="block">
-            <span className="text-xs font-medium text-[color:var(--brand-muted)]">Área</span>
-            <select name="area" className="mt-0.5 w-full rounded-md border border-[color:var(--brand-border)] bg-white px-3 py-2 text-sm text-[color:var(--brand-ink)] focus:outline-none focus:ring-2 focus:ring-[color:var(--brand-olive)] dark:bg-slate-800 dark:text-white">
-              <option value="">Sin área</option>
-              {equipoAreas.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
-          </label>
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={onClose} className={mutedButtonClass}>Cancelar</button>
             <button type="submit" className={oliveButtonClass}>Crear activo</button>

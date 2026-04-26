@@ -309,7 +309,6 @@ export async function crearActivoRapido(_state: FormState, formData: FormData): 
   const nombre = String(formData.get('nombre') ?? '').trim()
   const clase = String(formData.get('clase') ?? '').trim()
   const tipo = String(formData.get('tipo') ?? '').trim()
-  const area = String(formData.get('area') ?? '').trim() || null
   const zona_id = String(formData.get('zona_id') ?? '').trim() || null
 
   if (!nombre) return { error: 'El nombre es obligatorio.' }
@@ -326,10 +325,10 @@ export async function crearActivoRapido(_state: FormState, formData: FormData): 
 
   if (zonaError) return { error: zonaError.message }
 
-  const resolvedArea = zona.area ?? zona.nombre ?? area
+  const resolvedArea = zona.area ?? zona.nombre ?? null
   const { data, error } = await supabase
     .from('activos')
-    .insert({ nombre, clase, tipo, area: resolvedArea, zona_id })
+    .insert({ nombre, clase, tipo, area: resolvedArea, zona_id, nivel_id: zona.nivel_id })
     .select('id, nombre, area, clase, tipo')
     .single()
 

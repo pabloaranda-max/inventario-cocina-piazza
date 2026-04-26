@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useActionState } from 'react'
-import type { Activo, EjecucionMantenimiento, Equipo, Infraestructura, Mantenimiento, MapaZona, Proveedor } from '@/lib/types'
+import type { Activo, EjecucionMantenimiento, Equipo, Infraestructura, Mantenimiento, MapaNivel, MapaZona, Proveedor } from '@/lib/types'
+import { ZonaSelect } from '@/components/ui/zona-select'
 import { actualizarMantenimiento, crearMantenimiento } from './actions'
 import { todayMX } from '@/lib/utils'
 import { FormError } from '@/components/ui/flash-message'
@@ -21,6 +22,7 @@ export function MantenimientoForm({
   mantenimiento,
   activos,
   zonas,
+  niveles,
   proveedores,
   incidencias,
   selectedActivoId,
@@ -30,7 +32,8 @@ export function MantenimientoForm({
 }: {
   mantenimiento?: Mantenimiento
   activos: Pick<Activo, 'id' | 'nombre' | 'area' | 'clase' | 'tipo'>[]
-  zonas: Pick<MapaZona, 'id' | 'nombre' | 'area' | 'label'>[]
+  zonas: Pick<MapaZona, 'id' | 'nombre' | 'area' | 'label' | 'nivel_id'>[]
+  niveles: Pick<MapaNivel, 'id' | 'nombre' | 'orden'>[]
   proveedores: Pick<Proveedor, 'id' | 'nombre' | 'especialidad'>[]
   incidencias: IncidenciaOption[]
   selectedActivoId?: string
@@ -86,19 +89,14 @@ export function MantenimientoForm({
 
         <label className="block md:col-span-2">
           <span className="brand-label">Zona del mapa</span>
-          <select
+          <ZonaSelect
             name="zona_id"
             defaultValue={mantenimiento?.zona_id ?? selectedZonaId ?? ''}
             className="brand-field mt-1"
-          >
-            <option value="">Sin zona específica</option>
-            {zonas.map((zona) => (
-              <option key={zona.id} value={zona.id}>
-                {zona.nombre || zona.label}
-                {zona.area ? ` · ${zona.area}` : ''}
-              </option>
-            ))}
-          </select>
+            placeholder="Sin zona específica"
+            zonas={zonas}
+            niveles={niveles}
+          />
           <span className="brand-hint mt-1 block">
             Si seleccionas un activo con zona, se usará la zona del activo.
           </span>

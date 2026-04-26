@@ -42,7 +42,7 @@ export default async function ActivoDetallePage({
 
   const { data: activoData } = await supabase
     .from('activos')
-    .select('*, proveedor:proveedores(*), nivel:mapa_niveles(id,nombre), zona:mapa_zonas(id,nombre,area), limpieza_proveedor:proveedores!limpieza_proveedor_id(nombre)')
+    .select('*, proveedor:proveedores!proveedor_id(*), nivel:mapa_niveles(id,nombre), zona:mapa_zonas(id,nombre,area), limpieza_proveedor:proveedores!limpieza_proveedor_id(nombre)')
     .eq('id', id)
     .single()
 
@@ -136,16 +136,9 @@ export default async function ActivoDetallePage({
           >
             Asignar zona
           </Link>
-          {activo.clase === 'equipo' ? (
-            <Link href={`/equipos/${activo.id}/editar`} className="brand-button rounded-md px-4 py-2 text-sm font-medium">
-              Editar
-            </Link>
-          ) : null}
-          {activo.clase === 'infraestructura' ? (
-            <Link href={`/infraestructura/${activo.id}/editar`} className="brand-button rounded-md px-4 py-2 text-sm font-medium">
-              Editar
-            </Link>
-          ) : null}
+          <Link href={`/activos/${activo.id}/editar`} className="brand-button rounded-md px-4 py-2 text-sm font-medium">
+            Editar
+          </Link>
         </div>
       </div>
 

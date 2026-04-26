@@ -6,7 +6,7 @@ import { AsignarPanel } from '../asignar-panel'
 import { EstadoFlowPanel } from '../estado-flow-panel'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createSignedUrl } from '@/lib/storage'
-import type { Activo, Cotizacion, Incidencia, Mantenimiento, MapaZona } from '@/lib/types'
+import type { Activo, Cotizacion, Incidencia, Mantenimiento, MapaNivel, MapaZona } from '@/lib/types'
 import { formatDate, formatDateTime, formatCurrency, isAdminEmail } from '@/lib/utils'
 import { ConfirmDeleteButton } from '@/components/ui/confirm-delete-button'
 import { FlashMessage } from '@/components/ui/flash-message'
@@ -49,12 +49,13 @@ export default async function IncidenciaDetallePage({
   const incidencia = data as Incidencia
   const pendienteAsignacion = incidencia.estado === 'pendiente_asignacion'
 
-  const [activosData, zonasData] = pendienteAsignacion
+  const [activosData, zonasData, nivelesData] = pendienteAsignacion
     ? await Promise.all([
         supabase.from('activos').select('id,nombre,area,clase,tipo').order('nombre', { ascending: true }),
-        supabase.from('mapa_zonas').select('id,nombre,area,label').eq('visible', true).order('area', { ascending: true })
+        supabase.from('mapa_zonas').select('id,nombre,area,label,nivel_id').eq('visible', true).order('orden', { ascending: true }),
+        supabase.from('mapa_niveles').select('id,nombre,orden').eq('visible', true).order('orden', { ascending: true })
       ])
-    : [{ data: null }, { data: null }]
+    : [{ data: null }, { data: null }, { data: null }]
 
   const foto = await createSignedUrl(supabase, incidencia.foto_url)
   const destinoNombre =
@@ -84,7 +85,8 @@ export default async function IncidenciaDetallePage({
             <AsignarPanel
               incidenciaId={incidencia.id}
               activos={(activosData.data ?? []) as Pick<Activo, 'id' | 'nombre' | 'area' | 'clase' | 'tipo'>[]}
-              zonas={(zonasData.data ?? []) as Pick<MapaZona, 'id' | 'nombre' | 'area' | 'label'>[]}
+              zonas={(zonasData.data ?? []) as Pick<MapaZona, 'id' | 'nombre' | 'area' | 'label' | 'nivel_id'>[]}
+              niveles={(nivelesData.data ?? []) as Pick<MapaNivel, 'id' | 'nombre' | 'orden'>[]}
             />
           </div>
         </section>

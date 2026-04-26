@@ -1,24 +1,27 @@
 'use client'
 
 import { useActionState, useState } from 'react'
-import type { Activo, ClaseActivo, MapaZona } from '@/lib/types'
+import type { Activo, ClaseActivo, MapaNivel, MapaZona } from '@/lib/types'
+import { ZonaSelect } from '@/components/ui/zona-select'
 import { asignarIncidencia, crearActivoRapido } from './actions'
 import { initialFormState } from '@/lib/form-state'
-import { equipoAreas } from '@/lib/defined-options'
 
 const clases = ['equipo', 'infraestructura', 'mobiliario', 'edificacion', 'sistema']
 
 type ActivoItem = { id: string; nombre: string; area: string | null; clase: ClaseActivo; tipo: string }
-type ZonaItem = Pick<MapaZona, 'id' | 'nombre' | 'area' | 'label'>
+type ZonaItem = Pick<MapaZona, 'id' | 'nombre' | 'area' | 'label' | 'nivel_id'>
+type NivelItem = Pick<MapaNivel, 'id' | 'nombre' | 'orden'>
 
 export function AsignarPanel({
   incidenciaId,
   activos: activosInit,
   zonas,
+  niveles,
 }: {
   incidenciaId: string
   activos: ActivoItem[]
   zonas: ZonaItem[]
+  niveles: NivelItem[]
 }) {
   const [activos, setActivos] = useState<ActivoItem[]>(activosInit)
   const [selectedActivoId, setSelectedActivoId] = useState('')
@@ -73,19 +76,15 @@ export function AsignarPanel({
 
           <div>
             <label className="block text-sm font-medium text-orange-800 dark:text-orange-300">Zona del mapa</label>
-            <select
+            <ZonaSelect
               name="zona_id"
               value={selectedZonaId}
               onChange={(e) => { setSelectedZonaId(e.target.value); if (e.target.value) setZonaTexto('') }}
               className="mt-1 w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm dark:bg-slate-800 dark:border-slate-600 dark:text-white"
-            >
-              <option value="">Sin zona del mapa</option>
-              {zonas.map((z) => (
-                <option key={z.id} value={z.id}>
-                  {z.nombre || z.label}{z.area ? ` · ${z.area}` : ''}
-                </option>
-              ))}
-            </select>
+              placeholder="Sin zona del mapa"
+              zonas={zonas}
+              niveles={niveles}
+            />
             {!selectedZonaId && (
               <input
                 type="text"
@@ -142,16 +141,6 @@ export function AsignarPanel({
                 placeholder="ej. Freidora, Mesa, Bomba"
                 className="mt-0.5 w-full rounded-md border border-orange-200 bg-white px-3 py-1.5 text-sm dark:bg-slate-800 dark:border-slate-600 dark:text-white"
               />
-            </label>
-            <label className="block">
-              <span className="text-xs font-medium text-orange-700 dark:text-orange-400">Área</span>
-              <select
-                name="area"
-                className="mt-0.5 w-full rounded-md border border-orange-200 bg-white px-3 py-1.5 text-sm dark:bg-slate-800 dark:border-slate-600 dark:text-white"
-              >
-                <option value="">Sin área</option>
-                {equipoAreas.map((a) => <option key={a} value={a}>{a}</option>)}
-              </select>
             </label>
           </div>
           <p className="text-xs text-orange-700 dark:text-orange-400">

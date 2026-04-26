@@ -142,14 +142,9 @@ export default async function ActivosPage({
                   >
                     Ubicar
                   </Link>
-                  {activo.clase === 'equipo' || activo.clase === 'infraestructura' ? (
-                    <Link
-                      href={activo.clase === 'equipo' ? `/equipos/${activo.id}/editar` : `/infraestructura/${activo.id}/editar`}
-                      className="brand-button-muted"
-                    >
-                      Editar
-                    </Link>
-                  ) : null}
+                  <Link href={`/activos/${activo.id}/editar`} className="brand-button-muted">
+                    Editar
+                  </Link>
                 </div>
               </div>
             </article>
