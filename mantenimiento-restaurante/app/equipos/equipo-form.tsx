@@ -1,7 +1,6 @@
 'use client'
 
-import { useFormState } from 'react-dom'
-import { useTransition, useState } from 'react'
+import { useTransition, useState, useActionState } from 'react'
 import type { Activo, Equipo, MapaZona, Proveedor } from '@/lib/types'
 import { crearEquipo, actualizarEquipo } from './actions'
 import { extraerDatosPlaca } from './actions-ocr'
@@ -38,7 +37,7 @@ export function EquipoForm({
   activo?: Pick<Activo, 'limpieza_intervalo_dias' | 'limpieza_tipo' | 'limpieza_proveedor_id' | 'fecha_ultima_limpieza' | 'fecha_proxima_limpieza' | 'zona_id'>
 }) {
   const action = equipo ? actualizarEquipo.bind(null, equipo.id) : crearEquipo
-  const [state, formAction] = useFormState(action, initialFormState)
+  const [state, formAction] = useActionState(action, initialFormState)
 
   const [isPending, startTransition] = useTransition()
   const [marca, setMarca] = useState(equipo?.marca ?? '')
@@ -71,7 +70,7 @@ export function EquipoForm({
   }
 
   return (
-    <form action={formAction} encType="multipart/form-data" className="brand-shell space-y-5 rounded-lg p-5">
+    <form action={formAction} className="brand-shell space-y-5 rounded-lg p-5">
       <FormError message={state.error} />
 
       <div className="grid gap-4 md:grid-cols-2">

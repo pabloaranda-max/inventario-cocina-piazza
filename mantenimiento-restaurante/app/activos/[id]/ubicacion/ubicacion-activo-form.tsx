@@ -2,8 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
-import { useFormState } from 'react-dom'
+import { useMemo, useState, useActionState } from 'react'
 import { actualizarUbicacionActivo } from '../../actions'
 import { initialFormState } from '@/lib/form-state'
 import { FormError } from '@/components/ui/flash-message'
@@ -24,7 +23,7 @@ export function UbicacionActivoForm({
   const [nivelId, setNivelId] = useState(defaultNivelId)
   const [zonaId, setZonaId] = useState(activo.zona_id ?? '')
   const action = actualizarUbicacionActivo.bind(null, activo.id)
-  const [state, formAction] = useFormState(action, initialFormState)
+  const [state, formAction] = useActionState(action, initialFormState)
 
   const selectedNivel = niveles.find((nivel) => nivel.id === nivelId) ?? niveles[0]
   const zonasNivel = useMemo(

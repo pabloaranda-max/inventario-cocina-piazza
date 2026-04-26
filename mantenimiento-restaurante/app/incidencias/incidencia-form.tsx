@@ -1,6 +1,6 @@
 'use client'
 
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import type { Activo, Incidencia, MapaZona } from '@/lib/types'
 import { actualizarIncidencia, crearIncidencia } from './actions'
 import { toDateInputMX } from '@/lib/utils'
@@ -16,10 +16,10 @@ const prioridades = [
 ]
 
 export function ReporteRapidoForm() {
-  const [state, formAction] = useFormState(crearIncidencia, initialFormState)
+  const [state, formAction] = useActionState(crearIncidencia, initialFormState)
 
   return (
-    <form action={formAction} encType="multipart/form-data" className="brand-shell space-y-5 rounded-lg p-5">
+    <form action={formAction} className="brand-shell space-y-5 rounded-lg p-5">
       <FormError message={state.error} />
 
       <label className="block">
@@ -91,13 +91,13 @@ export function IncidenciaForm({
   selectedZonaId?: string
   incidencia: Incidencia
 }) {
-  const [state, formAction] = useFormState(
+  const [state, formAction] = useActionState(
     actualizarIncidencia.bind(null, incidencia.id),
     initialFormState
   )
 
   return (
-    <form action={formAction} encType="multipart/form-data" className="brand-shell space-y-5 rounded-lg p-5">
+    <form action={formAction} className="brand-shell space-y-5 rounded-lg p-5">
       <FormError message={state.error} />
 
       <label className="block">

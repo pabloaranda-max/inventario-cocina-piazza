@@ -1,7 +1,6 @@
 'use client'
 
-import { useFormState } from 'react-dom'
-import { useState } from 'react'
+import { useState, useActionState } from 'react'
 import { actualizarInfraestructura, crearInfraestructura } from './actions'
 import { FormError } from '@/components/ui/flash-message'
 import { ImageInput } from '@/components/ui/image-input'
@@ -45,7 +44,7 @@ export function InfraestructuraForm({
   activo?: Pick<Activo, 'limpieza_intervalo_dias' | 'limpieza_tipo' | 'limpieza_proveedor_id' | 'fecha_ultima_limpieza' | 'fecha_proxima_limpieza' | 'zona_id'>
 }) {
   const action = infraestructura ? actualizarInfraestructura.bind(null, infraestructura.id) : crearInfraestructura
-  const [state, formAction] = useFormState(action, initialFormState)
+  const [state, formAction] = useActionState(action, initialFormState)
   const [limpiezaEnabled, setLimpiezaEnabled] = useState(Boolean(activo?.limpieza_intervalo_dias))
   const [limpiezaIntervalo, setLimpiezaIntervalo] = useState(activo?.limpieza_intervalo_dias?.toString() ?? '')
   const [limpiezaTipo, setLimpiezaTipo] = useState<'interno' | 'contratado'>(activo?.limpieza_tipo ?? 'interno')
@@ -55,7 +54,7 @@ export function InfraestructuraForm({
   )
 
   return (
-    <form action={formAction} encType="multipart/form-data" className="brand-shell space-y-5 rounded-lg p-5">
+    <form action={formAction} className="brand-shell space-y-5 rounded-lg p-5">
       <FormError message={state.error} />
 
       <div className="grid gap-4 md:grid-cols-2">

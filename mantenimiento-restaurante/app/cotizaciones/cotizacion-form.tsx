@@ -1,6 +1,6 @@
 'use client'
 
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import type { Activo, Cotizacion, Incidencia, Mantenimiento, Proveedor } from '@/lib/types'
 import { crearCotizacion, actualizarCotizacion } from './actions'
 import { FormError } from '@/components/ui/flash-message'
@@ -30,14 +30,14 @@ export function CotizacionForm({
   defaultProveedorId?: string
 }) {
   const action = cotizacion ? actualizarCotizacion.bind(null, cotizacion.id) : crearCotizacion
-  const [state, formAction] = useFormState(action, initialFormState)
+  const [state, formAction] = useActionState(action, initialFormState)
 
   const today = todayMX()
 
   return (
     <form
       action={formAction}
-      encType="multipart/form-data"
+
       className="brand-shell space-y-5 rounded-lg p-5"
     >
       <FormError message={state.error} />

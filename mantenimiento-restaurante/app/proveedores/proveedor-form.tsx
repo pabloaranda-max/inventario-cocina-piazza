@@ -1,6 +1,6 @@
 'use client'
 
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import type { Proveedor } from '@/lib/types'
 import { actualizarProveedor, crearProveedor } from './actions'
 import { FormError } from '@/components/ui/flash-message'
@@ -10,7 +10,7 @@ import { initialFormState } from '@/lib/form-state'
 
 export function ProveedorForm({ proveedor }: { proveedor?: Proveedor }) {
   const action = proveedor ? actualizarProveedor.bind(null, proveedor.id) : crearProveedor
-  const [state, formAction] = useFormState(action, initialFormState)
+  const [state, formAction] = useActionState(action, initialFormState)
 
   return (
     <form action={formAction} className="brand-shell space-y-5 rounded-lg p-5">

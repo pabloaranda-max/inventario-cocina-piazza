@@ -83,7 +83,7 @@ export function EstadoFlowPanel({
           }
           onClose={() => setShowResolver(false)}
         >
-          <form action={cambiarEstadoAction} encType="multipart/form-data" className="space-y-4">
+          <form action={cambiarEstadoAction} className="space-y-4">
             <input type="hidden" name="estado" value="resuelta" />
             <input type="hidden" name="redirect_to" value={resolvedRedirectTo} />
             <ImageInput

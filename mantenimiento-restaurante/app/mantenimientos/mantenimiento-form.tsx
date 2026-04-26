@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import { useFormState } from 'react-dom'
+import { useState, useActionState } from 'react'
 import type { Activo, EjecucionMantenimiento, Equipo, Infraestructura, Mantenimiento, MapaZona, Proveedor } from '@/lib/types'
 import { actualizarMantenimiento, crearMantenimiento } from './actions'
 import { todayMX } from '@/lib/utils'
@@ -40,7 +39,7 @@ export function MantenimientoForm({
   selectedTipo?: Mantenimiento['tipo']
 }) {
   const action = mantenimiento ? actualizarMantenimiento.bind(null, mantenimiento.id) : crearMantenimiento
-  const [state, formAction] = useFormState(action, initialFormState)
+  const [state, formAction] = useActionState(action, initialFormState)
   const initialEjecucion: EjecucionMantenimiento = mantenimiento?.ejecucion_tipo ?? (mantenimiento?.proveedor_id ? 'externo' : 'interno')
   const [ejecucionTipo, setEjecucionTipo] = useState<EjecucionMantenimiento>(initialEjecucion)
   const [requiereMaterial, setRequiereMaterial] = useState(Boolean(mantenimiento?.requiere_material))
@@ -48,7 +47,7 @@ export function MantenimientoForm({
   const showCosto = isExterno || requiereMaterial
 
   return (
-    <form action={formAction} encType="multipart/form-data" className="brand-shell space-y-5 rounded-lg p-5">
+    <form action={formAction} className="brand-shell space-y-5 rounded-lg p-5">
       <FormError message={state.error} />
 
       <div className="grid gap-4 md:grid-cols-2">
