@@ -42,7 +42,7 @@ export default async function ActivoDetallePage({
 
   const { data: activoData } = await supabase
     .from('activos')
-    .select('*, proveedor:proveedores!proveedor_id(*), nivel:mapa_niveles(id,nombre), zona:mapa_zonas(id,nombre,area), limpieza_proveedor:proveedores!limpieza_proveedor_id(nombre), equipo:equipos(id), infraestructura:infraestructura(id)')
+    .select('*, proveedor:proveedores!proveedor_id(*), nivel:mapa_niveles(id,nombre), zona:mapa_zonas(id,nombre,area), limpieza_proveedor:proveedores!limpieza_proveedor_id(nombre)')
     .eq('id', id)
     .single()
 
@@ -51,11 +51,17 @@ export default async function ActivoDetallePage({
   const activo = activoData as Activo & {
     zona?: { id: string; nombre: string | null; area: string | null } | null
     limpieza_proveedor?: { nombre: string } | null
-    equipo?: { id: string }[] | { id: string } | null
-    infraestructura?: { id: string }[] | { id: string } | null
   }
-  const hasEquipo = Array.isArray(activo.equipo) ? activo.equipo.length > 0 : Boolean(activo.equipo)
-  const hasInfraestructura = Array.isArray(activo.infraestructura) ? activo.infraestructura.length > 0 : Boolean(activo.infraestructura)
+  const [{ data: equipo }, { data: infraestructura }] = await Promise.all([
+    activo.clase === 'equipo'
+      ? supabase.from('equipos').select('id').eq('id', id).single()
+      : Promise.resolve({ data: null }),
+    activo.clase === 'infraestructura'
+      ? supabase.from('infraestructura').select('id').eq('id', id).single()
+      : Promise.resolve({ data: null })
+  ])
+  const hasEquipo = Boolean(equipo)
+  const hasInfraestructura = Boolean(infraestructura)
   const provisional =
     (activo.clase === 'equipo' && !hasEquipo) ||
     (activo.clase === 'infraestructura' && !hasInfraestructura)
