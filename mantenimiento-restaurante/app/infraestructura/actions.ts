@@ -137,6 +137,7 @@ export async function crearInfraestructura(_state: FormState, formData: FormData
     limpieza_proveedor_id: _c,
     fecha_ultima_limpieza: _d,
     fecha_proxima_limpieza: _e,
+    zona_id: _f,
     ...infraPayload
   } = payload
   const { error: infraestructuraError } = await supabase
@@ -202,6 +203,7 @@ export async function actualizarInfraestructura(
     limpieza_proveedor_id: _c,
     fecha_ultima_limpieza: _d,
     fecha_proxima_limpieza: _e,
+    zona_id: _f,
     ...infraUpdatePayload
   } = payload
   if (fotoUrl) infraUpdatePayload.foto_url = fotoUrl
@@ -216,7 +218,7 @@ export async function actualizarInfraestructura(
       criticidad: payload.criticidad,
       proveedor_id: payload.proveedor_id,
       zona_id: payload.zona_id,
-      nivel_id: zona.nivel_id,
+      nivel_id: null,
       x: null,
       y: null,
       ...(fotoUrl ? { foto_url: fotoUrl } : {}),

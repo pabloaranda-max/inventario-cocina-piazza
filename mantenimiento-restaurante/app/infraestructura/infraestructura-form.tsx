@@ -6,7 +6,7 @@ import { FormError } from '@/components/ui/flash-message'
 import { ImageInput } from '@/components/ui/image-input'
 import { infraestructuraTipos, limpiezaIntervalos } from '@/lib/defined-options'
 import { initialFormState } from '@/lib/form-state'
-import type { Activo, Infraestructura, MapaZona, Proveedor } from '@/lib/types'
+import type { Activo, Infraestructura, MapaNivel, MapaZona, Proveedor } from '@/lib/types'
 import { addDaysToDateInput } from '@/lib/utils'
 
 const estados = [
@@ -33,14 +33,14 @@ function computeNextCleaningDate(lastDate: string, intervalDays: string) {
 export function InfraestructuraForm({
   infraestructura,
   proveedores,
-  areas,
   zonas,
+  niveles,
   activo
 }: {
   infraestructura?: Infraestructura
   proveedores: Proveedor[]
-  areas: string[]
-  zonas: Pick<MapaZona, 'id' | 'nombre' | 'label' | 'area'>[]
+  zonas: Pick<MapaZona, 'id' | 'nombre' | 'label' | 'area' | 'nivel_id'>[]
+  niveles: Pick<MapaNivel, 'id' | 'nombre' | 'orden'>[]
   activo?: Pick<Activo, 'limpieza_intervalo_dias' | 'limpieza_tipo' | 'limpieza_proveedor_id' | 'fecha_ultima_limpieza' | 'fecha_proxima_limpieza' | 'zona_id'>
 }) {
   const action = infraestructura ? actualizarInfraestructura.bind(null, infraestructura.id) : crearInfraestructura
@@ -63,13 +63,22 @@ export function InfraestructuraForm({
           <span className="brand-label">Zona</span>
           <select name="zona_id" defaultValue={activo?.zona_id ?? ''} required className="brand-field mt-1">
             <option value="">Selecciona una zona</option>
-            {zonas.map((zona) => (
-              <option key={zona.id} value={zona.id}>
-                {(zona.nombre || zona.label) ?? 'Zona'}{zona.area ? ` · ${zona.area}` : ''}
-              </option>
-            ))}
+            {niveles
+              .sort((a, b) => a.orden - b.orden)
+              .map((nivel) => {
+                const zonasNivel = zonas.filter((z) => z.nivel_id === nivel.id)
+                if (!zonasNivel.length) return null
+                return (
+                  <optgroup key={nivel.id} label={nivel.nombre}>
+                    {zonasNivel.map((zona) => (
+                      <option key={zona.id} value={zona.id}>
+                        {zona.nombre || zona.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                )
+              })}
           </select>
-          <p className="brand-hint mt-1">La infraestructura se asigna por zona; no se captura punto exacto.</p>
         </label>
 
         <label className="block">
@@ -84,21 +93,6 @@ export function InfraestructuraForm({
           <datalist id="infraestructura-tipos">
             {infraestructuraTipos.map((tipo) => (
               <option key={tipo} value={tipo} />
-            ))}
-          </datalist>
-        </label>
-
-        <label className="block">
-          <span className="brand-label">Área</span>
-          <input
-            name="area"
-            list="infraestructura-areas"
-            defaultValue={infraestructura?.area ?? ''}
-            className="brand-field mt-1"
-          />
-          <datalist id="infraestructura-areas">
-            {areas.map((area) => (
-              <option key={area} value={area} />
             ))}
           </datalist>
         </label>
