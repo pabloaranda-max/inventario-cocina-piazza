@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { InfraestructuraForm } from '../../infraestructura-form'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Activo, Infraestructura, MapaNivel, MapaZona, Proveedor } from '@/lib/types'
@@ -15,7 +15,11 @@ export default async function EditarInfraestructuraPage({ params }: { params: Pr
     supabase.from('mapa_niveles').select('id,nombre,orden').eq('visible', true).order('orden', { ascending: true })
   ])
 
-  if (!infraestructura) notFound()
+  if (!infraestructura) {
+    const { data: activoBase } = await supabase.from('activos').select('id').eq('id', id).single()
+    if (activoBase) redirect(`/activos/${id}/editar`)
+    notFound()
+  }
 
   return (
     <div className="space-y-5">

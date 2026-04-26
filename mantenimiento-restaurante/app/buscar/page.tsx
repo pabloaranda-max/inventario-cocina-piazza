@@ -376,8 +376,6 @@ function firstRelation<T>(value: T | T[] | null | undefined) {
 }
 
 function getActivoHref(activo: SearchActivo) {
-  if (activo.clase === 'equipo') return `/equipos/${activo.id}`
-  if (activo.clase === 'infraestructura') return `/infraestructura/${activo.id}`
   return `/activos/${activo.id}`
 }
 

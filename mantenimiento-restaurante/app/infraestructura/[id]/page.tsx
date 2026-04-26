@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createSignedUrl } from '@/lib/storage'
 import type { Activo, Incidencia, Infraestructura, Mantenimiento } from '@/lib/types'
@@ -43,7 +43,11 @@ export default async function InfraestructuraDetallePage({
       .single()
   ])
 
-  if (!data) notFound()
+  if (!data) {
+    const { data: activo } = await supabase.from('activos').select('id').eq('id', id).single()
+    if (activo) redirect(`/activos/${id}`)
+    notFound()
+  }
 
   const infraestructura = data as Infraestructura
   const limpiezaData = activo as (Pick<Activo, 'limpieza_intervalo_dias' | 'limpieza_tipo' | 'limpieza_proveedor_id' | 'fecha_ultima_limpieza' | 'fecha_proxima_limpieza'> & { limpieza_proveedor?: { nombre: string } | null }) | null

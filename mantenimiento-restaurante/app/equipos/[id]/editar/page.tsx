@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { EquipoForm } from '../../equipo-form'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Activo, Equipo, MapaNivel, MapaZona, Proveedor } from '@/lib/types'
@@ -15,7 +15,11 @@ export default async function EditarEquipoPage({ params }: { params: Promise<{ i
     supabase.from('mapa_niveles').select('id,nombre,orden').eq('visible', true).order('orden', { ascending: true })
   ])
 
-  if (!equipo) notFound()
+  if (!equipo) {
+    const { data: activoBase } = await supabase.from('activos').select('id').eq('id', id).single()
+    if (activoBase) redirect(`/activos/${id}/editar`)
+    notFound()
+  }
 
   return (
     <div className="space-y-5">
