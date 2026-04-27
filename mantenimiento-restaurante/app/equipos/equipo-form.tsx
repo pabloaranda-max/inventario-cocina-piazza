@@ -1,9 +1,8 @@
 'use client'
 
-import { useTransition, useState, useActionState } from 'react'
+import { useState, useActionState } from 'react'
 import type { Activo, Equipo, MapaNivel, MapaZona, Proveedor } from '@/lib/types'
 import { crearEquipo, actualizarEquipo } from './actions'
-import { extraerDatosPlaca } from './actions-ocr'
 import { FormError } from '@/components/ui/flash-message'
 import { MultipleDefinedCheckboxes } from '@/components/ui/defined-fields'
 import { ZonaSelect } from '@/components/ui/zona-select'
@@ -40,7 +39,6 @@ export function EquipoForm({
   const action = equipo ? actualizarEquipo.bind(null, equipo.id) : crearEquipo
   const [state, formAction] = useActionState(action, initialFormState)
 
-  const [isPending, startTransition] = useTransition()
   const [marca, setMarca] = useState(equipo?.marca ?? '')
   const [modelo, setModelo] = useState(equipo?.modelo ?? '')
   const [numeroSerie, setNumeroSerie] = useState(equipo?.numero_serie ?? '')
@@ -52,23 +50,6 @@ export function EquipoForm({
   const [fechaProximaLimpieza, setFechaProximaLimpieza] = useState(
     activo?.fecha_proxima_limpieza ?? computeNextCleaningDate(activo?.fecha_ultima_limpieza ?? '', activo?.limpieza_intervalo_dias?.toString() ?? '')
   )
-
-  function handlePlacaSelected(file: File) {
-    startTransition(async () => {
-      const fd = new FormData()
-      fd.append('imagen', file)
-      const datos = await extraerDatosPlaca(fd)
-      if (datos.marca) setMarca(datos.marca)
-      if (datos.modelo) setModelo(datos.modelo)
-      if (datos.numero_serie) setNumeroSerie(datos.numero_serie)
-      if (datos.specs) {
-        setNotas((prev) => {
-          const prefix = datos.specs!
-          return prev ? `${prefix}\n${prev}` : prefix
-        })
-      }
-    })
-  }
 
   return (
     <form action={formAction} className="brand-shell space-y-5 rounded-lg p-5">
@@ -177,22 +158,7 @@ export function EquipoForm({
 
         <ImageInput name="foto" label="Foto general" />
 
-        <div className="relative">
-          <ImageInput
-            name="foto_placa"
-            label="Foto de placa"
-            onFileSelected={handlePlacaSelected}
-          />
-          {isPending && (
-            <p className="brand-hint mt-1.5 flex items-center gap-1.5">
-              <svg className="h-3 w-3 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Extrayendo datos de la placa...
-            </p>
-          )}
-        </div>
+        <ImageInput name="foto_placa" label="Foto de placa" />
       </div>
 
       <label className="block">
@@ -308,7 +274,7 @@ export function EquipoForm({
 
       <button
         type="submit"
-        disabled={isPending}
+  
         className="brand-button rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
       >
         {equipo ? 'Guardar cambios' : 'Crear equipo'}
