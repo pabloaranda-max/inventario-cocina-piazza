@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { EquipoForm } from '../../equipo-form'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createSignedUrl } from '@/lib/storage'
 import type { Activo, Equipo, MapaNivel, MapaZona, Proveedor } from '@/lib/types'
 
 export default async function EditarEquipoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -21,6 +22,12 @@ export default async function EditarEquipoPage({ params }: { params: Promise<{ i
     notFound()
   }
 
+  const typedEquipo = equipo as Equipo
+  const [fotoUrl, fotoPlacaUrl] = await Promise.all([
+    createSignedUrl(supabase, typedEquipo.foto_url),
+    createSignedUrl(supabase, typedEquipo.foto_placa_url)
+  ])
+
   return (
     <div className="space-y-5">
       <div>
@@ -30,7 +37,9 @@ export default async function EditarEquipoPage({ params }: { params: Promise<{ i
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[color:var(--brand-ink)]">Editar equipo</h1>
       </div>
       <EquipoForm
-        equipo={equipo as Equipo}
+        equipo={typedEquipo}
+        fotoUrl={fotoUrl}
+        fotoPlacaUrl={fotoPlacaUrl}
         proveedores={(proveedores as Proveedor[]) ?? []}
         zonas={(zonas as Pick<MapaZona, 'id' | 'nombre' | 'label' | 'area' | 'nivel_id'>[]) ?? []}
         niveles={(niveles as Pick<MapaNivel, 'id' | 'nombre' | 'orden'>[]) ?? []}

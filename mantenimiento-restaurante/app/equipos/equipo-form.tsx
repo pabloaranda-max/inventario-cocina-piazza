@@ -25,12 +25,16 @@ function computeNextCleaningDate(lastDate: string, intervalDays: string) {
 
 export function EquipoForm({
   equipo,
+  fotoUrl,
+  fotoPlacaUrl,
   proveedores,
   zonas,
   niveles,
   activo
 }: {
   equipo?: Equipo
+  fotoUrl?: string | null
+  fotoPlacaUrl?: string | null
   proveedores: Proveedor[]
   zonas: Pick<MapaZona, 'id' | 'nombre' | 'label' | 'area' | 'nivel_id'>[]
   niveles: Pick<MapaNivel, 'id' | 'nombre' | 'orden'>[]
@@ -156,9 +160,19 @@ export function EquipoForm({
           defaultValue={equipo?.fecha_proximo_mantenimiento}
         />
 
-        <ImageInput name="foto" label="Foto general" />
+        <div>
+          <ImageInput name="foto" label={fotoUrl ? 'Reemplazar foto general' : 'Foto general'} />
+          {fotoUrl && (
+            <img src={fotoUrl} alt="Foto actual" className="mt-2 h-32 w-full rounded-md object-cover" />
+          )}
+        </div>
 
-        <ImageInput name="foto_placa" label="Foto de placa" />
+        <div>
+          <ImageInput name="foto_placa" label={fotoPlacaUrl ? 'Reemplazar foto de placa' : 'Foto de placa'} />
+          {fotoPlacaUrl && (
+            <img src={fotoPlacaUrl} alt="Placa actual" className="mt-2 h-32 w-full rounded-md object-cover" />
+          )}
+        </div>
       </div>
 
       <label className="block">
@@ -274,8 +288,7 @@ export function EquipoForm({
 
       <button
         type="submit"
-  
-        className="brand-button rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
+        className="brand-button rounded-md px-4 py-2 text-sm font-medium"
       >
         {equipo ? 'Guardar cambios' : 'Crear equipo'}
       </button>
