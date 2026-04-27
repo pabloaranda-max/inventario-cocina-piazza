@@ -100,12 +100,14 @@ export async function crearEquipo(_state: FormState, formData: FormData): Promis
   if (zonaError) return { error: zonaError.message }
   const resolvedArea = zona.area ?? zona.nombre ?? null
 
-  const fotoUrl = await uploadOptionalFile(supabase, formData.get('foto'), 'equipos')
-  const fotoPlacaUrl = await uploadOptionalFile(
-    supabase,
-    formData.get('foto_placa'),
-    'equipos/placas'
-  )
+  let fotoUrl: string | null = null
+  let fotoPlacaUrl: string | null = null
+  try {
+    fotoUrl = await uploadOptionalFile(supabase, formData.get('foto'), 'equipos')
+    fotoPlacaUrl = await uploadOptionalFile(supabase, formData.get('foto_placa'), 'equipos/placas')
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'No se pudieron subir las fotos.' }
+  }
 
   const { data, error } = await supabase
     .from('activos')
