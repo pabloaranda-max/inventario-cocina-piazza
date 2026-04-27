@@ -341,6 +341,44 @@ export async function crearActivoRapido(_state: FormState, formData: FormData): 
 }
 
 
+export async function agregarSeguimiento(
+  id: string,
+  _state: FormState,
+  formData: FormData
+): Promise<FormState> {
+  const texto = String(formData.get('texto') ?? '').trim()
+  if (!texto) return { error: 'El seguimiento no puede estar vacío.' }
+
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user }
+  } = await supabase.auth.getUser()
+
+  const { data: incidencia } = await supabase
+    .from('incidencias')
+    .select('estado')
+    .eq('id', id)
+    .single()
+
+  if (incidencia?.estado !== 'en_progreso') {
+    return { error: 'Solo se puede registrar seguimiento cuando la incidencia está en progreso.' }
+  }
+
+  const registrado_por =
+    emptyToNull(formData.get('registrado_por')) ?? user?.email ?? null
+
+  const { error } = await supabase.from('incidencia_seguimientos').insert({
+    incidencia_id: id,
+    texto,
+    registrado_por
+  })
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/incidencias/${id}`)
+  return {}
+}
+
 export async function eliminarIncidencia(id: string) {
   const supabase = await createServerSupabaseClient()
   const { data, error: fetchError } = await supabase

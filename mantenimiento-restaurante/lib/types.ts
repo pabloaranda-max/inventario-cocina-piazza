@@ -132,6 +132,14 @@ export type Incidencia = {
   infraestructura?: Pick<Infraestructura, 'id' | 'nombre' | 'area' | 'tipo'> | null
 }
 
+export type IncidenciaSeguimiento = {
+  id: string
+  incidencia_id: string
+  texto: string
+  registrado_por: string | null
+  created_at: string
+}
+
 export type Mantenimiento = {
   id: string
   tipo: TipoMantenimiento

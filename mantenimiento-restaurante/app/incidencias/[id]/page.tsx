@@ -4,9 +4,10 @@ import { notFound } from 'next/navigation'
 import { cambiarEstadoIncidencia, eliminarIncidencia } from '../actions'
 import { AsignarPanel } from '../asignar-panel'
 import { EstadoFlowPanel } from '../estado-flow-panel'
+import { SeguimientoPanel } from '../seguimiento-panel'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createSignedUrl } from '@/lib/storage'
-import type { Activo, Cotizacion, Incidencia, Mantenimiento, MapaNivel, MapaZona } from '@/lib/types'
+import type { Activo, Cotizacion, Incidencia, IncidenciaSeguimiento, Mantenimiento, MapaNivel, MapaZona } from '@/lib/types'
 import { formatDate, formatDateTime, formatCurrency, isAdminEmail } from '@/lib/utils'
 import { ConfirmDeleteButton } from '@/components/ui/confirm-delete-button'
 import { FlashMessage } from '@/components/ui/flash-message'
@@ -23,7 +24,7 @@ export default async function IncidenciaDetallePage({
   const { flash } = await searchParams
   const supabase = await createServerSupabaseClient()
 
-  const [{ data }, { data: mantenimientos }, { data: cotizaciones }] = await Promise.all([
+  const [{ data }, { data: mantenimientos }, { data: cotizaciones }, { data: seguimientos }] = await Promise.all([
     supabase
       .from('incidencias')
       .select('*, activo:activos(id,nombre,area,clase,tipo), equipo:equipos(id,nombre,area), infraestructura:infraestructura(id,nombre,area,tipo)')
@@ -38,7 +39,12 @@ export default async function IncidenciaDetallePage({
       .from('cotizaciones')
       .select('*, proveedor:proveedores(id,nombre)')
       .eq('incidencia_id', id)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('incidencia_seguimientos')
+      .select('*')
+      .eq('incidencia_id', id)
+      .order('created_at', { ascending: true })
   ])
   const {
     data: { user }
@@ -51,7 +57,7 @@ export default async function IncidenciaDetallePage({
 
   const [activosData, zonasData, nivelesData] = pendienteAsignacion
     ? await Promise.all([
-        supabase.from('activos').select('id,nombre,area,clase,tipo').order('nombre', { ascending: true }),
+        supabase.from('activos').select('id,nombre,area,clase,tipo,zona_id').order('nombre', { ascending: true }),
         supabase.from('mapa_zonas').select('id,nombre,area,label,nivel_id').eq('visible', true).order('orden', { ascending: true }),
         supabase.from('mapa_niveles').select('id,nombre,orden').eq('visible', true).order('orden', { ascending: true })
       ])
@@ -84,7 +90,7 @@ export default async function IncidenciaDetallePage({
           <div className="mt-4">
             <AsignarPanel
               incidenciaId={incidencia.id}
-              activos={(activosData.data ?? []) as Pick<Activo, 'id' | 'nombre' | 'area' | 'clase' | 'tipo'>[]}
+              activos={(activosData.data ?? []) as Pick<Activo, 'id' | 'nombre' | 'area' | 'clase' | 'tipo' | 'zona_id'>[]}
               zonas={(zonasData.data ?? []) as Pick<MapaZona, 'id' | 'nombre' | 'area' | 'label' | 'nivel_id'>[]}
               niveles={(nivelesData.data ?? []) as Pick<MapaNivel, 'id' | 'nombre' | 'orden'>[]}
             />
@@ -227,6 +233,14 @@ export default async function IncidenciaDetallePage({
           )}
         </div>
       </section>
+
+      {incidencia.estado === 'en_progreso' && (
+        <SeguimientoPanel
+          incidenciaId={incidencia.id}
+          seguimientos={(seguimientos ?? []) as IncidenciaSeguimiento[]}
+          usuarioEmail={user?.email}
+        />
+      )}
 
       <section className="brand-card rounded-lg p-5">
         <div className="flex items-center justify-between gap-3">

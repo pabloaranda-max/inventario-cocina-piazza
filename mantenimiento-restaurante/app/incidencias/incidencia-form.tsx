@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import type { Activo, Incidencia, MapaNivel, MapaZona } from '@/lib/types'
 import { ZonaSelect } from '@/components/ui/zona-select'
 import { actualizarIncidencia, crearIncidencia } from './actions'
@@ -79,6 +79,8 @@ export function ReporteRapidoForm() {
   )
 }
 
+type ActivoOption = Pick<Activo, 'id' | 'nombre' | 'area' | 'clase' | 'tipo' | 'zona_id'>
+
 export function IncidenciaForm({
   activos,
   selectedActivoId,
@@ -87,7 +89,7 @@ export function IncidenciaForm({
   selectedZonaId,
   incidencia
 }: {
-  activos: Pick<Activo, 'id' | 'nombre' | 'area' | 'clase' | 'tipo'>[]
+  activos: ActivoOption[]
   selectedActivoId?: string
   zonas: Pick<MapaZona, 'id' | 'nombre' | 'area' | 'label' | 'nivel_id'>[]
   niveles: Pick<MapaNivel, 'id' | 'nombre' | 'orden'>[]
@@ -99,6 +101,34 @@ export function IncidenciaForm({
     initialFormState
   )
 
+  const initialActivoId = incidencia.activo_id ?? selectedActivoId ?? ''
+  const initialActivo = activos.find((a) => a.id === initialActivoId)
+  const initialZonaId =
+    initialActivo?.zona_id ?? incidencia.zona_id ?? selectedZonaId ?? ''
+
+  const [activoId, setActivoId] = useState(initialActivoId)
+  const [zonaId, setZonaId] = useState(initialZonaId)
+  const [zonaFromActivo, setZonaFromActivo] = useState(
+    Boolean(initialActivo?.zona_id)
+  )
+
+  function handleActivoChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const id = e.target.value
+    setActivoId(id)
+    const activo = activos.find((a) => a.id === id)
+    if (activo?.zona_id) {
+      setZonaId(activo.zona_id)
+      setZonaFromActivo(true)
+    } else {
+      setZonaFromActivo(false)
+      if (id === '') setZonaId('')
+    }
+  }
+
+  const zonaNombreAuto = zonaFromActivo
+    ? (zonas.find((z) => z.id === zonaId)?.nombre ?? null)
+    : null
+
   return (
     <form action={formAction} className="brand-shell space-y-5 rounded-lg p-5">
       <FormError message={state.error} />
@@ -107,7 +137,8 @@ export function IncidenciaForm({
         <span className="brand-label">Activo</span>
         <select
           name="activo_id"
-          defaultValue={incidencia.activo_id ?? selectedActivoId ?? ''}
+          value={activoId}
+          onChange={handleActivoChange}
           className="brand-field mt-1"
         >
           <option value="">Sin activo específico</option>
@@ -120,20 +151,35 @@ export function IncidenciaForm({
         </select>
       </label>
 
-      <label className="block">
+      <div className="block">
         <span className="brand-label">Zona del mapa</span>
-        <ZonaSelect
-          name="zona_id"
-          defaultValue={incidencia.zona_id ?? selectedZonaId ?? ''}
-          className="brand-field mt-1"
-          placeholder="Sin zona específica"
-          zonas={zonas}
-          niveles={niveles}
-        />
-        <span className="brand-hint mt-1 block">
-          Si seleccionas un activo con zona, se usará la zona del activo.
-        </span>
-      </label>
+        {zonaFromActivo ? (
+          <>
+            <input type="hidden" name="zona_id" value={zonaId} />
+            <div className="brand-field mt-1 text-[color:var(--brand-muted)]">
+              {zonaNombreAuto ?? zonaId}
+            </div>
+            <span className="brand-hint mt-1 block text-xs">
+              Zona asignada automáticamente desde el activo.
+            </span>
+          </>
+        ) : (
+          <>
+            <ZonaSelect
+              name="zona_id"
+              value={zonaId}
+              onChange={(e) => setZonaId(e.target.value)}
+              className="brand-field mt-1"
+              placeholder="Sin zona específica"
+              zonas={zonas}
+              niveles={niveles}
+            />
+            <span className="brand-hint mt-1 block">
+              Si seleccionas un activo con zona, se asignará automáticamente.
+            </span>
+          </>
+        )}
+      </div>
 
       <label className="block">
         <span className="brand-label">Descripción</span>

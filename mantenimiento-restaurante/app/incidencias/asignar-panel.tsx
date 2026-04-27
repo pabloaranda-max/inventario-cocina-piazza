@@ -1,14 +1,21 @@
 'use client'
 
 import { useActionState, useState } from 'react'
-import type { Activo, ClaseActivo, MapaNivel, MapaZona } from '@/lib/types'
+import type { ClaseActivo, MapaNivel, MapaZona } from '@/lib/types'
 import { ZonaSelect } from '@/components/ui/zona-select'
 import { asignarIncidencia, crearActivoRapido } from './actions'
 import { initialFormState } from '@/lib/form-state'
 
 const clases = ['equipo', 'infraestructura', 'mobiliario', 'edificacion', 'sistema']
 
-type ActivoItem = { id: string; nombre: string; area: string | null; clase: ClaseActivo; tipo: string }
+type ActivoItem = {
+  id: string
+  nombre: string
+  area: string | null
+  clase: ClaseActivo
+  tipo: string
+  zona_id: string | null
+}
 type ZonaItem = Pick<MapaZona, 'id' | 'nombre' | 'area' | 'label' | 'nivel_id'>
 type NivelItem = Pick<MapaNivel, 'id' | 'nombre' | 'orden'>
 
@@ -27,6 +34,7 @@ export function AsignarPanel({
   const [selectedActivoId, setSelectedActivoId] = useState('')
   const [selectedZonaId, setSelectedZonaId] = useState('')
   const [zonaTexto, setZonaTexto] = useState('')
+  const [zonaFromActivo, setZonaFromActivo] = useState(false)
   const [showNuevoActivo, setShowNuevoActivo] = useState(false)
 
   const [nuevoActivoState, nuevoActivoAction, nuevoActivoPending] = useActionState(
@@ -44,6 +52,24 @@ export function AsignarPanel({
 
   const asignar = asignarIncidencia.bind(null, incidenciaId)
 
+  function handleActivoChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const id = e.target.value
+    setSelectedActivoId(id)
+    const activo = activos.find((a) => a.id === id)
+    if (activo?.zona_id) {
+      setSelectedZonaId(activo.zona_id)
+      setZonaFromActivo(true)
+      setZonaTexto('')
+    } else {
+      setZonaFromActivo(false)
+      if (id === '') setSelectedZonaId('')
+    }
+  }
+
+  const zonaNombreAuto = zonaFromActivo
+    ? (zonas.find((z) => z.id === selectedZonaId)?.nombre ?? null)
+    : null
+
   return (
     <div className="space-y-4">
       <form action={asignar} className="space-y-4">
@@ -55,7 +81,7 @@ export function AsignarPanel({
             <select
               name="activo_id"
               value={selectedActivoId}
-              onChange={(e) => setSelectedActivoId(e.target.value)}
+              onChange={handleActivoChange}
               className="mt-1 w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm dark:bg-slate-800 dark:border-slate-600 dark:text-white"
             >
               <option value="">Sin activo específico</option>
@@ -75,24 +101,43 @@ export function AsignarPanel({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-orange-800 dark:text-orange-300">Zona del mapa</label>
-            <ZonaSelect
-              name="zona_id"
-              value={selectedZonaId}
-              onChange={(e) => { setSelectedZonaId(e.target.value); if (e.target.value) setZonaTexto('') }}
-              className="mt-1 w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm dark:bg-slate-800 dark:border-slate-600 dark:text-white"
-              placeholder="Sin zona del mapa"
-              zonas={zonas}
-              niveles={niveles}
-            />
-            {!selectedZonaId && (
-              <input
-                type="text"
-                placeholder="O escribe la ubicación..."
-                value={zonaTexto}
-                onChange={(e) => setZonaTexto(e.target.value)}
-                className="mt-1.5 w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm placeholder-orange-300 dark:bg-slate-800 dark:border-slate-600 dark:text-white dark:placeholder-slate-500"
-              />
+            <label className="block text-sm font-medium text-orange-800 dark:text-orange-300">
+              Zona del mapa
+            </label>
+            {zonaFromActivo ? (
+              <>
+                <input type="hidden" name="zona_id" value={selectedZonaId} />
+                <div className="mt-1 w-full rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-700 dark:bg-slate-700 dark:border-slate-600 dark:text-orange-300">
+                  {zonaNombreAuto ?? selectedZonaId}
+                </div>
+                <p className="mt-1 text-xs text-orange-600 dark:text-orange-400">
+                  Zona asignada automáticamente desde el activo.
+                </p>
+              </>
+            ) : (
+              <>
+                <ZonaSelect
+                  name="zona_id"
+                  value={selectedZonaId}
+                  onChange={(e) => {
+                    setSelectedZonaId(e.target.value)
+                    if (e.target.value) setZonaTexto('')
+                  }}
+                  className="mt-1 w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm dark:bg-slate-800 dark:border-slate-600 dark:text-white"
+                  placeholder="Sin zona del mapa"
+                  zonas={zonas}
+                  niveles={niveles}
+                />
+                {!selectedZonaId && (
+                  <input
+                    type="text"
+                    placeholder="O escribe la ubicación..."
+                    value={zonaTexto}
+                    onChange={(e) => setZonaTexto(e.target.value)}
+                    className="mt-1.5 w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm placeholder-orange-300 dark:bg-slate-800 dark:border-slate-600 dark:text-white dark:placeholder-slate-500"
+                  />
+                )}
+              </>
             )}
           </div>
         </div>
