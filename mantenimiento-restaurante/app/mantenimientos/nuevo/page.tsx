@@ -21,7 +21,7 @@ export default async function NuevoMantenimientoPage({
   const supabase = await createServerSupabaseClient()
   const selectedTipo = tiposMantenimiento.includes(tipo as TipoMantenimiento) ? (tipo as TipoMantenimiento) : undefined
   const [{ data: activos }, { data: zonas }, { data: niveles }, { data: proveedores }, { data: incidencias }] = await Promise.all([
-    supabase.from('activos').select('id,nombre,area,clase,tipo').order('nombre', { ascending: true }),
+    supabase.from('activos').select('id,nombre,area,clase,tipo,zona_id').order('nombre', { ascending: true }),
     supabase.from('mapa_zonas').select('id,nombre,area,label,nivel_id').eq('visible', true).order('orden', { ascending: true }),
     supabase.from('mapa_niveles').select('id,nombre,orden').eq('visible', true).order('orden', { ascending: true }),
     supabase.from('proveedores').select('id,nombre,especialidad').order('nombre', { ascending: true }),
@@ -42,7 +42,7 @@ export default async function NuevoMantenimientoPage({
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[color:var(--brand-ink)]">Nuevo mantenimiento</h1>
       </div>
       <MantenimientoForm
-        activos={(activos as Pick<Activo, 'id' | 'nombre' | 'area' | 'clase' | 'tipo'>[]) ?? []}
+        activos={(activos as Pick<Activo, 'id' | 'nombre' | 'area' | 'clase' | 'tipo' | 'zona_id'>[]) ?? []}
         zonas={(zonas as Pick<MapaZona, 'id' | 'nombre' | 'area' | 'label' | 'nivel_id'>[]) ?? []}
         niveles={(niveles as Pick<MapaNivel, 'id' | 'nombre' | 'orden'>[]) ?? []}
         proveedores={(proveedores as Pick<Proveedor, 'id' | 'nombre' | 'especialidad'>[]) ?? []}

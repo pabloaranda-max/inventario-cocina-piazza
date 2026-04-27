@@ -28,7 +28,7 @@ const estadosPorClase: Record<Activo['clase'], Activo['estado'][]> = {
 }
 
 type ActivoEditable = Pick<Activo, 'id' | 'clase' | 'nombre' | 'tipo' | 'estado' | 'zona_id' | 'notas'>
-  & Pick<Activo, 'criticidad' | 'proveedor_id' | 'sistema' | 'fecha_ultima_revision' | 'fecha_proxima_revision' | 'foto_url'>
+  & Pick<Activo, 'criticidad' | 'proveedor_id' | 'fecha_ultima_revision' | 'fecha_proxima_revision' | 'foto_url'>
 
 const criticidades: Array<{ value: Activo['criticidad']; label: string }> = [
   { value: 'baja', label: 'Baja' },
@@ -110,11 +110,6 @@ export function ActivoBaseForm({
             niveles={niveles}
           />
           <p className="brand-hint mt-1">El área se deriva automáticamente de la zona seleccionada.</p>
-        </label>
-
-        <label className="block">
-          <span className="brand-label">Sistema</span>
-          <input name="sistema" defaultValue={activo.sistema ?? ''} className="brand-field mt-1" />
         </label>
 
         <label className="block">

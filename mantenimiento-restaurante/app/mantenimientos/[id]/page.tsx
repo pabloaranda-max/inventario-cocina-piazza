@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { eliminarMantenimiento } from '../actions'
+import { AplicarPanel } from '../aplicar-panel'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createSignedUrlMap } from '@/lib/storage'
 import type { Mantenimiento } from '@/lib/types'
@@ -43,9 +44,20 @@ export default async function MantenimientoDetallePage({
           ? `/infraestructura/${mantenimiento.activo.id}`
       : null
 
+  const isPlaneado = mantenimiento.estado_ejecucion === 'planeado'
+
   return (
     <div className="space-y-6">
       <FlashMessage code={flash} />
+
+      {isPlaneado && (
+        <AplicarPanel
+          mantenimientoId={mantenimiento.id}
+          costoEstimado={mantenimiento.costo_estimado}
+          ejecucionTipo={mantenimiento.ejecucion_tipo}
+          requiereMaterial={mantenimiento.requiere_material}
+        />
+      )}
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -55,7 +67,14 @@ export default async function MantenimientoDetallePage({
           <h1 className="mt-2 text-2xl font-semibold">Mantenimiento</h1>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <StatusBadge type="mantenimiento" value={mantenimiento.tipo} />
-            <span className="brand-hint text-sm">{formatDate(mantenimiento.fecha_realizacion)}</span>
+            {isPlaneado && (
+              <span className="rounded-full border border-[rgba(239,169,30,0.4)] bg-[rgba(239,169,30,0.16)] px-2 py-0.5 text-xs font-medium text-[#8f5a00] dark:text-[#ffd982]">
+                Planeado
+              </span>
+            )}
+            <span className="brand-hint text-sm">
+              {isPlaneado ? 'Fecha planeada: ' : ''}{formatDate(mantenimiento.fecha_realizacion)}
+            </span>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -93,11 +112,18 @@ export default async function MantenimientoDetallePage({
           <Info label="Ejecución" value={mantenimiento.ejecucion_tipo === 'externo' ? 'Externo' : 'Interno'} />
           <Info label="Material" value={mantenimiento.requiere_material ? 'Requiere material' : 'Sin material'} />
           <Info label="Proveedor" value={mantenimiento.proveedor?.nombre} />
-          <Info
-            label={mantenimiento.ejecucion_tipo === 'externo' ? 'Costo del servicio' : 'Costo de material'}
-            value={(mantenimiento.ejecucion_tipo === 'externo' || mantenimiento.requiere_material) && mantenimiento.costo ? `$${mantenimiento.costo}` : null}
-          />
-          <Info label="Fecha" value={formatDate(mantenimiento.fecha_realizacion)} />
+          {isPlaneado ? (
+            <Info
+              label="Costo estimado"
+              value={mantenimiento.costo_estimado != null ? `$${mantenimiento.costo_estimado}` : null}
+            />
+          ) : (
+            <Info
+              label={mantenimiento.ejecucion_tipo === 'externo' ? 'Costo del servicio' : 'Costo de material'}
+              value={(mantenimiento.ejecucion_tipo === 'externo' || mantenimiento.requiere_material) && mantenimiento.costo ? `$${mantenimiento.costo}` : null}
+            />
+          )}
+          <Info label={isPlaneado ? 'Fecha planeada' : 'Fecha'} value={formatDate(mantenimiento.fecha_realizacion)} />
           <Info label="Próxima fecha" value={formatDate(mantenimiento.proxima_fecha_sugerida)} />
         </dl>
         {mantenimiento.repuestos_notas ? (

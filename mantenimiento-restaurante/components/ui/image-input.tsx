@@ -44,11 +44,13 @@ export function ImageInput({
   label,
   multiple = false,
   onFileSelected,
+  onFilesSelected,
 }: {
   name: string
   label: string
   multiple?: boolean
   onFileSelected?: (file: File) => void
+  onFilesSelected?: (files: File[]) => void
 }) {
   const hiddenRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
@@ -61,7 +63,9 @@ export function ImageInput({
 
     const compressed = await Promise.all(files.map(compressImage))
 
-    if (onFileSelected && compressed[0]) {
+    if (onFilesSelected) {
+      onFilesSelected(compressed)
+    } else if (onFileSelected && compressed[0]) {
       onFileSelected(compressed[0])
     }
 

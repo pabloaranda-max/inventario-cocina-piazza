@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useActionState } from 'react'
+import { useState, useActionState, useRef } from 'react'
 import type { Activo, EjecucionMantenimiento, Equipo, Infraestructura, Mantenimiento, MapaNivel, MapaZona, Proveedor } from '@/lib/types'
 import { ZonaSelect } from '@/components/ui/zona-select'
 import { actualizarMantenimiento, crearMantenimiento } from './actions'
@@ -8,6 +8,8 @@ import { todayMX } from '@/lib/utils'
 import { FormError } from '@/components/ui/flash-message'
 import { ImageInput } from '@/components/ui/image-input'
 import { initialFormState } from '@/lib/form-state'
+
+type ActivoOption = Pick<Activo, 'id' | 'nombre' | 'area' | 'clase' | 'tipo' | 'zona_id'>
 
 type IncidenciaOption = {
   id: string
@@ -31,7 +33,7 @@ export function MantenimientoForm({
   selectedTipo
 }: {
   mantenimiento?: Mantenimiento
-  activos: Pick<Activo, 'id' | 'nombre' | 'area' | 'clase' | 'tipo'>[]
+  activos: ActivoOption[]
   zonas: Pick<MapaZona, 'id' | 'nombre' | 'area' | 'label' | 'nivel_id'>[]
   niveles: Pick<MapaNivel, 'id' | 'nombre' | 'orden'>[]
   proveedores: Pick<Proveedor, 'id' | 'nombre' | 'especialidad'>[]
@@ -43,22 +45,84 @@ export function MantenimientoForm({
 }) {
   const action = mantenimiento ? actualizarMantenimiento.bind(null, mantenimiento.id) : crearMantenimiento
   const [state, formAction] = useActionState(action, initialFormState)
+
+  const fotosRef = useRef<File[]>([])
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const fd = new FormData(e.currentTarget)
+    fd.delete('fotos')
+    fotosRef.current.forEach((f) => fd.append('fotos', f))
+    formAction(fd)
+  }
+
+  const initialActivoId = mantenimiento?.activo_id ?? selectedActivoId ?? ''
+  const initialActivo = activos.find((a) => a.id === initialActivoId) ?? null
+  const [activoId, setActivoId] = useState(initialActivoId)
+  const [zonaId, setZonaId] = useState(
+    mantenimiento?.zona_id ?? (initialActivo?.zona_id ?? selectedZonaId ?? '')
+  )
+  const [zonaFromActivo, setZonaFromActivo] = useState(Boolean(initialActivo?.zona_id))
+
+  function handleActivoChange(newId: string) {
+    setActivoId(newId)
+    const found = activos.find((a) => a.id === newId)
+    if (found?.zona_id) {
+      setZonaId(found.zona_id)
+      setZonaFromActivo(true)
+    } else {
+      setZonaFromActivo(false)
+    }
+  }
+
   const initialEjecucion: EjecucionMantenimiento = mantenimiento?.ejecucion_tipo ?? (mantenimiento?.proveedor_id ? 'externo' : 'interno')
   const [ejecucionTipo, setEjecucionTipo] = useState<EjecucionMantenimiento>(initialEjecucion)
   const [requiereMaterial, setRequiereMaterial] = useState(Boolean(mantenimiento?.requiere_material))
+
+  const isEditing = Boolean(mantenimiento)
+  const [modePlaneado, setModePlaneado] = useState(
+    isEditing ? mantenimiento!.estado_ejecucion === 'planeado' : false
+  )
+
   const isExterno = ejecucionTipo === 'externo'
-  const showCosto = isExterno || requiereMaterial
+  const showCosto = !modePlaneado && (isExterno || requiereMaterial)
+
+  const zonaLabel = zonaFromActivo
+    ? zonas.find((z) => z.id === zonaId)?.label ?? zonas.find((z) => z.id === zonaId)?.nombre ?? zonaId
+    : null
 
   return (
-    <form action={formAction} className="brand-shell space-y-5 rounded-lg p-5">
+    <form onSubmit={handleSubmit} className="brand-shell space-y-5 rounded-lg p-5">
       <FormError message={state.error} />
+
+      {!isEditing && (
+        <div className="flex gap-2">
+          {(['ahora', 'planear'] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setModePlaneado(mode === 'planear')}
+              className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+                (mode === 'planear') === modePlaneado
+                  ? 'border-[color:var(--brand-wine)] bg-[color:var(--brand-wine)] text-[color:var(--brand-bone)]'
+                  : 'border-[rgba(47,62,30,0.14)] text-[color:var(--brand-green)] dark:border-[rgba(238,227,202,0.12)] dark:text-[color:var(--brand-bone)]'
+              }`}
+            >
+              {mode === 'ahora' ? 'Registrar como realizado' : 'Planear para después'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <input type="hidden" name="estado_ejecucion" value={modePlaneado ? 'planeado' : 'aplicado'} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
           <span className="brand-label">Activo</span>
           <select
             name="activo_id"
-            defaultValue={mantenimiento?.activo_id ?? selectedActivoId ?? ''}
+            value={activoId}
+            onChange={(e) => handleActivoChange(e.target.value)}
             className="brand-field mt-1"
           >
             <option value="">Sin activo específico</option>
@@ -76,7 +140,7 @@ export function MantenimientoForm({
 
         <label className="block">
           <span className="brand-label">Tipo</span>
-            <select
+          <select
             name="tipo"
             defaultValue={mantenimiento?.tipo ?? selectedTipo ?? 'preventivo'}
             className="brand-field mt-1"
@@ -87,20 +151,26 @@ export function MantenimientoForm({
           </select>
         </label>
 
-        <label className="block md:col-span-2">
+        <div className="block md:col-span-2">
           <span className="brand-label">Zona del mapa</span>
-          <ZonaSelect
-            name="zona_id"
-            defaultValue={mantenimiento?.zona_id ?? selectedZonaId ?? ''}
-            className="brand-field mt-1"
-            placeholder="Sin zona específica"
-            zonas={zonas}
-            niveles={niveles}
-          />
-          <span className="brand-hint mt-1 block">
-            Si seleccionas un activo con zona, se usará la zona del activo.
-          </span>
-        </label>
+          {zonaFromActivo ? (
+            <>
+              <input type="hidden" name="zona_id" value={zonaId} />
+              <div className="brand-field mt-1 text-[color:var(--brand-muted)]">
+                {zonaLabel} <span className="brand-hint">(del activo)</span>
+              </div>
+            </>
+          ) : (
+            <ZonaSelect
+              name="zona_id"
+              defaultValue={zonaId}
+              className="brand-field mt-1"
+              placeholder="Sin zona específica"
+              zonas={zonas}
+              niveles={niveles}
+            />
+          )}
+        </div>
 
         <label className="block md:col-span-2">
           <span className="brand-label">Incidencia relacionada</span>
@@ -120,14 +190,16 @@ export function MantenimientoForm({
           </select>
         </label>
 
-        <label className="block">
-          <span className="brand-label">Realizado por</span>
-          <input
-            name="realizado_por"
-            defaultValue={mantenimiento?.realizado_por ?? ''}
-            className="brand-field mt-1"
-          />
-        </label>
+        {!modePlaneado && (
+          <label className="block">
+            <span className="brand-label">Realizado por</span>
+            <input
+              name="realizado_por"
+              defaultValue={mantenimiento?.realizado_por ?? ''}
+              className="brand-field mt-1"
+            />
+          </label>
+        )}
 
         <fieldset className="block">
           <legend className="brand-label">Ejecución</legend>
@@ -164,9 +236,6 @@ export function MantenimientoForm({
               Externo
             </label>
           </div>
-          <p className="brand-hint mt-1">
-            Interno no usa proveedor. El costo solo aplica si requiere material.
-          </p>
         </fieldset>
 
         {!isExterno ? (
@@ -207,7 +276,20 @@ export function MantenimientoForm({
           </label>
         ) : null}
 
-        {showCosto ? (
+        {modePlaneado ? (
+          <label className="block">
+            <span className="brand-label">Costo estimado</span>
+            <input
+              name="costo_estimado"
+              type="number"
+              min="0"
+              step="0.01"
+              defaultValue={mantenimiento?.costo_estimado ?? ''}
+              placeholder="Opcional"
+              className="brand-field mt-1"
+            />
+          </label>
+        ) : showCosto ? (
           <label className="block">
             <span className="brand-label">
               {isExterno ? 'Costo del servicio' : 'Costo de material'}
@@ -224,7 +306,7 @@ export function MantenimientoForm({
         ) : null}
 
         <label className="block">
-          <span className="brand-label">Fecha de realizacion</span>
+          <span className="brand-label">{modePlaneado ? 'Fecha planeada' : 'Fecha de realizacion'}</span>
           <input
             name="fecha_realizacion"
             type="date"
@@ -233,28 +315,32 @@ export function MantenimientoForm({
           />
         </label>
 
-        <label className="block">
-          <span className="brand-label">Proxima fecha sugerida</span>
-          <input
-            name="proxima_fecha_sugerida"
-            type="date"
-            defaultValue={mantenimiento?.proxima_fecha_sugerida ?? ''}
-            className="brand-field mt-1"
-          />
-        </label>
+        {!modePlaneado && (
+          <label className="block">
+            <span className="brand-label">Proxima fecha sugerida</span>
+            <input
+              name="proxima_fecha_sugerida"
+              type="date"
+              defaultValue={mantenimiento?.proxima_fecha_sugerida ?? ''}
+              className="brand-field mt-1"
+            />
+          </label>
+        )}
       </div>
 
-      <label className="brand-card flex items-start gap-2 rounded-md p-3 text-sm text-[color:var(--brand-green)] dark:text-[color:var(--brand-bone)]">
-        <input
-          name="marcar_operativo"
-          type="checkbox"
-          className="mt-1 h-4 w-4 rounded border-[color:color-mix(in_srgb,var(--brand-olive)_22%,transparent)] text-[color:var(--brand-wine)] accent-[color:var(--brand-wine)]"
-        />
-        <span>Marcar el activo como operativo al registrar este mantenimiento</span>
-      </label>
+      {!modePlaneado && (
+        <label className="brand-card flex items-start gap-2 rounded-md p-3 text-sm text-[color:var(--brand-green)] dark:text-[color:var(--brand-bone)]">
+          <input
+            name="marcar_operativo"
+            type="checkbox"
+            className="mt-1 h-4 w-4 rounded border-[color:color-mix(in_srgb,var(--brand-olive)_22%,transparent)] text-[color:var(--brand-wine)] accent-[color:var(--brand-wine)]"
+          />
+          <span>Marcar el activo como operativo al registrar este mantenimiento</span>
+        </label>
+      )}
 
       <label className="block">
-        <span className="brand-label">Descripcion</span>
+        <span className="brand-label">{modePlaneado ? 'Qué se va a hacer' : 'Descripcion'}</span>
         <textarea
           name="descripcion"
           required
@@ -274,13 +360,20 @@ export function MantenimientoForm({
         />
       </label>
 
-      <ImageInput name="fotos" label={mantenimiento ? 'Agregar fotos' : 'Fotos opcionales'} multiple />
+      {!modePlaneado && (
+        <ImageInput
+          name="fotos"
+          label={mantenimiento ? 'Agregar fotos' : 'Fotos opcionales'}
+          multiple
+          onFilesSelected={(files) => { fotosRef.current = [...fotosRef.current, ...files] }}
+        />
+      )}
 
       <button
         type="submit"
         className="brand-button rounded-md px-4 py-2 text-sm font-medium"
       >
-        {mantenimiento ? 'Guardar cambios' : 'Registrar mantenimiento'}
+        {mantenimiento ? 'Guardar cambios' : modePlaneado ? 'Guardar plan' : 'Registrar mantenimiento'}
       </button>
     </form>
   )

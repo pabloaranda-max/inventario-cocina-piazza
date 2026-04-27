@@ -188,7 +188,6 @@ export default async function ActivoDetallePage({
             </div>
             <Info label="Proveedor" value={activo.proveedor?.nombre} />
             <Info label="Lámina" value={activo.nivel?.nombre} />
-            <Info label="Sistema" value={activo.sistema} />
             <Info label="Zona" value={activo.zona?.nombre ?? 'Sin zona'} />
             <Info label="Última revisión" value={formatDate(activo.fecha_ultima_revision)} />
             <Info label="Próxima revisión" value={formatDate(activo.fecha_proxima_revision)} />

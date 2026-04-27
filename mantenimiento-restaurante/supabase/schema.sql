@@ -100,7 +100,6 @@ create table if not exists activos (
   clase text not null check (clase in ('equipo', 'infraestructura', 'mobiliario', 'edificacion', 'sistema')),
   nombre text not null,
   tipo text not null,
-  sistema text,
   area text,
   zona_id uuid,
   estado text not null default 'operativo' check (
@@ -302,7 +301,6 @@ create index if not exists idx_equipos_proximo_mantenimiento on equipos(fecha_pr
 create index if not exists idx_activos_clase on activos(clase);
 create index if not exists idx_activos_area on activos(area);
 create index if not exists idx_activos_estado on activos(estado);
-create index if not exists idx_activos_sistema on activos(sistema);
 create index if not exists idx_activos_nivel_id on activos(nivel_id);
 create index if not exists idx_activos_zona_id on activos(zona_id);
 create index if not exists idx_activos_proveedor_id on activos(proveedor_id);

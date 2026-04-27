@@ -10,6 +10,7 @@ import type { EjecucionMantenimiento, TipoMantenimiento } from '@/lib/types'
 
 type MantenimientoPayload = {
   tipo: TipoMantenimiento
+  estado_ejecucion: 'planeado' | 'aplicado'
   activo_id: string | null
   incidencia_id: string | null
   zona_id: string | null
@@ -19,6 +20,7 @@ type MantenimientoPayload = {
   requiere_material: boolean
   proveedor_id: string | null
   costo: number | null
+  costo_estimado: number | null
   repuestos_notas: string | null
   fecha_realizacion: string
   proxima_fecha_sugerida: string | null
@@ -38,6 +40,8 @@ function getPayload(formData: FormData): MantenimientoPayload | FormState {
   const descripcion = String(formData.get('descripcion') ?? '').trim()
   const tipo = String(formData.get('tipo') ?? 'preventivo') as TipoMantenimiento
   const ejecucionTipo = String(formData.get('ejecucion_tipo') ?? 'interno') as EjecucionMantenimiento
+  const estadoEjecucionRaw = String(formData.get('estado_ejecucion') ?? 'aplicado')
+  const estadoEjecucion: 'planeado' | 'aplicado' = estadoEjecucionRaw === 'planeado' ? 'planeado' : 'aplicado'
 
   if (!descripcion) return { error: 'La descripción es obligatoria.' }
   if (!tiposMantenimiento.includes(tipo)) return { error: 'Tipo de mantenimiento no válido.' }
@@ -54,8 +58,13 @@ function getPayload(formData: FormData): MantenimientoPayload | FormState {
   const costo = requiereMaterial && costoValue ? Number(costoValue) : null
   if (Number.isNaN(costo)) return { error: 'El costo debe ser numérico.' }
 
+  const costoEstimadoValue = emptyToNull(formData.get('costo_estimado'))
+  const costoEstimado = costoEstimadoValue ? Number(costoEstimadoValue) : null
+  if (Number.isNaN(costoEstimado)) return { error: 'El costo estimado debe ser numérico.' }
+
   return {
     tipo,
+    estado_ejecucion: estadoEjecucion,
     activo_id: activoId || null,
     incidencia_id: emptyToNull(formData.get('incidencia_id')),
     zona_id: emptyToNull(formData.get('zona_id')),
@@ -65,6 +74,7 @@ function getPayload(formData: FormData): MantenimientoPayload | FormState {
     requiere_material: requiereMaterial,
     proveedor_id: proveedorId,
     costo,
+    costo_estimado: costoEstimado,
     repuestos_notas: emptyToNull(formData.get('repuestos_notas')),
     fecha_realizacion: emptyToNull(formData.get('fecha_realizacion')) ?? todayMX(),
     proxima_fecha_sugerida: emptyToNull(formData.get('proxima_fecha_sugerida')),
@@ -152,8 +162,6 @@ export async function crearMantenimiento(_state: FormState, formData: FormData):
   const payload = getPayload(formData)
   if (!('descripcion' in payload)) return payload
 
-  const fotosUrls: string[] = []
-
   const supabase = await createServerSupabaseClient()
   const activoContext = await getActivoContext(supabase, payload.activo_id)
   if ('error' in activoContext) return { error: activoContext.error }
@@ -169,6 +177,38 @@ export async function crearMantenimiento(_state: FormState, formData: FormData):
   const incidenciaError = await validateIncidenciaDestino(supabase, payload, equipoId, infraestructuraId)
   if (incidenciaError) return { error: incidenciaError }
 
+  if (payload.estado_ejecucion === 'planeado') {
+    const { data, error } = await supabase
+      .from('mantenimientos')
+      .insert({
+        tipo: payload.tipo,
+        estado_ejecucion: 'planeado',
+        activo_id: payload.activo_id,
+        equipo_id: equipoId,
+        infraestructura_id: infraestructuraId,
+        incidencia_id: payload.incidencia_id,
+        zona_id: zonaId,
+        zona_nombre: zonaNombre,
+        descripcion: payload.descripcion,
+        ejecucion_tipo: payload.ejecucion_tipo,
+        requiere_material: payload.requiere_material,
+        proveedor_id: payload.proveedor_id,
+        costo_estimado: payload.costo_estimado,
+        repuestos_notas: payload.repuestos_notas,
+        fotos_urls: [],
+        fecha_realizacion: payload.fecha_realizacion,
+      })
+      .select('id')
+      .single()
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/')
+    revalidatePath('/mantenimientos')
+    redirect(`/mantenimientos/${data.id}?flash=mantenimiento_creado`)
+  }
+
+  const fotosUrls: string[] = []
   try {
     fotosUrls.push(...(await uploadOptionalFiles(supabase, formData.getAll('fotos'), 'mantenimientos')))
   } catch (error) {
@@ -355,6 +395,102 @@ export async function actualizarMantenimiento(
   if (infraestructuraId) revalidatePath(`/infraestructura/${infraestructuraId}`)
   if (payload.incidencia_id) revalidatePath(`/incidencias/${payload.incidencia_id}`)
   redirect(`/mantenimientos/${id}?flash=mantenimiento_actualizado`)
+}
+
+export async function aplicarMantenimiento(
+  id: string,
+  _state: FormState,
+  formData: FormData
+): Promise<FormState> {
+  const supabase = await createServerSupabaseClient()
+
+  const { data: current, error: currentError } = await supabase
+    .from('mantenimientos')
+    .select('activo_id,equipo_id,infraestructura_id,incidencia_id,tipo,ejecucion_tipo,requiere_material,proveedor_id')
+    .eq('id', id)
+    .single()
+
+  if (currentError) return { error: currentError.message }
+  if (!current) return { error: 'Mantenimiento no encontrado.' }
+
+  const fechaRealizacion = String(formData.get('fecha_realizacion') ?? todayMX())
+  const costoValue = emptyToNull(formData.get('costo'))
+  const costo = costoValue ? Number(costoValue) : null
+  const marcarOperativo = formData.get('marcar_operativo') === 'on'
+  const proximaFechaSugerida = emptyToNull(formData.get('proxima_fecha_sugerida'))
+
+  const { error } = await supabase
+    .from('mantenimientos')
+    .update({
+      estado_ejecucion: 'aplicado',
+      fecha_realizacion: fechaRealizacion,
+      proxima_fecha_sugerida: proximaFechaSugerida,
+      costo,
+    })
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+
+  if (current.tipo === 'limpieza_profunda') {
+    if (current.activo_id) {
+      const { data: limpiezaActivo } = await supabase
+        .from('activos')
+        .select('limpieza_intervalo_dias')
+        .eq('id', current.activo_id)
+        .single()
+
+      const intervalo = limpiezaActivo?.limpieza_intervalo_dias as number | null
+      await supabase
+        .from('activos')
+        .update({
+          fecha_ultima_limpieza: fechaRealizacion,
+          fecha_proxima_limpieza: intervalo ? addDaysToDateInput(fechaRealizacion, intervalo) : null
+        })
+        .eq('id', current.activo_id)
+    }
+  } else {
+    if (current.activo_id) {
+      await supabase
+        .from('activos')
+        .update({
+          fecha_ultima_revision: fechaRealizacion,
+          fecha_proxima_revision: proximaFechaSugerida,
+          ...(marcarOperativo ? { estado: 'operativo' } : {})
+        })
+        .eq('id', current.activo_id)
+    }
+    if (current.equipo_id) {
+      await supabase
+        .from('equipos')
+        .update({
+          fecha_ultimo_mantenimiento: fechaRealizacion,
+          fecha_proximo_mantenimiento: proximaFechaSugerida,
+          ...(marcarOperativo ? { estado: 'operativo' } : {})
+        })
+        .eq('id', current.equipo_id)
+    }
+    if (current.infraestructura_id) {
+      await supabase
+        .from('infraestructura')
+        .update({
+          fecha_ultima_revision: fechaRealizacion,
+          fecha_proxima_revision: proximaFechaSugerida,
+          ...(marcarOperativo ? { estado: 'operativo' } : {})
+        })
+        .eq('id', current.infraestructura_id)
+    }
+    if (current.incidencia_id) {
+      await supabase.from('incidencias').update({ estado: 'en_progreso' }).eq('id', current.incidencia_id)
+    }
+  }
+
+  revalidatePath('/')
+  revalidatePath('/mantenimientos')
+  revalidatePath(`/mantenimientos/${id}`)
+  if (current.equipo_id) revalidatePath(`/equipos/${current.equipo_id}`)
+  if (current.infraestructura_id) revalidatePath(`/infraestructura/${current.infraestructura_id}`)
+  if (current.incidencia_id) revalidatePath(`/incidencias/${current.incidencia_id}`)
+  redirect(`/mantenimientos/${id}?flash=mantenimiento_aplicado`)
 }
 
 export async function eliminarMantenimiento(id: string) {

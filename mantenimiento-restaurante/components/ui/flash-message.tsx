@@ -11,6 +11,7 @@ const messages: Record<string, string> = {
   incidencia_admin_error: 'Solo un correo admin configurado puede cerrar incidencias.',
   mantenimiento_creado: 'Mantenimiento registrado.',
   mantenimiento_actualizado: 'Mantenimiento actualizado.',
+  mantenimiento_aplicado: 'Mantenimiento aplicado.',
   mantenimiento_eliminado: 'Mantenimiento eliminado.',
   mantenimiento_error: 'No se pudo actualizar el mantenimiento.',
   proveedor_creado: 'Proveedor creado.',

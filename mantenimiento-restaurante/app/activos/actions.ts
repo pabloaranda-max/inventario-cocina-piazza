@@ -96,7 +96,6 @@ export async function actualizarActivoBase(
   const estado = String(formData.get('estado') ?? '').trim() as EstadoActivoEditable
   const criticidad = String(formData.get('criticidad') ?? 'media').trim() as Activo['criticidad']
   const zonaId = emptyToNull(formData.get('zona_id'))
-  const sistema = emptyToNull(formData.get('sistema'))
   const proveedorId = emptyToNull(formData.get('proveedor_id'))
   const notas = emptyToNull(formData.get('notas'))
   const fechaUltimaRevision = emptyToNull(formData.get('fecha_ultima_revision'))
@@ -144,7 +143,6 @@ export async function actualizarActivoBase(
     x: zona?.x ?? null,
     y: zona?.y ?? null,
     area: resolvedArea,
-    sistema,
     proveedor_id: proveedorId,
     notas,
     fecha_ultima_revision: fechaUltimaRevision,

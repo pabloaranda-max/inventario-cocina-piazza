@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useActionState } from 'react'
+import { useState, useActionState, useRef } from 'react'
 import type { Activo, Equipo, MapaNivel, MapaZona, Proveedor } from '@/lib/types'
 import { crearEquipo, actualizarEquipo } from './actions'
 import { FormError } from '@/components/ui/flash-message'
@@ -43,6 +43,17 @@ export function EquipoForm({
   const action = equipo ? actualizarEquipo.bind(null, equipo.id) : crearEquipo
   const [state, formAction] = useActionState(action, initialFormState)
 
+  const fotoFileRef = useRef<File | null>(null)
+  const fotoPlacaFileRef = useRef<File | null>(null)
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const fd = new FormData(e.currentTarget)
+    if (fotoFileRef.current) fd.set('foto', fotoFileRef.current)
+    if (fotoPlacaFileRef.current) fd.set('foto_placa', fotoPlacaFileRef.current)
+    formAction(fd)
+  }
+
   const [marca, setMarca] = useState(equipo?.marca ?? '')
   const [modelo, setModelo] = useState(equipo?.modelo ?? '')
   const [numeroSerie, setNumeroSerie] = useState(equipo?.numero_serie ?? '')
@@ -56,7 +67,7 @@ export function EquipoForm({
   )
 
   return (
-    <form action={formAction} className="brand-shell space-y-5 rounded-lg p-5">
+    <form onSubmit={handleSubmit} className="brand-shell space-y-5 rounded-lg p-5">
       <FormError message={state.error} />
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -161,14 +172,22 @@ export function EquipoForm({
         />
 
         <div>
-          <ImageInput name="foto" label={fotoUrl ? 'Reemplazar foto general' : 'Foto general'} />
+          <ImageInput
+            name="foto"
+            label={fotoUrl ? 'Reemplazar foto general' : 'Foto general'}
+            onFileSelected={(f) => { fotoFileRef.current = f }}
+          />
           {fotoUrl && (
             <img src={fotoUrl} alt="Foto actual" className="mt-2 h-32 w-full rounded-md object-cover" />
           )}
         </div>
 
         <div>
-          <ImageInput name="foto_placa" label={fotoPlacaUrl ? 'Reemplazar foto de placa' : 'Foto de placa'} />
+          <ImageInput
+            name="foto_placa"
+            label={fotoPlacaUrl ? 'Reemplazar foto de placa' : 'Foto de placa'}
+            onFileSelected={(f) => { fotoPlacaFileRef.current = f }}
+          />
           {fotoPlacaUrl && (
             <img src={fotoPlacaUrl} alt="Placa actual" className="mt-2 h-32 w-full rounded-md object-cover" />
           )}

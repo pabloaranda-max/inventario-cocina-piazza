@@ -42,7 +42,6 @@ export type Activo = {
   clase: ClaseActivo
   nombre: string
   tipo: string
-  sistema: string | null
   area: string | null
   zona_id: string | null
   estado: EstadoActivo
@@ -143,6 +142,7 @@ export type IncidenciaSeguimiento = {
 export type Mantenimiento = {
   id: string
   tipo: TipoMantenimiento
+  estado_ejecucion: 'planeado' | 'aplicado'
   activo_id: string | null
   equipo_id: string | null
   infraestructura_id: string | null
@@ -155,6 +155,7 @@ export type Mantenimiento = {
   requiere_material: boolean
   proveedor_id: string | null
   costo: number | null
+  costo_estimado: number | null
   repuestos_notas: string | null
   fotos_urls: string[]
   fecha_realizacion: string

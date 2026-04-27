@@ -5,8 +5,9 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { FlashMessage } from '@/components/ui/flash-message'
 import { StatusBadge } from '@/components/ui/status-badge'
 
-const filtros: Array<{ label: string; tipo?: TipoMantenimiento }> = [
+const filtros: Array<{ label: string; tipo?: TipoMantenimiento; estado?: string }> = [
   { label: 'Todos' },
+  { label: 'Planeados', estado: 'planeado' },
   { label: 'Preventivos', tipo: 'preventivo' },
   { label: 'Correctivos', tipo: 'correctivo' },
   { label: 'Limpiezas profundas', tipo: 'limpieza_profunda' }
@@ -17,11 +18,12 @@ const tiposMantenimiento: TipoMantenimiento[] = ['preventivo', 'correctivo', 'li
 export default async function MantenimientosPage({
   searchParams
 }: {
-  searchParams: Promise<{ flash?: string; tipo?: string }>
+  searchParams: Promise<{ flash?: string; tipo?: string; estado?: string }>
 }) {
-  const { flash, tipo } = await searchParams
+  const { flash, tipo, estado } = await searchParams
   const supabase = await createServerSupabaseClient()
   const tipoActivo = tiposMantenimiento.includes(tipo as TipoMantenimiento) ? (tipo as TipoMantenimiento) : undefined
+  const estadoFiltro = estado === 'planeado' ? 'planeado' : undefined
 
   let query = supabase
     .from('mantenimientos')
@@ -30,6 +32,7 @@ export default async function MantenimientosPage({
     .limit(100)
 
   if (tipoActivo) query = query.eq('tipo', tipoActivo)
+  if (estadoFiltro) query = query.eq('estado_ejecucion', estadoFiltro)
 
   const { data } = await query
   const mantenimientos = (data as Mantenimiento[]) ?? []
@@ -50,8 +53,16 @@ export default async function MantenimientosPage({
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {filtros.map((filtro) => {
-          const href = filtro.tipo ? `/mantenimientos?tipo=${filtro.tipo}` : '/mantenimientos'
-          const active = filtro.tipo ? tipoActivo === filtro.tipo : !tipoActivo
+          const href = filtro.estado
+            ? `/mantenimientos?estado=${filtro.estado}`
+            : filtro.tipo
+              ? `/mantenimientos?tipo=${filtro.tipo}`
+              : '/mantenimientos'
+          const active = filtro.estado
+            ? estadoFiltro === filtro.estado
+            : filtro.tipo
+              ? tipoActivo === filtro.tipo
+              : !tipoActivo && !estadoFiltro
 
           return (
             <Link
@@ -85,6 +96,11 @@ export default async function MantenimientosPage({
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge type="mantenimiento" value={mantenimiento.tipo} />
+                    {mantenimiento.estado_ejecucion === 'planeado' && (
+                      <span className="rounded-full border border-[rgba(239,169,30,0.4)] bg-[rgba(239,169,30,0.16)] px-2 py-0.5 text-xs font-medium text-[#8f5a00] dark:text-[#ffd982]">
+                        Planeado
+                      </span>
+                    )}
                     <span className="text-sm text-[color:var(--brand-muted)]">
                       {formatDate(mantenimiento.fecha_realizacion)}
                     </span>
