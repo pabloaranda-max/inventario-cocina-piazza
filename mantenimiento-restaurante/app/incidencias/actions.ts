@@ -8,7 +8,7 @@ import { emptyToNull, isAdminEmail, todayMX } from '@/lib/utils'
 import type { FormState } from '@/lib/form-state'
 import type { EstadoIncidencia, PrioridadIncidencia } from '@/lib/types'
 import { notificarNuevoReporte } from '@/lib/email'
-import { postSlackMessage, postSlackSeguimiento } from '@/lib/slack'
+import { postSlackMessage, postSlackSeguimiento, buildImageBlocks } from '@/lib/slack'
 
 const ESTADO_EMOJI: Record<string, string> = {
   pendiente_asignacion: '🔔',
@@ -132,10 +132,9 @@ export async function crearIncidencia(_state: FormState, formData: FormData): Pr
 
   try {
     const p = PRIORIDAD_EMOJI[payload.prioridad] ?? ''
-    await postSlackSeguimiento(
-      `🔔 Nueva incidencia ${ticket} — "${payload.descripcion}" ${p} ${payload.prioridad}` +
+    const msg = `🔔 Nueva incidencia ${ticket} — "${payload.descripcion}" ${p} ${payload.prioridad}` +
       (payload.reportado_por ? ` — Reportado por: ${payload.reportado_por}` : '')
-    )
+    await postSlackSeguimiento(msg, buildImageBlocks(msg, fotoUrl))
   } catch {
     // no crítico
   }
@@ -327,6 +326,7 @@ export async function cambiarEstadoIncidencia(id: string, formData: FormData) {
     const ticket = (incidencia as { ticket_numero?: string }).ticket_numero ?? id
     const desc = (incidencia as { descripcion?: string }).descripcion ?? ''
     const zona = (incidencia as { zona_nombre?: string | null }).zona_nombre
+    const fotoExistente = (incidencia as { foto_url?: string | null }).foto_url
     const estadoLabel: Record<string, string> = {
       pendiente_asignacion: 'Pendiente de asignación',
       abierta: 'Abierta',
@@ -335,9 +335,9 @@ export async function cambiarEstadoIncidencia(id: string, formData: FormData) {
       cerrada: 'Cerrada'
     }
     const label = estadoLabel[estado] ?? estado
-    await postSlackSeguimiento(
-      `${emoji} ${label}: ${ticket} — "${desc}"` + (zona ? ` (${zona})` : '')
-    )
+    const msg = `${emoji} ${label}: ${ticket} — "${desc}"` + (zona ? ` (${zona})` : '')
+    const foto = fotoUrl ?? fotoExistente
+    await postSlackSeguimiento(msg, buildImageBlocks(msg, foto))
   } catch {
     // no crítico
   }
@@ -438,7 +438,7 @@ export async function reportarResolucionSlack(id: string) {
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase
     .from('incidencias')
-    .select('ticket_numero,descripcion,prioridad,reportado_por,fecha_reporte,fecha_resuelta,validado_por,activo:activos(nombre,area),equipo:equipos(nombre,area),infraestructura:infraestructura(nombre,area),zona_nombre')
+    .select('ticket_numero,descripcion,prioridad,reportado_por,fecha_reporte,fecha_resuelta,validado_por,foto_url,activo:activos(nombre,area),equipo:equipos(nombre,area),infraestructura:infraestructura(nombre,area),zona_nombre')
     .eq('id', id)
     .single()
 
@@ -452,6 +452,7 @@ export async function reportarResolucionSlack(id: string) {
     fecha_reporte: string
     fecha_resuelta: string | null
     validado_por: string | null
+    foto_url: string | null
     activo: { nombre: string } | { nombre: string }[] | null
     equipo: { nombre: string } | { nombre: string }[] | null
     infraestructura: { nombre: string } | { nombre: string }[] | null
@@ -497,7 +498,8 @@ export async function reportarResolucionSlack(id: string) {
         ...(duracion ? [{ type: 'mrkdwn', text: `*Tiempo de resolución:*\n${duracion}` }] : []),
         ...(inc.validado_por ? [{ type: 'mrkdwn', text: `*Cerrado por:*\n${inc.validado_por}` }] : [])
       ]
-    }
+    },
+    ...(inc.foto_url ? [{ type: 'image', image_url: inc.foto_url, alt_text: 'Evidencia' }] : [])
   ]
 
   try {
