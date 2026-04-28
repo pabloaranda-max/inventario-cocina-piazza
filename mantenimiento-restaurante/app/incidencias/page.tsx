@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { cambiarEstadoIncidencia } from './actions'
 import { EstadoFlowPanel } from './estado-flow-panel'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/supabase/current-user'
 import { createSignedUrlMap } from '@/lib/storage'
 import type { Incidencia } from '@/lib/types'
 import { formatDateTime, isAdminEmail } from '@/lib/utils'
@@ -18,24 +19,25 @@ export default async function IncidenciasPage({
 }) {
   const { flash, estado, prioridad } = await searchParams
   const supabase = await createServerSupabaseClient()
-  const {
-    data: { user }
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   const canCloseIncidencias = isAdminEmail(user?.email)
   let query = supabase
     .from('incidencias')
-    .select('*, activo:activos(id,nombre,area,clase,tipo), equipo:equipos(id,nombre,area), infraestructura:infraestructura(id,nombre,area,tipo)')
+    .select('id,activo_id,equipo_id,infraestructura_id,zona_id,zona_nombre,ticket_numero,descripcion,prioridad,foto_url,reportado_por,fecha_reporte,estado,fusionada_en_id,activo:activos(id,nombre,area,clase,tipo),equipo:equipos(id,nombre,area),infraestructura:infraestructura(id,nombre,area,tipo)')
     .order('fecha_reporte', { ascending: false })
 
   if (estado === 'activas') query = query.in('estado', ['abierta', 'en_progreso'])
   else if (estado === 'sin_asignar') query = query.eq('estado', 'pendiente_asignacion')
   else if (estado && estados.includes(estado)) query = query.eq('estado', estado)
 
+  // Excluir fusionadas por defecto (solo las que apuntan a un principal)
+  query = query.is('fusionada_en_id', null)
+
   if (prioridad === 'alta_urgente') query = query.in('prioridad', ['alta', 'urgente'])
   else if (prioridad && ['baja', 'media', 'alta', 'urgente'].includes(prioridad)) query = query.eq('prioridad', prioridad)
 
   const { data } = await query
-  const incidencias = (data as Incidencia[]) ?? []
+  const incidencias = (data as unknown as Incidencia[]) ?? []
   const fotoUrls = await createSignedUrlMap(
     supabase,
     incidencias.map((incidencia) => incidencia.foto_url)

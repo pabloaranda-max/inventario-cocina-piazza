@@ -7,8 +7,7 @@ import { Navbar } from '@/components/layout/navbar'
 import { LogoutButton } from '@/components/layout/logout-button'
 import { MobileMenu } from '@/components/layout/mobile-menu'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { isSupabaseConfigured } from '@/lib/utils'
+import { getCurrentUser } from '@/lib/supabase/current-user'
 
 const freightNeo = localFont({
   src: '../public/branding/fonts/FreightNeo W03 Book.ttf',
@@ -33,9 +32,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const user = isSupabaseConfigured()
-    ? (await (await createServerSupabaseClient()).auth.getUser()).data.user
-    : null
+  const user = await getCurrentUser()
 
   return (
     <html lang="es" suppressHydrationWarning>

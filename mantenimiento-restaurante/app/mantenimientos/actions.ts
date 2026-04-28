@@ -106,8 +106,8 @@ async function getActivoContext(
 
   return {
     activo,
-    equipoId: activo.clase === 'equipo' ? activo.id : null,
-    infraestructuraId: activo.clase === 'infraestructura' ? activo.id : null,
+    equipoId: null,
+    infraestructuraId: null,
     zonaId: activo.zona_id ?? null,
     zonaNombre: getZonaNombre(activo)
   }
@@ -449,12 +449,15 @@ export async function aplicarMantenimiento(
         .eq('id', current.activo_id)
     }
   } else {
+    const proximaUpdate = proximaFechaSugerida ? { fecha_proxima_revision: proximaFechaSugerida } : {}
+    const proximaEquipoUpdate = proximaFechaSugerida ? { fecha_proximo_mantenimiento: proximaFechaSugerida } : {}
+
     if (current.activo_id) {
       await supabase
         .from('activos')
         .update({
           fecha_ultima_revision: fechaRealizacion,
-          fecha_proxima_revision: proximaFechaSugerida,
+          ...proximaUpdate,
           ...(marcarOperativo ? { estado: 'operativo' } : {})
         })
         .eq('id', current.activo_id)
@@ -464,7 +467,7 @@ export async function aplicarMantenimiento(
         .from('equipos')
         .update({
           fecha_ultimo_mantenimiento: fechaRealizacion,
-          fecha_proximo_mantenimiento: proximaFechaSugerida,
+          ...proximaEquipoUpdate,
           ...(marcarOperativo ? { estado: 'operativo' } : {})
         })
         .eq('id', current.equipo_id)
@@ -474,7 +477,7 @@ export async function aplicarMantenimiento(
         .from('infraestructura')
         .update({
           fecha_ultima_revision: fechaRealizacion,
-          fecha_proxima_revision: proximaFechaSugerida,
+          ...proximaUpdate,
           ...(marcarOperativo ? { estado: 'operativo' } : {})
         })
         .eq('id', current.infraestructura_id)

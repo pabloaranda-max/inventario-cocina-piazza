@@ -2,7 +2,7 @@
 
 > Documento de ejecución incremental.
 > Reemplaza el enfoque anterior de "rediseño" por un plan real de slices sobre el codebase existente.
-> Última actualización: 2026-04-25
+> Última actualización: 2026-04-28
 
 ---
 
@@ -451,6 +451,36 @@ Si no, se mezcla problema de layout con problema de jerarquía operativa.
 
 ---
 
+## 15b. Checklist de cierre de slice
+
+Antes de marcar cualquier slice como `COMPLETO`, verificar:
+
+### Si el slice toca un campo nuevo o un flujo de datos
+
+1. **Buscar todos los formularios que usan ese campo** — no solo el que se modificó.
+   - `grep -rn "nombre_del_campo" app/`
+   - Confirmar que cada form muestra el campo correctamente y que el tipo incluye lo necesario.
+
+2. **Buscar todas las server actions que escriben ese campo** — no solo la que se modificó.
+   - Confirmar que ningún `...spread` arrastra el campo a una tabla que no lo tiene.
+   - Confirmar que ninguna action asume que el campo siempre viene del form si puede venir de la DB.
+
+3. **Buscar todas las páginas que proveen datos a esos formularios** — no solo la que se modificó.
+   - Confirmar que el query de Supabase incluye el campo.
+   - Confirmar que el prop se pasa hasta el form.
+
+4. **Correr el flujo completo en la versión deployada** — crear, editar, ver — antes de cerrar.
+   - No cerrar basándose solo en que el build pasa o que TypeScript no tiene errores.
+   - Un error de schema en runtime (columna inexistente, constraint violado) no lo detecta el compilador.
+
+### Regla general
+
+Si en el slice se trabajó un formulario A y existe un formulario B que hace lo mismo sobre el mismo modelo,
+B también debe quedar alineado antes de cerrar.
+No se cierra el slice cuando "el caso que se tocó funciona". Se cierra cuando todos los casos relacionados funcionan.
+
+---
+
 ## 16. Orden recomendado a partir de hoy
 
 1. abrir Slice 3 para sacar `limpiezas profundas` de `mantenimientos`
@@ -482,3 +512,74 @@ No volver a discutir rediseño total.
 Retomar desde:
 
 `abrir Slice 3`
+
+---
+
+## 18. Trabajo hecho en sesión 2026-04-28
+
+### Features nuevas
+
+- **Fusión de incidencias**: columna `fusionada_en_id` en `incidencias`. Desde la ficha de una incidencia `pendiente_asignacion` se puede fusionar hacia cualquier incidencia activa (`pendiente_asignacion`, `abierta`, `en_progreso`). La secundaria se cierra y el principal recibe una nota automática en seguimientos.
+- **Notificación Slack al resolver incidencia**: bot `mantenimiento_pasticc`, canal `C0AU3PNU2CW` (privado). Botón "Compartir en Slack" visible en incidencias `resuelta` o `cerrada`. Al enviarse guarda `reportado_slack_at` y el botón se convierte en badge "Reportado en Slack".
+- **Activos organizados por nivel/zona**: la página `/activos` ahora agrupa igual que el mapa.
+
+### Bugs corregidos
+
+- **FK violation `mantenimientos_equipo_id_fkey`**: `getActivoContext` usaba `activo.id` como `equipo_id` aunque son tablas distintas. Corregido: mantenimientos de activos solo setean `activo_id`.
+- **Dashboard conteos incluían fusionadas**: conteos de `pendientesCount`, `incidenciasCount`, `urgentesCount` ahora filtran `fusionada_en_id IS NULL`.
+- **Dashboard mostraba "Sin equipo"** para incidencias ligadas a activos: queries ahora incluyen `activo:activos(...)` y usan `getDestinoNombre()`.
+
+### Migraciones aplicadas
+
+- `202604270028_drop_activos_sistema.sql`
+- `202604270029_incidencias_fusion.sql`
+- `202604280030_incidencias_slack_at.sql`
+
+---
+
+## 19. Deuda técnica identificada (pendiente de atender)
+
+Ordenada por prioridad:
+
+### Alta — afecta flujos activos hoy
+
+1. **`AplicarPanel` incompleto**: al aplicar un mantenimiento planeado no se captura `realizado_por` ni fotos de evidencia. El action `aplicarMantenimiento` tampoco los persiste. Corregir antes de abrir Slice 3.
+
+2. **Mantenimiento desde incidencia con `?equipo=xxx`**: `nuevo/page.tsx` inyecta el UUID de `equipos` como `selectedActivoId` en el dropdown de activos — tablas incompatibles. La incidencia crea el mantenimiento sin equipo vinculado. Requiere separar el selector de equipo del selector de activo en el form, o un flujo distinto.
+
+3. **`FusionarPanel` solo en `pendiente_asignacion`**: si una incidencia ya `abierta` necesita fusionarse con otra, no hay UI. El candidatos-query ya soporta otros estados; falta exponer el panel en más estados.
+
+### Media — datos incompletos pero no bloquean operación
+
+4. **Dashboard: vencidos/próximos solo miran `equipos`**: los paneles "Mantenimientos vencidos" y "Próximos mantenimientos" ignoran activos con `fecha_proxima_revision`. Incluir activos en esas queries.
+
+5. **`activos.zona_id NOT NULL` no impuesto**: activos pueden crearse sin zona. El plan lo pospone pero conviene añadir validación en el form antes de Slice 3.
+
+6. **Lista de mantenimientos mezcla planeados con aplicados**: sin separación visual clara. Los planeados deberían destacar o tener sección propia.
+
+### Baja — legacy aceptado por ahora
+
+7. **Dualidad `activos` / `equipos` / `infraestructura`**: tres tablas separadas generan fricción. El plan los consolida eventualmente pero no antes de Slice 5-6.
+
+8. **Columnas `x/y` siguen en DB**: legacy aceptado hasta que se decida limpiar.
+
+9. **`limpieza_profunda` como tipo en mantenimientos**: se elimina cuando se complete Slice 3.
+
+---
+
+## 20. Retomar mañana desde aquí
+
+**Paso 1 (rápido, antes de Slice 3):**
+Completar `AplicarPanel` con `realizado_por` y fotos — es deuda directa del flujo planeado→aplicado.
+
+**Paso 2:**
+Abrir Slice 3 — limpiezas profundas como entidad propia.
+- Nueva tabla `limpiezas_profundas` con zona, responsable, recurrencia, estados, evidencia y costo
+- Retirar `limpieza_profunda` del dropdown de tipos en mantenimientos
+- Migrar registros existentes si los hay
+- Conectar al panel del mapa (vista Limpiezas)
+
+**Paso 3:**
+Abrir Slice 4 — feed operativo compartido dashboard → mapa.
+- Extraer queries reutilizables
+- Dashboard como vista ejecutiva, mapa como centro accionable

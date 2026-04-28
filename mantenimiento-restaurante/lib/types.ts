@@ -124,6 +124,8 @@ export type Incidencia = {
   fecha_resuelta: string | null
   validado_por: string | null
   estado: EstadoIncidencia
+  fusionada_en_id: string | null
+  reportado_slack_at: string | null
   created_at: string
   updated_at: string
   activo?: Pick<Activo, 'id' | 'nombre' | 'area' | 'clase' | 'tipo'> | null

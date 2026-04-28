@@ -56,6 +56,7 @@ export default async function MantenimientoDetallePage({
           costoEstimado={mantenimiento.costo_estimado}
           ejecucionTipo={mantenimiento.ejecucion_tipo}
           requiereMaterial={mantenimiento.requiere_material}
+          tipo={mantenimiento.tipo}
         />
       )}
 

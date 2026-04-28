@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useActionState, useRef } from 'react'
-import type { Activo, EjecucionMantenimiento, Equipo, Infraestructura, Mantenimiento, MapaNivel, MapaZona, Proveedor } from '@/lib/types'
+import { useState, useActionState, useRef, useTransition } from 'react'
+import type { Activo, EjecucionMantenimiento, Equipo, Infraestructura, Mantenimiento, MapaNivel, MapaZona, Proveedor, TipoMantenimiento } from '@/lib/types'
 import { ZonaSelect } from '@/components/ui/zona-select'
 import { actualizarMantenimiento, crearMantenimiento } from './actions'
 import { todayMX } from '@/lib/utils'
@@ -47,13 +47,14 @@ export function MantenimientoForm({
   const [state, formAction] = useActionState(action, initialFormState)
 
   const fotosRef = useRef<File[]>([])
+  const [, startTransition] = useTransition()
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     fd.delete('fotos')
     fotosRef.current.forEach((f) => fd.append('fotos', f))
-    formAction(fd)
+    startTransition(() => formAction(fd))
   }
 
   const initialActivoId = mantenimiento?.activo_id ?? selectedActivoId ?? ''
@@ -75,14 +76,13 @@ export function MantenimientoForm({
     }
   }
 
+  const [tipo, setTipo] = useState<TipoMantenimiento>(mantenimiento?.tipo ?? selectedTipo ?? 'preventivo')
   const initialEjecucion: EjecucionMantenimiento = mantenimiento?.ejecucion_tipo ?? (mantenimiento?.proveedor_id ? 'externo' : 'interno')
   const [ejecucionTipo, setEjecucionTipo] = useState<EjecucionMantenimiento>(initialEjecucion)
   const [requiereMaterial, setRequiereMaterial] = useState(Boolean(mantenimiento?.requiere_material))
 
   const isEditing = Boolean(mantenimiento)
-  const [modePlaneado, setModePlaneado] = useState(
-    isEditing ? mantenimiento!.estado_ejecucion === 'planeado' : false
-  )
+  const modePlaneado = isEditing ? mantenimiento!.estado_ejecucion === 'planeado' : true
 
   const isExterno = ejecucionTipo === 'externo'
   const showCosto = !modePlaneado && (isExterno || requiereMaterial)
@@ -93,26 +93,7 @@ export function MantenimientoForm({
 
   return (
     <form onSubmit={handleSubmit} className="brand-shell space-y-5 rounded-lg p-5">
-      <FormError message={state.error} />
-
-      {!isEditing && (
-        <div className="flex gap-2">
-          {(['ahora', 'planear'] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setModePlaneado(mode === 'planear')}
-              className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
-                (mode === 'planear') === modePlaneado
-                  ? 'border-[color:var(--brand-wine)] bg-[color:var(--brand-wine)] text-[color:var(--brand-bone)]'
-                  : 'border-[rgba(47,62,30,0.14)] text-[color:var(--brand-green)] dark:border-[rgba(238,227,202,0.12)] dark:text-[color:var(--brand-bone)]'
-              }`}
-            >
-              {mode === 'ahora' ? 'Registrar como realizado' : 'Planear para después'}
-            </button>
-          ))}
-        </div>
-      )}
+      <FormError message={state?.error} />
 
       <input type="hidden" name="estado_ejecucion" value={modePlaneado ? 'planeado' : 'aplicado'} />
 
@@ -142,7 +123,8 @@ export function MantenimientoForm({
           <span className="brand-label">Tipo</span>
           <select
             name="tipo"
-            defaultValue={mantenimiento?.tipo ?? selectedTipo ?? 'preventivo'}
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value as TipoMantenimiento)}
             className="brand-field mt-1"
           >
             <option value="preventivo">Preventivo</option>
@@ -315,7 +297,7 @@ export function MantenimientoForm({
           />
         </label>
 
-        {!modePlaneado && (
+        {!modePlaneado && tipo !== 'correctivo' && (
           <label className="block">
             <span className="brand-label">Proxima fecha sugerida</span>
             <input

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useActionState, useRef } from 'react'
+import { useState, useActionState, useRef, useTransition } from 'react'
 import type { Activo, Equipo, MapaNivel, MapaZona, Proveedor } from '@/lib/types'
 import { crearEquipo, actualizarEquipo } from './actions'
 import { FormError } from '@/components/ui/flash-message'
@@ -45,13 +45,14 @@ export function EquipoForm({
 
   const fotoFileRef = useRef<File | null>(null)
   const fotoPlacaFileRef = useRef<File | null>(null)
+  const [, startTransition] = useTransition()
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     if (fotoFileRef.current) fd.set('foto', fotoFileRef.current)
     if (fotoPlacaFileRef.current) fd.set('foto_placa', fotoPlacaFileRef.current)
-    formAction(fd)
+    startTransition(() => formAction(fd))
   }
 
   const [marca, setMarca] = useState(equipo?.marca ?? '')
@@ -68,7 +69,7 @@ export function EquipoForm({
 
   return (
     <form onSubmit={handleSubmit} className="brand-shell space-y-5 rounded-lg p-5">
-      <FormError message={state.error} />
+      <FormError message={state?.error} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Nombre" name="nombre" defaultValue={equipo?.nombre} required />

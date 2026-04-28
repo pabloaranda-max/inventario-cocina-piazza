@@ -8,6 +8,19 @@ import { emptyToNull, isAdminEmail, todayMX } from '@/lib/utils'
 import type { FormState } from '@/lib/form-state'
 import type { EstadoIncidencia, PrioridadIncidencia } from '@/lib/types'
 import { notificarNuevoReporte } from '@/lib/email'
+import { postSlackMessage, postSlackSeguimiento } from '@/lib/slack'
+
+const ESTADO_EMOJI: Record<string, string> = {
+  pendiente_asignacion: '🔔',
+  abierta: '📋',
+  en_progreso: '🔧',
+  resuelta: '✅',
+  cerrada: '🔒'
+}
+
+const PRIORIDAD_EMOJI: Record<string, string> = {
+  baja: '🟢', media: '🟡', alta: '🟠', urgente: '🔴'
+}
 
 const estadoTransitions: Record<EstadoIncidencia, EstadoIncidencia[]> = {
   pendiente_asignacion: ['pendiente_asignacion', 'abierta'],
@@ -117,6 +130,16 @@ export async function crearIncidencia(_state: FormState, formData: FormData): Pr
     // notificación no crítica
   }
 
+  try {
+    const p = PRIORIDAD_EMOJI[payload.prioridad] ?? ''
+    await postSlackSeguimiento(
+      `🔔 Nueva incidencia ${ticket} — "${payload.descripcion}" ${p} ${payload.prioridad}` +
+      (payload.reportado_por ? ` — Reportado por: ${payload.reportado_por}` : '')
+    )
+  } catch {
+    // no crítico
+  }
+
   revalidatePath('/')
   revalidatePath('/mapa')
   revalidatePath('/incidencias')
@@ -130,9 +153,12 @@ export async function asignarIncidencia(id: string, formData: FormData) {
 
   const supabase = await createServerSupabaseClient()
 
-  const { data: activo, error: activoError } = activoId
-    ? await supabase.from('activos').select('id,clase,zona_id,zona:mapa_zonas(nombre)').eq('id', activoId).single()
-    : { data: null, error: null }
+  const [{ data: incRef }, { data: activo, error: activoError }] = await Promise.all([
+    supabase.from('incidencias').select('ticket_numero,descripcion').eq('id', id).single(),
+    activoId
+      ? supabase.from('activos').select('id,clase,zona_id,zona:mapa_zonas(nombre)').eq('id', activoId).single()
+      : Promise.resolve({ data: null, error: null })
+  ])
   if (activoError) redirect(`/incidencias/${id}?flash=incidencia_error`)
 
   const resolvedZonaId = activo?.zona_id ?? zonaId
@@ -149,6 +175,15 @@ export async function asignarIncidencia(id: string, formData: FormData) {
   }).eq('id', id)
 
   if (error) redirect(`/incidencias/${id}?flash=incidencia_error`)
+
+  try {
+    const ticket = (incRef as { ticket_numero: string } | null)?.ticket_numero ?? id
+    const desc = (incRef as { descripcion: string } | null)?.descripcion ?? ''
+    const destino = zonaNombre ?? zonaTexto ?? 'sin zona'
+    await postSlackSeguimiento(`📋 Asignada ${ticket} — "${desc}" → ${destino}`)
+  } catch {
+    // no crítico
+  }
 
   revalidatePath('/')
   revalidatePath('/mapa')
@@ -225,7 +260,7 @@ export async function cambiarEstadoIncidencia(id: string, formData: FormData) {
   } = await supabase.auth.getUser()
   const { data: incidencia, error: incidenciaError } = await supabase
     .from('incidencias')
-    .select('estado, prioridad, foto_url, activo_id, zona_id')
+    .select('estado, prioridad, foto_url, activo_id, zona_id, ticket_numero, descripcion, zona_nombre')
     .eq('id', id)
     .single()
 
@@ -285,6 +320,26 @@ export async function cambiarEstadoIncidencia(id: string, formData: FormData) {
   if (error) {
     await removeStorageFiles(supabase, [fotoUrl])
     redirect(`${redirectTarget}?flash=incidencia_error`)
+  }
+
+  try {
+    const emoji = ESTADO_EMOJI[estado] ?? '•'
+    const ticket = (incidencia as { ticket_numero?: string }).ticket_numero ?? id
+    const desc = (incidencia as { descripcion?: string }).descripcion ?? ''
+    const zona = (incidencia as { zona_nombre?: string | null }).zona_nombre
+    const estadoLabel: Record<string, string> = {
+      pendiente_asignacion: 'Pendiente de asignación',
+      abierta: 'Abierta',
+      en_progreso: 'En progreso',
+      resuelta: 'Resuelta',
+      cerrada: 'Cerrada'
+    }
+    const label = estadoLabel[estado] ?? estado
+    await postSlackSeguimiento(
+      `${emoji} ${label}: ${ticket} — "${desc}"` + (zona ? ` (${zona})` : '')
+    )
+  } catch {
+    // no crítico
   }
 
   revalidatePath('/')
@@ -377,6 +432,132 @@ export async function agregarSeguimiento(
 
   revalidatePath(`/incidencias/${id}`)
   return {}
+}
+
+export async function reportarResolucionSlack(id: string) {
+  const supabase = await createServerSupabaseClient()
+  const { data, error } = await supabase
+    .from('incidencias')
+    .select('ticket_numero,descripcion,prioridad,reportado_por,fecha_reporte,fecha_resuelta,validado_por,activo:activos(nombre,area),equipo:equipos(nombre,area),infraestructura:infraestructura(nombre,area),zona_nombre')
+    .eq('id', id)
+    .single()
+
+  if (error || !data) redirect(`/incidencias/${id}?flash=incidencia_error`)
+
+  const inc = data as unknown as {
+    ticket_numero: string
+    descripcion: string
+    prioridad: string
+    reportado_por: string | null
+    fecha_reporte: string
+    fecha_resuelta: string | null
+    validado_por: string | null
+    activo: { nombre: string } | { nombre: string }[] | null
+    equipo: { nombre: string } | { nombre: string }[] | null
+    infraestructura: { nombre: string } | { nombre: string }[] | null
+    zona_nombre: string | null
+  }
+
+  function firstName(rel: { nombre: string } | { nombre: string }[] | null): string | null {
+    if (!rel) return null
+    return Array.isArray(rel) ? (rel[0]?.nombre ?? null) : rel.nombre
+  }
+
+  const destino = firstName(inc.activo) ?? firstName(inc.equipo) ?? firstName(inc.infraestructura) ?? inc.zona_nombre ?? 'Sin destino'
+
+  const prioridadEmoji: Record<string, string> = {
+    baja: '🟢', media: '🟡', alta: '🟠', urgente: '🔴'
+  }
+
+  const duracion = (() => {
+    if (!inc.fecha_resuelta) return null
+    const ms = new Date(inc.fecha_resuelta).getTime() - new Date(inc.fecha_reporte).getTime()
+    const h = Math.floor(ms / 3600000)
+    const d = Math.floor(h / 24)
+    if (d > 0) return `${d}d ${h % 24}h`
+    if (h > 0) return `${h}h`
+    return 'menos de 1h'
+  })()
+
+  const blocks = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: `✅ Incidencia resuelta: ${inc.ticket_numero}` }
+    },
+    {
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*${inc.descripcion}*` }
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Destino:*\n${destino}` },
+        { type: 'mrkdwn', text: `*Prioridad:*\n${prioridadEmoji[inc.prioridad] ?? ''} ${inc.prioridad}` },
+        ...(inc.reportado_por ? [{ type: 'mrkdwn', text: `*Reportado por:*\n${inc.reportado_por}` }] : []),
+        ...(duracion ? [{ type: 'mrkdwn', text: `*Tiempo de resolución:*\n${duracion}` }] : []),
+        ...(inc.validado_por ? [{ type: 'mrkdwn', text: `*Cerrado por:*\n${inc.validado_por}` }] : [])
+      ]
+    }
+  ]
+
+  try {
+    await postSlackMessage(`✅ Incidencia resuelta: ${inc.ticket_numero} — ${inc.descripcion}`, blocks)
+  } catch {
+    redirect(`/incidencias/${id}?flash=incidencia_error`)
+  }
+
+  await supabase.from('incidencias').update({ reportado_slack_at: new Date().toISOString() }).eq('id', id)
+
+  revalidatePath(`/incidencias/${id}`)
+  redirect(`/incidencias/${id}?flash=incidencia_actualizada`)
+}
+
+export async function fusionarIncidencia(id: string, formData: FormData) {
+  const principalId = String(formData.get('principal_id') ?? '').trim()
+  if (!principalId || principalId === id) redirect(`/incidencias/${id}?flash=incidencia_error`)
+
+  const supabase = await createServerSupabaseClient()
+
+  const [{ data: secundaria }, { data: principal }] = await Promise.all([
+    supabase.from('incidencias').select('ticket_numero,descripcion,reportado_por,estado').eq('id', id).single(),
+    supabase.from('incidencias').select('id,estado,ticket_numero').eq('id', principalId).single()
+  ])
+
+  if (!secundaria || !principal) redirect(`/incidencias/${id}?flash=incidencia_error`)
+
+  // Cerrar la secundaria y marcarla como fusionada
+  const { error: updateError } = await supabase
+    .from('incidencias')
+    .update({ estado: 'cerrada', fusionada_en_id: principalId })
+    .eq('id', id)
+
+  if (updateError) redirect(`/incidencias/${id}?flash=incidencia_error`)
+
+  // Agregar nota al principal
+  const nota = [
+    `Reporte fusionado: ${secundaria.ticket_numero}`,
+    secundaria.reportado_por ? `Reportado por: ${secundaria.reportado_por}` : null,
+    secundaria.descripcion !== principal.id ? `"${secundaria.descripcion}"` : null
+  ].filter(Boolean).join(' — ')
+
+  await supabase.from('incidencia_seguimientos').insert({
+    incidencia_id: principalId,
+    texto: nota,
+    registrado_por: 'sistema'
+  })
+
+  try {
+    const ticketSec = secundaria.ticket_numero
+    const ticketPrin = (principal as { ticket_numero?: string }).ticket_numero ?? principalId
+    await postSlackSeguimiento(`🔀 ${ticketSec} fusionada en ${ticketPrin} — "${secundaria.descripcion}"`)
+  } catch {
+    // no crítico
+  }
+
+  revalidatePath('/incidencias')
+  revalidatePath(`/incidencias/${id}`)
+  revalidatePath(`/incidencias/${principalId}`)
+  redirect(`/incidencias/${principalId}?flash=incidencia_actualizada`)
 }
 
 export async function eliminarIncidencia(id: string) {

@@ -5,17 +5,20 @@ import { aplicarMantenimiento } from './actions'
 import { FormError } from '@/components/ui/flash-message'
 import { initialFormState } from '@/lib/form-state'
 import { todayMX } from '@/lib/utils'
+import type { TipoMantenimiento } from '@/lib/types'
 
 export function AplicarPanel({
   mantenimientoId,
   costoEstimado,
   ejecucionTipo,
   requiereMaterial,
+  tipo,
 }: {
   mantenimientoId: string
   costoEstimado: number | null
   ejecucionTipo: 'interno' | 'externo'
   requiereMaterial: boolean
+  tipo: TipoMantenimiento
 }) {
   const action = aplicarMantenimiento.bind(null, mantenimientoId)
   const [state, formAction] = useActionState(action, initialFormState)
@@ -29,7 +32,7 @@ export function AplicarPanel({
       </p>
 
       <form action={formAction} className="mt-4 space-y-4">
-        <FormError message={state.error} />
+        <FormError message={state?.error} />
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
@@ -43,14 +46,16 @@ export function AplicarPanel({
             />
           </label>
 
-          <label className="block">
-            <span className="brand-label">Próxima fecha sugerida</span>
-            <input
-              name="proxima_fecha_sugerida"
-              type="date"
-              className="brand-field mt-1"
-            />
-          </label>
+          {tipo !== 'correctivo' && (
+            <label className="block">
+              <span className="brand-label">Próxima fecha sugerida</span>
+              <input
+                name="proxima_fecha_sugerida"
+                type="date"
+                className="brand-field mt-1"
+              />
+            </label>
+          )}
 
           {showCosto && (
             <label className="block">

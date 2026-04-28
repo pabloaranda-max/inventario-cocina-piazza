@@ -12,8 +12,13 @@ type DashboardIncidencia = {
   estado: 'pendiente_asignacion' | 'abierta' | 'en_progreso'
   fecha_reporte: string
   reportado_por: string | null
+  activo: { id: string; nombre: string; area: string | null } | null
   equipo: { id: string; nombre: string; area: string | null } | null
   zona_nombre: string | null
+}
+
+function getDestinoNombre(inc: DashboardIncidencia) {
+  return inc.activo?.nombre ?? inc.equipo?.nombre ?? inc.zona_nombre ?? 'Sin destino'
 }
 
 export default async function DashboardPage() {
@@ -39,47 +44,50 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase
       .from('incidencias')
-      .select('id, ticket_numero, descripcion, prioridad, estado, fecha_reporte, reportado_por, equipo:equipos(id,nombre,area), zona_nombre')
+      .select('id, ticket_numero, descripcion, prioridad, estado, fecha_reporte, reportado_por, activo:activos(id,nombre,area), equipo:equipos(id,nombre,area), zona_nombre')
       .eq('estado', 'pendiente_asignacion')
+      .is('fusionada_en_id', null)
       .order('fecha_reporte', { ascending: true })
       .limit(10),
     supabase
       .from('incidencias')
-      .select('id, ticket_numero, descripcion, prioridad, estado, fecha_reporte, reportado_por, equipo:equipos(id,nombre,area), zona_nombre')
+      .select('id, ticket_numero, descripcion, prioridad, estado, fecha_reporte, reportado_por, activo:activos(id,nombre,area), equipo:equipos(id,nombre,area), zona_nombre')
       .in('estado', ['abierta', 'en_progreso'])
       .in('prioridad', ['alta', 'urgente'])
+      .is('fusionada_en_id', null)
       .order('prioridad', { ascending: false })
       .order('fecha_reporte', { ascending: true })
       .limit(6),
     supabase
       .from('incidencias')
-      .select('id, ticket_numero, descripcion, prioridad, estado, fecha_reporte, reportado_por, equipo:equipos(id,nombre,area), zona_nombre')
+      .select('id, ticket_numero, descripcion, prioridad, estado, fecha_reporte, reportado_por, activo:activos(id,nombre,area), equipo:equipos(id,nombre,area), zona_nombre')
       .in('estado', ['abierta', 'en_progreso'])
+      .is('fusionada_en_id', null)
       .order('fecha_reporte', { ascending: false })
       .limit(6),
     supabase
       .from('equipos')
-      .select('*')
+      .select('id,nombre,area,fecha_proximo_mantenimiento')
       .lt('fecha_proximo_mantenimiento', today)
       .order('fecha_proximo_mantenimiento', { ascending: true })
       .limit(6),
     supabase
       .from('equipos')
-      .select('*')
+      .select('id,nombre,area,fecha_proximo_mantenimiento')
       .gte('fecha_proximo_mantenimiento', today)
       .lte('fecha_proximo_mantenimiento', nextLimitDate)
       .order('fecha_proximo_mantenimiento', { ascending: true })
       .limit(6),
     supabase
       .from('activos')
-      .select('id, nombre, area, fecha_proxima_limpieza')
+      .select('id,nombre,area,fecha_proxima_limpieza')
       .not('limpieza_intervalo_dias', 'is', null)
       .lt('fecha_proxima_limpieza', today)
       .order('fecha_proxima_limpieza', { ascending: true })
       .limit(6),
     supabase
       .from('activos')
-      .select('id, nombre, area, fecha_proxima_limpieza')
+      .select('id,nombre,area,fecha_proxima_limpieza')
       .not('limpieza_intervalo_dias', 'is', null)
       .gte('fecha_proxima_limpieza', today)
       .lte('fecha_proxima_limpieza', nextLimitDate)
@@ -88,16 +96,19 @@ export default async function DashboardPage() {
     supabase
       .from('incidencias')
       .select('id', { count: 'exact', head: true })
-      .eq('estado', 'pendiente_asignacion'),
-    supabase
-      .from('incidencias')
-      .select('id', { count: 'exact', head: true })
-      .in('estado', ['abierta', 'en_progreso']),
+      .eq('estado', 'pendiente_asignacion')
+      .is('fusionada_en_id', null),
     supabase
       .from('incidencias')
       .select('id', { count: 'exact', head: true })
       .in('estado', ['abierta', 'en_progreso'])
-      .in('prioridad', ['alta', 'urgente']),
+      .is('fusionada_en_id', null),
+    supabase
+      .from('incidencias')
+      .select('id', { count: 'exact', head: true })
+      .in('estado', ['abierta', 'en_progreso'])
+      .in('prioridad', ['alta', 'urgente'])
+      .is('fusionada_en_id', null),
     supabase
       .from('equipos')
       .select('id', { count: 'exact', head: true })
@@ -403,7 +414,7 @@ export default async function DashboardPage() {
                       <StatusBadge type="incidencia" value={incidencia.estado} />
                     </div>
                     <p className="mt-2 text-sm text-[color:var(--brand-muted)]">
-                      {incidencia.equipo?.nombre ?? 'Sin equipo'} · {formatDate(incidencia.fecha_reporte)}
+                      {getDestinoNombre(incidencia)} · {formatDate(incidencia.fecha_reporte)}
                     </p>
                   </li>
                 ))}
@@ -460,7 +471,7 @@ export default async function DashboardPage() {
                     <StatusBadge type="prioridad" value={incidencia.prioridad} />
                   </div>
                   <p className="mt-2 text-sm text-[color:var(--brand-muted)]">
-                    {incidencia.equipo?.nombre ?? 'Sin equipo'} · {formatDate(incidencia.fecha_reporte)}
+                    {getDestinoNombre(incidencia)} · {formatDate(incidencia.fecha_reporte)}
                   </p>
                 </li>
               ))}

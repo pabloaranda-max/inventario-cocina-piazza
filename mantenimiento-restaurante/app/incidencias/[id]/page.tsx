@@ -1,9 +1,10 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { cambiarEstadoIncidencia, eliminarIncidencia } from '../actions'
+import { cambiarEstadoIncidencia, eliminarIncidencia, reportarResolucionSlack } from '../actions'
 import { AsignarPanel } from '../asignar-panel'
 import { EstadoFlowPanel } from '../estado-flow-panel'
+import { FusionarPanel } from '../fusionar-panel'
 import { SeguimientoPanel } from '../seguimiento-panel'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createSignedUrl } from '@/lib/storage'
@@ -24,7 +25,7 @@ export default async function IncidenciaDetallePage({
   const { flash } = await searchParams
   const supabase = await createServerSupabaseClient()
 
-  const [{ data }, { data: mantenimientos }, { data: cotizaciones }, { data: seguimientos }] = await Promise.all([
+  const [{ data }, { data: mantenimientos }, { data: cotizaciones }, { data: seguimientos }, { data: fusionadas }] = await Promise.all([
     supabase
       .from('incidencias')
       .select('*, activo:activos(id,nombre,area,clase,tipo), equipo:equipos(id,nombre,area), infraestructura:infraestructura(id,nombre,area,tipo)')
@@ -44,7 +45,12 @@ export default async function IncidenciaDetallePage({
       .from('incidencia_seguimientos')
       .select('*')
       .eq('incidencia_id', id)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('incidencias')
+      .select('id,ticket_numero,descripcion,reportado_por,fecha_reporte,prioridad')
+      .eq('fusionada_en_id', id)
+      .order('fecha_reporte', { ascending: true })
   ])
   const {
     data: { user }
@@ -55,13 +61,14 @@ export default async function IncidenciaDetallePage({
   const incidencia = data as Incidencia
   const pendienteAsignacion = incidencia.estado === 'pendiente_asignacion'
 
-  const [activosData, zonasData, nivelesData] = pendienteAsignacion
+  const [activosData, zonasData, nivelesData, candidatosData] = pendienteAsignacion
     ? await Promise.all([
         supabase.from('activos').select('id,nombre,area,clase,tipo,zona_id').order('nombre', { ascending: true }),
         supabase.from('mapa_zonas').select('id,nombre,area,label,nivel_id').eq('visible', true).order('orden', { ascending: true }),
-        supabase.from('mapa_niveles').select('id,nombre,orden').eq('visible', true).order('orden', { ascending: true })
+        supabase.from('mapa_niveles').select('id,nombre,orden').eq('visible', true).order('orden', { ascending: true }),
+        supabase.from('incidencias').select('id,ticket_numero,descripcion,reportado_por').in('estado', ['pendiente_asignacion', 'abierta', 'en_progreso']).neq('id', id).is('fusionada_en_id', null).order('fecha_reporte', { ascending: false }).limit(50)
       ])
-    : [{ data: null }, { data: null }, { data: null }]
+    : [{ data: null }, { data: null }, { data: null }, { data: null }]
 
   const foto = await createSignedUrl(supabase, incidencia.foto_url)
   const destinoNombre =
@@ -95,6 +102,10 @@ export default async function IncidenciaDetallePage({
               niveles={(nivelesData.data ?? []) as Pick<MapaNivel, 'id' | 'nombre' | 'orden'>[]}
             />
           </div>
+          <FusionarPanel
+            incidenciaId={incidencia.id}
+            candidatos={(candidatosData?.data ?? []) as { id: string; ticket_numero: string; descripcion: string; reportado_por: string | null }[]}
+          />
         </section>
       )}
 
@@ -151,6 +162,22 @@ export default async function IncidenciaDetallePage({
               Ver infraestructura
             </Link>
           ) : null}
+          {(incidencia.estado === 'resuelta' || incidencia.estado === 'cerrada') && (
+            incidencia.reportado_slack_at ? (
+              <span className="rounded-md border border-[rgba(54,197,94,0.3)] bg-[rgba(54,197,94,0.1)] px-4 py-2 text-sm font-medium text-[#1a7a3a] dark:border-[rgba(54,197,94,0.24)] dark:bg-[rgba(54,197,94,0.14)] dark:text-[#7ae8a0]">
+                Reportado en Slack
+              </span>
+            ) : (
+              <form action={reportarResolucionSlack.bind(null, incidencia.id)}>
+                <button
+                  type="submit"
+                  className="rounded-md border border-[rgba(54,197,94,0.3)] bg-[rgba(54,197,94,0.1)] px-4 py-2 text-sm font-medium text-[#1a7a3a] hover:bg-[rgba(54,197,94,0.18)] dark:border-[rgba(54,197,94,0.24)] dark:bg-[rgba(54,197,94,0.14)] dark:text-[#7ae8a0]"
+                >
+                  Compartir en Slack
+                </button>
+              </form>
+            )
+          )}
           <form action={eliminarIncidencia.bind(null, incidencia.id)}>
             <ConfirmDeleteButton
               label="Eliminar"
@@ -277,6 +304,28 @@ export default async function IncidenciaDetallePage({
           <p className="brand-hint mt-4 text-sm">Sin cotizaciones registradas.</p>
         )}
       </section>
+
+      {fusionadas && fusionadas.length > 0 && (
+        <section className="brand-card rounded-lg p-5">
+          <h2 className="text-lg font-semibold">Reportes fusionados</h2>
+          <p className="brand-hint mt-1 text-sm">Incidencias que se consolidaron en este reporte.</p>
+          <ul className="mt-4 space-y-3">
+            {fusionadas.map((f) => (
+              <li key={f.id} className="border-b border-[rgba(47,62,30,0.08)] pb-3 last:border-0 dark:border-[rgba(238,227,202,0.08)]">
+                <div className="flex items-start justify-between gap-2">
+                  <Link href={`/incidencias/${f.id}`} className="font-medium text-[color:var(--brand-green)] hover:underline dark:text-[color:var(--brand-bone)]">
+                    {f.ticket_numero}
+                  </Link>
+                  <span className="brand-hint text-xs">fusionada</span>
+                </div>
+                <p className="brand-hint mt-1 text-sm">
+                  {f.reportado_por ? `${f.reportado_por} · ` : ''}{f.descripcion}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="brand-card rounded-lg p-5">
         <h2 className="text-lg font-semibold">Mantenimientos vinculados</h2>
