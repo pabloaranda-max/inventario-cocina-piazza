@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { removeStorageFiles, uploadOptionalFile } from '@/lib/storage'
+import { removeStorageFiles, uploadOptionalFile, createSignedUrl } from '@/lib/storage'
 import { emptyToNull, isAdminEmail, todayMX } from '@/lib/utils'
 import type { FormState } from '@/lib/form-state'
 import type { EstadoIncidencia, PrioridadIncidencia } from '@/lib/types'
@@ -134,7 +134,8 @@ export async function crearIncidencia(_state: FormState, formData: FormData): Pr
     const p = PRIORIDAD_EMOJI[payload.prioridad] ?? ''
     const msg = `🔔 Nueva incidencia ${ticket} — "${payload.descripcion}" ${p} ${payload.prioridad}` +
       (payload.reportado_por ? ` — Reportado por: ${payload.reportado_por}` : '')
-    await postSlackSeguimiento(msg, buildImageBlocks(msg, fotoUrl))
+    const signedFoto = fotoUrl ? await createSignedUrl(supabase, fotoUrl) : null
+    await postSlackSeguimiento(msg, buildImageBlocks(msg, signedFoto))
   } catch {
     // no crítico
   }
@@ -336,8 +337,9 @@ export async function cambiarEstadoIncidencia(id: string, formData: FormData) {
     }
     const label = estadoLabel[estado] ?? estado
     const msg = `${emoji} ${label}: ${ticket} — "${desc}"` + (zona ? ` (${zona})` : '')
-    const foto = fotoUrl ?? fotoExistente
-    await postSlackSeguimiento(msg, buildImageBlocks(msg, foto))
+    const fotoPath = fotoUrl ?? fotoExistente
+    const signedFoto = fotoPath ? await createSignedUrl(supabase, fotoPath) : null
+    await postSlackSeguimiento(msg, buildImageBlocks(msg, signedFoto))
   } catch {
     // no crítico
   }
@@ -480,7 +482,7 @@ export async function reportarResolucionSlack(id: string) {
     return 'menos de 1h'
   })()
 
-  const blocks = [
+  const blocks: object[] = [
     {
       type: 'header',
       text: { type: 'plain_text', text: `✅ Incidencia resuelta: ${inc.ticket_numero}` }
@@ -498,9 +500,15 @@ export async function reportarResolucionSlack(id: string) {
         ...(duracion ? [{ type: 'mrkdwn', text: `*Tiempo de resolución:*\n${duracion}` }] : []),
         ...(inc.validado_por ? [{ type: 'mrkdwn', text: `*Cerrado por:*\n${inc.validado_por}` }] : [])
       ]
-    },
-    ...(inc.foto_url ? [{ type: 'image', image_url: inc.foto_url, alt_text: 'Evidencia' }] : [])
+    }
   ]
+
+  if (inc.foto_url) {
+    const signedFoto = await createSignedUrl(supabase, inc.foto_url)
+    if (signedFoto) {
+      blocks.push({ type: 'image', image_url: signedFoto, alt_text: 'Evidencia' })
+    }
+  }
 
   try {
     await postSlackMessage(`✅ Incidencia resuelta: ${inc.ticket_numero} — ${inc.descripcion}`, blocks)
