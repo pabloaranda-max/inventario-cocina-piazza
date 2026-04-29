@@ -8,7 +8,7 @@ import { emptyToNull, isAdminEmail, todayMX } from '@/lib/utils'
 import type { FormState } from '@/lib/form-state'
 import type { EstadoIncidencia, PrioridadIncidencia } from '@/lib/types'
 import { notificarNuevoReporte } from '@/lib/email'
-import { postSlackMessage, postSlackSeguimiento, buildImageBlocks } from '@/lib/slack'
+import { postSlackMessage, postSlackSeguimiento } from '@/lib/slack'
 
 const ESTADO_EMOJI: Record<string, string> = {
   pendiente_asignacion: '🔔',
@@ -132,10 +132,11 @@ export async function crearIncidencia(_state: FormState, formData: FormData): Pr
 
   try {
     const p = PRIORIDAD_EMOJI[payload.prioridad] ?? ''
-    const msg = `🔔 Nueva incidencia ${ticket} — "${payload.descripcion}" ${p} ${payload.prioridad}` +
+    let msg = `🔔 Nueva incidencia ${ticket} — "${payload.descripcion}" ${p} ${payload.prioridad}` +
       (payload.reportado_por ? ` — Reportado por: ${payload.reportado_por}` : '')
-    const signedFoto = fotoUrl ? getPublicUrl(supabase, fotoUrl) : null
-    await postSlackSeguimiento(msg, buildImageBlocks(msg, signedFoto))
+    const publicFoto = fotoUrl ? getPublicUrl(supabase, fotoUrl) : null
+    if (publicFoto) msg += `\n${publicFoto}`
+    await postSlackSeguimiento(msg)
   } catch {
     // no crítico
   }
@@ -336,10 +337,11 @@ export async function cambiarEstadoIncidencia(id: string, formData: FormData) {
       cerrada: 'Cerrada'
     }
     const label = estadoLabel[estado] ?? estado
-    const msg = `${emoji} ${label}: ${ticket} — "${desc}"` + (zona ? ` (${zona})` : '')
+    let msg = `${emoji} ${label}: ${ticket} — "${desc}"` + (zona ? ` (${zona})` : '')
     const fotoPath = fotoUrl ?? fotoExistente
-    const signedFoto = fotoPath ? getPublicUrl(supabase, fotoPath) : null
-    await postSlackSeguimiento(msg, buildImageBlocks(msg, signedFoto))
+    const publicFoto = fotoPath ? getPublicUrl(supabase, fotoPath) : null
+    if (publicFoto) msg += `\n${publicFoto}`
+    await postSlackSeguimiento(msg)
   } catch {
     // no crítico
   }
@@ -503,11 +505,9 @@ export async function reportarResolucionSlack(id: string) {
     }
   ]
 
-  if (inc.foto_url) {
-    const signedFoto = getPublicUrl(supabase, inc.foto_url)
-    if (signedFoto) {
-      blocks.push({ type: 'image', image_url: signedFoto, alt_text: 'Evidencia' })
-    }
+  const fotoPublica = inc.foto_url ? getPublicUrl(supabase, inc.foto_url) : null
+  if (fotoPublica) {
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: fotoPublica } })
   }
 
   try {
