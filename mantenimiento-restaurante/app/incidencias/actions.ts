@@ -134,8 +134,10 @@ export async function crearIncidencia(_state: FormState, formData: FormData): Pr
     const p = PRIORIDAD_EMOJI[payload.prioridad] ?? ''
     let msg = `🔔 Nueva incidencia ${ticket} — "${payload.descripcion}" ${p} ${payload.prioridad}` +
       (payload.reportado_por ? ` — Reportado por: ${payload.reportado_por}` : '')
-    const publicFoto = fotoUrl ? getPublicUrl(supabase, fotoUrl) : null
-    if (publicFoto) msg += `\n${publicFoto}`
+    try {
+      const publicFoto = fotoUrl ? getPublicUrl(supabase, fotoUrl) : null
+      if (publicFoto) msg += `\n${publicFoto}`
+    } catch { /* foto no crítica */ }
     await postSlackSeguimiento(msg)
   } catch {
     // no crítico
@@ -338,9 +340,11 @@ export async function cambiarEstadoIncidencia(id: string, formData: FormData) {
     }
     const label = estadoLabel[estado] ?? estado
     let msg = `${emoji} ${label}: ${ticket} — "${desc}"` + (zona ? ` (${zona})` : '')
-    const fotoPath = fotoUrl ?? fotoExistente
-    const publicFoto = fotoPath ? getPublicUrl(supabase, fotoPath) : null
-    if (publicFoto) msg += `\n${publicFoto}`
+    try {
+      const fotoPath = fotoUrl ?? fotoExistente
+      const publicFoto = fotoPath ? getPublicUrl(supabase, fotoPath) : null
+      if (publicFoto) msg += `\n${publicFoto}`
+    } catch { /* foto no crítica */ }
     await postSlackSeguimiento(msg)
   } catch {
     // no crítico
