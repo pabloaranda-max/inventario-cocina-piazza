@@ -58,6 +58,12 @@ export async function createSignedUrl(supabase: SupabaseClient, path: string | n
   return data?.signedUrl ?? null
 }
 
+export function getPublicUrl(supabase: SupabaseClient, path: string | null) {
+  if (!path) return null
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
+  return data.publicUrl ?? null
+}
+
 export async function createSignedUrlMap(supabase: SupabaseClient, paths: Array<string | null>) {
   const uniquePaths = Array.from(new Set(paths.filter((path): path is string => Boolean(path))))
   if (!uniquePaths.length) return new Map<string, string>()

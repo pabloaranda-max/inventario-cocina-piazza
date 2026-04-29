@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { removeStorageFiles, uploadOptionalFile, createSignedUrl } from '@/lib/storage'
+import { removeStorageFiles, uploadOptionalFile, getPublicUrl } from '@/lib/storage'
 import { emptyToNull, isAdminEmail, todayMX } from '@/lib/utils'
 import type { FormState } from '@/lib/form-state'
 import type { EstadoIncidencia, PrioridadIncidencia } from '@/lib/types'
@@ -134,7 +134,7 @@ export async function crearIncidencia(_state: FormState, formData: FormData): Pr
     const p = PRIORIDAD_EMOJI[payload.prioridad] ?? ''
     const msg = `🔔 Nueva incidencia ${ticket} — "${payload.descripcion}" ${p} ${payload.prioridad}` +
       (payload.reportado_por ? ` — Reportado por: ${payload.reportado_por}` : '')
-    const signedFoto = fotoUrl ? await createSignedUrl(supabase, fotoUrl) : null
+    const signedFoto = fotoUrl ? getPublicUrl(supabase, fotoUrl) : null
     await postSlackSeguimiento(msg, buildImageBlocks(msg, signedFoto))
   } catch {
     // no crítico
@@ -338,7 +338,7 @@ export async function cambiarEstadoIncidencia(id: string, formData: FormData) {
     const label = estadoLabel[estado] ?? estado
     const msg = `${emoji} ${label}: ${ticket} — "${desc}"` + (zona ? ` (${zona})` : '')
     const fotoPath = fotoUrl ?? fotoExistente
-    const signedFoto = fotoPath ? await createSignedUrl(supabase, fotoPath) : null
+    const signedFoto = fotoPath ? getPublicUrl(supabase, fotoPath) : null
     await postSlackSeguimiento(msg, buildImageBlocks(msg, signedFoto))
   } catch {
     // no crítico
@@ -504,7 +504,7 @@ export async function reportarResolucionSlack(id: string) {
   ]
 
   if (inc.foto_url) {
-    const signedFoto = await createSignedUrl(supabase, inc.foto_url)
+    const signedFoto = getPublicUrl(supabase, inc.foto_url)
     if (signedFoto) {
       blocks.push({ type: 'image', image_url: signedFoto, alt_text: 'Evidencia' })
     }
