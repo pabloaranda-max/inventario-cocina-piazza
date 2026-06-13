@@ -8,7 +8,7 @@ import { emptyToNull, isAdminEmail, todayMX } from '@/lib/utils'
 import type { FormState } from '@/lib/form-state'
 import type { EstadoIncidencia, PrioridadIncidencia } from '@/lib/types'
 import { notificarNuevoReporte } from '@/lib/email'
-import { postSlackMessage, postSlackSeguimiento } from '@/lib/slack'
+import { buildImageBlocks, postSlackMessage, postSlackSeguimiento } from '@/lib/slack'
 
 const ESTADO_EMOJI: Record<string, string> = {
   pendiente_asignacion: '🔔',
@@ -132,13 +132,11 @@ export async function crearIncidencia(_state: FormState, formData: FormData): Pr
 
   try {
     const p = PRIORIDAD_EMOJI[payload.prioridad] ?? ''
-    let msg = `🔔 Nueva incidencia ${ticket} — "${payload.descripcion}" ${p} ${payload.prioridad}` +
+    const msg = `🔔 Nueva incidencia ${ticket} — "${payload.descripcion}" ${p} ${payload.prioridad}` +
       (payload.reportado_por ? ` — Reportado por: ${payload.reportado_por}` : '')
-    try {
-      const publicFoto = fotoUrl ? getPublicUrl(supabase, fotoUrl) : null
-      if (publicFoto) msg += `\n${publicFoto}`
-    } catch { /* foto no crítica */ }
-    await postSlackSeguimiento(msg)
+    const fotoPublica = getPublicUrl(supabase, fotoUrl)
+    const slackText = fotoPublica ? `${msg}\n${fotoPublica}` : msg
+    await postSlackSeguimiento(slackText, buildImageBlocks(msg, fotoPublica))
   } catch {
     // no crítico
   }
@@ -179,14 +177,6 @@ export async function asignarIncidencia(id: string, formData: FormData) {
 
   if (error) redirect(`/incidencias/${id}?flash=incidencia_error`)
 
-  try {
-    const ticket = (incRef as { ticket_numero: string } | null)?.ticket_numero ?? id
-    const desc = (incRef as { descripcion: string } | null)?.descripcion ?? ''
-    const destino = zonaNombre ?? zonaTexto ?? 'sin zona'
-    await postSlackSeguimiento(`📋 Asignada ${ticket} — "${desc}" → ${destino}`)
-  } catch {
-    // no crítico
-  }
 
   revalidatePath('/')
   revalidatePath('/mapa')
@@ -323,31 +313,6 @@ export async function cambiarEstadoIncidencia(id: string, formData: FormData) {
   if (error) {
     await removeStorageFiles(supabase, [fotoUrl])
     redirect(`${redirectTarget}?flash=incidencia_error`)
-  }
-
-  try {
-    const emoji = ESTADO_EMOJI[estado] ?? '•'
-    const ticket = (incidencia as { ticket_numero?: string }).ticket_numero ?? id
-    const desc = (incidencia as { descripcion?: string }).descripcion ?? ''
-    const zona = (incidencia as { zona_nombre?: string | null }).zona_nombre
-    const fotoExistente = (incidencia as { foto_url?: string | null }).foto_url
-    const estadoLabel: Record<string, string> = {
-      pendiente_asignacion: 'Pendiente de asignación',
-      abierta: 'Abierta',
-      en_progreso: 'En progreso',
-      resuelta: 'Resuelta',
-      cerrada: 'Cerrada'
-    }
-    const label = estadoLabel[estado] ?? estado
-    let msg = `${emoji} ${label}: ${ticket} — "${desc}"` + (zona ? ` (${zona})` : '')
-    try {
-      const fotoPath = fotoUrl ?? fotoExistente
-      const publicFoto = fotoPath ? getPublicUrl(supabase, fotoPath) : null
-      if (publicFoto) msg += `\n${publicFoto}`
-    } catch { /* foto no crítica */ }
-    await postSlackSeguimiento(msg)
-  } catch {
-    // no crítico
   }
 
   revalidatePath('/')
@@ -488,7 +453,7 @@ export async function reportarResolucionSlack(id: string) {
     return 'menos de 1h'
   })()
 
-  const blocks: object[] = [
+  const blocks: Record<string, unknown>[] = [
     {
       type: 'header',
       text: { type: 'plain_text', text: `✅ Incidencia resuelta: ${inc.ticket_numero}` }
@@ -511,11 +476,16 @@ export async function reportarResolucionSlack(id: string) {
 
   const fotoPublica = inc.foto_url ? getPublicUrl(supabase, inc.foto_url) : null
   if (fotoPublica) {
-    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: fotoPublica } })
+    blocks.push({ type: 'image', image_url: fotoPublica, alt_text: 'Foto de incidencia resuelta' })
   }
 
   try {
-    await postSlackMessage(`✅ Incidencia resuelta: ${inc.ticket_numero} — ${inc.descripcion}`, blocks)
+    const msg = `✅ Incidencia resuelta: ${inc.ticket_numero} — ${inc.descripcion}`
+    const slackText = fotoPublica ? `${msg}\n${fotoPublica}` : msg
+    await Promise.all([
+      postSlackMessage(slackText, blocks),
+      postSlackSeguimiento(slackText, buildImageBlocks(msg, fotoPublica))
+    ])
   } catch {
     redirect(`/incidencias/${id}?flash=incidencia_error`)
   }
@@ -560,13 +530,6 @@ export async function fusionarIncidencia(id: string, formData: FormData) {
     registrado_por: 'sistema'
   })
 
-  try {
-    const ticketSec = secundaria.ticket_numero
-    const ticketPrin = (principal as { ticket_numero?: string }).ticket_numero ?? principalId
-    await postSlackSeguimiento(`🔀 ${ticketSec} fusionada en ${ticketPrin} — "${secundaria.descripcion}"`)
-  } catch {
-    // no crítico
-  }
 
   revalidatePath('/incidencias')
   revalidatePath(`/incidencias/${id}`)
