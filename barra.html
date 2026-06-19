@@ -1,917 +1,1099 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
- <meta charset="UTF-8">
- <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
- <title>📦 Inventario BARRA - Piazza Pasticcio</title>
- <style>
-   /* ESTILOS CRÍTICOS Y GLOBALES */
-   * { box-sizing: border-box; margin: 0; padding: 0; }
-   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f5f5; color: #333; }
-   
-   /* Touch targets mínimo 48px */
-   button { min-height: 48px; cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
-   
-   /* Evitar zoom en iOS — todos los inputs font-size >= 16px */
-   input, textarea, select { font-size: 16px; font-family: inherit; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Inventario · Xetux</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; }
 
-   /* PANTALLA 1: INICIO DE SESIÓN */
-   #pantalla-inicio {
-     padding: 24px; display: flex; flex-direction: column; justify-content: center;
-     min-height: 100vh; background: white;
-   }
-   .inicio-titulo { font-size: 28px; text-align: center; margin-bottom: 8px; }
-   .inicio-sub { text-align: center; color: #666; margin-bottom: 32px; font-size: 18px; }
-   .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-   .form-group label { font-weight: bold; font-size: 14px; }
-   .form-group input { padding: 14px; border: 1px solid #ddd; border-radius: 8px; }
-   #btn-iniciar { background: #667eea; color: white; font-size: 18px; padding: 16px; margin-top: 16px; width: 100%; border-radius: 28px; }
-   
-   #banner-sesion { background: #fff3cd; color: #856404; padding: 16px; border-radius: 8px; display: none; flex-direction: column; gap: 12px; border: 1px solid #ffeeba; margin-bottom: 24px; }
-   .banner-btns { display: flex; gap: 8px; }
-   .banner-btns button { flex: 1; border-radius: 6px; }
-   #btn-continuar { background: #667eea; color: white; }
-   #btn-nueva { background: white; border: 1px solid #ddd; color: #333; }
+/* ── Screens ── */
+.screen { display: none; min-height: 100vh; flex-direction: column; }
+.screen.active { display: flex; }
 
-   /* PANTALLA 2: INVENTARIO */
-   #pantalla-inventario { display: none; padding-bottom: 120px; }
-   
-   /* Header sticky */
-   #header-sticky { position: sticky; top: 0; background: #667eea; color: white; padding: 16px; z-index: 50; }
-   #header-line1 { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
-   #header-line2 { font-size: 14px; opacity: 0.9; }
+/* ── Header ── */
+.hdr { background: #667eea; color: white; padding: 14px 16px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 50; }
+.hdr h1 { font-size: 17px; font-weight: 700; flex: 1; }
+.hdr-back { background: none; border: none; color: white; font-size: 22px; padding: 0 6px; cursor: pointer; line-height: 1; }
+.hdr-action { background: rgba(255,255,255,.2); border: none; color: white; padding: 7px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
 
-   /* Búsqueda y Chips sticky */
-   #search-sticky { position: sticky; top: 73px; background: white; padding: 12px 16px; z-index: 50; border-bottom: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-   .search-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
-   .search-row input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
-   .search-row button { width: 48px; height: 48px; background: #f3f4f6; color: #555; border-radius: 8px; font-size: 16px; }
-   
-   /* Chips scrolleables sin scrollbar visible */
-   .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
-   .chips::-webkit-scrollbar { display: none; }
-   .chip { padding: 8px 16px; background: #f3f4f6; border-radius: 20px; font-size: 14px; color: #555; white-space: nowrap; font-weight: normal; }
-   .chip.active { background: #667eea; color: white; font-weight: bold; }
+/* ── Buttons ── */
+button { cursor: pointer; border: none; font-family: inherit; font-weight: 600; border-radius: 10px; transition: opacity .15s; }
+button:active { opacity: .75; }
+.btn { display: block; width: 100%; padding: 15px; font-size: 16px; border-radius: 12px; text-align: center; }
+.btn-purple { background: #667eea; color: white; }
+.btn-green  { background: #22c55e; color: white; }
+.btn-gray   { background: #e5e7eb; color: #374151; }
+.btn-red    { background: #ef4444; color: white; }
+.btn-sm     { padding: 8px 14px; font-size: 13px; border-radius: 8px; }
+.btn-icon   { background: rgba(255,255,255,.2); color: white; padding: 8px 10px; font-size: 14px; border-radius: 8px; }
 
-   /* Lista y Tarjetas */
-   #lista, #lista-manuales { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-   .item { background: white; padding: 16px; border-radius: 8px; border-left: 4px solid transparent; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-   /* Items con cantidad */
-   .item.capturado { border-left: 4px solid #22c55e; background: #f0fff4; }
-   
-   .item-name { font-weight: bold; font-size: 15px; margin-bottom: 4px; }
-   .item-code { font-size: 12px; color: #777; margin-bottom: 8px; }
-   
-   /* Qty row */
-   .qty-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-   .qty-input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; text-align: center; font-weight: bold; }
-   .qty-btn { width: 48px; height: 48px; border-radius: 6px; font-size: 20px; background: #667eea; color: white; flex-shrink: 0; }
+/* ── Forms ── */
+.form-group { margin-bottom: 14px; }
+label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 5px; }
+input[type=text], input[type=date], select {
+  width: 100%; padding: 13px 14px; border: 1.5px solid #ddd; border-radius: 10px;
+  font-size: 16px; font-family: inherit; background: white; color: #333; -webkit-appearance: none;
+}
+input:focus, select:focus { outline: none; border-color: #667eea; }
 
-   /* Manuales */
-   .badge-manual { display: inline-block; background: #ef4444; color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-bottom: 6px; font-weight: bold;}
-   .manual-row { display: flex; gap: 12px; margin-top: 8px; align-items: center; }
-   .manual-row img { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
-   .manual-desc { font-size: 13px; color: #666; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* ── Content ── */
+.content { flex: 1; padding: 16px; overflow-y: auto; }
+.card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
+.divider { height: 1px; background: #e5e7eb; margin: 16px 0; }
+.section-label { font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: .8px; margin: 18px 0 8px; }
+.row { display: flex; gap: 8px; margin-top: 10px; }
+.gap-8 { gap: 8px; }
 
-   /* Flotantes */
-   .fab { position: fixed; bottom: 24px; border-radius: 28px; padding: 14px 20px; font-size: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 100; }
-   .fab-enviar { left: 16px; background: #22c55e; color: white; }
-   .fab-manual { right: 16px; background: #f59e0b; color: white; }
-   .fab:disabled { opacity: 0.4; cursor: not-allowed; }
-   
-   #btn-top { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); color: white; width: 48px; height: 48px; border-radius: 24px; z-index: 200; font-size: 20px; backdrop-filter: blur(4px); display: none; }
+/* ── Progress ── */
+.progress-bar { height: 4px; background: #e5e7eb; border-radius: 4px; overflow: hidden; margin: 6px 0 0; }
+.progress-fill { height: 100%; background: #22c55e; border-radius: 4px; transition: width .3s; }
 
-   /* Modales */
-   .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; justify-content: center; align-items: flex-end; }
-   .modal-content { background: white; width: 100%; max-height: 90vh; border-radius: 16px 16px 0 0; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
-   .modal-title { font-size: 20px; font-weight: bold; margin-bottom: 8px; }
-   
-   .btn-green { background: #22c55e; color: white; border-radius: 8px; width: 100%; padding: 16px; }
-   .btn-gray { background: #e5e7eb; color: #333; border-radius: 8px; width: 100%; padding: 16px; }
-   
-   /* File input estelizado */
-   .file-input-wrapper { position: relative; overflow: hidden; display: inline-block; width: 100%; }
-   .file-input-wrapper input[type=file] { font-size: 100px; position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer; height: 100%; }
-   .btn-file { background: #f3f4f6; border: 2px dashed #ccc; color: #555; padding: 16px; text-align: center; border-radius: 8px; font-weight: bold; }
-   #preview-foto { max-height: 200px; object-fit: contain; border-radius: 8px; margin-top: 8px; display: none; width: 100%; }
+/* ── Zone cards (overview) ── */
+.zone-card { background: white; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.07); cursor: pointer; border-left: 4px solid #e5e7eb; }
+.zone-card:active { opacity: .8; }
+.zone-card.done { border-left-color: #22c55e; }
+.zone-card.partial { border-left-color: #f59e0b; }
+.zone-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.zone-info { flex: 1; min-width: 0; }
+.zone-name { font-weight: 700; font-size: 15px; }
+.zone-meta { font-size: 12px; color: #888; margin-top: 2px; }
+.zone-status { font-size: 20px; }
 
-   /* Spinner */
-   .spinner { border: 4px solid rgba(0,0,0,0.1); width: 48px; height: 48px; border-radius: 50%; border-left-color: #667eea; animation: spin 1s linear infinite; margin: 0 auto 16px; }
-   @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-   #modal-spinner .modal-content { background: white; width: 85%; max-width: 320px; border-radius: 16px; align-items: center; padding: 32px; margin: auto; }
-   
-   .resumen-lista { max-height: 150px; overflow-y: auto; background: #f9fafb; padding: 12px; border-radius: 8px; font-size: 14px; margin-top: 8px;}
-   .resumen-lista li { margin-bottom: 6px; margin-left: 16px; }
+/* ── Count list ── */
+.subgrupo-hdr { font-size: 11px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 1px; padding: 10px 16px 4px; background: #f5f5f5; }
+.item-row { background: white; padding: 11px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #f3f4f6; }
+.item-row.presentation { background: #fafafa; padding-left: 28px; }
+.item-row.parent-hdr-row { background: #f9f9f9; padding: 8px 16px; }
+.item-row.hidden { display: none; }
+.item-text { flex: 1; min-width: 0; }
+.item-name { font-size: 14px; font-weight: 600; }
+.item-unit { font-size: 11px; color: #aaa; }
+.parent-label { font-size: 12px; font-weight: 700; color: #667eea; }
+.qty-input {
+  width: 80px; padding: 10px 6px; border: 1.5px solid #ddd; border-radius: 8px;
+  text-align: center; font-size: 16px; font-weight: 700; font-family: inherit;
+  -webkit-appearance: none; appearance: none;
+}
+.qty-input:focus { outline: none; border-color: #667eea; background: #f5f3ff; }
+.qty-input.filled { border-color: #22c55e; background: #f0fff4; }
 
-  /* GROQ CHAT BUTTON */
-  .fab-groq { bottom: 90px; right: 16px; background: #1e293b; color: white; width: 52px; height: 52px; border-radius: 50%; font-size: 22px; display: flex; align-items: center; justify-content: center; padding: 0; }
-  .groq-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; align-items: flex-end; }
-  .groq-overlay.active { display: flex; }
-  .groq-panel { background: white; width: 100%; border-radius: 20px 20px 0 0; padding: 20px; max-height: 80vh; display: flex; flex-direction: column; }
-  .groq-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-  .groq-title { font-weight: bold; font-size: 16px; }
-  .groq-close { background: #f1f5f9; color: #333; padding: 6px 12px; font-size: 14px; min-height: 36px; }
-  .groq-messages { flex: 1; overflow-y: auto; margin-bottom: 12px; min-height: 150px; max-height: 300px; }
-  .gmsg { padding: 10px 14px; border-radius: 10px; margin-bottom: 8px; font-size: 14px; line-height: 1.5; }
-  .gmsg.user { background: #667eea; color: white; margin-left: 15%; }
-  .gmsg.ai { background: #f1f5f9; color: #333; margin-right: 15%; }
-  .gmsg.loading { color: #94a3b8; font-style: italic; background: #f1f5f9; margin-right: 15%; }
-  .groq-input-row { display: flex; gap: 8px; }
-  .groq-input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
-  .groq-send { background: #667eea; color: white; padding: 12px 16px; min-height: 48px; border-radius: 8px; }
+/* ── Search bar ── */
+.search-bar { background: white; padding: 10px 16px; border-bottom: 1px solid #e5e7eb; display: flex; gap: 8px; position: sticky; top: 53px; z-index: 40; }
+.search-bar input { flex: 1; padding: 10px 14px; border: 1.5px solid #ddd; border-radius: 10px; font-size: 16px; font-family: inherit; }
+.search-bar input:focus { outline: none; border-color: #667eea; }
+.search-bar button { background: #f3f4f6; color: #555; padding: 10px 14px; border-radius: 10px; font-size: 14px; }
 
- </style>
+/* ── FAB ── */
+.fab-bar { position: fixed; bottom: 0; left: 0; right: 0; padding: 12px 16px; background: white; border-top: 1px solid #e5e7eb; z-index: 50; }
+
+/* ── Drop zone ── */
+.drop-zone { border: 2px dashed #c4b5fd; border-radius: 16px; padding: 40px 20px; text-align: center; background: white; cursor: pointer; transition: all .2s; }
+.drop-zone.over { border-color: #667eea; background: #f5f3ff; }
+.drop-icon { font-size: 48px; margin-bottom: 10px; }
+.drop-zone p { color: #888; font-size: 14px; margin-bottom: 14px; }
+
+/* ── Alerts ── */
+.alert { border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; font-size: 13px; line-height: 1.4; }
+.alert-warn  { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+.alert-error { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
+.alert-ok    { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+.alert-title { font-weight: 700; margin-bottom: 4px; }
+
+/* ── Setup tabs ── */
+.tabs { display: flex; background: white; border-bottom: 1px solid #e5e7eb; }
+.tab { flex: 1; padding: 12px; font-size: 13px; font-weight: 600; text-align: center; cursor: pointer; border-radius: 0; background: none; color: #888; border-bottom: 3px solid transparent; }
+.tab.active { color: #667eea; border-bottom-color: #667eea; }
+
+/* ── Zone setup items ── */
+.sg-row { background: white; border-radius: 10px; margin-bottom: 6px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+.sg-name { flex: 1; font-size: 14px; font-weight: 600; }
+.sg-count { font-size: 12px; color: #aaa; margin-right: 4px; }
+.sg-row select { width: auto; padding: 6px 8px; font-size: 13px; border-radius: 8px; border: 1.5px solid #ddd; }
+
+/* ── Order items ── */
+.order-row { background: white; border-radius: 10px; margin-bottom: 6px; padding: 11px 14px; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+.order-row .label { flex: 1; font-size: 14px; }
+.order-btns button { background: #f3f4f6; color: #555; padding: 6px 10px; font-size: 13px; border-radius: 6px; }
+
+/* ── Welcome ── */
+.welcome-hero { text-align: center; padding: 40px 16px 24px; }
+.welcome-icon { font-size: 52px; }
+.welcome-hero h1 { font-size: 26px; font-weight: 800; margin-top: 10px; }
+.welcome-hero p { color: #888; margin-top: 4px; font-size: 14px; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; }
+.badge-green { background: #dcfce7; color: #166534; }
+.badge-yellow { background: #fef9c3; color: #854d0e; }
+.badge-gray { background: #f3f4f6; color: #555; }
+</style>
 </head>
 <body>
 
- <div id="pantalla-inicio">
-   <div id="banner-sesion">
-     <p id="banner-text">Sesión activa encontrada.</p>
-     <div class="banner-btns">
-       <button id="btn-continuar" onclick="continuarSesion()">Continuar</button>
-       <button id="btn-nueva" onclick="iniciarNuevaToma(true)">Iniciar nueva</button>
-     </div>
-   </div>
-   
-   <div class="inicio-titulo">📦 Inventario BARRA</div>
-   <div class="inicio-sub">Piazza Pasticcio</div>
-   
-   <div class="form-group">
-     <label>Nombre del operario</label>
-     <input type="text" id="operario-input" placeholder="Tu nombre completo">
-   </div>
-   <div class="form-group">
-     <label>Área que estás contando</label>
-     <input type="text" id="area-input" placeholder="Ej: Cámara fría, Refri 1, Alacena seca...">
-   </div>
-   <div class="form-group">
-     <label>Fecha de la toma</label>
-     <input type="date" id="fecha-input">
-   </div>
-   
-   <button id="btn-iniciar" onclick="iniciarNuevaToma(false)">Iniciar toma →</button>
- </div>
-
- <div id="pantalla-inventario">
-   
-   <div id="header-sticky">
-     <div id="header-line1">📦 BARRA | Área | Operario</div>
-     <div id="header-line2">Fecha | 0 capturados</div>
-   </div>
-   
-   <div id="search-sticky">
-     <div class="search-row">
-       <input type="text" id="search-input" placeholder="Buscar producto o código..." oninput="filtrarLista()">
-       <button onclick="limpiarBusqueda()">✕</button>
-     </div>
-     <div class="chips" id="chips-container">
-       </div>
-   </div>
-   
-   <div id="lista">
-  <div id="catalogo-loading" style="text-align:center;padding:60px 16px;color:#999;">
-    <div style="font-size:36px;margin-bottom:12px">⏳</div>
-    <div style="font-size:15px">Cargando catálogo...</div>
+<!-- ══════════════════════ WELCOME ══════════════════════ -->
+<div id="screen-welcome" class="screen">
+  <div class="welcome-hero">
+    <div class="welcome-icon">🍾</div>
+    <h1 id="welcome-title">Inventario Xetux</h1>
+    <p id="welcome-sub">—</p>
   </div>
-
+  <div class="content" style="padding-top:0" id="welcome-body"></div>
 </div>
-   
-   <div id="lista-manuales"></div>
-   
-   <button class="fab fab-enviar" id="btn-enviar" onclick="abrirModalConfirmar()" disabled>Enviar ✓</button>
-   <button class="fab fab-manual" id="btn-manual" onclick="abrirModalManual()">＋ No catalogado</button>
-   <button id="btn-top" onclick="scrollToTop()">↑</button>
- </div>
-
- <div id="modal-manual" class="modal-overlay">
-   <div class="modal-content">
-     <div class="modal-title">Ítem no catalogado</div>
-     
-     <div class="form-group">
-       <label>Nombre del producto *</label>
-       <input type="text" id="man-nombre" placeholder="Ej: Salsa de la casa" required>
-     </div>
-     
-     <div style="display:flex; gap: 12px;">
-       <div class="form-group" style="flex:1;">
-         <label>Cantidad *</label>
-         <input type="number" id="man-cantidad" inputmode="decimal" step="0.01" min="0" placeholder="0.00" required>
-       </div>
-       <div class="form-group" style="flex:1;">
-         <label>Unidad</label>
-         <input type="text" id="man-unidad" placeholder="KG, LT, PZA...">
-       </div>
-     </div>
-
-     <div class="form-group">
-       <label>Descripción de uso</label>
-       <textarea id="man-desc" rows="2" placeholder="Ej: Se usó en evento de marzo..."></textarea>
-     </div>
-
-     <div class="form-group">
-       <div class="file-input-wrapper">
-         <div class="btn-file">📷 Tomar foto o elegir</div>
-         <input type="file" id="man-foto" accept="image/*" capture="environment" onchange="previewImage(this)">
-       </div>
-       <img id="preview-foto" src="" alt="Vista previa">
-     </div>
-
-     <div class="modal-actions">
-       <button class="btn-gray" onclick="cerrarModalManual()">Cancelar</button>
-       <button class="btn-green" onclick="guardarManual()">Guardar ítem</button>
-     </div>
-   </div>
- </div>
-
- <div id="modal-confirmar" class="modal-overlay">
-   <div class="modal-content">
-     <div class="modal-title">Confirmar envío</div>
-     <div id="resumen-envio"></div>
-     <div class="modal-actions">
-       <button class="btn-gray" onclick="cerrarModalConfirmar()">Cancelar</button>
-       <button class="btn-green" onclick="ejecutarEnvio()">Confirmar envío</button>
-     </div>
-   </div>
- </div>
-
- <div id="modal-spinner" class="modal-overlay" style="align-items: center;">
-   <div class="modal-content">
-     <div class="spinner" id="spinner-loader"></div>
-     <div id="spinner-text" style="font-size: 18px; font-weight: bold; text-align: center;">Enviando...</div>
-     <div id="spinner-actions" style="display: none; width: 100%; margin-top: 16px;">
-        <button class="btn-green" onclick="limpiarYVolverInicio()" style="margin-bottom:8px;">Nueva toma</button>
-        <button onclick="descargarPDF()" style="width:100%;background:#3b82f6;color:white;padding:14px;border-radius:8px;font-size:15px;font-weight:bold;border:none;cursor:pointer;">📄 Descargar PDF</button>
-     </div>
-     <div id="spinner-error" style="display:none; width:100%; margin-top:16px; text-align:center;">
-       <p style="font-size:14px; color:#555; margin-bottom:16px;">Tu inventario está guardado en este dispositivo.<br>Espera mejor señal e intenta de nuevo.</p>
-       <button onclick="ejecutarEnvio()" style="width:100%;background:#22c55e;color:white;padding:14px;border-radius:8px;font-size:15px;font-weight:bold;border:none;cursor:pointer;margin-bottom:8px;">🔄 Reintentar</button>
-       <button onclick="document.getElementById('modal-spinner').style.display='none'" style="width:100%;background:#e2e8f0;color:#475569;padding:14px;border-radius:8px;font-size:15px;font-weight:bold;border:none;cursor:pointer;">Cerrar y seguir capturando</button>
-     </div>
-   </div>
- </div>
-
- <script>
-   // CONSTANTE GLOBAL
-   const WORKER_URL = 'https://piazza-operaciones.pablo-aranda.workers.dev';
-  const AREA = 'BARRA';
-
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby_lsQ9Rn36eAP7zQJrvGjCfDD_rAIhkDSsfYTL8UWg-jYB0YkVdR_uXD-fb0BZvF60BQ/exec';
-   
-   // Variables de Estado
-   let sesionActiva = null;
-   let inventarioLocal = {};
-   let manualesLocal = [];
-   let currentChip = 'Todos';
-
-   // Grupos según requerimiento
-   let grupos = ['Todos', 'ABARROTES', 'BEBIDAS', 'BEBIDAS CON ALCOHOL', 'CAFE Y TE', 'CERVEZA Y REFRESCO', 'EMPAQUE', 'FRUTA Y VERDURA', 'GENERAL', 'GRUPO DE PRODUCTO', 'PESCADOS Y MARISCOS', 'PRODUCTO TERMINADO', 'SALSAS ALIMENTARI', 'SUB RECETAS BEBIDAS', 'VINO'];
-
-   document.addEventListener('DOMContentLoaded', () => {
-     // Setear fecha de hoy
-     document.getElementById('fecha-input').value = new Date().toISOString().split('T')[0];
-     
-     // Checar sesión: sessionStorage (tab abierto) o localStorage (tab cerrado)
-     const saved = sessionStorage.getItem('sesion_activa') || localStorage.getItem('ultima_sesion_barra');
-     if (saved) {
-       const sesion = JSON.parse(saved);
-       const dataKey = `inventario_barra_${sesion.fecha}`;
-       const dataMan = `manuales_barra_${sesion.fecha}`;
-       const invData = JSON.parse(localStorage.getItem(dataKey) || '{}');
-       const manData = JSON.parse(localStorage.getItem(dataMan) || '[]');
-       const totalItems = Object.values(invData).filter(v => v > 0).length + manData.length;
-
-       if (totalItems > 0) {
-         sesionActiva = sesion;
-         document.getElementById('banner-text').textContent =
-           `📂 Toma guardada del ${sesion.fecha} — ${sesion.operario} · ${sesion.area} · ${totalItems} ítems capturados`;
-         document.getElementById('banner-sesion').style.display = 'flex';
-         document.getElementById('operario-input').value = sesion.operario;
-         document.getElementById('area-input').value = sesion.area;
-         document.getElementById('fecha-input').value = sesion.fecha;
-       }
-     }
-     
-     renderChips();
-     
-     // Control botón flotante subir
-     window.addEventListener('scroll', () => {
-       if (window.scrollY > 300) document.getElementById('btn-top').style.display = 'block';
-       else document.getElementById('btn-top').style.display = 'none';
-     });
-   });
-
-   // ------ LOGICA DE INICIO Y SESIÓN ------
-
-   function iniciarNuevaToma(forzarNueva) {
-     const operario = document.getElementById('operario-input').value.trim();
-     const area = document.getElementById('area-input').value.trim();
-     const fecha = document.getElementById('fecha-input').value;
-
-     if (!operario || !area) {
-       alert("El nombre del operario y el área son requeridos.");
-       return;
-     }
-
-     if (forzarNueva && sesionActiva) {
-       // Limpiar localStorage de la sesión anterior
-       localStorage.removeItem(`inventario_barra_${sesionActiva.fecha}`);
-       localStorage.removeItem(`manuales_barra_${sesionActiva.fecha}`);
-     }
-
-     sesionActiva = { operario, area, fecha };
-     sessionStorage.setItem('sesion_activa', JSON.stringify(sesionActiva));
-     localStorage.setItem('ultima_sesion_barra', JSON.stringify(sesionActiva));
-
-     prepararInventario();
-   }
-
-   function continuarSesion() {
-     prepararInventario();
-   }
-
-   function prepararInventario() {
-     // Ocultar inicio, mostrar inventario
-     document.getElementById('pantalla-inicio').style.display = 'none';
-     document.getElementById('pantalla-inventario').style.display = 'block';
-     
-     // Cargar datos del localStorage
-     const dataKey = `inventario_barra_${sesionActiva.fecha}`;
-     const dataMan = `manuales_barra_${sesionActiva.fecha}`;
-     
-     inventarioLocal = JSON.parse(localStorage.getItem(dataKey) || '{}');
-     manualesLocal = JSON.parse(localStorage.getItem(dataMan) || '[]');
-     
-     // Cargar catálogo desde Worker (o caché) y aplicar valores guardados
-     cargarCatalogo();
-
-     renderManuales();
-     actualizarHeader();
-     evaluarBotonEnviar();
-   }
-
-   // ------ LOGICA DEL INVENTARIO ------
-
-   function actualizarHeader() {
-     const prods = Object.values(inventarioLocal).filter(v => v > 0).length;
-     const mans = manualesLocal.length;
-     const total = prods + mans;
-     
-     document.getElementById('header-line1').textContent = `📦 BARRA | ${sesionActiva.area} | ${sesionActiva.operario}`;
-     document.getElementById('header-line2').textContent = `${sesionActiva.fecha} | ${total} capturados`;
-   }
-
-   function cambiar(btn, delta) {
-     const input = btn.parentElement.querySelector('.qty-input');
-     let val = parseFloat(input.value) || 0;
-     val += delta;
-     if (val < 0) val = 0;
-     
-     input.value = (val % 1 === 0) ? val : val.toFixed(2);
-     guardar(input);
-   }
-
-   function guardar(input) {
-     const val = parseFloat(input.value) || 0;
-     const code = input.getAttribute('data-codigo');
-     const item = input.closest('.item');
-     
-     if (val > 0) {
-       inventarioLocal[code] = val;
-       item.classList.add('capturado');
-     } else {
-       delete inventarioLocal[code];
-       item.classList.remove('capturado');
-     }
-     
-     // Auto-guardado
-     localStorage.setItem(`inventario_barra_${sesionActiva.fecha}`, JSON.stringify(inventarioLocal));
-     
-     actualizarHeader();
-     evaluarBotonEnviar();
-   }
-
-   function evaluarBotonEnviar() {
-     const total = Object.values(inventarioLocal).filter(v => v > 0).length + manualesLocal.length;
-     document.getElementById('btn-enviar').disabled = (total === 0);
-   }
-
-   function scrollToTop() {
-     window.scrollTo({ top: 0, behavior: 'smooth' });
-   }
-
-   // ------ FILTROS Y BÚSQUEDA ------
-
-   function renderChips() {
-     const container = document.getElementById('chips-container');
-     container.innerHTML = '';
-     grupos.forEach(g => {
-       const btn = document.createElement('button');
-       btn.className = `chip ${g === currentChip ? 'active' : ''}`;
-       btn.textContent = g;
-       btn.onclick = () => {
-         currentChip = g;
-         renderChips();
-         filtrarLista();
-       };
-       container.appendChild(btn);
-     });
-   }
-
-   function limpiarBusqueda() {
-     document.getElementById('search-input').value = '';
-     filtrarLista();
-   }
-
-   function filtrarLista() {
-     const query = document.getElementById('search-input').value.toLowerCase();
-     const items = document.querySelectorAll('#lista .item');
-     
-     items.forEach(item => {
-       const nombre = item.getAttribute('data-nombre').toLowerCase();
-       const codigo = item.getAttribute('data-codigo').toLowerCase();
-       const grupo = item.getAttribute('data-grupo');
-       
-       const textMatch = nombre.includes(query) || codigo.includes(query);
-       const chipMatch = (currentChip === 'Todos' || grupo === currentChip);
-       
-       if (textMatch && chipMatch) {
-         item.style.display = 'block';
-       } else {
-         item.style.display = 'none';
-       }
-     });
-   }
-
-   // ------ CATÁLOGO DINÁMICO (D1 via Worker) ------
-
-   async function cargarCatalogo() {
-     const CACHE_KEY = 'catalogo_' + AREA;
-     const CACHE_TS_KEY = 'catalogo_ts_' + AREA;
-     const CACHE_TTL = 7 * 24 * 3600 * 1000;
-
-     let articulos = null;
-     const ts = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0');
-     if (Date.now() - ts < CACHE_TTL) {
-       try { articulos = JSON.parse(localStorage.getItem(CACHE_KEY)); } catch(e) {}
-     }
-
-     if (!articulos) {
-       try {
-         const r = await fetch(WORKER_URL + '/articulos?almacen=' + AREA);
-         const data = await r.json();
-         if (data.ok && data.articulos && data.articulos.length > 0) {
-           articulos = data.articulos;
-           try {
-             localStorage.setItem(CACHE_KEY, JSON.stringify(articulos));
-             localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
-           } catch(e) {}
-         }
-       } catch(e) { console.error('Error cargando catálogo:', e); }
-     }
-
-     if (!articulos || articulos.length === 0) {
-       document.getElementById('catalogo-loading').innerHTML =
-         '<div style="font-size:32px;margin-bottom:12px">⚠️</div>' +
-         '<div style="font-size:15px">Sin conexión y sin caché.<br>Conéctate al menos una vez para descargar el catálogo.</div>';
-       return;
-     }
-     renderCatalogo(articulos);
-   }
-
-   function renderCatalogo(articulos) {
-     const gruposSet = new Set(articulos.map(a => a.tipo_producto).filter(Boolean));
-     grupos.length = 0;
-     grupos.push('Todos', ...Array.from(gruposSet).sort());
-     renderChips();
-
-     const lista = document.getElementById('lista');
-     lista.innerHTML = '';
-     articulos.forEach(art => {
-       const cod = (art.id_xetux || '').toUpperCase();
-       const nom = (art.nombre   || '').toUpperCase();
-       const gru = art.tipo_producto || 'GENERAL';
-       const uni = art.unidad    || '';
-       const alm = art.almacen   || AREA;
-       const div = document.createElement('div');
-       div.className = 'item';
-       div.setAttribute('data-grupo',  gru);
-       div.setAttribute('data-nombre', nom.toLowerCase());
-       div.setAttribute('data-codigo', cod.toLowerCase());
-       div.innerHTML =
-         `<div class="item-name">${nom}</div>` +
-         `<div class="item-code">${cod} | ${uni} | ${alm}</div>` +
-         `<button class="qty-btn minus" onclick="cambiar(this,-1)">−</button>` +
-         `<input type="number" class="qty-input" inputmode="decimal" step="0.01"` +
-         ` data-codigo="${cod}" data-nombre="${nom}" data-unidad="${uni}" data-almacen="${alm}" data-grupo="${gru}"` +
-         ` value="0" oninput="guardar(this)" min="0">` +
-         `<button class="qty-btn plus" onclick="cambiar(this,1)" data-codigo="${cod}">+</button>`;
-       lista.appendChild(div);
-     });
-     aplicarInventarioLocal();
-     filtrarLista();
-   }
-
-   function aplicarInventarioLocal() {
-     document.querySelectorAll('#lista .item').forEach(item => {
-       const input = item.querySelector('.qty-input');
-       const code = input.getAttribute('data-codigo');
-       if (inventarioLocal[code]) {
-         input.value = inventarioLocal[code];
-         item.classList.add('capturado');
-       } else {
-         input.value = 0;
-         item.classList.remove('capturado');
-       }
-     });
-     actualizarHeader();
-     evaluarBotonEnviar();
-   }
-
-   // ------ ÍTEM MANUAL ------
-
-   function abrirModalManual() {
-     document.getElementById('modal-manual').style.display = 'flex';
-     document.getElementById('man-nombre').value = '';
-     document.getElementById('man-cantidad').value = '';
-     document.getElementById('man-unidad').value = '';
-     document.getElementById('man-desc').value = '';
-     document.getElementById('man-foto').value = '';
-     document.getElementById('preview-foto').style.display = 'none';
-     document.getElementById('preview-foto').src = '';
-   }
-
-   function cerrarModalManual() {
-     document.getElementById('modal-manual').style.display = 'none';
-   }
-
-   function previewImage(input) {
-     if (input.files && input.files[0]) {
-       const reader = new FileReader();
-       reader.onload = function(e) {
-         const tempImg = new Image();
-         tempImg.onload = function() {
-           const canvas = document.createElement('canvas');
-           const MAX = 1024;
-           let w = tempImg.width, h = tempImg.height;
-           if (w > MAX || h > MAX) {
-             if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-             else { w = Math.round(w * MAX / h); h = MAX; }
-           }
-           canvas.width = w;
-           canvas.height = h;
-           canvas.getContext('2d').drawImage(tempImg, 0, 0, w, h);
-           const compressed = canvas.toDataURL('image/jpeg', 0.75);
-           const preview = document.getElementById('preview-foto');
-           preview.src = compressed;
-           preview.style.display = 'block';
-         };
-         tempImg.src = e.target.result;
-       };
-       reader.readAsDataURL(input.files[0]);
-     }
-   }
-
-   function guardarManual() {
-     const nombre = document.getElementById('man-nombre').value.trim();
-     const cantidad = parseFloat(document.getElementById('man-cantidad').value);
-     const unidad = document.getElementById('man-unidad').value.trim();
-     const desc = document.getElementById('man-desc').value.trim();
-     const foto = document.getElementById('preview-foto').src;
-     
-     if (!nombre || isNaN(cantidad) || cantidad <= 0) {
-       alert("Por favor completa el nombre y la cantidad.");
-       return;
-     }
-     
-     const consecutivo = manualesLocal.length + 1;
-     const codigo = `MANUAL-${consecutivo.toString().padStart(3, '0')}`;
-     
-     const nuevoManual = {
-       codigo: codigo,
-       nombre: nombre,
-       cantidad: cantidad,
-       unidad: unidad,
-       descripcion: desc,
-       foto_base64: foto,
-       catalogado: false
-     };
-     
-     manualesLocal.push(nuevoManual);
-     try {
-       localStorage.setItem(`manuales_barra_${sesionActiva.fecha}`, JSON.stringify(manualesLocal));
-     } catch(e) { /* cuota excedida, datos en memoria */ }
-
-     renderManuales();
-     cerrarModalManual();
-     actualizarHeader();
-     evaluarBotonEnviar();
-   }
-
-   function renderManuales() {
-     const container = document.getElementById('lista-manuales');
-     container.innerHTML = '';
-
-     if (manualesLocal.length === 0) return;
-
-     const title = document.createElement('h3');
-     title.textContent = "Ítems No Catalogados";
-     title.style.margin = "8px 0";
-     container.appendChild(title);
-
-     manualesLocal.forEach(m => {
-       const d = document.createElement('div');
-       d.className = 'item capturado';
-       d.innerHTML = `
-         <div style="display:flex; justify-content:space-between; align-items:center;">
-           <div class="badge-manual">MANUAL</div>
-           <button onclick="borrarManual('${m.codigo}')" style="background:#ef4444; color:white; border-radius:6px; padding:2px 10px; font-size:18px; min-height:32px; line-height:1;">✕</button>
-         </div>
-         <div class="item-name">${m.nombre.toUpperCase()}</div>
-         <div class="item-code">${m.codigo} | ${m.unidad} | COCINA</div>
-         <div class="manual-row">
-           ${m.foto_base64 ? `<img src="${m.foto_base64}" alt="Foto">` : ''}
-           <div>
-             <strong>Cant: ${m.cantidad}</strong>
-             <div class="manual-desc">${m.descripcion}</div>
-           </div>
-         </div>
-       `;
-       container.appendChild(d);
-     });
-   }
-
-   function borrarManual(codigo) {
-     manualesLocal = manualesLocal.filter(m => m.codigo !== codigo);
-     try {
-       localStorage.setItem(`manuales_barra_${sesionActiva.fecha}`, JSON.stringify(manualesLocal));
-     } catch(e) {}
-     renderManuales();
-     actualizarHeader();
-     evaluarBotonEnviar();
-   }
-
-   // ------ ENVÍO Y CONFIRMACIÓN ------
-
-   function abrirModalConfirmar() {
-     const keys = Object.keys(inventarioLocal).filter(k => inventarioLocal[k] > 0);
-     let htmlLista = '';
-     
-     // Tomar los primeros 5
-     keys.slice(0, 5).forEach(cod => {
-       const el = document.querySelector(`.qty-input[data-codigo="${cod}"]`);
-       const nombre = el ? el.getAttribute('data-nombre') : cod;
-       htmlLista += `<li>${nombre} (x${inventarioLocal[cod]})</li>`;
-     });
-     if(keys.length === 0 && manualesLocal.length > 0) {
-         htmlLista += `<li>(Solo ítems manuales)</li>`;
-     }
-     
-     document.getElementById('resumen-envio').innerHTML = `
-       <p><strong>Operario:</strong> ${sesionActiva.operario}</p>
-       <p><strong>Área:</strong> ${sesionActiva.area}</p>
-       <p><strong>Fecha:</strong> ${sesionActiva.fecha}</p>
-       <p><strong>Catálogo:</strong> ${keys.length} ítems</p>
-       <p><strong>Manuales:</strong> ${manualesLocal.length} ítems</p>
-       <div class="resumen-lista">
-         <strong>Primeros capturados:</strong><br>
-         <ul>${htmlLista}</ul>
-       </div>
-     `;
-     document.getElementById('modal-confirmar').style.display = 'flex';
-   }
-
-   function cerrarModalConfirmar() {
-     document.getElementById('modal-confirmar').style.display = 'none';
-   }
-
-   function ejecutarEnvio() {
-     cerrarModalConfirmar();
-     mostrarSpinnerEnviando();
-
-     const productos = [];
-     document.querySelectorAll('#lista .qty-input').forEach(input => {
-       const val = parseFloat(input.value) || 0;
-       if (val > 0) {
-         productos.push({
-           codigo: input.getAttribute('data-codigo'),
-           nombre: input.getAttribute('data-nombre'),
-           unidad: input.getAttribute('data-unidad'),
-           cantidad: val,
-           catalogado: true
-         });
-       }
-     });
-
-     const payload = {
-       operario: sesionActiva.operario,
-       area: sesionActiva.area,
-       fecha: sesionActiva.fecha,
-       almacen: "BARRA",
-       timestamp: new Date().toISOString(),
-       productos: productos,
-       manuales: manualesLocal
-     };
-
-     fetch(APPS_SCRIPT_URL, {
-       method: 'POST',
-       mode: 'no-cors',
-       headers: {'Content-Type': 'text/plain'},
-       body: JSON.stringify(payload)
-     }).then(() => {
-       esperarYConfirmarExito();
-     }).catch(() => {
-       mostrarErrorRed();
-     });
-   }
-
-   function mostrarSpinnerEnviando() {
-     document.getElementById('modal-spinner').style.display = 'flex';
-     document.getElementById('spinner-loader').style.display = 'block';
-     document.getElementById('spinner-text').innerHTML = 'Enviando...';
-     document.getElementById('spinner-actions').style.display = 'none';
-     document.getElementById('spinner-error').style.display = 'none';
-   }
-
-   function mostrarErrorRed() {
-     document.getElementById('spinner-loader').style.display = 'none';
-     document.getElementById('spinner-text').innerHTML = '⚠️ No se pudo enviar';
-     document.getElementById('spinner-error').style.display = 'block';
-   }
-
-   function esperarYConfirmarExito() {
-     setTimeout(() => {
-       document.getElementById('spinner-loader').style.display = 'none';
-       document.getElementById('spinner-text').innerHTML = "✓ Inventario enviado correctamente.<br><br><span style='font-size:14px; color:#555;'>Puedes cerrar la app o iniciar una nueva toma.</span>";
-       document.getElementById('spinner-actions').style.display = 'block';
-       
-       // Limpiar el localStorage de esta sesión
-       localStorage.removeItem(`inventario_barra_${sesionActiva.fecha}`);
-       localStorage.removeItem(`manuales_barra_${sesionActiva.fecha}`);
-       localStorage.removeItem('ultima_sesion_barra');
-
-     }, 3000);
-   }
-
-   function limpiarYVolverInicio() {
-     // Limpiar sessionStorage es opcional, pero lo dejamos si desean mantener el operario en memoria. 
-     // Reiniciamos todo reseteando la página.
-     window.location.reload();
-   }
-
-  // ── GROQ ──────────────────────────────────────────────────
-  function getGroqKey() { return localStorage.getItem('groq_api_key') || ''; }
-  let groqHistory = [];
-
-  function abrirGroq() { document.getElementById('groq-overlay').classList.add('active'); document.getElementById('groq-input').focus(); }
-  function cerrarGroq() { document.getElementById('groq-overlay').classList.remove('active'); }
-
-  async function enviarGroq() {
-    const input = document.getElementById('groq-input');
-    const msg = input.value.trim();
-    if (!msg) return;
-    input.value = '';
-    const msgs = document.getElementById('groq-messages');
-    msgs.innerHTML += '<div class="gmsg user">' + msg + '</div>';
-    msgs.innerHTML += '<div class="gmsg loading" id="groq-loading">Pensando...</div>';
-    msgs.scrollTop = msgs.scrollHeight;
-    groqHistory.push({ role: 'user', content: msg });
-
-    const capturados = Object.keys(inventarioLocal || {}).filter(k => inventarioLocal[k] > 0).length;
-    const sistema = 'Eres un asistente de inventario para Piazza Pasticcio, restaurante italiano en CDMX. El operario esta haciendo la toma de inventario del almacen BARRA. Lleva ' + capturados + ' productos capturados. Ayuda con dudas sobre productos, unidades de medida (KG=kilogramos, LT=litros, PZA=pieza, B.750=botella 750ml) o como usar la app. Responde en espanol, de forma muy breve y practica.';
-
-    try {
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + getGroqKey(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'system', content: sistema }, ...groqHistory], max_tokens: 300, temperature: 0.7 })
+
+<!-- ══════════════════════ IMPORT ════════════════════════ -->
+<div id="screen-import" class="screen">
+  <div class="hdr">
+    <button class="hdr-back" onclick="go('welcome')">←</button>
+    <h1>Importar plantilla Xetux</h1>
+  </div>
+  <div class="content">
+    <p style="font-size:14px;color:#555;margin-bottom:16px">
+      Exporta desde Xetux con <strong>"Incluir presentaciones"</strong> activado. Los demás checkboxes son opcionales.
+    </p>
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="drop-icon">📄</div>
+      <p>Arrastra el .xlsx aquí<br>o toca para seleccionar</p>
+      <input type="file" id="file-input" accept=".xlsx" style="display:none" onchange="handleFileInput(this)">
+      <div id="import-msg" style="margin-top:10px;font-size:13px;font-weight:600"></div>
+    </div>
+    <div class="card" style="background:#f5f3ff;margin-top:16px">
+      <div style="font-size:13px;color:#555;line-height:1.6">
+        <strong>Pasos en Xetux:</strong><br>
+        1. Inventarios → Gestión de inventario → Exportar<br>
+        2. ✓ Incluir presentaciones<br>
+        3. Aceptar → descargar .xlsx
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ ZONE SETUP ════════════════════ -->
+<div id="screen-setup" class="screen">
+  <div class="hdr">
+    <button class="hdr-back" onclick="go('welcome')">←</button>
+    <h1>Configurar zonas</h1>
+    <button class="hdr-action" onclick="promptNewZone()">+ Zona</button>
+  </div>
+  <div class="tabs">
+    <button class="tab active" id="tab-zones"  onclick="setupTab('zones')">Zonas</button>
+    <button class="tab"        id="tab-assign" onclick="setupTab('assign')">Asignar</button>
+    <button class="tab"        id="tab-order"  onclick="setupTab('order')">Ordenar</button>
+  </div>
+  <div class="content" id="setup-content" style="padding-bottom:80px"></div>
+  <div class="fab-bar">
+    <button class="btn btn-purple" onclick="saveAndGoWelcome()">Guardar ✓</button>
+  </div>
+</div>
+
+<!-- ══════════════════════ SESSION START ═════════════════ -->
+<div id="screen-session" class="screen">
+  <div class="hdr">
+    <button class="hdr-back" onclick="go('welcome')">←</button>
+    <h1>Nueva toma</h1>
+  </div>
+  <div class="content">
+    <div class="form-group">
+      <label>Operario</label>
+      <input type="text" id="inp-operario" placeholder="Tu nombre completo">
+    </div>
+    <div class="form-group">
+      <label>Fecha</label>
+      <input type="date" id="inp-fecha">
+    </div>
+    <div class="form-group">
+      <label>Zona a contar</label>
+      <select id="inp-zona"><option value="__all__">Todas las zonas</option></select>
+    </div>
+    <button class="btn btn-purple" style="margin-top:8px" onclick="startSession()">Iniciar →</button>
+  </div>
+</div>
+
+<!-- ══════════════════════ COUNT ═════════════════════════ -->
+<div id="screen-count" class="screen">
+  <div class="hdr">
+    <button class="hdr-back" onclick="exitCount()">←</button>
+    <div style="flex:1;min-width:0">
+      <h1 id="count-zone-name">Conteo</h1>
+      <div class="progress-bar"><div class="progress-fill" id="count-bar" style="width:0%"></div></div>
+    </div>
+    <span id="count-pct" style="font-size:13px;white-space:nowrap;opacity:.85"></span>
+  </div>
+  <div class="search-bar">
+    <input type="text" id="count-search" placeholder="Buscar artículo o código…" oninput="filterCount(this.value)">
+    <button onclick="clearCountSearch()">✕</button>
+  </div>
+  <div id="count-list" style="padding-bottom:80px"></div>
+  <div class="fab-bar">
+    <button class="btn btn-green" onclick="doneZone()">Listo esta zona ✓</button>
+  </div>
+</div>
+
+<!-- ══════════════════════ OVERVIEW ══════════════════════ -->
+<div id="screen-overview" class="screen">
+  <div class="hdr">
+    <button class="hdr-back" onclick="go('welcome')">←</button>
+    <h1 id="ov-title">Toma de inventario</h1>
+  </div>
+  <div class="content">
+    <div id="ov-meta" style="font-size:13px;color:#888;margin-bottom:4px"></div>
+    <div id="ov-global-bar" style="margin-bottom:16px">
+      <div class="progress-bar"><div class="progress-fill" id="ov-bar" style="width:0%"></div></div>
+    </div>
+    <div id="ov-zones"></div>
+    <div style="margin-top:20px">
+      <button class="btn btn-purple" id="btn-generate" onclick="go('generate')">
+        Generar Excel para Xetux →
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ GENERATE ══════════════════════ -->
+<div id="screen-generate" class="screen">
+  <div class="hdr">
+    <button class="hdr-back" onclick="go('overview')">←</button>
+    <h1>Validación y descarga</h1>
+  </div>
+  <div class="content">
+    <div id="validation-out"></div>
+    <div style="margin-top:16px">
+      <button class="btn btn-green" onclick="generateExcel()">⬇️ Descargar Excel para Xetux</button>
+    </div>
+    <p style="font-size:12px;color:#aaa;text-align:center;margin-top:12px;line-height:1.5">
+      El archivo es una copia exacta de la plantilla Xetux con la columna Cantidad llenada.<br>
+      Artículos no contados quedan en 0.
+    </p>
+  </div>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script>
+// ── Constants ────────────────────────────────────────────────────────────
+const ALMACEN = 'BARRA';
+const COLORS  = ['#667eea','#f59e0b','#10b981','#ef4444','#8b5cf6','#f97316','#06b6d4','#ec4899'];
+
+// ── State ────────────────────────────────────────────────────────────────
+let T   = null;  // template: { items, cantidadColIdx, headerRowIdx, filename }
+let Z   = null;  // zones:    { zones: [{ id, nombre, color, codigos }] }
+let S   = null;  // session:  { operario, fecha, counts, completedZones }
+let CZ  = null;  // currentZone being counted (null = all zones)
+let activeSetupTab = 'zones';
+
+// ── LocalStorage ─────────────────────────────────────────────────────────
+const LS = {
+  T:   `xtux_t_${ALMACEN}`,
+  RAW: `xtux_raw_${ALMACEN}`,
+  Z:   `xtux_z_${ALMACEN}`,
+  S:   `xtux_s_${ALMACEN}`,
+};
+const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+const lsSet = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+const lsDel = k => localStorage.removeItem(k);
+
+// ── Escape HTML ──────────────────────────────────────────────────────────
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// ── Navigation ───────────────────────────────────────────────────────────
+function go(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(`screen-${id}`).classList.add('active');
+  if (id === 'welcome')  renderWelcome();
+  if (id === 'setup')    renderSetup(activeSetupTab);
+  if (id === 'overview') renderOverview();
+  if (id === 'generate') renderValidation();
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────
+function init() {
+  T = lsGet(LS.T);
+  Z = lsGet(LS.Z);
+  S = lsGet(LS.S);
+
+  // Drop zone
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', ()  => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); handleFile(e.dataTransfer.files[0]); });
+
+  document.getElementById('inp-fecha').value = new Date().toISOString().slice(0, 10);
+  go('welcome');
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  WELCOME                                                 ║
+// ╚══════════════════════════════════════════════════════════╝
+function renderWelcome() {
+  const title = document.getElementById('welcome-title');
+  const sub   = document.getElementById('welcome-sub');
+  const body  = document.getElementById('welcome-body');
+
+  title.textContent = `Inventario · ${ALMACEN}`;
+
+  if (!T) {
+    sub.textContent = 'Sin plantilla';
+    body.innerHTML = `
+      <div class="card">
+        <div style="font-size:15px;margin-bottom:12px">Para empezar importa la plantilla de Xetux.</div>
+        <button class="btn btn-purple" onclick="go('import')">📥 Importar plantilla</button>
+      </div>`;
+    return;
+  }
+
+  const nParents = T.items.filter(i => !i.isP).length;
+  const nPres    = T.items.filter(i => i.isP).length;
+  sub.textContent = `${nParents} artículos · ${nPres} presentaciones`;
+
+  const hasZones   = Z && Z.zones.length > 0;
+  const hasSession = S && S.fecha;
+
+  // Session card
+  let sessionCard = '';
+  if (hasSession) {
+    const done  = S.completedZones?.length ?? 0;
+    const total = Z?.zones.length ?? 0;
+    const counted = Object.keys(S.counts).length;
+    sessionCard = `
+      <div class="card" style="border-left:4px solid #667eea">
+        <div style="font-weight:700;margin-bottom:2px">Toma del ${S.fecha}</div>
+        <div style="font-size:13px;color:#888">${S.operario} · ${done}/${total} zonas · ${counted} artículos contados</div>
+        <div class="row">
+          <button class="btn btn-purple" style="flex:2" onclick="go('overview')">Continuar →</button>
+          <button class="btn btn-gray btn-sm" style="flex:1" onclick="confirmNewSession()">Nueva</button>
+        </div>
+      </div>`;
+  }
+
+  const canCount = hasZones;
+  body.innerHTML = `
+    ${sessionCard}
+    ${!hasSession ? `<button class="btn ${canCount ? 'btn-purple' : 'btn-gray'}" onclick="${canCount ? "go('session')" : "alert('Configura las zonas primero')"}">
+      Iniciar conteo →
+    </button>` : ''}
+    <div class="divider"></div>
+    <div class="section-label">Configuración</div>
+    <button class="btn btn-gray" style="margin-bottom:8px" onclick="go('setup')">
+      ⚙️ ${hasZones ? 'Editar zonas de conteo' : 'Configurar zonas'}
+    </button>
+    <button class="btn btn-gray" onclick="go('import')">📥 ${T ? 'Reimportar plantilla' : 'Importar plantilla'}</button>
+    ${!hasZones && T ? '<div class="alert alert-warn" style="margin-top:12px">Configura las zonas de conteo antes de iniciar.</div>' : ''}
+  `;
+
+  // Populate zone select for session screen
+  if (Z) {
+    const sel = document.getElementById('inp-zona');
+    sel.innerHTML = '<option value="__all__">Todas las zonas</option>' +
+      Z.zones.map(z => `<option value="${z.id}">${esc(z.nombre)}</option>`).join('');
+  }
+}
+
+function confirmNewSession() {
+  if (!confirm('¿Iniciar nueva toma? Se perderán los conteos actuales.')) return;
+  S = null;
+  lsDel(LS.S);
+  go('welcome');
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  IMPORT & PARSE                                          ║
+// ╚══════════════════════════════════════════════════════════╝
+function handleFileInput(inp) { if (inp.files[0]) handleFile(inp.files[0]); }
+
+async function handleFile(file) {
+  if (!file?.name.endsWith('.xlsx')) { alert('Necesito un archivo .xlsx de Xetux'); return; }
+  const msg = document.getElementById('import-msg');
+  msg.style.color = '#888';
+  msg.textContent = 'Leyendo…';
+
+  try {
+    const buf = await file.arrayBuffer();
+    const parsed = parseTemplate(buf);
+    T = { ...parsed, filename: file.name };
+    lsSet(LS.T, T);
+
+    // Store raw as base64 for Excel generation
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    bytes.forEach(b => bin += String.fromCharCode(b));
+    localStorage.setItem(LS.RAW, btoa(bin));
+
+    if (Z) {
+      applyTemplateUpdate();
+    } else {
+      Z = autoZones(T.items);
+      lsSet(LS.Z, Z);
+    }
+
+    const nP = T.items.filter(i => !i.isP).length;
+    const nR = T.items.filter(i => i.isP).length;
+    msg.style.color = '#16a34a';
+    msg.textContent = `✓ ${nP} artículos, ${nR} presentaciones`;
+    setTimeout(() => { renderWelcome(); go('setup'); }, 700);
+
+  } catch(e) {
+    console.error(e);
+    msg.style.color = '#ef4444';
+    msg.textContent = 'Error: ' + e.message;
+  }
+}
+
+function parseTemplate(buf) {
+  const wb   = XLSX.read(buf, { type: 'array' });
+  const ws   = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+  const headerRowIdx = rows.findIndex(r => r.map(String).includes('Código'));
+  if (headerRowIdx === -1) throw new Error('"Código" no encontrado. ¿Es la plantilla correcta?');
+
+  const H = rows[headerRowIdx].map(String);
+  const fi = name => H.indexOf(name);
+  const ff = fn  => H.findIndex(fn);
+
+  const iCod = fi('Código');
+  const iArt = ff(h => /rtículo|rticulo/i.test(h));
+  const iUni = fi('Unidad');
+  const iCan = fi('Cantidad');
+  const iGru = fi('Grupo');
+  const iSgr = fi('Subgrupo');
+
+  if (iCod < 0 || iCan < 0) throw new Error('Columnas Código o Cantidad no encontradas');
+
+  const items = [];
+  let lastParent = null;
+
+  for (let r = headerRowIdx + 1; r < rows.length; r++) {
+    const row = rows[r];
+    const cod = String(row[iCod] ?? '').trim();
+    if (!cod) continue;
+
+    const artRaw = String(row[iArt] ?? '').trim();
+    const isP    = artRaw.startsWith('----');
+
+    // Parse presentation label, strip prefix
+    let artLabel = artRaw;
+    if (isP) artLabel = artRaw.replace(/^----\s*\(P\)\s*/,'').trim();
+
+    const item = {
+      rowIdx: r,
+      codigo: cod,
+      art:    artLabel,
+      artRaw,
+      uni:    String(row[iUni] ?? '').trim(),
+      grupo:  iGru >= 0 ? String(row[iGru] ?? '').trim() : '',
+      sgr:    iSgr >= 0 && row[iSgr] ? String(row[iSgr]).trim() : '',
+      isP,
+      parentCod: isP ? (lastParent?.codigo ?? null) : null,
+    };
+
+    if (!isP) {
+      lastParent = item;
+    } else {
+      // Inherit subgrupo/grupo from parent for zone grouping
+      item.sgr   = lastParent?.sgr   ?? '';
+      item.grupo = lastParent?.grupo ?? item.grupo;
+    }
+
+    items.push(item);
+  }
+
+  return { items, cantidadColIdx: iCan, headerRowIdx };
+}
+
+function applyTemplateUpdate() {
+  const allZoneCods = new Set(Z.zones.flatMap(z => z.codigos));
+  const newCods     = new Set(T.items.filter(i => !i.isP).map(i => i.codigo));
+
+  const added   = [...newCods].filter(c => !allZoneCods.has(c));
+  const removed = [...allZoneCods].filter(c => !newCods.has(c));
+
+  // Remove obsolete codes from zones
+  Z.zones.forEach(z => { z.codigos = z.codigos.filter(c => !removed.includes(c)); });
+
+  // Add new codes to "Sin asignar" zone
+  if (added.length) {
+    let ua = Z.zones.find(z => z.id === '__ua__');
+    if (!ua) {
+      ua = { id:'__ua__', nombre:'Sin asignar', color:'#9ca3af', codigos:[] };
+      Z.zones.unshift(ua);
+    }
+    ua.codigos.push(...added);
+  }
+
+  lsSet(LS.Z, Z);
+
+  const msgs = [];
+  if (added.length)   msgs.push(`${added.length} artículos nuevos → "Sin asignar"`);
+  if (removed.length) msgs.push(`${removed.length} artículos eliminados de las zonas`);
+  if (msgs.length) alert('Plantilla actualizada:\n\n' + msgs.join('\n') + '\n\nRevisa la pestaña Asignar.');
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  AUTO-ZONES                                              ║
+// ╚══════════════════════════════════════════════════════════╝
+function autoZones(items) {
+  const parents = items.filter(i => !i.isP);
+  const byKey   = {};
+  for (const it of parents) {
+    const k = it.sgr || it.grupo || 'GENERAL';
+    if (!byKey[k]) byKey[k] = [];
+    byKey[k].push(it.codigo);
+  }
+  const zones = Object.entries(byKey).map(([nombre, codigos], i) => ({
+    id:      `z_${i}`,
+    nombre,
+    color:   COLORS[i % COLORS.length],
+    codigos,
+  }));
+  return { zones };
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  ZONE SETUP                                              ║
+// ╚══════════════════════════════════════════════════════════╝
+function setupTab(tab) {
+  activeSetupTab = tab;
+  ['zones','assign','order'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+  });
+  renderSetup(tab);
+}
+
+function renderSetup(tab) {
+  const el = document.getElementById('setup-content');
+  if (!T || !Z) { el.innerHTML = '<p style="color:#888">Importa la plantilla primero.</p>'; return; }
+  if (tab === 'zones')  renderZonesTab(el);
+  if (tab === 'assign') renderAssignTab(el);
+  if (tab === 'order')  renderOrderTab(el);
+}
+
+// ── Tab: Zonas ────────────────────────────────────────────
+function renderZonesTab(el) {
+  if (!Z.zones.length) {
+    el.innerHTML = '<p style="color:#888">No hay zonas. Toca "+ Zona" para crear.</p>';
+    return;
+  }
+  el.innerHTML = Z.zones.map((z, i) => `
+    <div class="card" style="border-left:4px solid ${z.color}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="flex:1;font-weight:700;font-size:15px">${esc(z.nombre)}</div>
+        <span class="badge badge-gray">${z.codigos.length} art.</span>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn-gray btn-sm" onclick="renameZone('${z.id}')">✏️ Renombrar</button>
+        <button class="btn-gray btn-sm" onclick="changeColor('${z.id}')">🎨</button>
+        <button class="btn-gray btn-sm" onclick="moveZone(${i},-1)">↑</button>
+        <button class="btn-gray btn-sm" onclick="moveZone(${i},1)">↓</button>
+        <button class="btn-red btn-sm"  onclick="deleteZone('${z.id}')">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function promptNewZone() {
+  const nombre = prompt('Nombre de la nueva zona:');
+  if (!nombre?.trim()) return;
+  const id = 'z_' + Date.now();
+  Z.zones.push({ id, nombre: nombre.trim(), color: COLORS[Z.zones.length % COLORS.length], codigos: [] });
+  renderSetup(activeSetupTab);
+}
+
+function renameZone(id) {
+  const z = Z.zones.find(z => z.id === id);
+  if (!z) return;
+  const n = prompt('Nuevo nombre:', z.nombre);
+  if (n?.trim()) { z.nombre = n.trim(); renderSetup(activeSetupTab); }
+}
+
+function changeColor(id) {
+  const z = Z.zones.find(z => z.id === id);
+  if (!z) return;
+  const idx = COLORS.indexOf(z.color);
+  z.color = COLORS[(idx + 1) % COLORS.length];
+  renderSetup(activeSetupTab);
+}
+
+function moveZone(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= Z.zones.length) return;
+  [Z.zones[i], Z.zones[j]] = [Z.zones[j], Z.zones[i]];
+  renderSetup(activeSetupTab);
+}
+
+function deleteZone(id) {
+  const z = Z.zones.find(z => z.id === id);
+  if (!z) return;
+  if (z.codigos.length && !confirm(`"${z.nombre}" tiene ${z.codigos.length} artículos. ¿Eliminar zona? Los artículos quedarán sin asignar.`)) return;
+  // Move codigos to unassigned
+  if (z.codigos.length) {
+    let ua = Z.zones.find(z => z.id === '__ua__');
+    if (!ua) { ua = { id:'__ua__', nombre:'Sin asignar', color:'#9ca3af', codigos:[] }; Z.zones.unshift(ua); }
+    ua.codigos.push(...z.codigos);
+  }
+  Z.zones = Z.zones.filter(z => z.id !== id);
+  renderSetup(activeSetupTab);
+}
+
+// ── Tab: Asignar ──────────────────────────────────────────
+function renderAssignTab(el) {
+  if (!Z.zones.length) {
+    el.innerHTML = '<div class="alert alert-warn">Crea zonas primero en la pestaña Zonas.</div>';
+    return;
+  }
+
+  // Group parent items by subgrupo
+  const parents = T.items.filter(i => !i.isP);
+  const byKey   = {};
+  for (const it of parents) {
+    const k = it.sgr || it.grupo || 'SIN GRUPO';
+    if (!byKey[k]) byKey[k] = [];
+    byKey[k].push(it);
+  }
+
+  const zoneOpts = Z.zones.map(z => `<option value="${z.id}">${esc(z.nombre)}</option>`).join('');
+
+  el.innerHTML = `
+    <p style="font-size:13px;color:#888;margin-bottom:12px">Asigna cada grupo de artículos a una zona. El orden dentro de cada zona se ajusta en la pestaña Ordenar.</p>
+    ${Object.entries(byKey).map(([key, items]) => {
+      // Find the zone where most of these items are
+      const zoneCounts = {};
+      Z.zones.forEach(z => { zoneCounts[z.id] = 0; });
+      items.forEach(it => {
+        const z = Z.zones.find(z => z.codigos.includes(it.codigo));
+        if (z) zoneCounts[z.id] = (zoneCounts[z.id] || 0) + 1;
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-      const reply = data.choices && data.choices[0] ? data.choices[0].message.content : 'Sin respuesta';
-      groqHistory.push({ role: 'assistant', content: reply });
-      document.getElementById('groq-loading').remove();
-      msgs.innerHTML += '<div class="gmsg ai">' + reply + '</div>';
-      msgs.scrollTop = msgs.scrollHeight;
-    } catch(e) {
-      document.getElementById('groq-loading').textContent = 'Error: ' + e.message;
+      const dominantZone = Object.entries(zoneCounts).sort((a,b)=>b[1]-a[1])[0];
+      const currentZoneId = dominantZone && dominantZone[1] > 0 ? dominantZone[0] : '';
+
+      return `
+        <div class="sg-row">
+          <div class="sg-name">${esc(key)}</div>
+          <div class="sg-count">${items.length}</div>
+          <select onchange="assignGroupToZone(${JSON.stringify(items.map(i=>i.codigo))}, this.value)">
+            <option value="">Sin zona</option>
+            ${zoneOpts}
+          </select>
+        </div>`;
+    }).join('')}
+  `;
+
+  // Set current selection
+  el.querySelectorAll('.sg-row').forEach((row, idx) => {
+    const key    = Object.keys(byKey)[idx];
+    const items  = byKey[key];
+    const z      = Z.zones.find(z => items.some(it => z.codigos.includes(it.codigo)));
+    const sel    = row.querySelector('select');
+    if (z) sel.value = z.id;
+  });
+}
+
+function assignGroupToZone(codigos, zoneId) {
+  // Remove these codigos from all zones
+  Z.zones.forEach(z => { z.codigos = z.codigos.filter(c => !codigos.includes(c)); });
+  // Add to target zone
+  if (zoneId) {
+    const target = Z.zones.find(z => z.id === zoneId);
+    if (target) target.codigos.push(...codigos);
+  }
+}
+
+// ── Tab: Ordenar ──────────────────────────────────────────
+function renderOrderTab(el) {
+  const zoneOpts = Z.zones.map((z, i) => `<option value="${i}">${esc(z.nombre)}</option>`).join('');
+  el.innerHTML = `
+    <div class="form-group">
+      <label>Zona a ordenar</label>
+      <select onchange="renderZoneOrder(this.value)" id="order-zone-sel">${zoneOpts}</select>
+    </div>
+    <div id="order-items"></div>`;
+  if (Z.zones.length) renderZoneOrder(0);
+}
+
+function renderZoneOrder(zoneIdx) {
+  const zone = Z.zones[zoneIdx];
+  if (!zone) return;
+  const el = document.getElementById('order-items');
+  if (!zone.codigos.length) { el.innerHTML = '<p style="color:#888">Esta zona no tiene artículos asignados.</p>'; return; }
+
+  el.innerHTML = zone.codigos.map((cod, i) => {
+    const item = T.items.find(it => it.codigo === cod);
+    const label = item ? item.art : cod;
+    return `
+      <div class="order-row" id="or_${i}">
+        <span class="label">${esc(label)}</span>
+        <div class="order-btns">
+          <button onclick="moveItem(${zoneIdx},${i},-1)">↑</button>
+          <button onclick="moveItem(${zoneIdx},${i},1)">↓</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function moveItem(zoneIdx, i, dir) {
+  const zone = Z.zones[zoneIdx];
+  const j = i + dir;
+  if (j < 0 || j >= zone.codigos.length) return;
+  [zone.codigos[i], zone.codigos[j]] = [zone.codigos[j], zone.codigos[i]];
+  renderZoneOrder(zoneIdx);
+}
+
+function saveAndGoWelcome() {
+  lsSet(LS.Z, Z);
+  go('welcome');
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  SESSION                                                 ║
+// ╚══════════════════════════════════════════════════════════╝
+function startSession() {
+  const operario = document.getElementById('inp-operario').value.trim();
+  const fecha    = document.getElementById('inp-fecha').value;
+  const zoneId   = document.getElementById('inp-zona').value;
+  if (!operario) { alert('Ingresa tu nombre'); return; }
+  if (!fecha)    { alert('Selecciona la fecha'); return; }
+
+  if (!S || S.fecha !== fecha) {
+    S = { operario, fecha, counts: {}, completedZones: [] };
+  }
+  S.operario = operario;
+  lsSet(LS.S, S);
+
+  if (zoneId === '__all__') {
+    go('overview');
+  } else {
+    const zone = Z.zones.find(z => z.id === zoneId);
+    if (zone) startCount(zone);
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  COUNT SCREEN                                            ║
+// ╚══════════════════════════════════════════════════════════╝
+function getZoneItems(zone) {
+  // Returns items in physical order: for each parent, include its presentations
+  const out = [];
+  for (const cod of zone.codigos) {
+    const parent = T.items.find(i => i.codigo === cod);
+    if (!parent) continue;
+    const pres = T.items.filter(i => i.parentCod === cod);
+    if (pres.length > 0) {
+      out.push({ ...parent, _headerOnly: true });
+      out.push(...pres);
+    } else {
+      out.push(parent);
+    }
+  }
+  return out;
+}
+
+function getAllItems() {
+  return (Z?.zones ?? []).flatMap(z => getZoneItems(z));
+}
+
+function startCountById(id) {
+  const zone = Z.zones.find(z => z.id === id);
+  if (zone) startCount(zone);
+}
+
+function startCount(zone) {
+  CZ = zone;
+  document.getElementById('count-zone-name').textContent = zone.nombre;
+  document.getElementById('count-search').value = '';
+  renderCountList(getZoneItems(zone));
+  updateProgress();
+  go('count');
+}
+
+function startCountAll() {
+  CZ = null;
+  document.getElementById('count-zone-name').textContent = 'Todo el almacén';
+  document.getElementById('count-search').value = '';
+  renderCountList(getAllItems());
+  updateProgress();
+  go('count');
+}
+
+function renderCountList(items) {
+  const el = document.getElementById('count-list');
+  let html = '';
+  let lastSgr = null;
+
+  for (const item of items) {
+    const sgr = item.sgr || item.grupo || '';
+
+    if (!item.isP && !item._headerOnly && sgr !== lastSgr) {
+      lastSgr = sgr;
+      if (sgr) html += `<div class="subgrupo-hdr" data-sgr="${esc(sgr)}">${esc(sgr)}</div>`;
+    }
+
+    if (item._headerOnly) {
+      html += `
+        <div class="item-row parent-hdr-row" data-search="${esc(item.art)} ${esc(item.codigo)}">
+          <div class="parent-label">${esc(item.art)}</div>
+        </div>`;
+    } else {
+      const val     = S?.counts[item.codigo] ?? '';
+      const filled  = val !== '' ? 'filled' : '';
+      const classes = 'item-row' + (item.isP ? ' presentation' : '');
+      html += `
+        <div class="${classes}" data-search="${esc(item.art)} ${esc(item.codigo)}">
+          <div class="item-text">
+            <div class="item-name">${esc(item.art)}</div>
+            ${!item.isP ? `<div class="item-unit">${esc(item.uni)}</div>` : ''}
+          </div>
+          <input type="number" class="qty-input ${filled}"
+            inputmode="decimal" step="0.01" min="0" placeholder="0"
+            value="${val}"
+            data-cod="${esc(item.codigo)}"
+            oninput="onQty(this)"
+            onfocus="this.select()">
+        </div>`;
     }
   }
 
-  // ── PDF OPERARIO ───────────────────────────────────────────
-  function descargarPDF() {
-    if (!sesionActiva) return;
-    const items = [];
-    document.querySelectorAll('#lista .qty-input').forEach(input => {
-      const val = parseFloat(input.value) || 0;
-      if (val > 0) items.push({
-        codigo: input.getAttribute('data-codigo'),
-        nombre: input.getAttribute('data-nombre'),
-        unidad: input.getAttribute('data-unidad'),
-        cantidad: val
-      });
+  el.innerHTML = html;
+}
+
+function onQty(inp) {
+  const cod = inp.dataset.cod;
+  const v   = inp.value.trim();
+  const num = parseFloat(v);
+
+  if (v !== '' && !isNaN(num) && num >= 0) {
+    S.counts[cod] = num;
+  } else {
+    delete S.counts[cod];
+  }
+  inp.classList.toggle('filled', v !== '' && v !== '0');
+  lsSet(LS.S, S);
+  updateProgress();
+}
+
+function updateProgress() {
+  const items    = CZ ? getZoneItems(CZ) : getAllItems();
+  const countable= items.filter(i => !i._headerOnly);
+  const filled   = countable.filter(i => S?.counts[i.codigo] !== undefined);
+  const pct      = countable.length ? filled.length / countable.length * 100 : 0;
+  document.getElementById('count-bar').style.width = pct + '%';
+  document.getElementById('count-pct').textContent = `${filled.length}/${countable.length}`;
+}
+
+function filterCount(q) {
+  const ql = q.toLowerCase().trim();
+  const rows = document.querySelectorAll('#count-list .item-row');
+  rows.forEach(r => {
+    const match = !ql || (r.dataset.search ?? '').toLowerCase().includes(ql);
+    r.classList.toggle('hidden', !match);
+  });
+  // Hide empty subgrupo headers
+  document.querySelectorAll('#count-list .subgrupo-hdr').forEach(hdr => {
+    let next = hdr.nextElementSibling, visible = false;
+    while (next && !next.classList.contains('subgrupo-hdr')) {
+      if (next.classList.contains('item-row') && !next.classList.contains('hidden')) visible = true;
+      next = next.nextElementSibling;
+    }
+    hdr.classList.toggle('hidden', !visible);
+  });
+}
+
+function clearCountSearch() {
+  document.getElementById('count-search').value = '';
+  filterCount('');
+}
+
+function exitCount() {
+  CZ = null;
+  go('overview');
+}
+
+function doneZone() {
+  if (CZ) {
+    if (!S.completedZones.includes(CZ.id)) S.completedZones.push(CZ.id);
+    lsSet(LS.S, S);
+  }
+  CZ = null;
+  go('overview');
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  OVERVIEW                                                ║
+// ╚══════════════════════════════════════════════════════════╝
+function renderOverview() {
+  if (!S) { go('welcome'); return; }
+  document.getElementById('ov-title').textContent = `Toma · ${S.fecha}`;
+  document.getElementById('ov-meta').textContent  = S.operario;
+
+  const zones  = Z?.zones ?? [];
+  let allDone  = zones.length > 0;
+  let totalArt = 0, filledArt = 0;
+
+  const zonesHtml = zones.map(zone => {
+    const items     = getZoneItems(zone);
+    const countable = items.filter(i => !i._headerOnly);
+    const filled    = countable.filter(i => S.counts[i.codigo] !== undefined);
+    const done      = S.completedZones?.includes(zone.id);
+    const pct       = countable.length ? Math.round(filled.length / countable.length * 100) : 0;
+    totalArt  += countable.length;
+    filledArt += filled.length;
+    if (!done) allDone = false;
+
+    const statusClass = done ? 'done' : filled.length > 0 ? 'partial' : '';
+    const icon        = done ? '✅' : filled.length > 0 ? '⏳' : '○';
+
+    return `
+      <div class="zone-card ${statusClass}" onclick="startCountById('${zone.id}')">
+        <div class="zone-dot" style="background:${zone.color}"></div>
+        <div class="zone-info">
+          <div class="zone-name">${esc(zone.nombre)}</div>
+          <div class="zone-meta">${filled.length}/${countable.length} · ${pct}%</div>
+        </div>
+        <div class="zone-status">${icon}</div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('ov-zones').innerHTML = zonesHtml;
+
+  const globalPct = totalArt ? filledArt / totalArt * 100 : 0;
+  document.getElementById('ov-bar').style.width = globalPct + '%';
+
+  const btn = document.getElementById('btn-generate');
+  if (!allDone) {
+    btn.textContent       = 'Generar Excel (hay zonas pendientes)';
+    btn.style.background  = '#667eea';
+    btn.style.opacity     = '.7';
+  } else {
+    btn.textContent      = 'Generar Excel para Xetux →';
+    btn.style.background = '#22c55e';
+    btn.style.opacity    = '1';
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  VALIDATION & EXCEL GENERATION                           ║
+// ╚══════════════════════════════════════════════════════════╝
+function renderValidation() {
+  const el = document.getElementById('validation-out');
+  if (!T || !S) { el.innerHTML = '<p style="color:#888">Sin datos.</p>'; return; }
+
+  const errors = [], warnings = [], ok = [];
+  const allItems   = T.items.filter(i => !i._headerOnly);
+  const countable  = allItems.filter(i => !i.isP || !T.items.some(p => !p.isP && p.codigo === i.parentCod));
+  // Items that are either: a base item with no presentations, or a presentation
+  const leafItems  = allItems.filter(i => {
+    if (!i.isP) {
+      const hasPres = allItems.some(p => p.isP && p.parentCod === i.codigo);
+      return !hasPres;
+    }
+    return true;
+  });
+
+  const counted    = leafItems.filter(i => S.counts[i.codigo] !== undefined);
+  const notCounted = leafItems.filter(i => S.counts[i.codigo] === undefined);
+  const zeroCount  = leafItems.filter(i => S.counts[i.codigo] === 0);
+
+  if (notCounted.length > 0) {
+    warnings.push({
+      title: `${notCounted.length} artículos sin contar → quedarán en 0`,
+      detail: notCounted.slice(0, 5).map(i => i.art).join(', ') + (notCounted.length > 5 ? ` y ${notCounted.length-5} más…` : ''),
     });
-    const fecha_imp = new Date().toLocaleString('es-MX');
-    const itemsHtml = items.map((it,i)=>`<tr style="background:${i%2?'#f8fafc':'#fff'}">
-      <td style="border:1px solid #ddd;padding:5px;font-size:11px;">${it.codigo}</td>
-      <td style="border:1px solid #ddd;padding:5px;">${it.nombre}</td>
-      <td style="border:1px solid #ddd;padding:5px;text-align:center;">${it.unidad}</td>
-      <td style="border:1px solid #ddd;padding:5px;text-align:center;font-weight:bold;">${it.cantidad}</td>
-    </tr>`).join('');
-    const manualesHtml = manualesLocal.length ? `
-      <h3 style="margin:20px 0 8px;font-size:14px;">Ítems No Catalogados</h3>
-      <table style="width:100%;border-collapse:collapse;font-size:12px;">
-        <thead><tr style="background:#fef3c7;">
-          <th style="border:1px solid #ddd;padding:5px;text-align:left;">Código</th>
-          <th style="border:1px solid #ddd;padding:5px;text-align:left;">Nombre</th>
-          <th style="border:1px solid #ddd;padding:5px;text-align:center;">Unidad</th>
-          <th style="border:1px solid #ddd;padding:5px;text-align:center;">Cant.</th>
-        </tr></thead>
-        <tbody>${manualesLocal.map((m,i)=>`<tr style="background:${i%2?'#fffbeb':'#fff'}">
-          <td style="border:1px solid #ddd;padding:5px;">${m.codigo}</td>
-          <td style="border:1px solid #ddd;padding:5px;">${m.nombre}</td>
-          <td style="border:1px solid #ddd;padding:5px;text-align:center;">${m.unidad||'—'}</td>
-          <td style="border:1px solid #ddd;padding:5px;text-align:center;font-weight:bold;">${m.cantidad}</td>
-        </tr>`).join('')}</tbody>
-      </table>` : '';
-    const filename = `Inventario_BARRA_${sesionActiva.fecha}.pdf`;
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-    <title>${filename}</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
-    <style>
-      body{font-family:Arial,sans-serif;padding:20px;color:#333;font-size:12px;margin:0;}
-      h1{font-size:17px;margin-bottom:4px;}
-      .meta{font-size:11px;color:#555;margin-bottom:12px;border-bottom:1px solid #ddd;padding-bottom:8px;}
-      .firma{margin-top:40px;display:flex;gap:60px;}
-      .firma-box{flex:1;border-top:1px solid #333;padding-top:8px;font-size:11px;color:#555;}
-      #cargando{position:fixed;inset:0;background:white;display:flex;align-items:center;justify-content:center;font-size:16px;color:#667eea;font-family:Arial,sans-serif;}
-    </style></head><body>
-    <div id="cargando">Generando PDF...</div>
-    <div id="contenido" style="display:none;">
-      <h1>Piazza Pasticcio — Toma de Inventario</h1>
-      <div class="meta">
-        <strong>Almacén:</strong> BARRA &nbsp;|&nbsp;
-        <strong>Área:</strong> ${sesionActiva.area} &nbsp;|&nbsp;
-        <strong>Fecha:</strong> ${sesionActiva.fecha}<br>
-        <strong>Operario:</strong> ${sesionActiva.operario} &nbsp;|&nbsp;
-        <strong>Ítems catálogo:</strong> ${items.length} &nbsp;|&nbsp;
-        <strong>No catalogados:</strong> ${manualesLocal.length}<br>
-        <strong>Generado:</strong> ${fecha_imp}
-      </div>
-      <table style="width:100%;border-collapse:collapse;font-size:11px;">
-        <thead><tr style="background:#e0e7ff;">
-          <th style="border:1px solid #ddd;padding:5px;text-align:left;">Código</th>
-          <th style="border:1px solid #ddd;padding:5px;text-align:left;">Nombre</th>
-          <th style="border:1px solid #ddd;padding:5px;text-align:center;">Unidad</th>
-          <th style="border:1px solid #ddd;padding:5px;text-align:center;">Cantidad</th>
-        </tr></thead>
-        <tbody>${itemsHtml}</tbody>
-      </table>
-      ${manualesHtml}
-      <div class="firma">
-        <div class="firma-box">Firma del Operario &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
-        <div class="firma-box">Firma del Supervisor &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
-      </div>
-    </div>
-    <script>
-      window.addEventListener('load', function() {
-        var el = document.getElementById('contenido');
-        el.style.display = 'block';
-        html2pdf().set({
-          margin: 10, filename: '${filename}',
-          image: { type: 'jpeg', quality: 0.97 },
-          html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        }).from(el).save().then(function() {
-          document.getElementById('cargando').textContent = '✓ PDF descargado';
-          setTimeout(function(){ window.close(); }, 1500);
-        });
-      });
-    <\/script>
-    </body></html>`;
-    const win = window.open('', '_blank');
-    win.document.write(html);
-    win.document.close();
-  
   }
 
- </script>
+  // Check for unusually high values (simple heuristic: > 999 for liquids, > 9999 for pz)
+  const highValues = leafItems.filter(i => {
+    const v = S.counts[i.codigo];
+    if (v === undefined) return false;
+    const isLiquid = /LT|ML/i.test(i.uni);
+    return isLiquid ? v > 999 : v > 9999;
+  });
+  if (highValues.length) {
+    warnings.push({
+      title: `${highValues.length} cantidades inusualmente altas`,
+      detail: highValues.slice(0, 5).map(i => `${i.art}: ${S.counts[i.codigo]} ${i.uni}`).join(', '),
+    });
+  }
 
-  <!-- GROQ CHAT -->
-  <button class="fab fab-groq" onclick="abrirGroq()" title="Asistente IA">🤖</button>
-  <div class="groq-overlay" id="groq-overlay">
-    <div class="groq-panel">
-      <div class="groq-header">
-        <div class="groq-title">🤖 Asistente de Inventario</div>
-        <button class="groq-close" onclick="cerrarGroq()">Cerrar</button>
-      </div>
-      <div class="groq-messages" id="groq-messages">
-        <div class="gmsg ai">Hola, soy tu asistente. Puedo ayudarte a encontrar productos, aclarar unidades de medida o resolver dudas de la toma. ¿En qué te ayudo?</div>
-      </div>
-      <div class="groq-input-row">
-        <input type="text" class="groq-input" id="groq-input" placeholder="Pregunta algo..." onkeyup="if(event.key==='Enter') enviarGroq()">
-        <button class="groq-send" onclick="enviarGroq()">➤</button>
-      </div>
-    </div>
-  </div>
+  // Check for negative values
+  const negatives = leafItems.filter(i => (S.counts[i.codigo] ?? 0) < 0);
+  if (negatives.length) {
+    errors.push({ title: `${negatives.length} cantidades negativas`, detail: negatives.map(i => i.art).join(', ') });
+  }
+
+  const raw = localStorage.getItem(LS.RAW);
+  if (!raw) errors.push({ title: 'Plantilla original no encontrada', detail: 'Reimporta el .xlsx para poder generar.' });
+
+  // Zones not completed
+  const pendingZones = (Z?.zones ?? []).filter(z => !S.completedZones?.includes(z.id));
+  if (pendingZones.length) {
+    warnings.push({
+      title: `${pendingZones.length} zona(s) no marcadas como listas`,
+      detail: pendingZones.map(z => z.nombre).join(', '),
+    });
+  }
+
+  let html = '';
+  if (errors.length) {
+    html += errors.map(e => `
+      <div class="alert alert-error">
+        <div class="alert-title">❌ ${esc(e.title)}</div>
+        <div>${esc(e.detail)}</div>
+      </div>`).join('');
+  }
+  if (warnings.length) {
+    html += warnings.map(w => `
+      <div class="alert alert-warn">
+        <div class="alert-title">⚠️ ${esc(w.title)}</div>
+        <div>${esc(w.detail)}</div>
+      </div>`).join('');
+  }
+  html += `
+    <div class="alert alert-ok">
+      <div class="alert-title">✅ ${counted.length} artículos con cantidad registrada</div>
+      <div>${leafItems.length} artículos en total · ${notCounted.length} irán en 0</div>
+    </div>`;
+
+  el.innerHTML = html;
+}
+
+async function generateExcel() {
+  const rawB64 = localStorage.getItem(LS.RAW);
+  if (!rawB64) { alert('No encuentro la plantilla original. Reimporta el .xlsx.'); return; }
+  if (!S) { alert('No hay sesión activa.'); return; }
+
+  try {
+    // Decode base64 → ArrayBuffer
+    const bin   = atob(rawB64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+    const wb  = XLSX.read(bytes.buffer, { type:'array', cellStyles:true });
+    const ws  = wb.Sheets[wb.SheetNames[0]];
+
+    const canIdx = T.cantidadColIdx;
+
+    // Write counts into Cantidad column.
+    // Base items with presentations get 0 (counter filled the presentation rows).
+    // Base items without presentations and all presentations get their count or 0.
+    for (const item of T.items) {
+      const cantidad = S.counts[item.codigo] ?? 0;
+      const cellAddr = XLSX.utils.encode_cell({ r: item.rowIdx, c: canIdx });
+      ws[cellAddr]   = { t:'n', v: cantidad };
+    }
+
+    // Download
+    const out  = XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles:true });
+    const blob = new Blob([out], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `Inventario_${ALMACEN}_${S.fecha}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+  } catch(e) {
+    console.error(e);
+    alert('Error al generar el Excel: ' + e.message);
+  }
+}
+
+// ── Start ────────────────────────────────────────────────────────────────
+init();
+</script>
 </body>
 </html>
