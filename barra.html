@@ -3,189 +3,112 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Inventario · Xetux</title>
+<title>Inventario Barra · Xetux</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; }
-
-/* ── Screens ── */
 .screen { display: none; min-height: 100vh; flex-direction: column; }
 .screen.active { display: flex; }
-
-/* ── Header ── */
 .hdr { background: #667eea; color: white; padding: 14px 16px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 50; }
 .hdr h1 { font-size: 17px; font-weight: 700; flex: 1; }
 .hdr-back { background: none; border: none; color: white; font-size: 22px; padding: 0 6px; cursor: pointer; line-height: 1; }
-.hdr-action { background: rgba(255,255,255,.2); border: none; color: white; padding: 7px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
-
-/* ── Buttons ── */
 button { cursor: pointer; border: none; font-family: inherit; font-weight: 600; border-radius: 10px; transition: opacity .15s; }
 button:active { opacity: .75; }
 .btn { display: block; width: 100%; padding: 15px; font-size: 16px; border-radius: 12px; text-align: center; }
 .btn-purple { background: #667eea; color: white; }
 .btn-green  { background: #22c55e; color: white; }
 .btn-gray   { background: #e5e7eb; color: #374151; }
-.btn-red    { background: #ef4444; color: white; }
 .btn-sm     { padding: 8px 14px; font-size: 13px; border-radius: 8px; }
-.btn-icon   { background: rgba(255,255,255,.2); color: white; padding: 8px 10px; font-size: 14px; border-radius: 8px; }
-
-/* ── Forms ── */
 .form-group { margin-bottom: 14px; }
 label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 5px; }
-input[type=text], input[type=date], select {
+input[type=text], input[type=date] {
   width: 100%; padding: 13px 14px; border: 1.5px solid #ddd; border-radius: 10px;
   font-size: 16px; font-family: inherit; background: white; color: #333; -webkit-appearance: none;
 }
-input:focus, select:focus { outline: none; border-color: #667eea; }
-
-/* ── Content ── */
+input:focus { outline: none; border-color: #667eea; }
 .content { flex: 1; padding: 16px; overflow-y: auto; }
 .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
 .divider { height: 1px; background: #e5e7eb; margin: 16px 0; }
 .section-label { font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: .8px; margin: 18px 0 8px; }
 .row { display: flex; gap: 8px; margin-top: 10px; }
-.gap-8 { gap: 8px; }
-
-/* ── Progress ── */
-.progress-bar { height: 4px; background: #e5e7eb; border-radius: 4px; overflow: hidden; margin: 6px 0 0; }
+.progress-bar { height: 4px; background: #e5e7eb; border-radius: 4px; overflow: hidden; margin: 4px 0 0; }
 .progress-fill { height: 100%; background: #22c55e; border-radius: 4px; transition: width .3s; }
-
-/* ── Zone cards (overview) ── */
 .zone-card { background: white; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.07); cursor: pointer; border-left: 4px solid #e5e7eb; }
 .zone-card:active { opacity: .8; }
-.zone-card.done { border-left-color: #22c55e; }
+.zone-card.done    { border-left-color: #22c55e; }
 .zone-card.partial { border-left-color: #f59e0b; }
-.zone-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.zone-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .zone-info { flex: 1; min-width: 0; }
 .zone-name { font-weight: 700; font-size: 15px; }
 .zone-meta { font-size: 12px; color: #888; margin-top: 2px; }
 .zone-status { font-size: 20px; }
-
-/* ── Count list ── */
 .subgrupo-hdr { font-size: 11px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 1px; padding: 10px 16px 4px; background: #f5f5f5; }
 .item-row { background: white; padding: 11px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #f3f4f6; }
-.item-row.presentation { background: #fafafa; padding-left: 28px; }
-.item-row.parent-hdr-row { background: #f9f9f9; padding: 8px 16px; }
 .item-row.hidden { display: none; }
 .item-text { flex: 1; min-width: 0; }
 .item-name { font-size: 14px; font-weight: 600; }
-.item-unit { font-size: 11px; color: #aaa; }
-.parent-label { font-size: 12px; font-weight: 700; color: #667eea; }
+.item-unit { font-size: 11px; color: #aaa; margin-top: 2px; }
+.item-unit.warn { color: #d97706; }
+.qty-wrap { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .qty-input {
-  width: 80px; padding: 10px 6px; border: 1.5px solid #ddd; border-radius: 8px;
+  width: 72px; padding: 10px 6px; border: 1.5px solid #ddd; border-radius: 8px;
   text-align: center; font-size: 16px; font-weight: 700; font-family: inherit;
   -webkit-appearance: none; appearance: none;
 }
-.qty-input:focus { outline: none; border-color: #667eea; background: #f5f3ff; }
+.qty-input:focus  { outline: none; border-color: #667eea; background: #f5f3ff; }
 .qty-input.filled { border-color: #22c55e; background: #f0fff4; }
-
-/* ── Search bar ── */
+.qty-label { font-size: 11px; color: #aaa; white-space: nowrap; }
+.lt-badge { font-size: 11px; font-weight: 700; color: #667eea; background: #ede9fe; padding: 2px 6px; border-radius: 6px; white-space: nowrap; min-width: 54px; text-align: right; }
 .search-bar { background: white; padding: 10px 16px; border-bottom: 1px solid #e5e7eb; display: flex; gap: 8px; position: sticky; top: 53px; z-index: 40; }
 .search-bar input { flex: 1; padding: 10px 14px; border: 1.5px solid #ddd; border-radius: 10px; font-size: 16px; font-family: inherit; }
 .search-bar input:focus { outline: none; border-color: #667eea; }
 .search-bar button { background: #f3f4f6; color: #555; padding: 10px 14px; border-radius: 10px; font-size: 14px; }
-
-/* ── FAB ── */
 .fab-bar { position: fixed; bottom: 0; left: 0; right: 0; padding: 12px 16px; background: white; border-top: 1px solid #e5e7eb; z-index: 50; }
-
-/* ── Drop zone ── */
 .drop-zone { border: 2px dashed #c4b5fd; border-radius: 16px; padding: 40px 20px; text-align: center; background: white; cursor: pointer; transition: all .2s; }
 .drop-zone.over { border-color: #667eea; background: #f5f3ff; }
 .drop-icon { font-size: 48px; margin-bottom: 10px; }
 .drop-zone p { color: #888; font-size: 14px; margin-bottom: 14px; }
-
-/* ── Alerts ── */
 .alert { border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; font-size: 13px; line-height: 1.4; }
 .alert-warn  { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
 .alert-error { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
 .alert-ok    { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
 .alert-title { font-weight: 700; margin-bottom: 4px; }
-
-/* ── Setup tabs ── */
-.tabs { display: flex; background: white; border-bottom: 1px solid #e5e7eb; }
-.tab { flex: 1; padding: 12px; font-size: 13px; font-weight: 600; text-align: center; cursor: pointer; border-radius: 0; background: none; color: #888; border-bottom: 3px solid transparent; }
-.tab.active { color: #667eea; border-bottom-color: #667eea; }
-
-/* ── Zone setup items ── */
-.sg-row { background: white; border-radius: 10px; margin-bottom: 6px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
-.sg-name { flex: 1; font-size: 14px; font-weight: 600; }
-.sg-count { font-size: 12px; color: #aaa; margin-right: 4px; }
-.sg-row select { width: auto; padding: 6px 8px; font-size: 13px; border-radius: 8px; border: 1.5px solid #ddd; }
-
-/* ── Order items ── */
-.order-row { background: white; border-radius: 10px; margin-bottom: 6px; padding: 11px 14px; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
-.order-row .label { flex: 1; font-size: 14px; }
-.order-btns button { background: #f3f4f6; color: #555; padding: 6px 10px; font-size: 13px; border-radius: 6px; }
-
-/* ── Welcome ── */
-.welcome-hero { text-align: center; padding: 40px 16px 24px; }
+.welcome-hero { text-align: center; padding: 32px 16px 20px; }
 .welcome-icon { font-size: 52px; }
 .welcome-hero h1 { font-size: 26px; font-weight: 800; margin-top: 10px; }
 .welcome-hero p { color: #888; margin-top: 4px; font-size: 14px; }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; }
-.badge-green { background: #dcfce7; color: #166534; }
-.badge-yellow { background: #fef9c3; color: #854d0e; }
-.badge-gray { background: #f3f4f6; color: #555; }
 </style>
 </head>
 <body>
 
-<!-- ══════════════════════ WELCOME ══════════════════════ -->
 <div id="screen-welcome" class="screen">
   <div class="welcome-hero">
     <div class="welcome-icon">🍾</div>
-    <h1 id="welcome-title">Inventario Xetux</h1>
+    <h1>Inventario Barra</h1>
     <p id="welcome-sub">—</p>
   </div>
   <div class="content" style="padding-top:0" id="welcome-body"></div>
 </div>
 
-<!-- ══════════════════════ IMPORT ════════════════════════ -->
 <div id="screen-import" class="screen">
   <div class="hdr">
     <button class="hdr-back" onclick="go('welcome')">←</button>
     <h1>Importar plantilla Xetux</h1>
   </div>
   <div class="content">
-    <p style="font-size:14px;color:#555;margin-bottom:16px">
-      Exporta desde Xetux con <strong>"Incluir presentaciones"</strong> activado. Los demás checkboxes son opcionales.
-    </p>
+    <p style="font-size:14px;color:#555;margin-bottom:16px">Usa la plantilla <strong>simplificada</strong> (sin presentaciones).</p>
     <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
       <div class="drop-icon">📄</div>
       <p>Arrastra el .xlsx aquí<br>o toca para seleccionar</p>
       <input type="file" id="file-input" accept=".xlsx" style="display:none" onchange="handleFileInput(this)">
       <div id="import-msg" style="margin-top:10px;font-size:13px;font-weight:600"></div>
     </div>
-    <div class="card" style="background:#f5f3ff;margin-top:16px">
-      <div style="font-size:13px;color:#555;line-height:1.6">
-        <strong>Pasos en Xetux:</strong><br>
-        1. Inventarios → Gestión de inventario → Exportar<br>
-        2. ✓ Incluir presentaciones<br>
-        3. Aceptar → descargar .xlsx
-      </div>
+    <div class="card" style="background:#f5f3ff;margin-top:16px;font-size:13px;color:#555;line-height:1.6">
+      <strong>En Xetux:</strong> Inventarios → Gestión de inventario → Exportar (sin "Incluir presentaciones")
     </div>
   </div>
 </div>
 
-<!-- ══════════════════════ ZONE SETUP ════════════════════ -->
-<div id="screen-setup" class="screen">
-  <div class="hdr">
-    <button class="hdr-back" onclick="go('welcome')">←</button>
-    <h1>Configurar zonas</h1>
-    <button class="hdr-action" onclick="promptNewZone()">+ Zona</button>
-  </div>
-  <div class="tabs">
-    <button class="tab active" id="tab-zones"  onclick="setupTab('zones')">Zonas</button>
-    <button class="tab"        id="tab-assign" onclick="setupTab('assign')">Asignar</button>
-    <button class="tab"        id="tab-order"  onclick="setupTab('order')">Ordenar</button>
-  </div>
-  <div class="content" id="setup-content" style="padding-bottom:80px"></div>
-  <div class="fab-bar">
-    <button class="btn btn-purple" onclick="saveAndGoWelcome()">Guardar ✓</button>
-  </div>
-</div>
-
-<!-- ══════════════════════ SESSION START ═════════════════ -->
 <div id="screen-session" class="screen">
   <div class="hdr">
     <button class="hdr-back" onclick="go('welcome')">←</button>
@@ -194,21 +117,16 @@ input:focus, select:focus { outline: none; border-color: #667eea; }
   <div class="content">
     <div class="form-group">
       <label>Operario</label>
-      <input type="text" id="inp-operario" placeholder="Tu nombre completo">
+      <input type="text" id="inp-operario" placeholder="Tu nombre">
     </div>
     <div class="form-group">
       <label>Fecha</label>
       <input type="date" id="inp-fecha">
     </div>
-    <div class="form-group">
-      <label>Zona a contar</label>
-      <select id="inp-zona"><option value="__all__">Todas las zonas</option></select>
-    </div>
     <button class="btn btn-purple" style="margin-top:8px" onclick="startSession()">Iniciar →</button>
   </div>
 </div>
 
-<!-- ══════════════════════ COUNT ═════════════════════════ -->
 <div id="screen-count" class="screen">
   <div class="hdr">
     <button class="hdr-back" onclick="exitCount()">←</button>
@@ -219,16 +137,15 @@ input:focus, select:focus { outline: none; border-color: #667eea; }
     <span id="count-pct" style="font-size:13px;white-space:nowrap;opacity:.85"></span>
   </div>
   <div class="search-bar">
-    <input type="text" id="count-search" placeholder="Buscar artículo o código…" oninput="filterCount(this.value)">
-    <button onclick="clearCountSearch()">✕</button>
+    <input type="text" id="count-search" placeholder="Buscar artículo…" oninput="filterCount(this.value)">
+    <button onclick="clearSearch()">✕</button>
   </div>
   <div id="count-list" style="padding-bottom:80px"></div>
   <div class="fab-bar">
-    <button class="btn btn-green" onclick="doneZone()">Listo esta zona ✓</button>
+    <button class="btn btn-green" onclick="doneZone()">Zona lista ✓</button>
   </div>
 </div>
 
-<!-- ══════════════════════ OVERVIEW ══════════════════════ -->
 <div id="screen-overview" class="screen">
   <div class="hdr">
     <button class="hdr-back" onclick="go('welcome')">←</button>
@@ -236,19 +153,14 @@ input:focus, select:focus { outline: none; border-color: #667eea; }
   </div>
   <div class="content">
     <div id="ov-meta" style="font-size:13px;color:#888;margin-bottom:4px"></div>
-    <div id="ov-global-bar" style="margin-bottom:16px">
-      <div class="progress-bar"><div class="progress-fill" id="ov-bar" style="width:0%"></div></div>
-    </div>
+    <div style="margin-bottom:16px"><div class="progress-bar"><div class="progress-fill" id="ov-bar" style="width:0%"></div></div></div>
     <div id="ov-zones"></div>
     <div style="margin-top:20px">
-      <button class="btn btn-purple" id="btn-generate" onclick="go('generate')">
-        Generar Excel para Xetux →
-      </button>
+      <button class="btn btn-purple" id="btn-generate" onclick="go('generate')">Generar Excel para Xetux →</button>
     </div>
   </div>
 </div>
 
-<!-- ══════════════════════ GENERATE ══════════════════════ -->
 <div id="screen-generate" class="screen">
   <div class="hdr">
     <button class="hdr-back" onclick="go('overview')">←</button>
@@ -260,175 +172,130 @@ input:focus, select:focus { outline: none; border-color: #667eea; }
       <button class="btn btn-green" onclick="generateExcel()">⬇️ Descargar Excel para Xetux</button>
     </div>
     <p style="font-size:12px;color:#aaa;text-align:center;margin-top:12px;line-height:1.5">
-      El archivo es una copia exacta de la plantilla Xetux con la columna Cantidad llenada.<br>
-      Artículos no contados quedan en 0.
+      Artículos LT: la app convierte botellas → LT.<br>
+      Artículos sin tamaño: valor ingresado directo en LT.
     </p>
   </div>
 </div>
 
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <script>
-// ── Constants ────────────────────────────────────────────────────────────
+const PRES_LT    = {"XMAT2411000476": 0.75, "XMAT2605001432": 0.75, "XMAT2605001434": 0.75, "XMAT2411000461": 0.75, "XMAT2410000257": 0.75, "XMAT2409000190": 0.7, "XMAT2411000486": 0.7, "XMAT2410000246": 0.7, "XMAT2410000353": 0.7, "XMAT2501000686": 0.75, "MP0525": 0.7, "XMAT2410000247": 0.7, "XMAT2412000620": 0.7, "XMAT2501000685": 0.75, "XMAT2411000400": 1.0, "XMAT2410000242": 0.7, "XMAT2411000479": 0.75, "XMAT2412000602": 0.75, "XMAT2411000413": 0.75, "XMAT2410000352": 0.7, "XMAT2411000496": 1.0, "XMAT2411000500": 0.7, "XMAT2411000503": 0.7, "XMAT2411000475": 0.75, "MP0202": 0.75, "XMAT2411000459": 0.75, "XMAT2411000497": 1.0, "XMAT2410000254": 1.0, "XMAT2410000255": 1.0, "XMAT2411000439": 0.75, "XMAT2410000271": 0.75, "XMAT2512001203": 0.75, "XMAT2411000378": 0.7, "XMAT2411000377": 0.7, "XMAT2410000356": 0.7, "XMAT2410000365": 0.75, "XMAT2410000256": 0.75, "XMAT2410000367": 0.5, "XMAT2410000240": 0.75, "XMAT2411000464": 0.7, "XMAT2410000248": 0.75, "XMAT2601001214": 0.7, "XMAT2411000449": 0.7, "XMAT2411000448": 0.7, "XMAT2411000465": 0.75, "XMAT2411000477": 0.75, "XMAT2411000460": 0.75, "XMAT2411000511": 0.75, "XMAT2411000512": 0.75, "XMAT2410000228": 0.75, "XMAT2410000241": 0.75, "XMAT2411000492": 0.75, "XMAT2411000487": 0.75, "XMAT2411000481": 0.75, "XMAT2411000482": 0.75, "XMAT2411000527": 0.75, "XMAT2411000480": 0.75, "XMAT2411000524": 0.75, "XMAT2411000398": 0.7, "XMAT2501000687": 0.7, "XMAT2411000436": 0.7, "XMAT2411000408": 0.7, "XMAT2411000454": 0.75, "XMAT2409000121": 0.75, "XMAT2501000677": 0.75, "XMAT2409000120": 0.75, "XMAT2412000621": 0.7, "XMAT2410000274": 0.75, "XMAT2412000618": 0.7, "XMAT2412000619": 0.7, "XMAT2410000252": 0.7, "XMAT2410000233": 0.7, "XMAT2412000622": 0.7, "XMAT2410000231": 0.7, "XMAT2412000616": 0.7, "XMAT2412000617": 0.7, "XMAT2411000409": 0.7, "XMAT2504000817": 0.7, "MP0397": 0.7, "XMAT2410000359": 0.7, "XPRO2505001078": 1.0, "XMAT2410000258": 0.7, "XMAT2410000259": 0.75, "XMAT2412000644": 0.75, "XMAT2410000250": 0.7, "APERITIVO": 0.75, "XMAT2411000494": 0.7, "XMAT2411000397": 0.7, "XMAT2410000249": 1.0, "XMAT2411000488": 0.7, "XMAT2411000491": 0.7, "XMAT2410000355": 0.7, "XMAT2410000230": 0.7, "XMAT2410000260": 0.75, "XMAT2410000253": 1.0, "XMAT2410000243": 0.75, "XMAT2411000472": 0.75, "XMAT2411000471": 0.75, "XMAT2411000473": 0.75, "XMAT2412000603": 0.7, "XMAT2411000458": 0.75, "XMAT2410000251": 0.7, "XMAT2411000437": 0.75, "MP0201": 0.7, "XMAT2410000244": 0.75, "XMAT2411000498": 0.7, "XMAT2411000499": 0.7, "XMAT2602001363": 0.75, "XMAT2511001157": 0.75, "XMAT2411000393": 0.75, "MP0190": 0.75, "MP0189": 0.75, "XMAT2412000628": 0.5, "XMAT2501000682": 0.7, "XMAT2410000232": 0.7, "XMAT2411000450": 0.7, "XMAT2410000351": 0.75, "XMAT2411000403": 0.75, "XMAT2506000911": 0.7, "XMAT2411000474": 0.75, "XMAT2411000466": 0.7, "XMAT2410000245": 0.7, "XMAT2411000478": 0.7, "XMAT2410000364": 0.7, "XMAT2411000502": 0.7, "XMAT2411000501": 0.7, "XMAT2411000504": 0.7, "XMAT2501000678": 0.75, "XMAT2409000178": 0.75, "XMAT2411000462": 0.75, "XMAT2411000463": 0.75, "XMAT2501000679": 0.75, "XMAT2410000366": 0.75, "MP0443": 1.0, "XMAT2410000229": 1.0, "XMAT2411000522": 0.7, "XMAT2412000601": 0.75, "XMAT2605001444": 0.695};
+const ZONE_ORDER = [{"nombre": "almacen barra", "color": "#667eea", "items": [{"cod": "XMAT2410000271", "art": "TEQUILA CASCAHUIN BLANCO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000439", "art": "TEQUILA CASA DRAGONES BLANCO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000448", "art": "TEQUILA DON JULIO 70 AÑEJO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2504000817", "art": "TEQUILA HERRADURA REPOSADO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000450", "art": "TEQUILA 7 LEGUAS BLANCO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2602001363", "art": "TEQ RESERVA DE LA FAMILIA PLATINO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2605001444", "art": "TEQ CUERVO TRADICIONAL PLATA", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.695}, {"cod": "XMAT2412000644", "art": "TEQUILA TRADICIONAL CRISTALINO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2409000178", "art": "MEZCAL ESPADIN TRES CHICON", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2605001432", "art": "MEZ 7 MISTERIOS DOBA YEJ", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2409000121", "art": "GIN CONDESA CLASICO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2409000120", "art": "GIN CONDESA XOCONOSTLE", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2501000677", "art": "GIN CONDESA SOUMERIA", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000454", "art": "GIN BULLDOG", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000408", "art": "GIN BOMBAY SAPHIRE", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000403", "art": "VODKA STOLICHNAYA", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2501000678", "art": "VODKA TITOS", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000501", "art": "BRANDY TORRES 5", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000501", "art": "BRANDY TORRES 5", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000502", "art": "BRANDY TORRES 20", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000504", "art": "BRANDY TORRES ALTA LUZ CRISTALINO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2412000603", "art": "WHISKY MACALLAN 12 AÑOS DOUBLE CASK", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000477", "art": "WHISKY EAGLE RARE 10", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2410000258", "art": "WHISKY JOHNNIE WALKER ETIQUETA NEGRA", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2410000259", "art": "WHISKY JOHNNIE WALKER ROJA", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000393", "art": "WHISKY REVES ROJO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000480", "art": "RON FLOR DE CAÑA 7", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000524", "art": "RON FLOR DE CAÑA CRISTALINO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000481", "art": "RON FLOR DE CAÑA 12", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000482", "art": "RON FLOR DE CAÑA 18", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000413", "art": "RON BACARDI BLANCO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2412000601", "art": "RON BACARDI AÑEJO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2410000250", "art": "LIC 43", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2410000249", "art": "LICOR DE CAFE KAHLUA", "uni": "LT", "grp": "BEBIDAS", "lt": 1.0}, {"cod": "MP0201", "art": "LICOR PRIMO", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2410000246", "art": "LICOR AMARO AVERNA", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "MP0202", "art": "BITTER CAMPARI", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2410000232", "art": "LIC SAMBUCA NEGRO LNZ", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2501000682", "art": "LICOR SAMBUCA  BLANCO", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2410000248", "art": "LICOR CYNAR", "uni": "LT", "grp": "BEBIDAS", "lt": 0.75}, {"cod": "XPRO2505001078", "art": "JAGERMAISTER MANIFEST", "uni": "PZA", "grp": "GRUPO DE PRODUCTO", "lt": 1.0}, {"cod": "XMAT2409000190", "art": "LICOR AMARETTO DISARONNO", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2411000486", "art": "LICOR AMARETTO DISARONNO VELVET", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2411000511", "art": "TEQUILA ENEMIGO BLANCO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000512", "art": "TEQUILA ENEMIGO CRISTALINO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2410000228", "art": "TEQUILA ENEMIGO EXTRA AÑEJO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2410000233", "art": "GRAPPA BARRICATA CASA NOVA  CDC", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000400", "art": "LICOR VERMOUTH ANTICA FORMULA", "uni": "LT", "grp": "BEBIDAS", "lt": 1.0}, {"cod": "XMAT2412000616", "art": "GRAPPA POLI SARPA BLANCA", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2412000628", "art": "RUNNEGHT ROSSO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.5}, {"cod": "XMAT2410000254", "art": "LICOR VERMOUTH CARPANO ROSSO", "uni": "LT", "grp": "BEBIDAS", "lt": 1.0}, {"cod": "XMAT2410000253", "art": "LICOR VERMOUTH CARPANO BLANCO", "uni": "LT", "grp": "BEBIDAS", "lt": 1.0}, {"cod": "XMAT2410000255", "art": "LICOR VERMOUTH CARPANO DRY", "uni": "LT", "grp": "BEBIDAS", "lt": 1.0}, {"cod": "MP0443", "art": "LICOR YZAGUIRRE ROJO", "uni": "LT", "grp": "BEBIDAS", "lt": 1.0}, {"cod": "XMAT2412000618", "art": "LICOR GRAN BASSANO VERMUT BLANCO", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2412000619", "art": "LICOR GRAN BASSANO VERMUT TINTO", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2410000242", "art": "LIC APEROL", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2410000351", "art": "LICOR SAINT GERMAIN", "uni": "LT", "grp": "BEBIDAS", "lt": 0.75}, {"cod": "XMAT2410000365", "art": "CINZANO PRO SPRITZ", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2410000237", "art": "AGUA MINERAL  DE .237 ML", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2410000238", "art": "AGUA TONICA DE 237 ML", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "MP0479", "art": "PELLEGRINO LIMONATA DE .330 ML", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2411000507", "art": "COCA COLA  ZERO MINI", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2411000506", "art": "COCA COLA REGULAR MINI", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2508000983", "art": "AGUA TONICA SCHWEPPES DE BOTELLA DE .296", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2411000385", "art": "COCA COLA SIN AZUCAR 355 ML", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2411000384", "art": "COCA COLA  REGULAR 355 ML", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2411000508", "art": "SPRITE REGULAR 355 ML", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2411000509", "art": "SPRITE ZERO 355 ML", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2410000264", "art": "BOHEMIA CLASICA", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2411000404", "art": "BOHEMIA CRISTAL", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2410000263", "art": "BOHEMIA OSCURA", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2410000278", "art": "FELIX SCHORLE FRAMBUESA", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2410000277", "art": "FELIX SCHORLE MANDARINA", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2410000279", "art": "FELIX SCHORLE MARACUYA", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}]}, {"nombre": "refri almacen barra", "color": "#10b981", "items": [{"cod": "XMAT2410000266", "art": "HEINEKEN  0.0", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2410000357", "art": "CERVEZA PIEDRA LISA SESSION IPA", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "MP0463", "art": "CERVEZA BIRRA PORETTI 4 CEBADAS", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2410000264", "art": "BOHEMIA CLASICA", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2411000404", "art": "BOHEMIA CRISTAL", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2410000263", "art": "BOHEMIA OSCURA", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2604001411", "art": "AGU EVIAN CON GAS .330 ML", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2604001410", "art": "AGU EVIAN CON GAS .750 ML", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2604001409", "art": "AGU EVIAN NATURAL .330ML", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2604001408", "art": "AGU EVIAN NATURAL .750 ML", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}, {"cod": "XMAT2411000384", "art": "COCA COLA  REGULAR 355 ML", "uni": "PZA", "grp": "CERVEZA Y REFRESCO", "lt": null}]}, {"nombre": "CONTRA BARRA", "color": "#f59e0b", "items": [{"cod": "XMAT2410000260", "art": "LICOR POXAN", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "MP0190", "art": "RON LA GLORIA AÑEJO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "MP0189", "art": "RON LA GLORIA CRISTALINO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2412000622", "art": "GRAPPA CLEOPATRA", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000499", "art": "BRANDY  ST REMY MARTIN VSOP", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000498", "art": "COGNAC  REMY MARTIN 738", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000500", "art": "BRANDY ST REMY XO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000500", "art": "BRANDY ST REMY XO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2410000364", "art": "BRANDY TORRES 10", "uni": "LT", "grp": "c", "lt": 0.7}, {"cod": "XMAT2411000502", "art": "BRANDY TORRES 20", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000501", "art": "BRANDY TORRES 5", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000504", "art": "BRANDY TORRES ALTA LUZ CRISTALINO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000478", "art": "WHISKY THE BUSKER TRIPLE CASK", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2410000366", "art": "WHISKY WILD TURKEY BOURBON", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000475", "art": "WHISKY BUFFALO TRACE", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2501000679", "art": "WHISKY BUSHMILLS", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2501000679", "art": "WHISKY BUSHMILLS", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000477", "art": "WHISKY EAGLE RARE 10", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2412000603", "art": "WHISKY MACALLAN 12 AÑOS DOUBLE CASK", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000393", "art": "WHISKY REVES ROJO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2410000259", "art": "WHISKY JOHNNIE WALKER ROJA", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2410000258", "art": "WHISKY JOHNNIE WALKER ETIQUETA NEGRA", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2410000359", "art": "WHISKY JACK DANIELS", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2605001432", "art": "MEZ 7 MISTERIOS DOBA YEJ", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2605001434", "art": "7 MISTERIOS ENSAMBLE", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000463", "art": "MEZCAL TRES CHICON SIERRA NEGRA", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2409000178", "art": "MEZCAL ESPADIN TRES CHICON", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000462", "art": "MEZCAL TRES CHICON MADRECUISHE", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000459", "art": "MEZCAL CARA CARA  CIRIAL ESPADIN", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000458", "art": "MEZCAL CARA CARA TOBALA TEPEZTATE", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000460", "art": "MEZCAL EDITOR", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000461", "art": "MEZCAL ABRAXAS", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000439", "art": "TEQUILA CASA DRAGONES BLANCO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000448", "art": "TEQUILA DON JULIO 70 AÑEJO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000472", "art": "TEQUILA LOCO AMBAR", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000471", "art": "TEQUILA LOCO BLANCO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000473", "art": "TEQUILA LOCO PURO CORAZON", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2506000911", "art": "TEQ. PATRON AÑEJO CRISTALINO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000466", "art": "TEQUILA PATRON SILVER", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000449", "art": "TEQUILA DON JULIO BLANCO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2504000817", "art": "TEQUILA HERRADURA REPOSADO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000474", "art": "TEQUILA ESPOLON BLANCO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000450", "art": "TEQUILA 7 LEGUAS BLANCO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2410000252", "art": "TEQUILA GRAN CENTENARIO PLATA", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2601001214", "art": "TEQ MAESTRO DOBEL TAHONA", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2602001363", "art": "TEQ RESERVA DE LA FAMILIA PLATINO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2511001157", "art": "JOSE CUERVO RESERVA DE LA FAMILIA", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2412000644", "art": "TEQUILA TRADICIONAL CRISTALINO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000403", "art": "VODKA STOLICHNAYA", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000409", "art": "VODKA GREY GOOSE", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2501000678", "art": "VODKA TITOS", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2410000257", "art": "VODKA ABSOLUT AZUL", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2411000436", "art": "GIN ARMONICO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000464", "art": "MEZCAL CONTRA LUZ CRISTALINO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000408", "art": "GIN BOMBAY SAPHIRE", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2411000454", "art": "GIN BULLDOG", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.75}, {"cod": "XMAT2410000245", "art": "GIN THE BOTANIST", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2412000621", "art": "GIN POLI MARCONI 46", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2501000682", "art": "LICOR SAMBUCA  BLANCO", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2410000232", "art": "LIC SAMBUCA NEGRO LNZ", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2411000398", "art": "LICOR GENEPY DI BALME", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2411000377", "art": "LICOR CHARTREUSE AMARILLO", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2411000378", "art": "LICOR CHARTREUSE VERDE", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "MP0397", "art": "LICOR ITALICUS ROSOLIO DE BERGAMOTTO", "uni": "LT", "grp": "BEBIDAS CON ALCOHOL", "lt": 0.7}, {"cod": "XMAT2410000250", "art": "LIC 43", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2410000249", "art": "LICOR DE CAFE KAHLUA", "uni": "LT", "grp": "BEBIDAS", "lt": 1.0}, {"cod": "XMAT2411000494", "art": "LICOR CONTREU", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XPRO2505001078", "art": "JAGERMAISTER MANIFEST", "uni": "PZA", "grp": "GRUPO DE PRODUCTO", "lt": 1.0}, {"cod": "XMAT2512001203", "art": "CHAMBORD", "uni": "LT", "grp": "BEBIDAS", "lt": 0.75}, {"cod": "XMAT2411000486", "art": "LICOR AMARETTO DISARONNO VELVET", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2409000190", "art": "LICOR AMARETTO DISARONNO", "uni": "LT", "grp": "BEBIDAS", "lt": 0.7}, {"cod": "XMAT2411000437", "art": "LICOR DE MAIZ NIXTA", "uni": "LT", "grp": "BEBIDAS", "lt": 0.75}, {"cod": "XMAT2411000488", "art": "LICOR QUAGLIA CEREZA", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2411000491", "art": "LICOR QUAGLIA LAMPONE FRAMBUESA", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2410000241", "art": "LICOR APERETIVO FERNET BRANCA", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2410000355", "art": "LICOR DE VIOLETTA", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2410000356", "art": "LICOR DE CHINOTTO", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2411000397", "art": "LICOR DE AVELLANAS NOCCIOLA", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2501000687", "art": "LICOR DE GENZIANA", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2411000400", "art": "LICOR VERMOUTH ANTICA FORMULA", "uni": "LT", "grp": "", "lt": 1.0}, {"cod": "XMAT2410000243", "art": "LICOR APERITIVO LILLET BLANCO", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2410000241", "art": "LICOR APERETIVO FERNET BRANCA", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2411000492", "art": "LICOR BRANCA MENTA", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2412000618", "art": "LICOR GRAN BASSANO VERMUT BLANCO", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2412000619", "art": "LICOR GRAN BASSANO VERMUT TINTO", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2410000256", "art": "LICOR VERMOUTH COCCHI DI TORINO", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2410000367", "art": "LICOR VERMOUTH COCCHI EXTRA DRY", "uni": "LT", "grp": "", "lt": 0.5}, {"cod": "XMAT2410000240", "art": "LICOR APERITIVO COCCHI ROSA", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2410000248", "art": "LICOR CYNAR", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2410000230", "art": "LICOR LUXARDO MARASCHINO", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2411000496", "art": "BITTER ROUGE WHITE", "uni": "LT", "grp": "", "lt": 1.0}, {"cod": "XMAT2412000628", "art": "RUNNEGHT ROSSO", "uni": "LT", "grp": "", "lt": 0.5}, {"cod": "XMAT2501000686", "art": "BITTER AMARO DE ANGOSTURA", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2410000246", "art": "LICOR AMARO AVERNA", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2410000247", "art": "LICOR AMARO MONTENEGRO", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2411000522", "art": "LICOR AMARO CLASSICO 1890 ET. BLANCA", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2411000465", "art": "MEZCAL DON RAMON SALMIANA", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "MP0525", "art": "AMARO MARTINA", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2410000352", "art": "BITTER BATTISTA", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2412000616", "art": "GRAPPA POLI SARPA BLANCA", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2412000617", "art": "GRAPPA POLI SARPA ORO", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2412000620", "art": "LICOR VACA MORA AMARO", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2411000504", "art": "BRANDY TORRES ALTA LUZ CRISTALINO", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2411000413", "art": "RON BACARDI BLANCO", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2412000602", "art": "RON BACARDI RESERVA OCHO SELEC", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2412000601", "art": "RON BACARDI AÑEJO", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2411000481", "art": "RON FLOR DE CAÑA 12", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2411000482", "art": "RON FLOR DE CAÑA 18", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2411000527", "art": "RON FLOR DE CAÑA 4", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2411000480", "art": "RON FLOR DE CAÑA 7", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2411000524", "art": "RON FLOR DE CAÑA CRISTALINO", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2411000479", "art": "RON APPLETON STATE SIGNATURE", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2501000685", "art": "RON ANGOSTURA AÑEJO 7 AÑOS DE .750 ML", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2410000351", "art": "LICOR SAINT GERMAIN", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2410000244", "art": "LICOR APERETIVO PUNT E MES", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2410000254", "art": "LICOR VERMOUTH CARPANO ROSSO", "uni": "LT", "grp": "", "lt": 1.0}, {"cod": "MP0202", "art": "BITTER CAMPARI", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "MP0202", "art": "BITTER CAMPARI", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "MP0201", "art": "LICOR PRIMO", "uni": "LT", "grp": "", "lt": 0.7}, {"cod": "XMAT2409000121", "art": "GIN CONDESA CLASICO", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2409000120", "art": "GIN CONDESA XOCONOSTLE", "uni": "LT", "grp": "", "lt": 0.75}, {"cod": "XMAT2503000794", "art": "CERVEZA COLIMA CERO LAGER AMBAR", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2410000357", "art": "CERVEZA PIEDRA LISA SESSION IPA", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2503000793", "art": "HEINEKEN ORIGINAL", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2410000266", "art": "HEINEKEN  0.0", "uni": "PZA", "grp": "", "lt": null}, {"cod": "MP0463", "art": "CERVEZA BIRRA PORETTI 4 CEBADAS", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2410000264", "art": "BOHEMIA CLASICA", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2411000404", "art": "BOHEMIA CRISTAL", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2410000263", "art": "BOHEMIA OSCURA", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2604001411", "art": "AGU EVIAN CON GAS .330 ML", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2604001410", "art": "AGU EVIAN CON GAS .750 ML", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2604001409", "art": "AGU EVIAN NATURAL .330ML", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2604001408", "art": "AGU EVIAN NATURAL .750 ML", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2410000278", "art": "FELIX SCHORLE FRAMBUESA", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2410000277", "art": "FELIX SCHORLE MANDARINA", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2410000279", "art": "FELIX SCHORLE MARACUYA", "uni": "PZA", "grp": "", "lt": null}, {"cod": "MP0479", "art": "PELLEGRINO LIMONATA DE .330 ML", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2410000238", "art": "AGUA TONICA DE 237 ML", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2411000506", "art": "COCA COLA REGULAR MINI", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2410000237", "art": "AGUA MINERAL  DE .237 ML", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2411000507", "art": "COCA COLA  ZERO MINI", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2411000384", "art": "COCA COLA  REGULAR 355 ML", "uni": "PZA", "grp": "", "lt": null}, {"cod": "XMAT2411000385", "art": "COCA COLA SIN AZUCAR 355 ML", "uni": "PZA", "grp": "", "lt": null}]}];
+
 const ALMACEN = 'BARRA';
-const COLORS  = ['#667eea','#f59e0b','#10b981','#ef4444','#8b5cf6','#f97316','#06b6d4','#ec4899'];
+let T  = null;
+let S  = null;
+let CZ = null;
 
-// ── State ────────────────────────────────────────────────────────────────
-let T   = null;  // template: { items, cantidadColIdx, headerRowIdx, filename }
-let Z   = null;  // zones:    { zones: [{ id, nombre, color, codigos }] }
-let S   = null;  // session:  { operario, fecha, counts, completedZones }
-let CZ  = null;  // currentZone being counted (null = all zones)
-let activeSetupTab = 'zones';
-
-// ── LocalStorage ─────────────────────────────────────────────────────────
 const LS = {
-  T:   `xtux_t_${ALMACEN}`,
-  RAW: `xtux_raw_${ALMACEN}`,
-  Z:   `xtux_z_${ALMACEN}`,
-  S:   `xtux_s_${ALMACEN}`,
+  T:   'xtux_t_BARRA',
+  RAW: 'xtux_raw_BARRA',
+  S:   'xtux_s_BARRA',
 };
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
-const lsSet = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+const lsSet = (k,v) => localStorage.setItem(k, JSON.stringify(v));
 const lsDel = k => localStorage.removeItem(k);
+const esc   = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-// ── Escape HTML ──────────────────────────────────────────────────────────
-const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const factor  = cod => PRES_LT[cod] ?? null;
+const isLT    = item => item.uni === 'LT';
+const toExcel = (cod, raw) => { const f = factor(cod); return f ? raw * f : raw; };
+const fmtLT   = v => parseFloat(v.toFixed(3)).toString();
 
-// ── Navigation ───────────────────────────────────────────────────────────
 function go(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(`screen-${id}`).classList.add('active');
+  document.getElementById('screen-' + id).classList.add('active');
   if (id === 'welcome')  renderWelcome();
-  if (id === 'setup')    renderSetup(activeSetupTab);
   if (id === 'overview') renderOverview();
   if (id === 'generate') renderValidation();
 }
 
-// ── Init ─────────────────────────────────────────────────────────────────
 function init() {
   T = lsGet(LS.T);
-  Z = lsGet(LS.Z);
   S = lsGet(LS.S);
-
-  // Drop zone
   const dz = document.getElementById('drop-zone');
   dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('over'); });
-  dz.addEventListener('dragleave', ()  => dz.classList.remove('over'));
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
   dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); handleFile(e.dataTransfer.files[0]); });
-
-  document.getElementById('inp-fecha').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('inp-fecha').value = new Date().toISOString().slice(0,10);
   go('welcome');
 }
 
-// ╔══════════════════════════════════════════════════════════╗
-// ║  WELCOME                                                 ║
-// ╚══════════════════════════════════════════════════════════╝
 function renderWelcome() {
-  const title = document.getElementById('welcome-title');
-  const sub   = document.getElementById('welcome-sub');
-  const body  = document.getElementById('welcome-body');
-
-  title.textContent = `Inventario · ${ALMACEN}`;
+  const sub  = document.getElementById('welcome-sub');
+  const body = document.getElementById('welcome-body');
+  const nItems = ZONE_ORDER.reduce((a,z) => a + z.items.length, 0);
 
   if (!T) {
-    sub.textContent = 'Sin plantilla';
-    body.innerHTML = `
-      <div class="card">
-        <div style="font-size:15px;margin-bottom:12px">Para empezar importa la plantilla de Xetux.</div>
-        <button class="btn btn-purple" onclick="go('import')">📥 Importar plantilla</button>
-      </div>`;
+    sub.textContent = 'Sin plantilla Xetux';
+    body.innerHTML =
+      '<div class="card">' +
+        '<div style="font-size:15px;margin-bottom:12px">Importa la plantilla simplificada de Xetux para generar el Excel de carga.</div>' +
+        '<button class="btn btn-purple" onclick="go(\'import\')">📥 Importar plantilla</button>' +
+      '</div>' +
+      '<div class="divider"></div>' +
+      '<div class="section-label">Zonas de conteo</div>' +
+      ZONE_ORDER.map(z =>
+        '<div class="zone-card" style="border-left-color:' + z.color + '">' +
+          '<div class="zone-dot" style="background:' + z.color + '"></div>' +
+          '<div class="zone-info">' +
+            '<div class="zone-name">' + esc(z.nombre) + '</div>' +
+            '<div class="zone-meta">' + z.items.length + ' artículos</div>' +
+          '</div>' +
+        '</div>'
+      ).join('') +
+      '<div style="margin-top:12px"><button class="btn btn-gray" onclick="go(\'session\')">Iniciar conteo sin plantilla</button></div>';
     return;
   }
 
-  const nParents = T.items.filter(i => !i.isP).length;
-  const nPres    = T.items.filter(i => i.isP).length;
-  sub.textContent = `${nParents} artículos · ${nPres} presentaciones`;
+  sub.textContent = nItems + ' artículos · 3 zonas';
 
-  const hasZones   = Z && Z.zones.length > 0;
-  const hasSession = S && S.fecha;
-
-  // Session card
-  let sessionCard = '';
-  if (hasSession) {
-    const done  = S.completedZones?.length ?? 0;
-    const total = Z?.zones.length ?? 0;
+  if (S && S.fecha) {
     const counted = Object.keys(S.counts).length;
-    sessionCard = `
-      <div class="card" style="border-left:4px solid #667eea">
-        <div style="font-weight:700;margin-bottom:2px">Toma del ${S.fecha}</div>
-        <div style="font-size:13px;color:#888">${S.operario} · ${done}/${total} zonas · ${counted} artículos contados</div>
-        <div class="row">
-          <button class="btn btn-purple" style="flex:2" onclick="go('overview')">Continuar →</button>
-          <button class="btn btn-gray btn-sm" style="flex:1" onclick="confirmNewSession()">Nueva</button>
-        </div>
-      </div>`;
-  }
-
-  const canCount = hasZones;
-  body.innerHTML = `
-    ${sessionCard}
-    ${!hasSession ? `<button class="btn ${canCount ? 'btn-purple' : 'btn-gray'}" onclick="${canCount ? "go('session')" : "alert('Configura las zonas primero')"}">
-      Iniciar conteo →
-    </button>` : ''}
-    <div class="divider"></div>
-    <div class="section-label">Configuración</div>
-    <button class="btn btn-gray" style="margin-bottom:8px" onclick="go('setup')">
-      ⚙️ ${hasZones ? 'Editar zonas de conteo' : 'Configurar zonas'}
-    </button>
-    <button class="btn btn-gray" onclick="go('import')">📥 ${T ? 'Reimportar plantilla' : 'Importar plantilla'}</button>
-    ${!hasZones && T ? '<div class="alert alert-warn" style="margin-top:12px">Configura las zonas de conteo antes de iniciar.</div>' : ''}
-  `;
-
-  // Populate zone select for session screen
-  if (Z) {
-    const sel = document.getElementById('inp-zona');
-    sel.innerHTML = '<option value="__all__">Todas las zonas</option>' +
-      Z.zones.map(z => `<option value="${z.id}">${esc(z.nombre)}</option>`).join('');
+    const done    = S.completedZones ? S.completedZones.length : 0;
+    body.innerHTML =
+      '<div class="card" style="border-left:4px solid #667eea">' +
+        '<div style="font-weight:700;margin-bottom:2px">Toma del ' + S.fecha + '</div>' +
+        '<div style="font-size:13px;color:#888">' + S.operario + ' · ' + done + '/3 zonas · ' + counted + ' artículos contados</div>' +
+        '<div class="row">' +
+          '<button class="btn btn-purple" style="flex:2" onclick="go(\'overview\')">Continuar →</button>' +
+          '<button class="btn btn-gray btn-sm" style="flex:1" onclick="confirmNewSession()">Nueva</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="divider"></div>' +
+      '<button class="btn btn-gray" onclick="go(\'import\')">📥 Reimportar plantilla</button>';
+  } else {
+    body.innerHTML =
+      '<button class="btn btn-purple" onclick="go(\'session\')">Iniciar conteo →</button>' +
+      '<div class="divider"></div>' +
+      '<button class="btn btn-gray" onclick="go(\'import\')">📥 Reimportar plantilla</button>';
   }
 }
 
 function confirmNewSession() {
   if (!confirm('¿Iniciar nueva toma? Se perderán los conteos actuales.')) return;
-  S = null;
-  lsDel(LS.S);
-  go('welcome');
+  S = null; lsDel(LS.S); go('welcome');
 }
 
-// ╔══════════════════════════════════════════════════════════╗
-// ║  IMPORT & PARSE                                          ║
-// ╚══════════════════════════════════════════════════════════╝
 function handleFileInput(inp) { if (inp.files[0]) handleFile(inp.files[0]); }
 
 async function handleFile(file) {
-  if (!file?.name.endsWith('.xlsx')) { alert('Necesito un archivo .xlsx de Xetux'); return; }
+  if (!file || !file.name.endsWith('.xlsx')) { alert('Necesito un .xlsx de Xetux'); return; }
   const msg = document.getElementById('import-msg');
   msg.style.color = '#888';
   msg.textContent = 'Leyendo…';
-
   try {
     const buf = await file.arrayBuffer();
-    const parsed = parseTemplate(buf);
-    T = { ...parsed, filename: file.name };
+    T = parseTemplate(buf);
     lsSet(LS.T, T);
-
-    // Store raw as base64 for Excel generation
     const bytes = new Uint8Array(buf);
     let bin = '';
     bytes.forEach(b => bin += String.fromCharCode(b));
     localStorage.setItem(LS.RAW, btoa(bin));
-
-    if (Z) {
-      applyTemplateUpdate();
-    } else {
-      Z = autoZones(T.items);
-      lsSet(LS.Z, Z);
-    }
-
-    const nP = T.items.filter(i => !i.isP).length;
-    const nR = T.items.filter(i => i.isP).length;
     msg.style.color = '#16a34a';
-    msg.textContent = `✓ ${nP} artículos, ${nR} presentaciones`;
-    setTimeout(() => { renderWelcome(); go('setup'); }, 700);
-
+    msg.textContent = '✓ ' + Object.keys(T.rowMap).length + ' artículos cargados';
+    setTimeout(() => go('welcome'), 700);
   } catch(e) {
     console.error(e);
     msg.style.color = '#ef4444';
@@ -437,662 +304,249 @@ async function handleFile(file) {
 }
 
 function parseTemplate(buf) {
-  const wb   = XLSX.read(buf, { type: 'array' });
+  const wb   = XLSX.read(buf, { type:'array' });
   const ws   = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-
-  const headerRowIdx = rows.findIndex(r => r.map(String).includes('Código'));
-  if (headerRowIdx === -1) throw new Error('"Código" no encontrado. ¿Es la plantilla correcta?');
-
-  const H = rows[headerRowIdx].map(String);
-  const fi = name => H.indexOf(name);
-  const ff = fn  => H.findIndex(fn);
-
-  const iCod = fi('Código');
-  const iArt = ff(h => /rtículo|rticulo/i.test(h));
-  const iUni = fi('Unidad');
-  const iCan = fi('Cantidad');
-  const iGru = fi('Grupo');
-  const iSgr = fi('Subgrupo');
-
-  if (iCod < 0 || iCan < 0) throw new Error('Columnas Código o Cantidad no encontradas');
-
-  const items = [];
-  let lastParent = null;
-
-  for (let r = headerRowIdx + 1; r < rows.length; r++) {
-    const row = rows[r];
-    const cod = String(row[iCod] ?? '').trim();
-    if (!cod) continue;
-
-    const artRaw = String(row[iArt] ?? '').trim();
-    const isP    = artRaw.startsWith('----');
-
-    // Parse presentation label, strip prefix
-    let artLabel = artRaw;
-    if (isP) artLabel = artRaw.replace(/^----\s*\(P\)\s*/,'').trim();
-
-    const item = {
-      rowIdx: r,
-      codigo: cod,
-      art:    artLabel,
-      artRaw,
-      uni:    String(row[iUni] ?? '').trim(),
-      grupo:  iGru >= 0 ? String(row[iGru] ?? '').trim() : '',
-      sgr:    iSgr >= 0 && row[iSgr] ? String(row[iSgr]).trim() : '',
-      isP,
-      parentCod: isP ? (lastParent?.codigo ?? null) : null,
-    };
-
-    if (!isP) {
-      lastParent = item;
-    } else {
-      // Inherit subgrupo/grupo from parent for zone grouping
-      item.sgr   = lastParent?.sgr   ?? '';
-      item.grupo = lastParent?.grupo ?? item.grupo;
-    }
-
-    items.push(item);
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+  const norm = s => String(s??'').replace(/^﻿/,'').trim();
+  const hIdx = rows.findIndex(r => r.some(h => /^c[oó]digo$/i.test(norm(h))));
+  if (hIdx === -1) throw new Error('Columna "Código" no encontrada en la plantilla');
+  const H    = rows[hIdx].map(norm);
+  const iCod = H.findIndex(h => /^c[oó]digo$/i.test(h));
+  const iCan = H.findIndex(h => /^cantidad$/i.test(h));
+  if (iCan < 0) throw new Error('Columna "Cantidad" no encontrada');
+  const rowMap = {};
+  for (let r = hIdx + 1; r < rows.length; r++) {
+    const cod = norm(rows[r][iCod]);
+    if (cod) rowMap[cod] = r;
   }
-
-  return { items, cantidadColIdx: iCan, headerRowIdx };
+  return { rowMap: rowMap, cantidadColIdx: iCan };
 }
 
-function applyTemplateUpdate() {
-  const allZoneCods = new Set(Z.zones.flatMap(z => z.codigos));
-  const newCods     = new Set(T.items.filter(i => !i.isP).map(i => i.codigo));
-
-  const added   = [...newCods].filter(c => !allZoneCods.has(c));
-  const removed = [...allZoneCods].filter(c => !newCods.has(c));
-
-  // Remove obsolete codes from zones
-  Z.zones.forEach(z => { z.codigos = z.codigos.filter(c => !removed.includes(c)); });
-
-  // Add new codes to "Sin asignar" zone
-  if (added.length) {
-    let ua = Z.zones.find(z => z.id === '__ua__');
-    if (!ua) {
-      ua = { id:'__ua__', nombre:'Sin asignar', color:'#9ca3af', codigos:[] };
-      Z.zones.unshift(ua);
-    }
-    ua.codigos.push(...added);
-  }
-
-  lsSet(LS.Z, Z);
-
-  const msgs = [];
-  if (added.length)   msgs.push(`${added.length} artículos nuevos → "Sin asignar"`);
-  if (removed.length) msgs.push(`${removed.length} artículos eliminados de las zonas`);
-  if (msgs.length) alert('Plantilla actualizada:\n\n' + msgs.join('\n') + '\n\nRevisa la pestaña Asignar.');
-}
-
-// ╔══════════════════════════════════════════════════════════╗
-// ║  AUTO-ZONES                                              ║
-// ╚══════════════════════════════════════════════════════════╝
-function autoZones(items) {
-  const parents = items.filter(i => !i.isP);
-  const byKey   = {};
-  for (const it of parents) {
-    const k = it.sgr || it.grupo || 'GENERAL';
-    if (!byKey[k]) byKey[k] = [];
-    byKey[k].push(it.codigo);
-  }
-  const zones = Object.entries(byKey).map(([nombre, codigos], i) => ({
-    id:      `z_${i}`,
-    nombre,
-    color:   COLORS[i % COLORS.length],
-    codigos,
-  }));
-  return { zones };
-}
-
-// ╔══════════════════════════════════════════════════════════╗
-// ║  ZONE SETUP                                              ║
-// ╚══════════════════════════════════════════════════════════╝
-function setupTab(tab) {
-  activeSetupTab = tab;
-  ['zones','assign','order'].forEach(t => {
-    document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
-  });
-  renderSetup(tab);
-}
-
-function renderSetup(tab) {
-  const el = document.getElementById('setup-content');
-  if (!T || !Z) { el.innerHTML = '<p style="color:#888">Importa la plantilla primero.</p>'; return; }
-  if (tab === 'zones')  renderZonesTab(el);
-  if (tab === 'assign') renderAssignTab(el);
-  if (tab === 'order')  renderOrderTab(el);
-}
-
-// ── Tab: Zonas ────────────────────────────────────────────
-function renderZonesTab(el) {
-  if (!Z.zones.length) {
-    el.innerHTML = '<p style="color:#888">No hay zonas. Toca "+ Zona" para crear.</p>';
-    return;
-  }
-  el.innerHTML = Z.zones.map((z, i) => `
-    <div class="card" style="border-left:4px solid ${z.color}">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <div style="flex:1;font-weight:700;font-size:15px">${esc(z.nombre)}</div>
-        <span class="badge badge-gray">${z.codigos.length} art.</span>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn-gray btn-sm" onclick="renameZone('${z.id}')">✏️ Renombrar</button>
-        <button class="btn-gray btn-sm" onclick="changeColor('${z.id}')">🎨</button>
-        <button class="btn-gray btn-sm" onclick="moveZone(${i},-1)">↑</button>
-        <button class="btn-gray btn-sm" onclick="moveZone(${i},1)">↓</button>
-        <button class="btn-red btn-sm"  onclick="deleteZone('${z.id}')">🗑</button>
-      </div>
-    </div>`).join('');
-}
-
-function promptNewZone() {
-  const nombre = prompt('Nombre de la nueva zona:');
-  if (!nombre?.trim()) return;
-  const id = 'z_' + Date.now();
-  Z.zones.push({ id, nombre: nombre.trim(), color: COLORS[Z.zones.length % COLORS.length], codigos: [] });
-  renderSetup(activeSetupTab);
-}
-
-function renameZone(id) {
-  const z = Z.zones.find(z => z.id === id);
-  if (!z) return;
-  const n = prompt('Nuevo nombre:', z.nombre);
-  if (n?.trim()) { z.nombre = n.trim(); renderSetup(activeSetupTab); }
-}
-
-function changeColor(id) {
-  const z = Z.zones.find(z => z.id === id);
-  if (!z) return;
-  const idx = COLORS.indexOf(z.color);
-  z.color = COLORS[(idx + 1) % COLORS.length];
-  renderSetup(activeSetupTab);
-}
-
-function moveZone(i, dir) {
-  const j = i + dir;
-  if (j < 0 || j >= Z.zones.length) return;
-  [Z.zones[i], Z.zones[j]] = [Z.zones[j], Z.zones[i]];
-  renderSetup(activeSetupTab);
-}
-
-function deleteZone(id) {
-  const z = Z.zones.find(z => z.id === id);
-  if (!z) return;
-  if (z.codigos.length && !confirm(`"${z.nombre}" tiene ${z.codigos.length} artículos. ¿Eliminar zona? Los artículos quedarán sin asignar.`)) return;
-  // Move codigos to unassigned
-  if (z.codigos.length) {
-    let ua = Z.zones.find(z => z.id === '__ua__');
-    if (!ua) { ua = { id:'__ua__', nombre:'Sin asignar', color:'#9ca3af', codigos:[] }; Z.zones.unshift(ua); }
-    ua.codigos.push(...z.codigos);
-  }
-  Z.zones = Z.zones.filter(z => z.id !== id);
-  renderSetup(activeSetupTab);
-}
-
-// ── Tab: Asignar ──────────────────────────────────────────
-function renderAssignTab(el) {
-  if (!Z.zones.length) {
-    el.innerHTML = '<div class="alert alert-warn">Crea zonas primero en la pestaña Zonas.</div>';
-    return;
-  }
-
-  // Group parent items by subgrupo
-  const parents = T.items.filter(i => !i.isP);
-  const byKey   = {};
-  for (const it of parents) {
-    const k = it.sgr || it.grupo || 'SIN GRUPO';
-    if (!byKey[k]) byKey[k] = [];
-    byKey[k].push(it);
-  }
-
-  const zoneOpts = Z.zones.map(z => `<option value="${z.id}">${esc(z.nombre)}</option>`).join('');
-
-  el.innerHTML = `
-    <p style="font-size:13px;color:#888;margin-bottom:12px">Asigna cada grupo de artículos a una zona. El orden dentro de cada zona se ajusta en la pestaña Ordenar.</p>
-    ${Object.entries(byKey).map(([key, items]) => {
-      // Find the zone where most of these items are
-      const zoneCounts = {};
-      Z.zones.forEach(z => { zoneCounts[z.id] = 0; });
-      items.forEach(it => {
-        const z = Z.zones.find(z => z.codigos.includes(it.codigo));
-        if (z) zoneCounts[z.id] = (zoneCounts[z.id] || 0) + 1;
-      });
-      const dominantZone = Object.entries(zoneCounts).sort((a,b)=>b[1]-a[1])[0];
-      const currentZoneId = dominantZone && dominantZone[1] > 0 ? dominantZone[0] : '';
-
-      return `
-        <div class="sg-row">
-          <div class="sg-name">${esc(key)}</div>
-          <div class="sg-count">${items.length}</div>
-          <select onchange="assignGroupToZone(${JSON.stringify(items.map(i=>i.codigo))}, this.value)">
-            <option value="">Sin zona</option>
-            ${zoneOpts}
-          </select>
-        </div>`;
-    }).join('')}
-  `;
-
-  // Set current selection
-  el.querySelectorAll('.sg-row').forEach((row, idx) => {
-    const key    = Object.keys(byKey)[idx];
-    const items  = byKey[key];
-    const z      = Z.zones.find(z => items.some(it => z.codigos.includes(it.codigo)));
-    const sel    = row.querySelector('select');
-    if (z) sel.value = z.id;
-  });
-}
-
-function assignGroupToZone(codigos, zoneId) {
-  // Remove these codigos from all zones
-  Z.zones.forEach(z => { z.codigos = z.codigos.filter(c => !codigos.includes(c)); });
-  // Add to target zone
-  if (zoneId) {
-    const target = Z.zones.find(z => z.id === zoneId);
-    if (target) target.codigos.push(...codigos);
-  }
-}
-
-// ── Tab: Ordenar ──────────────────────────────────────────
-function renderOrderTab(el) {
-  const zoneOpts = Z.zones.map((z, i) => `<option value="${i}">${esc(z.nombre)}</option>`).join('');
-  el.innerHTML = `
-    <div class="form-group">
-      <label>Zona a ordenar</label>
-      <select onchange="renderZoneOrder(this.value)" id="order-zone-sel">${zoneOpts}</select>
-    </div>
-    <div id="order-items"></div>`;
-  if (Z.zones.length) renderZoneOrder(0);
-}
-
-function renderZoneOrder(zoneIdx) {
-  const zone = Z.zones[zoneIdx];
-  if (!zone) return;
-  const el = document.getElementById('order-items');
-  if (!zone.codigos.length) { el.innerHTML = '<p style="color:#888">Esta zona no tiene artículos asignados.</p>'; return; }
-
-  el.innerHTML = zone.codigos.map((cod, i) => {
-    const item = T.items.find(it => it.codigo === cod);
-    const label = item ? item.art : cod;
-    return `
-      <div class="order-row" id="or_${i}">
-        <span class="label">${esc(label)}</span>
-        <div class="order-btns">
-          <button onclick="moveItem(${zoneIdx},${i},-1)">↑</button>
-          <button onclick="moveItem(${zoneIdx},${i},1)">↓</button>
-        </div>
-      </div>`;
-  }).join('');
-}
-
-function moveItem(zoneIdx, i, dir) {
-  const zone = Z.zones[zoneIdx];
-  const j = i + dir;
-  if (j < 0 || j >= zone.codigos.length) return;
-  [zone.codigos[i], zone.codigos[j]] = [zone.codigos[j], zone.codigos[i]];
-  renderZoneOrder(zoneIdx);
-}
-
-function saveAndGoWelcome() {
-  lsSet(LS.Z, Z);
-  go('welcome');
-}
-
-// ╔══════════════════════════════════════════════════════════╗
-// ║  SESSION                                                 ║
-// ╚══════════════════════════════════════════════════════════╝
 function startSession() {
   const operario = document.getElementById('inp-operario').value.trim();
   const fecha    = document.getElementById('inp-fecha').value;
-  const zoneId   = document.getElementById('inp-zona').value;
   if (!operario) { alert('Ingresa tu nombre'); return; }
   if (!fecha)    { alert('Selecciona la fecha'); return; }
-
-  if (!S || S.fecha !== fecha) {
-    S = { operario, fecha, counts: {}, completedZones: [] };
-  }
-  S.operario = operario;
+  S = { operario: operario, fecha: fecha, counts: {}, completedZones: [] };
   lsSet(LS.S, S);
-
-  if (zoneId === '__all__') {
-    go('overview');
-  } else {
-    const zone = Z.zones.find(z => z.id === zoneId);
-    if (zone) startCount(zone);
-  }
+  go('overview');
 }
 
-// ╔══════════════════════════════════════════════════════════╗
-// ║  COUNT SCREEN                                            ║
-// ╚══════════════════════════════════════════════════════════╝
-function getZoneItems(zone) {
-  // Returns items in physical order: for each parent, include its presentations
-  const out = [];
-  for (const cod of zone.codigos) {
-    const parent = T.items.find(i => i.codigo === cod);
-    if (!parent) continue;
-    const pres = T.items.filter(i => i.parentCod === cod);
-    if (pres.length > 0) {
-      out.push({ ...parent, _headerOnly: true });
-      out.push(...pres);
-    } else {
-      out.push(parent);
-    }
-  }
-  return out;
-}
-
-function getAllItems() {
-  return (Z?.zones ?? []).flatMap(z => getZoneItems(z));
-}
-
-function startCountById(id) {
-  const zone = Z.zones.find(z => z.id === id);
-  if (zone) startCount(zone);
-}
-
-function startCount(zone) {
-  CZ = zone;
+function startCount(zoneIdx) {
+  CZ = zoneIdx;
+  const zone = ZONE_ORDER[zoneIdx];
   document.getElementById('count-zone-name').textContent = zone.nombre;
   document.getElementById('count-search').value = '';
-  renderCountList(getZoneItems(zone));
-  updateProgress();
-  go('count');
-}
-
-function startCountAll() {
-  CZ = null;
-  document.getElementById('count-zone-name').textContent = 'Todo el almacén';
-  document.getElementById('count-search').value = '';
-  renderCountList(getAllItems());
+  renderCountList(zone.items);
   updateProgress();
   go('count');
 }
 
 function renderCountList(items) {
-  const el = document.getElementById('count-list');
-  let html = '';
-  let lastSgr = null;
-
-  for (const item of items) {
-    const sgr = item.sgr || item.grupo || '';
-
-    if (!item.isP && !item._headerOnly && sgr !== lastSgr) {
-      lastSgr = sgr;
-      if (sgr) html += `<div class="subgrupo-hdr" data-sgr="${esc(sgr)}">${esc(sgr)}</div>`;
+  let html = '', lastGrp = null;
+  for (let k = 0; k < items.length; k++) {
+    const item = items[k];
+    if (item.grp !== lastGrp) {
+      lastGrp = item.grp;
+      if (item.grp) html += '<div class="subgrupo-hdr" data-grp="' + esc(item.grp) + '">' + esc(item.grp) + '</div>';
     }
+    const raw = (S && S.counts[item.cod] !== undefined) ? S.counts[item.cod] : '';
+    const flt = raw !== '' ? parseFloat(raw) : NaN;
+    const f   = factor(item.cod);
+    const hasFactor = isLT(item) && f !== null;
+    const filled = raw !== '' ? 'filled' : '';
 
-    if (item._headerOnly) {
-      html += `
-        <div class="item-row parent-hdr-row" data-search="${esc(item.art)} ${esc(item.codigo)}">
-          <div class="parent-label">${esc(item.art)}</div>
-        </div>`;
+    if (hasFactor) {
+      const ltStr = !isNaN(flt) ? fmtLT(flt * f) : '—';
+      html +=
+        '<div class="item-row" data-search="' + esc(item.art) + ' ' + esc(item.cod) + '">' +
+          '<div class="item-text">' +
+            '<div class="item-name">' + esc(item.art) + '</div>' +
+            '<div class="item-unit">bots × ' + f + ' LT</div>' +
+          '</div>' +
+          '<div class="qty-wrap">' +
+            '<span class="lt-badge" id="ltb_' + item.cod + '">' + ltStr + ' LT</span>' +
+            '<input type="number" class="qty-input ' + filled + '"' +
+              ' inputmode="decimal" step="0.5" min="0" placeholder="0"' +
+              ' value="' + raw + '" data-cod="' + esc(item.cod) + '" data-f="' + f + '"' +
+              ' oninput="onQty(this)" onfocus="this.select()">' +
+          '</div>' +
+        '</div>';
     } else {
-      const val     = S?.counts[item.codigo] ?? '';
-      const filled  = val !== '' ? 'filled' : '';
-      const classes = 'item-row' + (item.isP ? ' presentation' : '');
-      html += `
-        <div class="${classes}" data-search="${esc(item.art)} ${esc(item.codigo)}">
-          <div class="item-text">
-            <div class="item-name">${esc(item.art)}</div>
-            ${!item.isP ? `<div class="item-unit">${esc(item.uni)}</div>` : ''}
-          </div>
-          <input type="number" class="qty-input ${filled}"
-            inputmode="decimal" step="0.01" min="0" placeholder="0"
-            value="${val}"
-            data-cod="${esc(item.codigo)}"
-            oninput="onQty(this)"
-            onfocus="this.select()">
-        </div>`;
+      const unitWarn = isLT(item) ? ' warn' : '';
+      const unitTxt  = isLT(item) ? 'LT (ingresar directo)' : esc(item.uni);
+      html +=
+        '<div class="item-row" data-search="' + esc(item.art) + ' ' + esc(item.cod) + '">' +
+          '<div class="item-text">' +
+            '<div class="item-name">' + esc(item.art) + '</div>' +
+            '<div class="item-unit' + unitWarn + '">' + unitTxt + '</div>' +
+          '</div>' +
+          '<div class="qty-wrap">' +
+            '<span class="qty-label">' + esc(item.uni) + '</span>' +
+            '<input type="number" class="qty-input ' + filled + '"' +
+              ' inputmode="decimal" step="0.01" min="0" placeholder="0"' +
+              ' value="' + raw + '" data-cod="' + esc(item.cod) + '" data-f=""' +
+              ' oninput="onQty(this)" onfocus="this.select()">' +
+          '</div>' +
+        '</div>';
     }
   }
-
-  el.innerHTML = html;
+  document.getElementById('count-list').innerHTML = html;
 }
 
 function onQty(inp) {
   const cod = inp.dataset.cod;
+  const f   = parseFloat(inp.dataset.f) || null;
   const v   = inp.value.trim();
   const num = parseFloat(v);
-
   if (v !== '' && !isNaN(num) && num >= 0) {
     S.counts[cod] = num;
+    if (f) {
+      const badge = document.getElementById('ltb_' + cod);
+      if (badge) badge.textContent = fmtLT(num * f) + ' LT';
+    }
   } else {
     delete S.counts[cod];
+    if (f) {
+      const badge = document.getElementById('ltb_' + cod);
+      if (badge) badge.textContent = '— LT';
+    }
   }
-  inp.classList.toggle('filled', v !== '' && v !== '0');
+  inp.classList.toggle('filled', v !== '' && num > 0);
   lsSet(LS.S, S);
   updateProgress();
 }
 
 function updateProgress() {
-  const items    = CZ ? getZoneItems(CZ) : getAllItems();
-  const countable= items.filter(i => !i._headerOnly);
-  const filled   = countable.filter(i => S?.counts[i.codigo] !== undefined);
-  const pct      = countable.length ? filled.length / countable.length * 100 : 0;
+  if (CZ === null) return;
+  const zone   = ZONE_ORDER[CZ];
+  const filled = zone.items.filter(i => S && S.counts[i.cod] !== undefined).length;
+  const pct    = zone.items.length ? filled / zone.items.length * 100 : 0;
   document.getElementById('count-bar').style.width = pct + '%';
-  document.getElementById('count-pct').textContent = `${filled.length}/${countable.length}`;
+  document.getElementById('count-pct').textContent = filled + '/' + zone.items.length;
 }
 
 function filterCount(q) {
   const ql = q.toLowerCase().trim();
-  const rows = document.querySelectorAll('#count-list .item-row');
-  rows.forEach(r => {
-    const match = !ql || (r.dataset.search ?? '').toLowerCase().includes(ql);
-    r.classList.toggle('hidden', !match);
+  document.querySelectorAll('#count-list .item-row').forEach(function(r) {
+    r.classList.toggle('hidden', !!ql && !(r.dataset.search||'').toLowerCase().includes(ql));
   });
-  // Hide empty subgrupo headers
-  document.querySelectorAll('#count-list .subgrupo-hdr').forEach(hdr => {
-    let next = hdr.nextElementSibling, visible = false;
+  document.querySelectorAll('#count-list .subgrupo-hdr').forEach(function(hdr) {
+    var next = hdr.nextElementSibling, vis = false;
     while (next && !next.classList.contains('subgrupo-hdr')) {
-      if (next.classList.contains('item-row') && !next.classList.contains('hidden')) visible = true;
+      if (next.classList.contains('item-row') && !next.classList.contains('hidden')) vis = true;
       next = next.nextElementSibling;
     }
-    hdr.classList.toggle('hidden', !visible);
+    hdr.classList.toggle('hidden', !vis);
   });
 }
 
-function clearCountSearch() {
+function clearSearch() {
   document.getElementById('count-search').value = '';
   filterCount('');
 }
 
-function exitCount() {
-  CZ = null;
-  go('overview');
-}
+function exitCount() { CZ = null; go('overview'); }
 
 function doneZone() {
-  if (CZ) {
-    if (!S.completedZones.includes(CZ.id)) S.completedZones.push(CZ.id);
-    lsSet(LS.S, S);
-  }
+  if (CZ !== null && S.completedZones.indexOf(CZ) === -1) S.completedZones.push(CZ);
+  lsSet(LS.S, S);
   CZ = null;
   go('overview');
 }
 
-// ╔══════════════════════════════════════════════════════════╗
-// ║  OVERVIEW                                                ║
-// ╚══════════════════════════════════════════════════════════╝
 function renderOverview() {
   if (!S) { go('welcome'); return; }
-  document.getElementById('ov-title').textContent = `Toma · ${S.fecha}`;
+  document.getElementById('ov-title').textContent = 'Toma · ' + S.fecha;
   document.getElementById('ov-meta').textContent  = S.operario;
-
-  const zones  = Z?.zones ?? [];
-  let allDone  = zones.length > 0;
-  let totalArt = 0, filledArt = 0;
-
-  const zonesHtml = zones.map(zone => {
-    const items     = getZoneItems(zone);
-    const countable = items.filter(i => !i._headerOnly);
-    const filled    = countable.filter(i => S.counts[i.codigo] !== undefined);
-    const done      = S.completedZones?.includes(zone.id);
-    const pct       = countable.length ? Math.round(filled.length / countable.length * 100) : 0;
-    totalArt  += countable.length;
-    filledArt += filled.length;
+  var total = 0, filled = 0, allDone = true;
+  var html = ZONE_ORDER.map(function(zone, i) {
+    var zoneFilled = zone.items.filter(function(it) { return S.counts[it.cod] !== undefined; }).length;
+    var done = S.completedZones && S.completedZones.indexOf(i) !== -1;
+    var pct  = zone.items.length ? Math.round(zoneFilled / zone.items.length * 100) : 0;
+    total  += zone.items.length;
+    filled += zoneFilled;
     if (!done) allDone = false;
-
-    const statusClass = done ? 'done' : filled.length > 0 ? 'partial' : '';
-    const icon        = done ? '✅' : filled.length > 0 ? '⏳' : '○';
-
-    return `
-      <div class="zone-card ${statusClass}" onclick="startCountById('${zone.id}')">
-        <div class="zone-dot" style="background:${zone.color}"></div>
-        <div class="zone-info">
-          <div class="zone-name">${esc(zone.nombre)}</div>
-          <div class="zone-meta">${filled.length}/${countable.length} · ${pct}%</div>
-        </div>
-        <div class="zone-status">${icon}</div>
-      </div>`;
+    var cls  = done ? 'done' : zoneFilled > 0 ? 'partial' : '';
+    var icon = done ? '✅' : zoneFilled > 0 ? '⏳' : '○';
+    return '<div class="zone-card ' + cls + '" onclick="startCount(' + i + ')">' +
+      '<div class="zone-dot" style="background:' + zone.color + '"></div>' +
+      '<div class="zone-info">' +
+        '<div class="zone-name">' + esc(zone.nombre) + '</div>' +
+        '<div class="zone-meta">' + zoneFilled + '/' + zone.items.length + ' · ' + pct + '%</div>' +
+        '<div class="progress-bar" style="margin-top:4px"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
+      '</div>' +
+      '<div class="zone-status">' + icon + '</div>' +
+    '</div>';
   }).join('');
-
-  document.getElementById('ov-zones').innerHTML = zonesHtml;
-
-  const globalPct = totalArt ? filledArt / totalArt * 100 : 0;
-  document.getElementById('ov-bar').style.width = globalPct + '%';
-
-  const btn = document.getElementById('btn-generate');
-  if (!allDone) {
-    btn.textContent       = 'Generar Excel (hay zonas pendientes)';
-    btn.style.background  = '#667eea';
-    btn.style.opacity     = '.7';
-  } else {
-    btn.textContent      = 'Generar Excel para Xetux →';
-    btn.style.background = '#22c55e';
-    btn.style.opacity    = '1';
-  }
+  document.getElementById('ov-zones').innerHTML = html;
+  var pct = total ? filled / total * 100 : 0;
+  document.getElementById('ov-bar').style.width = pct + '%';
+  var btn = document.getElementById('btn-generate');
+  var pending = ZONE_ORDER.length - (S.completedZones ? S.completedZones.length : 0);
+  btn.textContent      = allDone ? 'Generar Excel para Xetux →' : 'Generar Excel (' + pending + ' zona' + (pending !== 1 ? 's' : '') + ' pendiente' + (pending !== 1 ? 's' : '') + ')';
+  btn.style.background = allDone ? '#22c55e' : '#667eea';
+  btn.style.opacity    = allDone ? '1' : '.8';
 }
 
-// ╔══════════════════════════════════════════════════════════╗
-// ║  VALIDATION & EXCEL GENERATION                           ║
-// ╚══════════════════════════════════════════════════════════╝
 function renderValidation() {
-  const el = document.getElementById('validation-out');
-  if (!T || !S) { el.innerHTML = '<p style="color:#888">Sin datos.</p>'; return; }
-
-  const errors = [], warnings = [], ok = [];
-  const allItems   = T.items.filter(i => !i._headerOnly);
-  const countable  = allItems.filter(i => !i.isP || !T.items.some(p => !p.isP && p.codigo === i.parentCod));
-  // Items that are either: a base item with no presentations, or a presentation
-  const leafItems  = allItems.filter(i => {
-    if (!i.isP) {
-      const hasPres = allItems.some(p => p.isP && p.parentCod === i.codigo);
-      return !hasPres;
-    }
-    return true;
-  });
-
-  const counted    = leafItems.filter(i => S.counts[i.codigo] !== undefined);
-  const notCounted = leafItems.filter(i => S.counts[i.codigo] === undefined);
-  const zeroCount  = leafItems.filter(i => S.counts[i.codigo] === 0);
-
-  if (notCounted.length > 0) {
-    warnings.push({
-      title: `${notCounted.length} artículos sin contar → quedarán en 0`,
-      detail: notCounted.slice(0, 5).map(i => i.art).join(', ') + (notCounted.length > 5 ? ` y ${notCounted.length-5} más…` : ''),
-    });
+  var el = document.getElementById('validation-out');
+  if (!S) { el.innerHTML = '<p style="color:#888">Sin sesión.</p>'; return; }
+  var allItems   = ZONE_ORDER.reduce(function(a, z) { return a.concat(z.items); }, []);
+  var counted    = allItems.filter(function(i) { return S.counts[i.cod] !== undefined; });
+  var notCounted = allItems.filter(function(i) { return S.counts[i.cod] === undefined; });
+  var ltDirect   = allItems.filter(function(i) { return isLT(i) && factor(i.cod) === null && S.counts[i.cod] !== undefined; });
+  var withConv   = counted.filter(function(i) { return isLT(i) && factor(i.cod) !== null; });
+  var html = '';
+  if (!T || !localStorage.getItem(LS.RAW)) {
+    html += '<div class="alert alert-error"><div class="alert-title">❌ Plantilla Xetux no importada</div><div>Importa el .xlsx antes de generar el Excel.</div></div>';
   }
-
-  // Check for unusually high values (simple heuristic: > 999 for liquids, > 9999 for pz)
-  const highValues = leafItems.filter(i => {
-    const v = S.counts[i.codigo];
-    if (v === undefined) return false;
-    const isLiquid = /LT|ML/i.test(i.uni);
-    return isLiquid ? v > 999 : v > 9999;
-  });
-  if (highValues.length) {
-    warnings.push({
-      title: `${highValues.length} cantidades inusualmente altas`,
-      detail: highValues.slice(0, 5).map(i => `${i.art}: ${S.counts[i.codigo]} ${i.uni}`).join(', '),
-    });
+  if (notCounted.length) {
+    html += '<div class="alert alert-warn"><div class="alert-title">⚠️ ' + notCounted.length + ' artículos sin contar → quedarán en blanco</div>' +
+      '<div>' + notCounted.slice(0,5).map(function(i) { return esc(i.art); }).join(', ') + (notCounted.length > 5 ? ' y ' + (notCounted.length-5) + ' más…' : '') + '</div></div>';
   }
-
-  // Check for negative values
-  const negatives = leafItems.filter(i => (S.counts[i.codigo] ?? 0) < 0);
-  if (negatives.length) {
-    errors.push({ title: `${negatives.length} cantidades negativas`, detail: negatives.map(i => i.art).join(', ') });
+  if (ltDirect.length) {
+    html += '<div class="alert alert-warn"><div class="alert-title">⚠️ ' + ltDirect.length + ' artículo' + (ltDirect.length!==1?'s':'') + ' LT sin tamaño — valor ingresado usado directo</div>' +
+      '<div>' + ltDirect.map(function(i) { return esc(i.art); }).join(', ') + '</div></div>';
   }
-
-  const raw = localStorage.getItem(LS.RAW);
-  if (!raw) errors.push({ title: 'Plantilla original no encontrada', detail: 'Reimporta el .xlsx para poder generar.' });
-
-  // Zones not completed
-  const pendingZones = (Z?.zones ?? []).filter(z => !S.completedZones?.includes(z.id));
-  if (pendingZones.length) {
-    warnings.push({
-      title: `${pendingZones.length} zona(s) no marcadas como listas`,
-      detail: pendingZones.map(z => z.nombre).join(', '),
-    });
-  }
-
-  let html = '';
-  if (errors.length) {
-    html += errors.map(e => `
-      <div class="alert alert-error">
-        <div class="alert-title">❌ ${esc(e.title)}</div>
-        <div>${esc(e.detail)}</div>
-      </div>`).join('');
-  }
-  if (warnings.length) {
-    html += warnings.map(w => `
-      <div class="alert alert-warn">
-        <div class="alert-title">⚠️ ${esc(w.title)}</div>
-        <div>${esc(w.detail)}</div>
-      </div>`).join('');
-  }
-  html += `
-    <div class="alert alert-ok">
-      <div class="alert-title">✅ ${counted.length} artículos con cantidad registrada</div>
-      <div>${leafItems.length} artículos en total · ${notCounted.length} irán en 0</div>
-    </div>`;
-
+  html += '<div class="alert alert-ok"><div class="alert-title">✅ ' + counted.length + ' artículos con cantidad</div>' +
+    '<div>' + withConv.length + ' con conversión botellas→LT · ' + (counted.length - withConv.length) + ' directos</div></div>';
   el.innerHTML = html;
 }
 
 async function generateExcel() {
-  const rawB64 = localStorage.getItem(LS.RAW);
+  if (!T || !S) { alert('Importa la plantilla y crea una sesión primero.'); return; }
+  var rawB64 = localStorage.getItem(LS.RAW);
   if (!rawB64) { alert('No encuentro la plantilla original. Reimporta el .xlsx.'); return; }
-  if (!S) { alert('No hay sesión activa.'); return; }
-
   try {
-    // Decode base64 → ArrayBuffer
-    const bin   = atob(rawB64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-
-    const wb  = XLSX.read(bytes.buffer, { type:'array', cellStyles:true });
-    const ws  = wb.Sheets[wb.SheetNames[0]];
-
-    const canIdx = T.cantidadColIdx;
-
-    // Write counts into Cantidad column.
-    // Base items with presentations get 0 (counter filled the presentation rows).
-    // Base items without presentations and all presentations get their count or 0.
-    for (const item of T.items) {
-      const cantidad = S.counts[item.codigo] ?? 0;
-      const cellAddr = XLSX.utils.encode_cell({ r: item.rowIdx, c: canIdx });
-      ws[cellAddr]   = { t:'n', v: cantidad };
+    var bin   = atob(rawB64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    var wb  = XLSX.read(bytes.buffer, { type:'array', cellStyles:true });
+    var ws  = wb.Sheets[wb.SheetNames[0]];
+    var can = T.cantidadColIdx;
+    var cods = Object.keys(S.counts);
+    for (var j = 0; j < cods.length; j++) {
+      var cod    = cods[j];
+      var raw    = S.counts[cod];
+      var rowIdx = T.rowMap[cod];
+      if (rowIdx === undefined) continue;
+      var qty  = toExcel(cod, raw);
+      var addr = XLSX.utils.encode_cell({ r: rowIdx, c: can });
+      ws[addr] = { t:'n', v: parseFloat(qty.toFixed(4)) };
     }
-
-    // Download
-    const out  = XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles:true });
-    const blob = new Blob([out], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `Inventario_${ALMACEN}_${S.fecha}.xlsx`;
-    a.click();
+    var out  = XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles:true });
+    var blob = new Blob([out], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href = url; a.download = 'Inventario_BARRA_' + S.fecha + '.xlsx'; a.click();
     URL.revokeObjectURL(url);
-
   } catch(e) {
     console.error(e);
-    alert('Error al generar el Excel: ' + e.message);
+    alert('Error al generar: ' + e.message);
   }
 }
 
-// ── Start ────────────────────────────────────────────────────────────────
 init();
 </script>
 </body>
