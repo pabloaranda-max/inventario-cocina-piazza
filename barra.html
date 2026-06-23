@@ -600,11 +600,68 @@ function filterCount(q) {
     }
     hdr.classList.toggle('hidden', !vis);
   });
+
+  // resultados de otras zonas
+  var extra = document.getElementById('count-extra');
+  if (!extra) {
+    extra = document.createElement('div');
+    extra.id = 'count-extra';
+    document.getElementById('count-list').after(extra);
+  }
+  if (!ql) { extra.innerHTML = ''; return; }
+
+  var currentItems = CZ !== null ? ZONE_ORDER[CZ].items.map(function(i) { return i.cod; }) : [];
+  var html = '';
+  ZONE_ORDER.forEach(function(zone, zi) {
+    if (zi === CZ) return;
+    var matches = zone.items.filter(function(item) {
+      return !currentItems.includes(item.cod) &&
+        (item.art.toLowerCase().includes(ql) || item.cod.toLowerCase().includes(ql));
+    });
+    if (!matches.length) return;
+    html += '<div class="subgrupo-hdr" style="background:#fef3c7;color:#92400e">' + esc(zone.nombre) + '</div>';
+    matches.forEach(function(item) {
+      var raw = (S && S.counts[item.cod] !== undefined) ? S.counts[item.cod] : '';
+      var flt = raw !== '' ? parseFloat(raw) : NaN;
+      var f   = factor(item.cod);
+      var hasFactor = isLT(item) && f !== null;
+      var filled = raw !== '' ? 'filled' : '';
+      if (hasFactor) {
+        var ltStr = !isNaN(flt) ? fmtLT(flt * f) : '—';
+        html += '<div class="item-row" data-search="' + esc(item.art) + ' ' + esc(item.cod) + '">' +
+          '<div class="item-text">' +
+            '<div class="item-name">' + esc(item.art) + '</div>' +
+            '<div class="item-unit">bots × ' + f + ' LT</div>' +
+          '</div>' +
+          '<div class="qty-wrap">' +
+            '<span class="lt-badge" id="ltb_' + item.cod + '">' + ltStr + ' LT</span>' +
+            '<input type="number" class="qty-input ' + filled + '" inputmode="decimal" step="0.5" min="0" placeholder="0"' +
+              ' value="' + raw + '" data-cod="' + esc(item.cod) + '" data-f="' + f + '" oninput="onQty(this)" onfocus="this.select()">' +
+          '</div>' +
+        '</div>';
+      } else {
+        html += '<div class="item-row" data-search="' + esc(item.art) + ' ' + esc(item.cod) + '">' +
+          '<div class="item-text">' +
+            '<div class="item-name">' + esc(item.art) + '</div>' +
+            '<div class="item-unit">' + esc(item.uni) + '</div>' +
+          '</div>' +
+          '<div class="qty-wrap">' +
+            '<span class="qty-label">' + esc(item.uni) + '</span>' +
+            '<input type="number" class="qty-input ' + filled + '" inputmode="decimal" step="0.01" min="0" placeholder="0"' +
+              ' value="' + raw + '" data-cod="' + esc(item.cod) + '" data-f="" oninput="onQty(this)" onfocus="this.select()">' +
+          '</div>' +
+        '</div>';
+      }
+    });
+  });
+  extra.innerHTML = html ? '<div class="subgrupo-hdr" style="background:#f0f0f0;color:#666;border-top:2px solid #e5e7eb">Otras zonas</div>' + html : '';
 }
 
 function clearSearch() {
   document.getElementById('count-search').value = '';
   filterCount('');
+  var extra = document.getElementById('count-extra');
+  if (extra) extra.innerHTML = '';
 }
 
 function exitCount() {
