@@ -239,6 +239,26 @@ async function fetchPlantillaWorker() {
   } catch(e) { console.warn('Worker plantilla fetch:', e); return false; }
 }
 
+async function pushPlantillaWorker() {
+  const raw = localStorage.getItem(LS.RAW);
+  if (!T || !raw) return;
+  try {
+    await fetch(WORKER_URL + '/inv/plantilla', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'inv_plantilla', almacen: ALMACEN, rowMap: T.rowMap, cantidadColIdx: T.cantidadColIdx, raw })
+    });
+  } catch(e) { console.warn('Worker plantilla push:', e); }
+}
+
+async function syncPlantillaWorker() {
+  try {
+    const r = await fetch(WORKER_URL + '/inv/plantilla?almacen=' + ALMACEN);
+    const data = await r.json();
+    if (data.ok && !data.found) await pushPlantillaWorker();
+  } catch(e) {}
+}
+
 async function fetchSesionWorker(fecha) {
   try {
     const r = await fetch(WORKER_URL + '/inv/sesion?almacen=' + ALMACEN + '&fecha=' + encodeURIComponent(fecha));
@@ -304,6 +324,8 @@ async function init() {
   if (!T) {
     const ok = await fetchPlantillaWorker();
     if (ok) T = lsGet(LS.T);
+  } else {
+    syncPlantillaWorker(); // sube al Worker si falta, sin bloquear
   }
 
   if (!S) {
@@ -404,14 +426,22 @@ async function handleFile(file) {
     bytes.forEach(b => bin += String.fromCharCode(b));
     const rawB64 = btoa(bin);
     localStorage.setItem(LS.RAW, rawB64);
-    msg.style.color = '#16a34a';
-    msg.textContent = '✓ ' + Object.keys(T.rowMap).length + ' artículos cargados';
-    fetch(WORKER_URL + '/inv/plantilla', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'inv_plantilla', almacen: ALMACEN, rowMap: T.rowMap, cantidadColIdx: T.cantidadColIdx, raw: rawB64 })
-    }).catch(e => console.warn('Worker plantilla upload:', e));
-    setTimeout(() => go('welcome'), 700);
+    msg.style.color = '#888';
+    msg.textContent = '✓ ' + Object.keys(T.rowMap).length + ' artículos · subiendo al servidor…';
+    try {
+      const wr = await fetch(WORKER_URL + '/inv/plantilla', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'inv_plantilla', almacen: ALMACEN, rowMap: T.rowMap, cantidadColIdx: T.cantidadColIdx, raw: rawB64 })
+      });
+      const wd = await wr.json();
+      msg.style.color = wd.ok ? '#16a34a' : '#ef4444';
+      msg.textContent = wd.ok ? '✓ Plantilla guardada en servidor' : '⚠️ Error servidor: ' + JSON.stringify(wd);
+    } catch(e) {
+      msg.style.color = '#ef4444';
+      msg.textContent = '⚠️ Sin conexión al servidor: ' + e.message;
+    }
+    setTimeout(() => go('welcome'), 1200);
   } catch(e) {
     console.error(e);
     msg.style.color = '#ef4444';
