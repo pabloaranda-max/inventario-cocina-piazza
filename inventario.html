@@ -440,25 +440,30 @@ function renderWelcome() {
   setColor('#667eea');
   const body = document.getElementById('welcome-body');
   const sub  = document.getElementById('welcome-sub');
-  sub.textContent = 'Selecciona el almacén';
+  sub.textContent = 'Inventarios';
 
-  const items = Object.entries(AREA_CONFIG).map(([key, cfg]) => {
-    const nZonas  = cfg.zonas ? cfg.zonas.length : (cfg.zonaNames?.length || 1);
-    const initials = cfg.titulo.split(' ').map(w => w[0]).join('').slice(0,3).toUpperCase();
-    const subLine  = key === 'BARRA_AMICI'
-      ? `<span style="color:${cfg.color};font-weight:700">Catálogo pendiente</span>`
-      : `${nZonas} zona${nZonas!==1?'s':''}`;
-    return `<div class="area-item" style="--ac:${cfg.color}" onclick="selectArea('${key}')">
-      <div class="area-item-badge" style="background:${cfg.color}">${initials}</div>
-      <div class="area-item-info">
-        <div class="area-item-name">${cfg.titulo}</div>
-        <div class="area-item-sub">${subLine}</div>
+  const sorted = Object.entries(AREA_CONFIG).sort((a, b) =>
+    a[1].titulo.localeCompare(b[1].titulo, 'es'));
+  const options = sorted.map(([key, cfg]) =>
+    `<option value="${key}">${cfg.titulo}</option>`).join('');
+
+  body.innerHTML = `
+    <div style="padding:24px 16px 16px">
+      <div class="form-group">
+        <label for="area-select">Almacén</label>
+        <select id="area-select">
+          <option value="" disabled selected>— Seleccionar —</option>
+          ${options}
+        </select>
       </div>
-      <div class="area-item-arrow">›</div>
+      <button class="btn btn-primary" onclick="onAreaSelectGo()">Continuar →</button>
     </div>`;
-  }).join('');
+}
 
-  body.innerHTML = `<div class="area-list">${items}</div>`;
+function onAreaSelectGo() {
+  const sel = document.getElementById('area-select');
+  if (!sel.value) return;
+  selectArea(sel.value);
 }
 
 function renderAreaWelcome() {
