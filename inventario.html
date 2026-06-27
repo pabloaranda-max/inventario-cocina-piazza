@@ -70,11 +70,14 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
 .alert-info{background:#eff6ff;border:1px solid #93c5fd;color:#1e40af}
 .alert-title{font-weight:700;margin-bottom:4px}
 /* Area selector */
-.area-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px}
-.area-btn{background:white;border-radius:14px;padding:20px 12px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.1);border:2px solid transparent;display:flex;flex-direction:column;align-items:center;gap:8px;transition:all .15s}
-.area-btn:active{transform:scale(.97)}
-.area-btn .area-name{font-size:13px;font-weight:700;color:#333}
-.area-btn .area-zones{font-size:11px;color:#888}
+.area-list{padding:0 16px 16px}
+.area-item{background:white;padding:16px;display:flex;align-items:center;gap:14px;border-radius:12px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.07);cursor:pointer;border-left:4px solid var(--ac,#667eea);transition:opacity .15s}
+.area-item:active{opacity:.75}
+.area-item-badge{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:800;flex-shrink:0}
+.area-item-info{flex:1;min-width:0}
+.area-item-name{font-size:15px;font-weight:700;color:#111}
+.area-item-sub{font-size:12px;color:#888;margin-top:2px}
+.area-item-arrow{color:#c4c4c4;font-size:18px;flex-shrink:0}
 /* Modal */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-end;justify-content:center}
 .modal-overlay.active{display:flex}
@@ -82,9 +85,8 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
 .modal-title{font-size:18px;font-weight:800;margin-bottom:16px}
 .modal-close{float:right;background:none;border:none;font-size:22px;color:#999;padding:0;margin-top:-4px}
 /* Welcome */
-.welcome-hero{text-align:center;padding:28px 16px 16px}
-.welcome-icon{font-size:48px}
-.welcome-hero h1{font-size:22px;font-weight:800;margin-top:8px}
+.welcome-hero{padding:28px 16px 16px}
+.welcome-hero h1{font-size:22px;font-weight:800}
 .welcome-hero p{color:#888;margin-top:4px;font-size:14px}
 </style>
 </head>
@@ -93,7 +95,6 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
 <!-- PANTALLA: selector de área -->
 <div id="screen-welcome" class="screen">
   <div class="welcome-hero">
-    <div class="welcome-icon">📋</div>
     <h1>Inventario Piazza</h1>
     <p id="welcome-sub">Selecciona el almacén</p>
   </div>
@@ -236,8 +237,8 @@ const AREA_CONFIG = {
   },
   COCINA:    { titulo:'Cocina',    color:'#f59e0b', appsScriptUrl:APPS+'AKfycbyTJ-jeve3udC1mAuhcmjlUwY0oiJO2HMu55ovpUa5z48JX2j1K25BsVULrgr_tnIQ/exec', zonas:null },
   ALIMENTARI:{ titulo:'Alimentari', color:'#10b981', appsScriptUrl:APPS+'AKfycbxgmVa9zMMYy0eGe8zFEVnoUuZWPH1w9cgT2oxBXI307N5eMD6vLnfd88Aovo6n6spO/exec', zonas:null, zonaNames:['Almacén','Tienda'], zonaColors:['#10b981','#0d9488'] },
-  CAVA:      { titulo:'Cava',      color:'#8b5cf6', appsScriptUrl:APPS+'AKfycbzQ7Pwt-rv9mPxCOzXkbI6gisss9FVtFzJyKWHGZbQOOMDHrJESa55UTNWriDUeH94B/exec', zonas:null },
-  SALUMERIA: { titulo:'Salumeria', color:'#ef4444', appsScriptUrl:APPS+'AKfycbwJ89hDt3pIyXwiQkbSaL7--Fr-DXTsFm5tTgo-rKoCc-G0fR14iJKqyjVwRCO3XC_3/exec', zonas:null },
+  CAVA:      { titulo:'Cava',      color:'#8b5cf6', appsScriptUrl:APPS+'AKfycbzQ7Pwt-rv9mPxCOzXkbI6gisss9FVtFzJyKWHGZbQOOMDHrJESa55UTNWriDUeH94B/exec', zonas:null, zonaNames:['Racks cava','Refri cava 1','Refri cava 2'], zonaColors:['#8b5cf6','#7c3aed','#6d28d9'] },
+  SALUMERIA: { titulo:'Salumeria', color:'#ef4444', appsScriptUrl:APPS+'AKfycbwJ89hDt3pIyXwiQkbSaL7--Fr-DXTsFm5tTgo-rKoCc-G0fR14iJKqyjVwRCO3XC_3/exec', zonas:null, zonaNames:['Camara maduracion','Congelador horizontal','Refri','Camara fria'], zonaColors:['#ef4444','#dc2626','#b91c1c','#991b1b'] },
   GENERAL:   { titulo:'General',   color:'#6b7280', appsScriptUrl:APPS+'AKfycbyg1vJUxEGFaHs8V1co2rLxY8IA5h-Ol23-peGDg-Hdon-kI81F_r7Rx9Yey9OdNFQtVg/exec', zonas:null },
   BARRA_AMICI:{ titulo:'Barra Amici', color:'#f97316', appsScriptUrl:null, zonas:null }
 };
@@ -427,19 +428,23 @@ function renderWelcome() {
   const sub  = document.getElementById('welcome-sub');
   sub.textContent = 'Selecciona el almacén';
 
-  const btns = Object.entries(AREA_CONFIG).map(([key, cfg]) => {
-    const nZonas = cfg.zonas ? cfg.zonas.length : (cfg.zonaNames?.length || 1);
+  const items = Object.entries(AREA_CONFIG).map(([key, cfg]) => {
+    const nZonas  = cfg.zonas ? cfg.zonas.length : (cfg.zonaNames?.length || 1);
     const initials = cfg.titulo.split(' ').map(w => w[0]).join('').slice(0,3).toUpperCase();
-    const pendiente = key === 'BARRA_AMICI' ? `<div style="font-size:10px;color:${cfg.color};margin-top:3px;font-weight:700">Catálogo pendiente</div>` : '';
-    return `<button class="area-btn" onclick="selectArea('${key}')" style="border-color:${cfg.color}30">
-      <div style="width:52px;height:52px;border-radius:14px;background:${cfg.color};display:flex;align-items:center;justify-content:center;color:white;font-size:17px;font-weight:800;letter-spacing:-.5px">${initials}</div>
-      <div class="area-name">${cfg.titulo}</div>
-      <div class="area-zones">${nZonas} zona${nZonas!==1?'s':''}</div>
-      ${pendiente}
-    </button>`;
+    const subLine  = key === 'BARRA_AMICI'
+      ? `<span style="color:${cfg.color};font-weight:700">Catálogo pendiente</span>`
+      : `${nZonas} zona${nZonas!==1?'s':''}`;
+    return `<div class="area-item" style="--ac:${cfg.color}" onclick="selectArea('${key}')">
+      <div class="area-item-badge" style="background:${cfg.color}">${initials}</div>
+      <div class="area-item-info">
+        <div class="area-item-name">${cfg.titulo}</div>
+        <div class="area-item-sub">${subLine}</div>
+      </div>
+      <div class="area-item-arrow">›</div>
+    </div>`;
   }).join('');
 
-  body.innerHTML = `<div class="area-grid">${btns}</div>`;
+  body.innerHTML = `<div class="area-list">${items}</div>`;
 }
 
 function renderAreaWelcome() {
