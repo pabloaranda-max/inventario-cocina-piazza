@@ -5,10 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Inventario · Piazza Pasticcio</title>
 <style>
-@font-face{font-family:'Great Vibes';font-weight:400;src:url(https://fonts.gstatic.com/s/greatvibes/v21/RWmMoKWR9v4ksMfaWd_JN9XFiaQ.woff2)format('woff2')}
-:root{--gold:#C9933A}
+@font-face{font-family:'Brand';font-weight:400;src:url(branding/fonts/FreightNeo%20W03%20Book.ttf)format('truetype')}
+@font-face{font-family:'BrandScript';font-weight:900;src:url(branding/fonts/TT%20Nooks%20Script%20Black.otf)format('opentype')}
+:root{
+  --brand-green:#2f3e1e;--brand-wine:#9b1e21;--brand-bone:#eee3ca;
+  --brand-yellow:#efa91e;--brand-ink:#1f2916;--brand-paper:#fffdf8;
+  --brand-border:rgba(47,62,30,0.14);--brand-muted:rgba(47,62,30,0.52);
+  --brand-shadow:0 18px 48px rgba(47,62,30,0.08);
+}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f5f5f5;color:#333;min-height:100vh}
+body{font-family:'Brand','Avenir Next','Segoe UI',serif;background:linear-gradient(180deg,#f8f4ea 0%,#fffdf8 28%,#f4f5f0 100%);color:var(--brand-ink);min-height:100vh}
 .screen{display:none;min-height:100vh;flex-direction:column}
 .screen.active{display:flex}
 .hdr{color:white;padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:50}
@@ -23,16 +29,16 @@ button:active{opacity:.75}
 .btn-sm{padding:8px 14px;font-size:13px;border-radius:8px}
 .form-group{margin-bottom:14px}
 label{display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:5px}
-input[type=text],input[type=date],select{width:100%;padding:13px 14px;border:1.5px solid #ddd;border-radius:10px;font-size:16px;font-family:inherit;background:white;color:#333;-webkit-appearance:none;appearance:none}
+input[type=text],input[type=date],select{width:100%;padding:13px 14px;border:1px solid rgba(47,62,30,.16);border-radius:10px;font-size:16px;font-family:inherit;background:rgba(255,253,248,.82);color:var(--brand-green);-webkit-appearance:none;appearance:none}
 input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
 .content{flex:1;padding:16px;overflow-y:auto}
-.card{background:white;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.07)}
-.divider{height:1px;background:#e5e7eb;margin:16px 0}
-.section-label{font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.8px;margin:18px 0 8px}
+.card{background:color-mix(in srgb,var(--brand-paper) 94%,white);border:1px solid var(--brand-border);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 14px 36px rgba(47,62,30,.06)}
+.divider{height:1px;background:var(--brand-border);margin:16px 0}
+.section-label{font-size:11px;font-weight:700;color:var(--brand-muted);text-transform:uppercase;letter-spacing:.8px;margin:18px 0 8px}
 .row{display:flex;gap:8px;margin-top:10px}
 .progress-bar{height:4px;background:#e5e7eb;border-radius:4px;overflow:hidden;margin:4px 0 0}
 .progress-fill{height:100%;background:#22c55e;border-radius:4px;transition:width .3s}
-.zone-card{background:white;border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,.07);cursor:pointer;border-left:4px solid #e5e7eb}
+.zone-card{background:color-mix(in srgb,var(--brand-paper) 94%,white);border:1px solid var(--brand-border);border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px rgba(47,62,30,.05);cursor:pointer;border-left:4px solid var(--brand-border)}
 .zone-card:active{opacity:.8}
 .zone-card.done{border-left-color:#22c55e}
 .zone-card.partial{border-left-color:#f59e0b}
@@ -42,8 +48,8 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
 .zone-name{font-weight:700;font-size:15px}
 .zone-meta{font-size:12px;color:#888;margin-top:2px}
 .zone-status{font-size:20px}
-.subgrupo-hdr{font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:1px;padding:10px 16px 4px;background:#f5f5f5}
-.item-row{background:white;padding:11px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f3f4f6}
+.subgrupo-hdr{font-size:11px;font-weight:700;color:var(--brand-muted);text-transform:uppercase;letter-spacing:1px;padding:10px 16px 4px;background:rgba(47,62,30,.04)}
+.item-row{background:var(--brand-paper);padding:11px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--brand-border)}
 .item-row.hidden{display:none}
 .item-text{flex:1;min-width:0}
 .item-name{font-size:14px;font-weight:600}
@@ -56,11 +62,11 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
 .qty-label{font-size:11px;color:#aaa;white-space:nowrap}
 .lt-badge{font-size:11px;font-weight:700;color:var(--color,#667eea);background:#ede9fe;padding:2px 6px;border-radius:6px;white-space:nowrap;min-width:54px;text-align:right}
 .pres-sel{font-size:12px;border:1px solid #ddd;border-radius:6px;padding:3px 6px;background:white;color:#333;max-width:110px}
-.search-bar{background:white;padding:10px 16px;border-bottom:1px solid #e5e7eb;display:flex;gap:8px;position:sticky;top:53px;z-index:40}
+.search-bar{background:rgba(255,253,248,.9);backdrop-filter:blur(8px);padding:10px 16px;border-bottom:1px solid var(--brand-border);display:flex;gap:8px;position:sticky;top:53px;z-index:40}
 .search-bar input{flex:1;padding:10px 14px;border:1.5px solid #ddd;border-radius:10px;font-size:16px;font-family:inherit}
 .search-bar input:focus{outline:none;border-color:var(--color,#667eea)}
 .search-bar button{background:#f3f4f6;color:#555;padding:10px 14px;border-radius:10px;font-size:14px}
-.fab-bar{position:fixed;bottom:0;left:0;right:0;padding:12px 16px;background:white;border-top:1px solid #e5e7eb;z-index:50;display:flex;gap:8px}
+.fab-bar{position:fixed;bottom:0;left:0;right:0;padding:12px 16px;background:rgba(255,253,248,.92);backdrop-filter:blur(10px);border-top:1px solid var(--brand-border);z-index:50;display:flex;gap:8px}
 .drop-zone{border:2px dashed #c4b5fd;border-radius:16px;padding:40px 20px;text-align:center;background:white;cursor:pointer;transition:all .2s}
 .drop-zone.over{border-color:var(--color,#667eea);background:#f5f3ff}
 .drop-icon{font-size:48px;margin-bottom:10px}
@@ -73,7 +79,7 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
 .alert-title{font-weight:700;margin-bottom:4px}
 /* Area selector */
 .area-list{padding:0 16px 16px}
-.area-item{background:white;padding:16px;display:flex;align-items:center;gap:14px;border-radius:12px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.07);cursor:pointer;border-left:4px solid var(--ac,#667eea);transition:opacity .15s}
+.area-item{background:color-mix(in srgb,var(--brand-paper) 94%,white);border:1px solid var(--brand-border);padding:16px;display:flex;align-items:center;gap:14px;border-radius:12px;margin-bottom:8px;box-shadow:0 4px 14px rgba(47,62,30,.05);cursor:pointer;border-left:4px solid var(--ac,#667eea);transition:opacity .15s}
 .area-item:active{opacity:.75}
 .area-item-badge{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:800;flex-shrink:0}
 .area-item-info{flex:1;min-width:0}
@@ -87,11 +93,12 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
 .modal-title{font-size:18px;font-weight:800;margin-bottom:16px}
 .modal-close{float:right;background:none;border:none;font-size:22px;color:#999;padding:0;margin-top:-4px}
 /* Welcome */
-.welcome-hero{background:#1a1a1a;padding:28px 20px 24px;color:white}
-.welcome-logo{font-family:'Great Vibes',cursive;font-size:36px;color:white;line-height:1.1}
-.welcome-logo span{color:var(--gold)}
-.welcome-sub-title{font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,.4);margin-top:6px}
-.welcome-hero p{color:rgba(255,255,255,.5);margin-top:14px;font-size:13px}
+.welcome-hero{background:rgba(255,253,248,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--brand-border);padding:20px 16px 16px;display:flex;align-items:center;gap:14px}
+.welcome-logo-img{width:48px;height:48px;object-fit:contain;border-radius:10px;border:1px solid rgba(155,30,33,.14);background:rgba(255,253,248,.7);padding:5px;flex-shrink:0}
+.welcome-logo-text{}
+.welcome-logo-name{font-family:'BrandScript',cursive;font-size:24px;line-height:1;color:var(--brand-wine)}
+.welcome-logo-sub{font-size:12px;font-weight:600;letter-spacing:.08em;color:var(--brand-green);margin-top:2px}
+.welcome-hero p{display:none}
 </style>
 </head>
 <body>
@@ -99,9 +106,11 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
 <!-- PANTALLA: selector de área -->
 <div id="screen-welcome" class="screen">
   <div class="welcome-hero">
-    <div class="welcome-logo">Piazza <span>Pasticcio</span></div>
-    <div class="welcome-sub-title">Inventarios</div>
-    <p id="welcome-sub">Selecciona el almacén</p>
+    <img class="welcome-logo-img" src="branding/logo.png" alt="Piazza Pasticcio">
+    <div class="welcome-logo-text">
+      <div class="welcome-logo-name">Piazza Pasticcio</div>
+      <div class="welcome-logo-sub" id="welcome-sub">Inventarios · selecciona el almacén</div>
+    </div>
   </div>
   <div id="welcome-body" class="content" style="padding-top:0"></div>
 </div>
