@@ -134,7 +134,13 @@ R5: múltiples factores válidos → conservar todos → selector en UI
 ### Versionado
 
 ```js
-templateHash = raw.length.toString(36) + '-' + raw.slice(100, 108)
+// SHA-256 determinístico via crypto.subtle (async)
+async function hashRaw(raw) {
+  const buf = await crypto.subtle.digest('SHA-256',
+    new TextEncoder().encode(raw));
+  return Array.from(new Uint8Array(buf))
+    .map(b => b.toString(16).padStart(2,'0')).join('').slice(0, 16);
+}
 ```
 
 Si `T.templateHash !== S.templateHash` → advertencia visible. No bloquear exportación.
@@ -183,8 +189,10 @@ S = {
 Response si existe:
 ```json
 { "ok": true, "found": true,
-  "rowMap": {}, "cantidadColIdx": 6,
-  "presMap": {}, "templateHash": "1f4a2b", "templateTs": 1719360000000 }
+  "rowMap": { "MP0001": 17, "XMAT001": 42 },
+  "cantidadColIdx": 6,
+  "presMap": {}, "templateHash": "sha256hex...", "templateTs": 1719360000000,
+  "raw": "base64..." }
 ```
 Response si no: `{ "ok": true, "found": false }`
 
@@ -195,8 +203,9 @@ Desde admin.html únicamente.
 Request:
 ```json
 { "action": "inv_plantilla", "almacen": "CAVA",
-  "rowMap": {}, "cantidadColIdx": 6,
-  "presMap": {}, "templateHash": "1f4a2b", "templateTs": 1719360000000 }
+  "rowMap": { "MP0001": 17 }, "cantidadColIdx": 6,
+  "presMap": {}, "templateHash": "sha256hex...", "templateTs": 1719360000000,
+  "raw": "base64..." }
 ```
 Response: `{ "ok": true }`
 
@@ -280,6 +289,7 @@ CREATE TABLE IF NOT EXISTS inv_plantillas (
   row_map        TEXT NOT NULL DEFAULT '{}',
   cantidad_col   INTEGER NOT NULL DEFAULT 6,
   pres_map       TEXT NOT NULL DEFAULT '{}',
+  raw            TEXT NOT NULL DEFAULT '',   -- base64 del .xlsx original
   updated_at     TEXT NOT NULL DEFAULT ''
 );
 ```
@@ -288,18 +298,25 @@ CREATE TABLE IF NOT EXISTS inv_plantillas (
 
 ## 9. Generación del Excel
 
+**rowMap:** `{ cod: rowIdx }` — número entero = índice de fila en el xlsx.
+
 ```js
 for (const cod of Object.keys(T.rowMap)) {
   let totalQty = 0;
+  let contado  = false;
   for (const [zoneId, zoneCounts] of Object.entries(S.countsByZone)) {
-    if (!zoneCounts[cod]) continue;
+    if (zoneCounts[cod] === undefined) continue;   // ← !== undefined, no falsy
     const factor = S.presChoiceByZone?.[zoneId]?.[cod]
                 ?? T.presMap?.[cod]?.[0]?.factor ?? 1;
     totalQty += zoneCounts[cod] * factor;
+    contado = true;
   }
-  if (totalQty > 0) escribirCelda(T.rowMap[cod].rowIdx, T.cantidadColIdx, totalQty);
+  // Escribir si fue contado explícitamente — cero es dato real ("confirmé que hay 0")
+  if (contado) escribirCelda(T.rowMap[cod], T.cantidadColIdx, totalQty);
 }
 ```
+
+El xlsx se regenera desde `T.raw` (base64): se parsea, se sobreescriben las celdas de cantidad y se descarga.
 
 Ítems manuales: no incluir en xlsx. Mostrar en pantalla de validación.
 
@@ -311,14 +328,19 @@ POST a `appsScriptUrl` con `mode: 'no-cors'`.
 
 **Si `appsScriptUrl === null`:** no hacer fetch, mostrar "Envío a Sheets no disponible".
 
-Payload:
+Payload — filas por zona (Sheets suma si necesita total):
 ```js
 {
   operario, area: almacen, fecha, timestamp,
-  productos: [{ cod, art, cantidad: totalQty, factorUsado, uni, zona, catalogado: true }],
+  productos: [
+    // una fila por (cod × zona) donde fue contado
+    { cod, art, cantidad: qty_zona, factorUsado, uni, zona: nombreZona, catalogado: true }
+  ],
   manuales: S.manuales
 }
 ```
+
+Si un mismo cod aparece en varias zonas → múltiples filas en Sheets, cada una con su zona y cantidad propia. El total lo calcula Sheets con SUMIF.
 
 ---
 
@@ -357,7 +379,7 @@ Payload:
 | `inv_device_id` | ID único del dispositivo |
 | `xtux_s_{ALMACEN}` | sesión completa (countsByZone, presChoiceByZone, manuales, …) |
 
-`xtux_t_{ALMACEN}` y `xtux_raw_{ALMACEN}` ya no se usan — la plantilla viene del Worker.
+`xtux_t_{ALMACEN}` y `xtux_raw_{ALMACEN}` ya no se usan — la plantilla (incluyendo `raw`) viene del Worker en cada sesión.
 
 ---
 
