@@ -376,10 +376,18 @@ async function handleInvGet(db, url) {
     const almacen = url.searchParams.get('almacen');
     if (!almacen) return json({ error: 'Falta almacen' }, 400);
     const row = await db.prepare(
-      'SELECT row_map, cantidad_col_idx, raw, updated_at FROM inv_plantillas WHERE almacen = ?'
+      'SELECT row_map, cantidad_col_idx, pres_map, raw, template_hash, updated_at FROM inv_plantillas WHERE almacen = ?'
     ).bind(almacen).first();
     if (!row) return json({ ok: true, found: false });
-    return json({ ok: true, found: true, rowMap: JSON.parse(row.row_map), cantidadColIdx: row.cantidad_col_idx, raw: row.raw, updatedAt: row.updated_at });
+    return json({
+      ok: true, found: true,
+      rowMap: JSON.parse(row.row_map),
+      cantidadColIdx: row.cantidad_col_idx,
+      presMap: row.pres_map ? JSON.parse(row.pres_map) : {},
+      raw: row.raw,
+      templateHash: row.template_hash || '',
+      updatedAt: row.updated_at
+    });
   }
 
   if (path === '/inv/sesion') {
@@ -387,10 +395,25 @@ async function handleInvGet(db, url) {
     const fecha   = url.searchParams.get('fecha');
     if (!almacen || !fecha) return json({ error: 'Falta almacen o fecha' }, 400);
     const row = await db.prepare(
-      'SELECT operario, fecha, counts, completed_zones, locked_zones, updated_at FROM inv_sesiones WHERE almacen = ? AND fecha = ?'
+      `SELECT operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
+              completed_zones, locked_zones, manuales, template_hash, updated_at
+       FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
     ).bind(almacen, fecha).first();
     if (!row) return json({ ok: true, found: false });
-    return json({ ok: true, found: true, operario: row.operario, fecha: row.fecha, counts: JSON.parse(row.counts), completedZones: JSON.parse(row.completed_zones), lockedZones: row.locked_zones ? JSON.parse(row.locked_zones) : {}, updatedAt: row.updated_at });
+    return json({
+      ok: true, found: true,
+      operario:         row.operario,
+      fecha:            row.fecha,
+      templateHash:     row.template_hash || '',
+      countsByZone:     JSON.parse(row.counts_by_zone || '{}'),
+      presChoiceByZone: JSON.parse(row.pres_choice_by_zone || '{}'),
+      completedZones:   JSON.parse(row.completed_zones || '[]'),
+      lockedZones:      JSON.parse(row.locked_zones || '{}'),
+      manuales:         JSON.parse(row.manuales || '[]'),
+      // legacy counts para barra.html
+      counts:           JSON.parse(row.counts || '{}'),
+      updatedAt:        row.updated_at
+    });
   }
 
   return json({ error: 'Ruta no encontrada' }, 404);
@@ -398,32 +421,86 @@ async function handleInvGet(db, url) {
 
 async function handleInvPost(db, body) {
   if (body.action === 'inv_plantilla') {
-    const { almacen, rowMap, cantidadColIdx, raw } = body;
+    const { almacen, rowMap, cantidadColIdx, presMap, raw, templateHash } = body;
     if (!almacen || !rowMap || cantidadColIdx == null) return json({ error: 'Datos incompletos' }, 400);
     await db.prepare(`
-      INSERT INTO inv_plantillas (almacen, row_map, cantidad_col_idx, raw, updated_at)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO inv_plantillas (almacen, row_map, cantidad_col_idx, pres_map, raw, template_hash, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(almacen) DO UPDATE SET
         row_map = excluded.row_map,
         cantidad_col_idx = excluded.cantidad_col_idx,
+        pres_map = excluded.pres_map,
         raw = excluded.raw,
+        template_hash = excluded.template_hash,
         updated_at = excluded.updated_at
-    `).bind(almacen, JSON.stringify(rowMap), cantidadColIdx, raw || '', new Date().toISOString()).run();
+    `).bind(almacen, JSON.stringify(rowMap), cantidadColIdx, JSON.stringify(presMap || {}), raw || '', templateHash || '', new Date().toISOString()).run();
     return json({ ok: true });
   }
 
   if (body.action === 'inv_sesion') {
-    const { almacen, operario, fecha, counts, completedZones } = body;
+    const { almacen, operario, fecha, countsByZone, presChoiceByZone, completedZones, manuales, templateHash,
+            counts } = body; // counts legacy para barra.html
     if (!almacen || !operario || !fecha) return json({ error: 'Datos incompletos' }, 400);
+
+    const existing = await db.prepare(
+      `SELECT counts, counts_by_zone, pres_choice_by_zone, completed_zones, manuales
+       FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
+    ).bind(almacen, fecha).first();
+
+    // Merge countsByZone por zona
+    const existingCBZ = JSON.parse(existing?.counts_by_zone || '{}');
+    const incomingCBZ = countsByZone || {};
+    const mergedCBZ = { ...existingCBZ };
+    for (const [zid, zc] of Object.entries(incomingCBZ)) {
+      mergedCBZ[zid] = { ...(mergedCBZ[zid] || {}), ...zc };
+    }
+
+    // Merge presChoiceByZone por zona
+    const existingPCBZ = JSON.parse(existing?.pres_choice_by_zone || '{}');
+    const incomingPCBZ = presChoiceByZone || {};
+    const mergedPCBZ = { ...existingPCBZ };
+    for (const [zid, zpc] of Object.entries(incomingPCBZ)) {
+      mergedPCBZ[zid] = { ...(mergedPCBZ[zid] || {}), ...zpc };
+    }
+
+    // Merge manuales por id
+    const existingManuales = JSON.parse(existing?.manuales || '[]');
+    const manMap = Object.fromEntries(existingManuales.map(m => [m.id, m]));
+    for (const m of (manuales || [])) if (m.id) manMap[m.id] = m;
+    const mergedManuales = Object.values(manMap);
+
+    // completedZones: union
+    const existingZones = JSON.parse(existing?.completed_zones || '[]');
+    const mergedZones = [...new Set([...existingZones, ...(completedZones || [])])];
+
+    // Legacy counts merge (para barra.html)
+    const existingCounts = JSON.parse(existing?.counts || '{}');
+    const mergedCounts = counts ? { ...existingCounts, ...counts } : existingCounts;
+
     await db.prepare(`
-      INSERT INTO inv_sesiones (almacen, operario, fecha, counts, completed_zones, locked_zones, updated_at)
-      VALUES (?, ?, ?, ?, ?, '{}', ?)
+      INSERT INTO inv_sesiones
+        (almacen, operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
+         completed_zones, locked_zones, manuales, template_hash, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?)
       ON CONFLICT(almacen, fecha) DO UPDATE SET
-        operario = excluded.operario,
-        counts = excluded.counts,
-        completed_zones = excluded.completed_zones,
-        updated_at = excluded.updated_at
-    `).bind(almacen, operario, fecha, JSON.stringify(counts || {}), JSON.stringify(completedZones || []), new Date().toISOString()).run();
+        operario           = excluded.operario,
+        counts             = excluded.counts,
+        counts_by_zone     = excluded.counts_by_zone,
+        pres_choice_by_zone = excluded.pres_choice_by_zone,
+        completed_zones    = excluded.completed_zones,
+        manuales           = excluded.manuales,
+        template_hash      = excluded.template_hash,
+        updated_at         = excluded.updated_at
+    `).bind(
+      almacen, operario, fecha,
+      JSON.stringify(mergedCounts),
+      JSON.stringify(mergedCBZ),
+      JSON.stringify(mergedPCBZ),
+      JSON.stringify(mergedZones),
+      JSON.stringify(mergedManuales),
+      templateHash || '',
+      new Date().toISOString()
+    ).run();
     return json({ ok: true });
   }
 
@@ -434,9 +511,16 @@ async function handleInvPost(db, body) {
       'SELECT locked_zones FROM inv_sesiones WHERE almacen = ? AND fecha = ?'
     ).bind(almacen, fecha).first();
     if (!row) return json({ ok: false, error: 'Sesión no encontrada' });
-    const locks = row.locked_zones ? JSON.parse(row.locked_zones) : {};
+    const locks = JSON.parse(row.locked_zones || '{}');
+
+    // Expirar locks viejos (> 30 min)
+    const now = Date.now();
+    for (const [zIdx, lock] of Object.entries(locks)) {
+      if (now - new Date(lock.ts).getTime() > 30 * 60 * 1000) delete locks[zIdx];
+    }
+
     if (release) {
-      if (locks[zone_idx] && locks[zone_idx].device_id === device_id) delete locks[zone_idx];
+      if (locks[zone_idx]?.device_id === device_id) delete locks[zone_idx];
     } else {
       if (locks[zone_idx] && locks[zone_idx].device_id !== device_id) {
         return json({ ok: false, locked_by: locks[zone_idx] });
