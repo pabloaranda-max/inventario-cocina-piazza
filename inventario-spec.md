@@ -10,6 +10,16 @@
 
 Problema resuelto: sync parcial por zona — cada dispositivo solo manda su zona activa, el Worker hace merge sin tocar las otras zonas.
 
+### Estado actual 2026-06-27
+
+- D1 `inv_sesiones`: migrado en producción con `counts_by_zone`, `pres_choice_by_zone`, `manuales` y `template_hash`.
+- Worker `inv_sesion` / `inv_lock`: deployado y probado contra producción con escenario multi-dispositivo 13/13.
+- Contrato crítico probado: una sync vacía (`countsByZone: {}`) no borra conteos existentes; cada zona entrante mergea sin tocar otras zonas.
+- `inventario.html` actual: versión funcional con importación local de plantilla; pendiente migrar a plantilla centralizada desde Worker.
+- `inv_plantillas`: pendiente crear en D1. Debe incluir `raw` base64 para poder regenerar el xlsx final.
+- `admin.html`: pendiente implementar sección de plantillas Xetux.
+- Prioridad antes de operar: completar plantillas centralizadas y corregir BUG-1 a BUG-5 de este documento.
+
 ---
 
 ## 2. Almacenes y zonas
@@ -452,6 +462,18 @@ const options = sorted.map(([key, cfg]) => {
 
 ## 15. Pendientes — nuevas funcionalidades
 
+### Orden recomendado para continuar
+
+1. Crear tabla `inv_plantillas` en D1 con columna `raw`.
+2. Implementar `GET /inv/plantilla?almacen=X` y `POST /inv/plantilla` en Worker.
+3. Deploy del Worker.
+4. Crear/actualizar `admin.html` con upload de plantilla Xetux por almacén.
+5. Subir plantilla de `BARRA_RESTAURANTE` desde `admin.html` y validar que `rowMap`, `presMap`, `raw` y `templateHash` quedan guardados.
+6. Migrar `inventario.html`: quitar importación local y consumir plantilla desde Worker.
+7. Corregir BUG-1 a BUG-5.
+8. Probar flujo completo de Barra: cargar plantilla, iniciar sesión, conteo por dos zonas/dispositivos, exportar xlsx, enviar Sheets.
+9. Repetir prueba con un almacén D1 replicado (`CAVA` o `SALUMERIA`) para validar `zonaNames`.
+
 ### Worker (operaciones-api)
 - [ ] Crear tabla `inv_plantillas` en D1
 - [ ] Endpoint `GET /inv/plantilla?almacen=X`
@@ -475,7 +497,7 @@ const options = sorted.map(([key, cfg]) => {
 
 ---
 
-## 15. Lo que NO hace esta app
+## 16. Lo que NO hace esta app
 
 - No carga a Xetux directamente — xlsx debe importarse manualmente
 - No autentica operarios (seguridad por URL no pública, WebAuthn pausado)
