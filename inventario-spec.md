@@ -383,7 +383,74 @@ Si un mismo cod aparece en varias zonas → múltiples filas en Sheets, cada una
 
 ---
 
-## 14. Pendientes
+## 14. Bugs conocidos — corregir antes de operar en producción
+
+Detectados en code review 2026-06-27.
+
+### BUG-1 — Race condition en selectArea() [CRÍTICO]
+
+`selectArea()` tiene 3 awaits (resolveZonas → fetchPlantilla → fetchSesion). Si el usuario presiona ← durante el vuelo, `go('welcome')` ejecuta `ALMACEN = null` síncronamente. Las llamadas pendientes continúan: `lsKey()` produce `xtux_s_null` y `renderAreaWelcome()` se ejecuta encima de la pantalla equivocada.
+
+**Fix:**
+```js
+async function selectArea(key) {
+  ALMACEN = key;
+  CFG = AREA_CONFIG[key];
+  const savedKey = key;                          // ← capturar al inicio
+  // ... awaits ...
+  if (ALMACEN !== savedKey) return;              // ← guard antes de cada lsSet
+  lsSet('s', S);
+  if (ALMACEN !== savedKey) return;              // ← guard antes de renderizar
+  renderAreaWelcome();
+}
+```
+
+### BUG-2 — renderAreaWelcome() apila pantallas [CRÍTICO]
+
+La rama `!T` desactiva todas las pantallas antes de mostrar welcome. La rama normal (T existe, línea ~527) solo hace `classList.add('active')` sin desactivar. `handleFile()` llama `setTimeout(renderAreaWelcome, 1200)` desde screen-import — si el parseo tiene éxito, screen-import y screen-welcome quedan activos simultáneamente (ambos `display:flex`).
+
+**Fix:** mover la deactivación al inicio de la función, antes de cualquier ramificación:
+```js
+function renderAreaWelcome() {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); // ← siempre
+  document.getElementById('screen-welcome').classList.add('active');
+  // ... resto de la lógica ...
+}
+```
+
+### BUG-3 — color-mix() sin fallback [CRÍTICO]
+
+`.card`, `.zone-card` y `.area-item` usan `background: color-mix(in srgb, var(--brand-paper) 94%, white)` como único valor. Android WebView <111 (Android 10–12) e iOS <16.2 no soportan `color-mix()` — tarjetas transparentes.
+
+**Fix:** añadir fallback antes de color-mix en cada regla:
+```css
+.card      { background: var(--brand-paper); background: color-mix(in srgb,var(--brand-paper) 94%,white); ... }
+.zone-card { background: var(--brand-paper); background: color-mix(in srgb,var(--brand-paper) 94%,white); ... }
+.area-item { background: var(--brand-paper); background: color-mix(in srgb,var(--brand-paper) 94%,white); ... }
+```
+
+### BUG-4 — backdrop-filter sin -webkit- en .search-bar y .fab-bar [MEDIA]
+
+`.welcome-hero` tiene `-webkit-backdrop-filter` y `backdrop-filter`. `.search-bar` y `.fab-bar` solo tienen el unprefixed. iOS Safari <15.4 no aplica blur.
+
+**Fix:** añadir `-webkit-backdrop-filter: blur(Xpx)` en ambas reglas CSS.
+
+### BUG-5 — BARRA_AMICI seleccionable sin advertencia [MEDIA]
+
+Aparece como `<option>` normal en el dropdown. El único check de `appsScriptUrl === null` está en `renderValidation()` (última pantalla del flujo). El operario puede completar todo el workflow antes de descubrir que Sheets no está disponible.
+
+**Fix:** deshabilitar la opción en el dropdown:
+```js
+const options = sorted.map(([key, cfg]) => {
+  const disabled = cfg.appsScriptUrl === null ? ' disabled' : '';
+  const label = cfg.appsScriptUrl === null ? `${cfg.titulo} (sin configurar)` : cfg.titulo;
+  return `<option value="${key}"${disabled}>${label}</option>`;
+}).join('');
+```
+
+---
+
+## 15. Pendientes — nuevas funcionalidades
 
 ### Worker (operaciones-api)
 - [ ] Crear tabla `inv_plantillas` en D1
@@ -401,6 +468,7 @@ Si un mismo cod aparece en varias zonas → múltiples filas en Sheets, cada una
 - [ ] Reemplazar lógica de importación local por `fetchPlantilla()` del Worker
 - [ ] Quitar pantalla `[import]` y referencias a `xtux_t_*` / `xtux_raw_*`
 - [ ] Mostrar aviso si T = null (plantilla no configurada)
+- [ ] Corregir bugs 1–5 listados arriba
 
 ### Pendientes menores
 - [ ] Apps Script URL de BARRA_AMICI (cuando haya catálogo en Xetux)
