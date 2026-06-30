@@ -374,16 +374,17 @@ async function selectArea(key) {
   ALMACEN = key;
   CFG     = AREA_CONFIG[key];
   const savedKey = key;
+  T = null;
   setColor(CFG.color);
   document.getElementById('inp-fecha').value = new Date().toISOString().slice(0,10);
 
   S = lsGet('s');
-  ZONAS = await resolveZonas();
-  if (ALMACEN !== savedKey) return;
-
   const ok = await fetchPlantillaWorker();
   if (ALMACEN !== savedKey) return;
   if (!ok) T = null;
+
+  ZONAS = await resolveZonas();
+  if (ALMACEN !== savedKey) return;
 
   if (!S) {
     const hoy = new Date().toISOString().slice(0,10);

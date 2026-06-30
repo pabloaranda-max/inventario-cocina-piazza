@@ -1,6 +1,6 @@
-# inventario.html — Especificación técnica v4
+# inventario.html — Especificación técnica v4.3
 
-> Última actualización: 2026-06-27.
+> Última actualización: 2026-06-30. Estado: **EN PRODUCCIÓN** (CAVA probado, resto pendiente de plantillas).
 
 ---
 
@@ -8,17 +8,31 @@
 
 `inventario.html` reemplaza 6 apps separadas (barra.html, cocina.html, alimentari.html, cava.html, salumeria.html, general.html). Los archivos originales se conservan como backup.
 
-Problema resuelto: sync parcial por zona — cada dispositivo solo manda su zona activa, el Worker hace merge sin tocar las otras zonas.
+### Estado actual 2026-06-30
 
-### Estado actual 2026-06-27
+**Implementado y deployado:**
+- BUG-1 a BUG-5 todos corregidos
+- Plantillas centralizadas: admin.html sube → Worker guarda → inventario.html descarga
+- `inv_plantillas` en D1: creado y en producción con todas las columnas (ver §8)
+- `parsePlantilla` adaptado al formato real de Xetux (ver §5)
+- `unitMap`: unidades de la plantilla sobreescriben el catálogo (fix units inconsistentes Xetux)
+- `defaultPres`: presentaciones por defecto por unidad (para artículos sin `_NNNN` en Xetux)
+- Catálogo filtrado por rowMap: solo aparecen artículos en la plantilla activa
+- Catálogos en D1: BARRA(423), COCINA(1106), ALIMENTARI(424), CAVA(214), GENERAL(385), SALUMERIA(74)
+- sync_d1.py: sincroniza catálogos Xetux → D1 permanentemente (POST /sync/catalogo con X-Sync-Token)
 
-- D1 `inv_sesiones`: migrado en producción con `counts_by_zone`, `pres_choice_by_zone`, `manuales` y `template_hash`.
-- Worker `inv_sesion` / `inv_lock`: deployado y probado contra producción con escenario multi-dispositivo 13/13.
-- Contrato crítico probado: una sync vacía (`countsByZone: {}`) no borra conteos existentes; cada zona entrante mergea sin tocar otras zonas.
-- `inventario.html` actual: versión funcional con importación local de plantilla; pendiente migrar a plantilla centralizada desde Worker.
-- `inv_plantillas`: pendiente crear en D1. Debe incluir `raw` base64 para poder regenerar el xlsx final.
-- `admin.html`: pendiente implementar sección de plantillas Xetux.
-- Prioridad antes de operar: completar plantillas centralizadas y corregir BUG-1 a BUG-5 de este documento.
+**CAVA probado:**
+- Plantilla: 146 artículos, 131 con presentaciones de Xetux
+- unitMap corrige unidades (B.750 → LT para vinos)
+- defaultPres configurable desde admin.html (ej: LT → BOTELLA 0.75)
+- Artículos sin presentaciones en Xetux reciben defaultPres según su unidad
+
+**Pendiente:**
+- Subir plantillas de COCINA, BARRA, ALIMENTARI, GENERAL, SALUMERIA desde admin.html
+- Configurar defaultPres para cada almacén que lo necesite
+- Corregir unidades del catálogo (gradual — unitMap ya resuelve en el contador)
+- BARRA_AMICI: appsScriptUrl aún null (sin catálogo en Xetux)
+- CSS muerto sin limpiar (ver §12)
 
 ---
 
@@ -36,6 +50,8 @@ Problema resuelto: sync parcial por zona — cada dispositivo solo manda su zona
 
 **Zonas con `zonaNames`:** el catálogo D1 se replica en N zonas idénticas. El operario de cada zona ve los mismos ítems; los conteos son independientes por zona y se suman al exportar.
 
+**Filtro por rowMap:** `resolveZonas()` filtra los artículos del catálogo por `T.rowMap` — solo muestra los que están en la plantilla activa de Xetux. Si no hay plantilla (T=null), muestra todo.
+
 ---
 
 ## 3. Arquitectura
@@ -47,17 +63,17 @@ Problema resuelto: sync parcial por zona — cada dispositivo solo manda su zona
        inv_device_id       → ID único del dispositivo
 
   └─ Cloudflare Worker: operaciones-api.pablo-aranda.workers.dev
-       GET  /articulos?almacen=X            ← catálogo D1
-       GET  /inv/plantilla?almacen=X        ← plantilla Xetux (PENDIENTE)
-       POST /inv/plantilla                  ← solo desde admin.html (PENDIENTE)
+       GET  /articulos?almacen=X            ← catálogo D1 (público)
+       GET  /inv/plantilla?almacen=X        ← plantilla Xetux (público)
+       POST /inv/plantilla (action: inv_plantilla)   ← solo desde admin.html
+       POST /inv/plantilla (action: inv_defaults)    ← solo desde admin.html
        GET  /inv/sesion?almacen=X&fecha=Y
        POST /inv/sesion  (inv_sesion | inv_lock)
+       POST /sync/catalogo  ← sync_d1.py con X-Sync-Token
 
-  └─ [admin.html] → POST /inv/plantilla    ← upload de plantilla por almacén
+  └─ [admin.html] → gestiona plantillas por almacén
   └─ Google Apps Script (por almacén) → Sheets
 ```
-
-**Decisión de plantilla:** la plantilla Xetux se gestiona desde `admin.html`, no desde `inventario.html`. Al seleccionar un almacén, `inventario.html` la descarga del Worker automáticamente. No hay pantalla de importación para operarios.
 
 ---
 
@@ -92,8 +108,6 @@ const AREA_CONFIG = {
 };
 ```
 
-**`appsScriptUrl: null`:** ocultar botón "Enviar a Sheets", no hacer fetch silencioso.
-
 ---
 
 ## 5. Gestión de plantilla Xetux
@@ -101,35 +115,38 @@ const AREA_CONFIG = {
 ### Responsabilidad
 
 - **admin.html** sube la plantilla por almacén (POST /inv/plantilla)
+- **admin.html** gestiona `defaultPres` por almacén (POST /inv/plantilla action: inv_defaults)
 - **inventario.html** la descarga automáticamente al seleccionar almacén (GET /inv/plantilla)
 - No hay pantalla de importación en inventario.html
 
-### Flujo en inventario.html al seleccionar almacén
+### Flujo crítico en inventario.html al seleccionar almacén
 
 ```
 selectArea(key)
-  → resolveZonas()      ← GET /articulos?almacen=X
+  → T = null
   → fetchPlantilla()    ← GET /inv/plantilla?almacen=X
-       si 404/vacía → T = null, continuar sin plantilla
-       si ok → parsear respuesta → T = { rowMap, cantidadColIdx, presMap, templateHash, templateTs }
+       si 404/vacía → T = null
+       si ok → T = { rowMap, cantidadColIdx, presMap, unitMap, defaultPres, templateHash, raw }
+  → resolveZonas()      ← GET /articulos?almacen=X y filtra con T.rowMap
   → si sesión activa en Worker → cargarla y mostrar overview
   → si no → mostrar pantalla de nueva sesión
 ```
 
-Si T = null: ocultar botón "Generar Excel para Xetux", mostrar aviso "Plantilla no configurada — contacta al administrador".
+**Importante:** `fetchPlantilla()` debe correr antes de `resolveZonas()`. Si se resuelven zonas primero, la app no puede aplicar `rowMap`, `unitMap` ni `defaultPres`; peor aún, podría reutilizar una `T` previa de otro almacén.
 
-### Formato del archivo (con presentaciones activadas)
+### Formato real del archivo Xetux (con "Incluir presentaciones" activado)
 
 ```
-Col:  0    1        2          3              4       5       6
-      #    Código   Producto   Presentación   Unidad  Factor  Cantidad
-      1    MP0001   ACEITE     —              LT      —       0
-           —        —          BOTELLA        —       0.75    —
-           —        —          LITRO          —       1.0     —
+Col:  0    1       2        3           4        5           6        7
+      #    Tipo    Grupo    Subgrupo    Código   Artículo    Unidad   Cantidad
+      1    3-VINO  3-1 VINO VINO        MP0553   MONTEPULCI  LT       ''
+      1    3-VINO  3-1 VINO ''          MP0553_1160  ---- (P) BOTELLA (0.75 LT)  BOTELLA  ''
 ```
 
-- Fila producto: col 0 con `#`, col 1 código, col 2 nombre, col 4 unidad
-- Fila presentación: col 0 vacío, col 3 nombre presentación, col 5 factor
+- Fila artículo: `#` = número, `Subgrupo` = texto, `Código` sin `_NNNN`
+- Fila presentación: mismo `#`, `Subgrupo` vacío, `Código` = `PARENTCODE_NNNN`, `Artículo` = `---- (P) NOMBRE (FACTOR UNIDAD)`
+- **Factor** se extrae del nombre del artículo: regex `\((\d+\.?\d*)\s+\w+\)\s*$` sobre el campo Artículo
+- **cantidadColIdx = 7** (columna Cantidad está en índice 7, no 6 como se asumió antes)
 
 ### Reglas de extracción (presMap)
 
@@ -140,6 +157,33 @@ R3: factor > 1  AND uni == PZA → válido (caja, paquete, bulto)
 R4: mismo factor, distintos nombres → deduplicar por valor
 R5: múltiples factores válidos → conservar todos → selector en UI
 ```
+
+### unitMap — unidades de la plantilla (fuente de verdad)
+
+```js
+// parsePlantilla retorna unitMap: { cod: unidad }
+// inventario.html lo usa para override del catálogo:
+uni: (T?.unitMap?.[a.codigo]) || a.unidad
+```
+
+Razón: Xetux puede tener unidades incorrectas en el catálogo (ej: CAVA vinos con "B.750" en lugar de "LT"). La plantilla tiene la unidad correcta siempre.
+
+### defaultPres — presentaciones por defecto
+
+```js
+// Formato en D1: { "LT": [{ "nombre": "BOTELLA", "factor": 0.75 }] }
+// Se aplica cuando presMap[cod] está vacío y unitMap[cod] coincide con una clave
+function getPresOptions(cod) {
+  const explicit = T?.presMap?.[cod];
+  if (explicit?.length) return explicit;
+  const uni = T?.unitMap?.[cod] || '';
+  return (T?.defaultPres?.[uni]) || [];
+}
+```
+
+Se guarda con `action: inv_defaults` — **sobrevive re-uploads de plantilla** (columna separada en D1).
+
+Admin configura defaults desde admin.html → sección "Presentaciones por defecto" en tab Plantillas.
 
 ### Versionado
 
@@ -175,12 +219,12 @@ S = {
   completedZones: [0, 2],
   manuales: [
     {
-      id:        'dev_xyz-abc123-r4nd',  // deviceId-ts36-random
+      id:        'dev_xyz-abc123-r4nd',
       nombre:    'Salsa de la casa',
       cantidad:  2,
       uni:       'LT',
       zona:      'Contra Barra',
-      foto:      'data:image/jpeg;base64,...',  // canvas max 800px JPEG75
+      foto:      'data:image/jpeg;base64,...',
       deviceId:  'dev_xyz',
       createdAt: '2026-06-26T20:00:00Z'
     }
@@ -200,24 +244,39 @@ Response si existe:
 ```json
 { "ok": true, "found": true,
   "rowMap": { "MP0001": 17, "XMAT001": 42 },
-  "cantidadColIdx": 6,
-  "presMap": {}, "templateHash": "sha256hex...", "templateTs": 1719360000000,
-  "raw": "base64..." }
+  "cantidadColIdx": 7,
+  "presMap": { "MP0001": [{"nombre":"BOTELLA","factor":0.75}] },
+  "unitMap": { "MP0001": "LT" },
+  "defaultPres": { "LT": [{"nombre":"BOTELLA","factor":0.75}] },
+  "templateHash": "sha256hex...",
+  "raw": "base64...",
+  "updatedAt": "2026-06-30T02:41:32.075Z" }
 ```
 Response si no: `{ "ok": true, "found": false }`
 
-### POST /inv/plantilla
+### POST /inv/plantilla (action: inv_plantilla)
 
-Desde admin.html únicamente.
+Desde admin.html únicamente. Sin auth requerida.
 
-Request:
 ```json
 { "action": "inv_plantilla", "almacen": "CAVA",
-  "rowMap": { "MP0001": 17 }, "cantidadColIdx": 6,
-  "presMap": {}, "templateHash": "sha256hex...", "templateTs": 1719360000000,
+  "rowMap": { "MP0001": 17 }, "cantidadColIdx": 7,
+  "presMap": { "MP0001": [{"nombre":"BOTELLA","factor":0.75}] },
+  "unitMap": { "MP0001": "LT" },
+  "templateHash": "sha256hex...",
   "raw": "base64..." }
 ```
-Response: `{ "ok": true }`
+
+### POST /inv/plantilla (action: inv_defaults)
+
+Desde admin.html únicamente. No modifica row_map ni raw — solo actualiza default_pres.
+
+```json
+{ "action": "inv_defaults", "almacen": "CAVA",
+  "defaultPres": { "LT": [{"nombre":"BOTELLA","factor":0.75}] } }
+```
+
+Response: `{ "ok": true }`. Error 404 si no existe plantilla para ese almacén (subir primero).
 
 ### GET /inv/sesion?almacen=X&fecha=Y
 
@@ -255,9 +314,7 @@ const mergedCBZ = { ...existingCBZ };
 for (const [zid, zc] of Object.entries(incomingCBZ)) {
   mergedCBZ[zid] = { ...(mergedCBZ[zid] || {}), ...zc };
 }
-// presChoiceByZone — igual
-// manuales — merge por id (incoming gana)
-// completedZones — union
+// {} entrante = "sin cambios" (no borra)
 ```
 
 ### POST /inv/sesion (action: inv_lock)
@@ -269,38 +326,42 @@ for (const [zid, zc] of Object.entries(incomingCBZ)) {
 
 Lock TTL: 30 minutos. Al inicio de cualquier operación de lock, expirar locks viejos.
 
-Response exitoso: `{ "ok": true, "locks": { ... } }`
-Response denegado: `{ "ok": false, "locked_by": { "operario": "Ana", "ts": "..." } }`
-
 ---
 
 ## 8. Esquema D1
 
-### inv_sesiones (existente + migraciones aplicadas)
-
-```sql
--- columna legacy (barra.html la sigue usando)
-counts TEXT DEFAULT '{}'
-
--- columnas nuevas (ya aplicadas en producción)
-ALTER TABLE inv_sesiones ADD COLUMN counts_by_zone      TEXT DEFAULT '{}';
-ALTER TABLE inv_sesiones ADD COLUMN pres_choice_by_zone TEXT DEFAULT '{}';
-ALTER TABLE inv_sesiones ADD COLUMN manuales            TEXT DEFAULT '[]';
-ALTER TABLE inv_sesiones ADD COLUMN template_hash       TEXT DEFAULT '';
-```
-
-### inv_plantillas (nueva — PENDIENTE)
+### inv_plantillas (en producción)
 
 ```sql
 CREATE TABLE IF NOT EXISTS inv_plantillas (
-  almacen        TEXT PRIMARY KEY,
-  template_hash  TEXT NOT NULL DEFAULT '',
-  template_ts    INTEGER NOT NULL DEFAULT 0,
-  row_map        TEXT NOT NULL DEFAULT '{}',
-  cantidad_col   INTEGER NOT NULL DEFAULT 6,
-  pres_map       TEXT NOT NULL DEFAULT '{}',
-  raw            TEXT NOT NULL DEFAULT '',   -- base64 del .xlsx original
-  updated_at     TEXT NOT NULL DEFAULT ''
+  almacen          TEXT PRIMARY KEY,
+  row_map          TEXT NOT NULL DEFAULT '{}',   -- {cod: rowIndex}
+  cantidad_col_idx INTEGER NOT NULL DEFAULT 7,   -- índice de col Cantidad (7 en Xetux real)
+  pres_map         TEXT NOT NULL DEFAULT '{}',   -- {cod: [{nombre, factor}]}
+  unit_map         TEXT NOT NULL DEFAULT '{}',   -- {cod: unidad} — override del catálogo
+  default_pres     TEXT NOT NULL DEFAULT '{}',   -- {unidad: [{nombre, factor}]} — fallback
+  raw              TEXT NOT NULL DEFAULT '',      -- XLSX original en base64
+  template_hash    TEXT NOT NULL DEFAULT '',
+  updated_at       TEXT NOT NULL DEFAULT ''
+);
+```
+
+### inv_sesiones (en producción)
+
+```sql
+CREATE TABLE IF NOT EXISTS inv_sesiones (
+  almacen              TEXT NOT NULL,
+  fecha                TEXT NOT NULL,
+  operario             TEXT NOT NULL,
+  counts               TEXT NOT NULL DEFAULT '{}',   -- legacy (barra.html)
+  counts_by_zone       TEXT NOT NULL DEFAULT '{}',
+  pres_choice_by_zone  TEXT NOT NULL DEFAULT '{}',
+  completed_zones      TEXT NOT NULL DEFAULT '[]',
+  locked_zones         TEXT NOT NULL DEFAULT '{}',
+  manuales             TEXT NOT NULL DEFAULT '[]',
+  template_hash        TEXT NOT NULL DEFAULT '',
+  updated_at           TEXT NOT NULL,
+  PRIMARY KEY (almacen, fecha)
 );
 ```
 
@@ -308,20 +369,17 @@ CREATE TABLE IF NOT EXISTS inv_plantillas (
 
 ## 9. Generación del Excel
 
-**rowMap:** `{ cod: rowIdx }` — número entero = índice de fila en el xlsx.
-
 ```js
 for (const cod of Object.keys(T.rowMap)) {
   let totalQty = 0;
   let contado  = false;
   for (const [zoneId, zoneCounts] of Object.entries(S.countsByZone)) {
-    if (zoneCounts[cod] === undefined) continue;   // ← !== undefined, no falsy
+    if (zoneCounts[cod] === undefined) continue;
     const factor = S.presChoiceByZone?.[zoneId]?.[cod]
                 ?? T.presMap?.[cod]?.[0]?.factor ?? 1;
     totalQty += zoneCounts[cod] * factor;
     contado = true;
   }
-  // Escribir si fue contado explícitamente — cero es dato real ("confirmé que hay 0")
   if (contado) escribirCelda(T.rowMap[cod], T.cantidadColIdx, totalQty);
 }
 ```
@@ -336,169 +394,34 @@ El xlsx se regenera desde `T.raw` (base64): se parsea, se sobreescriben las celd
 
 POST a `appsScriptUrl` con `mode: 'no-cors'`.
 
-**Si `appsScriptUrl === null`:** no hacer fetch, mostrar "Envío a Sheets no disponible".
+Si `appsScriptUrl === null` → no hacer fetch, mostrar "Envío a Sheets no disponible".
 
-Payload — filas por zona (Sheets suma si necesita total):
+Payload — filas por zona:
 ```js
 {
   operario, area: almacen, fecha, timestamp,
   productos: [
-    // una fila por (cod × zona) donde fue contado
     { cod, art, cantidad: qty_zona, factorUsado, uni, zona: nombreZona, catalogado: true }
   ],
   manuales: S.manuales
 }
 ```
 
-Si un mismo cod aparece en varias zonas → múltiples filas en Sheets, cada una con su zona y cantidad propia. El total lo calcula Sheets con SUMIF.
-
 ---
 
 ## 11. Ítems no catalogados (manuales)
 
 - Modal: nombre*, cantidad*, unidad, foto (cámara `capture="environment"`)
-- Foto: canvas compress max 800px JPEG 75%
-- Se sincronizan al Worker con merge por id
-- En pantalla de validación: botón Compartir (Web Share API, fallback clipboard)
+- ID: `${deviceId}-${Date.now().toString(36)}-${random4}`
+- Merge en Worker: por id (incoming gana)
+- Foto: canvas max 800px, JPEG 75%
+- No se escriben al xlsx. Aparecen en resumen de validación y en payload Sheets.
 
 ---
 
-## 12. Pantallas
+## 12. CSS muerto (pendiente limpiar)
 
-```
-[welcome]   → logo + dropdown almacenes (alfabético, sin colores)
-[session]   → nombre operario + fecha  (plantilla se carga automáticamente del Worker)
-[overview]  → zonas con progreso y locks, clic para entrar
-[count]     → ítems + búsqueda + qty + badge conversión + selector presentación
-               + botón "+ No catalogado"
-[generate]  → validación + descarga xlsx + envío Sheets + compartir manuales
-```
-
-**Sin pantalla de importación para operarios.** La plantilla viene del Worker o no está disponible.
-
-**Búsqueda:** zona actual → otras zonas (header amarillo) → fuera de zona en plantilla (header verde).
-**Badge de conversión:** solo si `factor != 1`.
-**Selector presentación:** solo si `presMap[cod].length > 1`.
-
----
-
-## 13. localStorage keys
-
-| Clave | Contenido |
-|---|---|
-| `inv_device_id` | ID único del dispositivo |
-| `xtux_s_{ALMACEN}` | sesión completa (countsByZone, presChoiceByZone, manuales, …) |
-
-`xtux_t_{ALMACEN}` y `xtux_raw_{ALMACEN}` ya no se usan — la plantilla (incluyendo `raw`) viene del Worker en cada sesión.
-
----
-
-## 14. Bugs conocidos — corregir antes de operar en producción
-
-Detectados en code review 2026-06-27.
-
-### BUG-1 — Race condition en selectArea() [CRÍTICO]
-
-`selectArea()` tiene 3 awaits (resolveZonas → fetchPlantilla → fetchSesion). Si el usuario presiona ← durante el vuelo, `go('welcome')` ejecuta `ALMACEN = null` síncronamente. Las llamadas pendientes continúan: `lsKey()` produce `xtux_s_null` y `renderAreaWelcome()` se ejecuta encima de la pantalla equivocada.
-
-**Fix:**
-```js
-async function selectArea(key) {
-  ALMACEN = key;
-  CFG = AREA_CONFIG[key];
-  const savedKey = key;                          // ← capturar al inicio
-  // ... awaits ...
-  if (ALMACEN !== savedKey) return;              // ← guard antes de cada lsSet
-  lsSet('s', S);
-  if (ALMACEN !== savedKey) return;              // ← guard antes de renderizar
-  renderAreaWelcome();
-}
-```
-
-### BUG-2 — renderAreaWelcome() apila pantallas [CRÍTICO]
-
-La rama `!T` desactiva todas las pantallas antes de mostrar welcome. La rama normal (T existe, línea ~527) solo hace `classList.add('active')` sin desactivar. `handleFile()` llama `setTimeout(renderAreaWelcome, 1200)` desde screen-import — si el parseo tiene éxito, screen-import y screen-welcome quedan activos simultáneamente (ambos `display:flex`).
-
-**Fix:** mover la deactivación al inicio de la función, antes de cualquier ramificación:
-```js
-function renderAreaWelcome() {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); // ← siempre
-  document.getElementById('screen-welcome').classList.add('active');
-  // ... resto de la lógica ...
-}
-```
-
-### BUG-3 — color-mix() sin fallback [CRÍTICO]
-
-`.card`, `.zone-card` y `.area-item` usan `background: color-mix(in srgb, var(--brand-paper) 94%, white)` como único valor. Android WebView <111 (Android 10–12) e iOS <16.2 no soportan `color-mix()` — tarjetas transparentes.
-
-**Fix:** añadir fallback antes de color-mix en cada regla:
-```css
-.card      { background: var(--brand-paper); background: color-mix(in srgb,var(--brand-paper) 94%,white); ... }
-.zone-card { background: var(--brand-paper); background: color-mix(in srgb,var(--brand-paper) 94%,white); ... }
-.area-item { background: var(--brand-paper); background: color-mix(in srgb,var(--brand-paper) 94%,white); ... }
-```
-
-### BUG-4 — backdrop-filter sin -webkit- en .search-bar y .fab-bar [MEDIA]
-
-`.welcome-hero` tiene `-webkit-backdrop-filter` y `backdrop-filter`. `.search-bar` y `.fab-bar` solo tienen el unprefixed. iOS Safari <15.4 no aplica blur.
-
-**Fix:** añadir `-webkit-backdrop-filter: blur(Xpx)` en ambas reglas CSS.
-
-### BUG-5 — BARRA_AMICI seleccionable sin advertencia [MEDIA]
-
-Aparece como `<option>` normal en el dropdown. El único check de `appsScriptUrl === null` está en `renderValidation()` (última pantalla del flujo). El operario puede completar todo el workflow antes de descubrir que Sheets no está disponible.
-
-**Fix:** deshabilitar la opción en el dropdown:
-```js
-const options = sorted.map(([key, cfg]) => {
-  const disabled = cfg.appsScriptUrl === null ? ' disabled' : '';
-  const label = cfg.appsScriptUrl === null ? `${cfg.titulo} (sin configurar)` : cfg.titulo;
-  return `<option value="${key}"${disabled}>${label}</option>`;
-}).join('');
-```
-
----
-
-## 15. Pendientes — nuevas funcionalidades
-
-### Orden recomendado para continuar
-
-1. Crear tabla `inv_plantillas` en D1 con columna `raw`.
-2. Implementar `GET /inv/plantilla?almacen=X` y `POST /inv/plantilla` en Worker.
-3. Deploy del Worker.
-4. Crear/actualizar `admin.html` con upload de plantilla Xetux por almacén.
-5. Subir plantilla de `BARRA_RESTAURANTE` desde `admin.html` y validar que `rowMap`, `presMap`, `raw` y `templateHash` quedan guardados.
-6. Migrar `inventario.html`: quitar importación local y consumir plantilla desde Worker.
-7. Corregir BUG-1 a BUG-5.
-8. Probar flujo completo de Barra: cargar plantilla, iniciar sesión, conteo por dos zonas/dispositivos, exportar xlsx, enviar Sheets.
-9. Repetir prueba con un almacén D1 replicado (`CAVA` o `SALUMERIA`) para validar `zonaNames`.
-
-### Worker (operaciones-api)
-- [ ] Crear tabla `inv_plantillas` en D1
-- [ ] Endpoint `GET /inv/plantilla?almacen=X`
-- [ ] Endpoint `POST /inv/plantilla` (upsert en inv_plantillas)
-- [ ] Deploy
-
-### admin.html
-- [ ] Sección "Plantillas Xetux": upload .xlsx por almacén
-  - Parsear .xlsx en cliente (misma lógica que inventario.html tenía)
-  - POST /inv/plantilla al Worker
-  - Mostrar: almacén, fecha de última actualización, hash
-
-### inventario.html
-- [ ] Reemplazar lógica de importación local por `fetchPlantilla()` del Worker
-- [ ] Quitar pantalla `[import]` y referencias a `xtux_t_*` / `xtux_raw_*`
-- [ ] Mostrar aviso si T = null (plantilla no configurada)
-- [ ] Corregir bugs 1–5 listados arriba
-
-### Pendientes menores
-- [ ] Apps Script URL de BARRA_AMICI (cuando haya catálogo en Xetux)
-
----
-
-## 16. Lo que NO hace esta app
-
-- No carga a Xetux directamente — xlsx debe importarse manualmente
-- No autentica operarios (seguridad por URL no pública, WebAuthn pausado)
-- No sincroniza catálogo — tarea del scraper (`sync_d1.py`)
+`.area-list`, `.area-item`, `.area-item-badge`, `.area-item-info`, `.area-item-name`, `.area-item-sub`, `.area-item-arrow` — del viejo selector en lista.
+`.welcome-logo`, `.welcome-sub-title` — del viejo hero oscuro.
+`.welcome-logo-text {}` — regla vacía.
+`.welcome-hero p { display:none }` — objetivo ya es `<div>`.
