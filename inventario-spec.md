@@ -419,7 +419,50 @@ Payload — filas por zona:
 
 ---
 
-## 12. CSS muerto (pendiente limpiar)
+## 12. Principios de mantenimiento
+
+> **El spec informa; el test grita.** Toda regla crítica documentada debe tener al menos un fixture ejecutable cuando un bug pueda afectar operación.
+
+No se añade testing por ceremonia — se pone alarma donde ya hubo falla real.
+
+### Plan de estabilización
+
+**Fase 1 — Fixture ejecutable del parser (hacer ya, antes de tocar más código de parser):**
+- `tests/fixtures/cava-synthetic.xlsx` — 10-15 filas representativas, sin datos reales de producción
+  - artículo LT + presentación BOTELLA 0.75 (caso base)
+  - artículo KG + presentación válida
+  - artículo PZA + factor 12 (caja — R3 válido)
+  - artículo con factor 1.0 → debe ignorarse (R1)
+  - artículo LT con factor 1000 → debe ignorarse (R2: mL/g)
+  - artículo con dos presentaciones válidas (selector en UI)
+  - artículo sin presentación (cae a defaultPres)
+- `tests/test-parser.html` — carga SheetJS + `js/plantilla-parser.js`, asserts inline
+  - `cantidadColIdx === 7`
+  - `rowMap[cod]` existe para cada artículo base
+  - `unitMap[cod] === 'LT'` para artículos con unidad LT en la plantilla
+  - `presMap[cod]` contiene BOTELLA 0.75 donde aplica
+  - artículos con R1/R2 no aparecen en presMap
+
+Nota sobre unitMap: `parsePlantilla` captura la unidad tal como aparece en la plantilla Xetux. El override real ocurre en `resolveZonas()`: si el catálogo D1 dice `B.750` pero `unitMap[cod]` dice `LT`, el ítem muestra `LT`. Eso es un test de integración posterior, no del parser.
+
+**Fase 2 — Alertas Slack en sync_d1.py:**
+- Postear a Slack si `articulos_sync == 0` para cualquier almacén
+- Postear si la cuenta baja >80% vs la corrida anterior (baseline guardado en archivo local)
+- Postear si hay error de login/scrape en Xetux
+- Postear si `/sync/catalogo` responde con error
+- Resumen normal solo en modo `--verbose` o en el reporte semanal — no generar ruido en cada corrida exitosa
+
+**Fase 3 — Módulos puros (sin bundler, type="module"):**
+- `js/plantilla-parser.js` — `parsePlantilla(buffer)`, `hashRaw(raw)`, helpers internos
+- `js/sesion-merge.js` — merge de countsByZone, presChoiceByZone, manuales, completedZones; cálculo de totales. **Sin imports DOM/browser** — puede correr en Worker y browser con el mismo archivo.
+
+**Fase 4 — Tests adicionales solo donde duela:**
+- Payload Sheets (cálculo de totales por zona con factores)
+- Merge Worker (sesion-merge.js cubre ambos lados)
+
+---
+
+## 13. CSS muerto (pendiente limpiar)
 
 `.area-list`, `.area-item`, `.area-item-badge`, `.area-item-info`, `.area-item-name`, `.area-item-sub`, `.area-item-arrow` — del viejo selector en lista.
 `.welcome-logo`, `.welcome-sub-title` — del viejo hero oscuro.
