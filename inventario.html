@@ -287,7 +287,7 @@ async function fetchPlantillaWorker() {
     if (!r.ok) return false;
     const d = await r.json();
     if (!d.ok || !d.found) return false;
-    T = { rowMap: d.rowMap, cantidadColIdx: d.cantidadColIdx, presMap: d.presMap || {}, unitMap: d.unitMap || {}, templateHash: d.templateHash || '', templateTs: Date.now(), raw: d.raw || null };
+    T = { rowMap: d.rowMap, cantidadColIdx: d.cantidadColIdx, presMap: d.presMap || {}, unitMap: d.unitMap || {}, defaultPres: d.defaultPres || {}, templateHash: d.templateHash || '', templateTs: Date.now(), raw: d.raw || null };
     return true;
   } catch(e) { console.warn('plantilla fetch:', e); return false; }
 }
@@ -534,7 +534,10 @@ function getQtyForZone(zid, cod) {
 }
 
 function getPresOptions(cod) {
-  return (T?.presMap?.[cod]) || [];
+  const explicit = T?.presMap?.[cod];
+  if (explicit?.length) return explicit;
+  const uni = T?.unitMap?.[cod] || '';
+  return (T?.defaultPres?.[uni]) || [];
 }
 
 function getPresChoice(zid, cod) {

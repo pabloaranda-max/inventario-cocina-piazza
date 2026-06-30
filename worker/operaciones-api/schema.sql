@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS inv_plantillas (
   cantidad_col_idx INTEGER NOT NULL DEFAULT 6,
   pres_map         TEXT NOT NULL DEFAULT '{}',   -- JSON: {cod: [{nombre, factor}]}
   unit_map         TEXT NOT NULL DEFAULT '{}',   -- JSON: {cod: unidad} — fuente de verdad, override del catálogo
+  default_pres     TEXT NOT NULL DEFAULT '{}',   -- JSON: {unidad: [{nombre, factor}]} — para artículos sin pres en Xetux
   raw              TEXT NOT NULL DEFAULT '',      -- XLSX original en base64
   template_hash    TEXT NOT NULL DEFAULT '',
   updated_at       TEXT NOT NULL DEFAULT ''

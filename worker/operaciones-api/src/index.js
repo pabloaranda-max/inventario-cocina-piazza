@@ -376,7 +376,7 @@ async function handleInvGet(db, url) {
     const almacen = url.searchParams.get('almacen');
     if (!almacen) return json({ error: 'Falta almacen' }, 400);
     const row = await db.prepare(
-      'SELECT row_map, cantidad_col_idx, pres_map, unit_map, raw, template_hash, updated_at FROM inv_plantillas WHERE almacen = ?'
+      'SELECT row_map, cantidad_col_idx, pres_map, unit_map, default_pres, raw, template_hash, updated_at FROM inv_plantillas WHERE almacen = ?'
     ).bind(almacen).first();
     if (!row) return json({ ok: true, found: false });
     return json({
@@ -385,6 +385,7 @@ async function handleInvGet(db, url) {
       cantidadColIdx: row.cantidad_col_idx,
       presMap: row.pres_map ? JSON.parse(row.pres_map) : {},
       unitMap: row.unit_map ? JSON.parse(row.unit_map) : {},
+      defaultPres: row.default_pres ? JSON.parse(row.default_pres) : {},
       raw: row.raw,
       templateHash: row.template_hash || '',
       updatedAt: row.updated_at
@@ -436,6 +437,16 @@ async function handleInvPost(db, body) {
         template_hash = excluded.template_hash,
         updated_at = excluded.updated_at
     `).bind(almacen, JSON.stringify(rowMap), cantidadColIdx, JSON.stringify(presMap || {}), JSON.stringify(unitMap || {}), raw || '', templateHash || '', new Date().toISOString()).run();
+    return json({ ok: true });
+  }
+
+  if (body.action === 'inv_defaults') {
+    const { almacen, defaultPres } = body;
+    if (!almacen || !defaultPres) return json({ error: 'Datos incompletos' }, 400);
+    const exists = await db.prepare('SELECT almacen FROM inv_plantillas WHERE almacen = ?').bind(almacen).first();
+    if (!exists) return json({ error: 'Sube la plantilla primero' }, 404);
+    await db.prepare('UPDATE inv_plantillas SET default_pres = ? WHERE almacen = ?')
+      .bind(JSON.stringify(defaultPres), almacen).run();
     return json({ ok: true });
   }
 

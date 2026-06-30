@@ -192,6 +192,24 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
       </div>
       <div id="plt-msg" style="margin-top:10px;font-size:13px;font-weight:600"></div>
     </div>
+    <div id="plt-defaults-section" style="display:none;margin-top:20px;border-top:1px solid #e5e7eb;padding-top:16px">
+      <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:4px">Presentaciones por defecto</div>
+      <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Se aplican a artículos sin presentaciones en Xetux, según su unidad.</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:10px">
+        <thead><tr style="color:#9ca3af;font-size:11px;text-align:left">
+          <th style="padding:3px 6px;font-weight:600">Unidad</th>
+          <th style="padding:3px 6px;font-weight:600">Nombre presentación</th>
+          <th style="padding:3px 6px;font-weight:600;text-align:right">Factor</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="plt-defs-body"></tbody>
+      </table>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="addDefaultRow()" style="font-size:12px;padding:5px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;color:#374151">+ Agregar fila</button>
+        <button onclick="saveDefaults()" style="font-size:12px;padding:5px 12px;border:none;border-radius:6px;background:#1d4ed8;color:#fff;cursor:pointer;font-weight:600">Guardar</button>
+        <span id="plt-defs-msg" style="font-size:12px;color:#6b7280"></span>
+      </div>
+    </div>
   </div>
 
   <!-- TAB: GROQ -->
@@ -781,8 +799,62 @@ async function loadPlantillaStatus() {
       </div>`;
     }
     uploadEl.style.display = 'block';
+    if (d.ok && d.found) renderDefaultsEditor(d.defaultPres || {});
   } catch(e) {
     statusEl.innerHTML = `<div style="color:#dc2626;font-size:13px">Error: ${e.message}</div>`;
+  }
+}
+
+function renderDefaultsEditor(defaultPres) {
+  const sec = document.getElementById('plt-defaults-section');
+  const tbody = document.getElementById('plt-defs-body');
+  tbody.innerHTML = '';
+  for (const [uni, pres] of Object.entries(defaultPres)) {
+    for (const p of (pres || [])) _addDefaultRow(uni, p.nombre, p.factor);
+  }
+  sec.style.display = 'block';
+}
+
+function _addDefaultRow(uni, nombre, factor) {
+  const tbody = document.getElementById('plt-defs-body');
+  const tr = document.createElement('tr');
+  const cellStyle = 'padding:3px 4px';
+  const inp = (val, ph, w, type='text') =>
+    `<input type="${type}" value="${String(val??'')}" placeholder="${ph}" style="width:${w};font-size:12px;border:1px solid #d1d5db;border-radius:4px;padding:3px 6px${type==='number'?';text-align:right':''}">`;
+  tr.innerHTML = `
+    <td style="${cellStyle}">${inp(uni,'LT','55px')}</td>
+    <td style="${cellStyle}">${inp(nombre,'BOTELLA','130px')}</td>
+    <td style="${cellStyle};text-align:right">${inp(factor,'0.75','65px','number')}</td>
+    <td style="${cellStyle}"><button onclick="this.closest('tr').remove()" style="border:none;background:none;color:#ef4444;cursor:pointer;font-size:16px;line-height:1">×</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function addDefaultRow() { _addDefaultRow('', '', ''); }
+
+async function saveDefaults() {
+  const almacen = document.getElementById('plt-almacen').value;
+  const msg = document.getElementById('plt-defs-msg');
+  msg.style.color = '#6b7280'; msg.textContent = 'Guardando…';
+  const defaultPres = {};
+  document.querySelectorAll('#plt-defs-body tr').forEach(tr => {
+    const [iUni, iNom, iFac] = tr.querySelectorAll('input');
+    const uni = iUni.value.trim().toUpperCase();
+    const nom = iNom.value.trim();
+    const fac = parseFloat(iFac.value);
+    if (!uni || !nom || isNaN(fac) || fac <= 0) return;
+    if (!defaultPres[uni]) defaultPres[uni] = [];
+    defaultPres[uni].push({ nombre: nom, factor: fac });
+  });
+  try {
+    const r = await fetch(WORKER_URL + '/inv/plantilla', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'inv_defaults', almacen, defaultPres })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error');
+    msg.style.color = '#16a34a'; msg.textContent = '✓ Guardado';
+  } catch(e) {
+    msg.style.color = '#dc2626'; msg.textContent = '✗ ' + e.message;
   }
 }
 
