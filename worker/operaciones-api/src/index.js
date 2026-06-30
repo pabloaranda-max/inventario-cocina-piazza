@@ -1,7 +1,7 @@
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Session-Token',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Session-Token, X-Sync-Token',
 };
 
 // Revisores que participan en aprobaciones
@@ -536,6 +536,48 @@ async function handleInvPost(db, body) {
   return json({ error: 'Acción no válida' }, 400);
 }
 
+// ── Sync desde scraper (X-Sync-Token) ─────────────────────────────────────
+
+async function handleSync(db, pathname, body) {
+  const now = Date.now();
+
+  if (pathname === '/sync/catalogo') {
+    const { articulos = [], subrecetas = [], mise_en_place = [] } = body;
+
+    const stmts = [];
+    for (const a of articulos) {
+      const cod = a.codigo || a.id_xetux;
+      if (!cod) continue;
+      stmts.push(db.prepare(
+        'INSERT OR REPLACE INTO catalogo_articulos (codigo,nombre,grupo,subgrupo,unidad,almacen,updated_at) VALUES (?,?,?,?,?,?,?)'
+      ).bind(cod, a.nombre || '', a.grupo || '', a.subgrupo || '', a.unidad || '', a.almacen || '', now));
+    }
+    for (const s of subrecetas) {
+      const cod = s.codigo || s.id_xetux;
+      if (!cod) continue;
+      stmts.push(db.prepare(
+        'INSERT OR REPLACE INTO catalogo_subrecetas (codigo,nombre,rendimiento,unidad,updated_at) VALUES (?,?,?,?,?)'
+      ).bind(cod, s.nombre || '', s.rendimiento || null, s.unidad || '', now));
+    }
+    for (const m of mise_en_place) {
+      const subCod = m.subreceta_id || m.subreceta_codigo;
+      const ingCod = m.codigo_xetux || m.ingrediente_codigo;
+      if (!subCod || !ingCod) continue;
+      stmts.push(db.prepare(
+        'INSERT OR REPLACE INTO catalogo_ingredientes (id,subreceta_codigo,ingrediente_codigo,ingrediente_nombre,cantidad,unidad) VALUES (?,?,?,?,?,?)'
+      ).bind(`${subCod}:${ingCod}`, subCod, ingCod, m.ingrediente || m.ingrediente_nombre || '', m.cantidad_por_unidad ?? m.cantidad ?? 0, m.unidad || ''));
+    }
+
+    // D1 batch: máximo 100 stmts por llamada
+    for (let i = 0; i < stmts.length; i += 100) {
+      await db.batch(stmts.slice(i, i + 100));
+    }
+    return json({ ok: true, articulos: articulos.length, subrecetas: subrecetas.length, mise_en_place: mise_en_place.length });
+  }
+
+  return json({ error: 'Ruta sync no reconocida: ' + pathname }, 404);
+}
+
 // ── Entry point ────────────────────────────────────────────────────────────
 
 export default {
@@ -553,6 +595,30 @@ export default {
         if (request.method === 'GET')  return await handleInvGet(env.DB, url);
         if (request.method === 'POST') return await handleInvPost(env.DB, await request.json());
         return new Response('Method not allowed', { status: 405, headers: CORS });
+      } catch (err) {
+        return json({ error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === '/articulos' && request.method === 'GET') {
+      const almacen = url.searchParams.get('almacen');
+      if (!almacen) return json({ error: 'Falta almacen' }, 400);
+      try {
+        const rows = await env.DB.prepare(
+          'SELECT codigo, nombre, grupo, subgrupo, unidad FROM catalogo_articulos WHERE almacen = ? ORDER BY nombre'
+        ).bind(almacen).all();
+        return json({ articulos: rows.results });
+      } catch (err) {
+        return json({ error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname.startsWith('/sync/') && request.method === 'POST') {
+      const syncToken = request.headers.get('X-Sync-Token') || '';
+      if (!env.SYNC_TOKEN || syncToken !== env.SYNC_TOKEN)
+        return json({ error: 'Token inválido' }, 401);
+      try {
+        return await handleSync(env.DB, url.pathname, await request.json());
       } catch (err) {
         return json({ error: err.message }, 500);
       }
