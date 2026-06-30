@@ -350,7 +350,10 @@ async function resolveZonas() {
     const r = await fetch(WORKER_URL + '/articulos?almacen=' + ALMACEN);
     if (r.ok) {
       const d = await r.json();
-      items = (d.articulos || d || []).map(a => ({ cod: a.codigo, art: a.nombre, uni: (T?.unitMap?.[a.codigo]) || a.unidad, grp: a.subgrupo || a.grupo || '' }));
+      const rm = T?.rowMap;
+      items = (d.articulos || d || [])
+        .filter(a => !rm || a.codigo in rm)
+        .map(a => ({ cod: a.codigo, art: a.nombre, uni: (T?.unitMap?.[a.codigo]) || a.unidad, grp: a.subgrupo || a.grupo || '' }));
     }
   } catch(e) { console.warn('articulos fetch:', e); }
 
