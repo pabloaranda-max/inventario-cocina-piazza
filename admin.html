@@ -797,23 +797,31 @@ function parsePlantilla(buf) {
   const H    = rows[hIdx].map(norm);
   const iCod = H.findIndex(h => /^c[oó]digo$/i.test(h));
   const iCan = H.findIndex(h => /^cantidad$/i.test(h));
-  const iPres= H.findIndex(h => /presentaci[oó]n/i.test(h));
-  const iFac = H.findIndex(h => /^factor$/i.test(h));
   const iUni = H.findIndex(h => /^unidad$/i.test(h));
+  const iArt = H.findIndex(h => /^art[ií]culo$/i.test(h));
   if (iCan < 0) throw new Error('Columna "Cantidad" no encontrada');
 
+  // Formato Xetux real: presentaciones tienen código PARENTCODE_NNNN
+  // El factor está en el nombre del artículo como "(0.75 LT)"
   const rowMap = {}, unitMap = {}, presRaw = {};
-  let curCod = null, curUni = null;
   for (let r = hIdx + 1; r < rows.length; r++) {
     const row = rows[r];
     const num = norm(row[0]), cod = norm(row[iCod]);
-    if (num && cod) {
-      curCod = cod; curUni = iUni >= 0 ? norm(row[iUni]) : '';
-      rowMap[cod] = r; unitMap[cod] = curUni; presRaw[cod] = [];
-    } else if (curCod && iPres >= 0) {
-      const presNom = norm(row[iPres]);
-      const facVal  = iFac >= 0 ? parseFloat(row[iFac]) : NaN;
-      if (presNom && !isNaN(facVal) && facVal > 0) presRaw[curCod].push({ nombre:presNom, factor:facVal, uni:curUni });
+    if (!num || !cod) continue;
+
+    const isPres = /_\d+$/.test(cod);
+    if (!isPres) {
+      const uni = iUni >= 0 ? norm(row[iUni]) : '';
+      rowMap[cod] = r; unitMap[cod] = uni; presRaw[cod] = [];
+    } else {
+      const parentCod = cod.replace(/_\d+$/, '');
+      if (!presRaw[parentCod]) continue;
+      const nom    = iUni >= 0 ? norm(row[iUni]) : '';
+      const artNom = iArt >= 0 ? norm(row[iArt]) : '';
+      const m      = artNom.match(/\((\d+\.?\d*)\s+\w+\)\s*$/);
+      const facVal = m ? parseFloat(m[1]) : NaN;
+      if (nom && !isNaN(facVal) && facVal > 0)
+        presRaw[parentCod].push({ nombre: nom, factor: facVal, uni: unitMap[parentCod] || '' });
     }
   }
 
