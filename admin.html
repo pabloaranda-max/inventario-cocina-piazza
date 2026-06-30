@@ -834,7 +834,7 @@ function parsePlantilla(buf) {
     const unique = [...seen.values()];
     if (unique.length) presMap[cod] = unique;
   }
-  return { rowMap, cantidadColIdx: iCan, presMap };
+  return { rowMap, cantidadColIdx: iCan, presMap, unitMap };
 }
 
 async function uploadPlantilla(file) {
@@ -844,7 +844,7 @@ async function uploadPlantilla(file) {
   msg.style.color = '#888'; msg.textContent = 'Leyendo archivo…';
   try {
     const buf = await file.arrayBuffer();
-    const { rowMap, cantidadColIdx, presMap } = parsePlantilla(buf);
+    const { rowMap, cantidadColIdx, presMap, unitMap } = parsePlantilla(buf);
     msg.textContent = `✓ ${Object.keys(rowMap).length} artículos · calculando hash…`;
 
     const bytes = new Uint8Array(buf);
@@ -855,7 +855,7 @@ async function uploadPlantilla(file) {
     msg.textContent = `✓ ${Object.keys(rowMap).length} artículos · subiendo al servidor…`;
     const r = await fetch(WORKER_URL + '/inv/plantilla', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action:'inv_plantilla', almacen, rowMap, cantidadColIdx, presMap, raw, templateHash, templateTs: Date.now() })
+      body: JSON.stringify({ action:'inv_plantilla', almacen, rowMap, cantidadColIdx, presMap, unitMap, raw, templateHash, templateTs: Date.now() })
     });
     const d = await r.json();
     if (d.ok) {
