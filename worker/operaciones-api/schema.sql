@@ -105,20 +105,26 @@ CREATE TABLE IF NOT EXISTS catalogo_ingredientes (
 -- ── Inventario: plantillas Xetux (una por almacén) ───────────────────────
 CREATE TABLE IF NOT EXISTS inv_plantillas (
   almacen          TEXT PRIMARY KEY,
-  row_map          TEXT NOT NULL,     -- JSON: {cod: rowIndex}
-  cantidad_col_idx INTEGER NOT NULL,
-  raw              TEXT NOT NULL,     -- XLSX original en base64
-  updated_at       TEXT NOT NULL
+  row_map          TEXT NOT NULL DEFAULT '{}',   -- JSON: {cod: rowIndex}
+  cantidad_col_idx INTEGER NOT NULL DEFAULT 6,
+  pres_map         TEXT NOT NULL DEFAULT '{}',   -- JSON: {cod: [{nombre, factor}]}
+  raw              TEXT NOT NULL DEFAULT '',      -- XLSX original en base64
+  template_hash    TEXT NOT NULL DEFAULT '',
+  updated_at       TEXT NOT NULL DEFAULT ''
 );
 
 -- ── Inventario: sesiones de conteo ────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS inv_sesiones (
-  almacen         TEXT NOT NULL,
-  fecha           TEXT NOT NULL,
-  operario        TEXT NOT NULL,
-  counts          TEXT NOT NULL,          -- JSON: {cod: cantidad}
-  completed_zones TEXT NOT NULL,          -- JSON: [zoneIdx, ...]
-  locked_zones    TEXT NOT NULL DEFAULT '{}', -- JSON: {zoneIdx: {device_id, operario, ts}}
-  updated_at      TEXT NOT NULL,
+  almacen              TEXT NOT NULL,
+  fecha                TEXT NOT NULL,
+  operario             TEXT NOT NULL,
+  counts               TEXT NOT NULL DEFAULT '{}', -- legacy JSON: {cod: cantidad}
+  counts_by_zone       TEXT NOT NULL DEFAULT '{}', -- JSON: {zoneIdx: {cod: cantidad}}
+  pres_choice_by_zone  TEXT NOT NULL DEFAULT '{}', -- JSON: {zoneIdx: {cod: factor}}
+  completed_zones      TEXT NOT NULL DEFAULT '[]', -- JSON: [zoneIdx, ...]
+  locked_zones         TEXT NOT NULL DEFAULT '{}', -- JSON: {zoneIdx: {device_id, operario, ts}}
+  manuales             TEXT NOT NULL DEFAULT '[]',
+  template_hash        TEXT NOT NULL DEFAULT '',
+  updated_at           TEXT NOT NULL,
   PRIMARY KEY (almacen, fecha)
 );

@@ -100,6 +100,11 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
 .modal-notas-box { background:white; border-radius:12px; max-width:560px; margin:auto; padding:20px; }
 .corr-block { border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:8px; background:#f8fafc; }
 .corr-input { width:100%; border:1px solid #ddd; border-radius:6px; padding:7px; font-size:13px; margin-bottom:6px; box-sizing:border-box; }
+/* PLANTILLAS */
+.plt-drop { border:2px dashed #c4b5fd; border-radius:12px; padding:32px 16px; text-align:center; background:#faf5ff; cursor:pointer; transition:all .2s; }
+.plt-drop:hover, .plt-drop.over { border-color:#667eea; background:#f5f3ff; }
+.plt-drop p { color:#888; font-size:14px; margin-top:8px; }
+.plt-status-card { background:white; border-radius:8px; padding:14px; border:1px solid #e2e8f0; margin-bottom:14px; }
 </style>
 </head>
 <body>
@@ -130,6 +135,7 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
   <div class="tabs">
     <button class="tab active" onclick="showTab('tomas')">📋 Tomas</button>
     <button class="tab" onclick="showTab('reporte')">📊 Resumen</button>
+    <button class="tab" onclick="showTab('plantillas')">📥 Plantillas</button>
     <button class="tab" onclick="showTab('groq')">🤖 Asistente</button>
   </div>
 
@@ -158,6 +164,34 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
       <div class="stat-card"><div class="stat-num" id="stat-manuales">—</div><div class="stat-label">No catalogados</div></div>
     </div>
     <div id="reporte-detalle"></div>
+  </div>
+
+  <!-- TAB: PLANTILLAS -->
+  <div id="tab-plantillas" class="tab-content">
+    <div style="margin-bottom:16px">
+      <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:6px">Almacén</label>
+      <select id="plt-almacen" onchange="loadPlantillaStatus()" style="padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;width:100%;max-width:340px">
+        <option value="" disabled selected>— Seleccionar —</option>
+        <option value="BARRA_RESTAURANTE">Barra Restaurante</option>
+        <option value="COCINA">Cocina</option>
+        <option value="ALIMENTARI">Alimentari</option>
+        <option value="CAVA">Cava</option>
+        <option value="SALUMERIA">Salumeria</option>
+        <option value="GENERAL">General</option>
+        <option value="BARRA_AMICI">Barra Amici</option>
+      </select>
+    </div>
+    <div id="plt-status"></div>
+    <div id="plt-upload" style="display:none">
+      <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:6px">Nueva plantilla (.xlsx)</label>
+      <p style="font-size:13px;color:#666;margin-bottom:12px">En Xetux: Inventarios → Gestión de inventario → Exportar. Activa <strong>Incluir presentaciones</strong>.</p>
+      <div class="plt-drop" id="plt-drop" onclick="document.getElementById('plt-file').click()">
+        <div style="font-size:40px">📄</div>
+        <p>Arrastra el .xlsx aquí o toca para seleccionar</p>
+        <input type="file" id="plt-file" accept=".xlsx,.xls" style="display:none" onchange="uploadPlantilla(this.files[0])">
+      </div>
+      <div id="plt-msg" style="margin-top:10px;font-size:13px;font-weight:600"></div>
+    </div>
   </div>
 
   <!-- TAB: GROQ -->
@@ -710,6 +744,140 @@ async function enviarChat() {
     document.getElementById('loading-msg').textContent = 'Error: ' + e.message;
   }
 }
+
+// ── PLANTILLAS XETUX ──────────────────────────────────────
+const WORKER_URL = 'https://operaciones-api.pablo-aranda.workers.dev';
+
+async function hashRaw(raw) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('').slice(0, 16);
+}
+
+async function loadPlantillaStatus() {
+  const almacen = document.getElementById('plt-almacen').value;
+  if (!almacen) return;
+  const statusEl = document.getElementById('plt-status');
+  const uploadEl = document.getElementById('plt-upload');
+  const msgEl    = document.getElementById('plt-msg');
+  statusEl.innerHTML = '<div style="color:#888;font-size:13px">Cargando…</div>';
+  uploadEl.style.display = 'none';
+  msgEl.textContent = '';
+  try {
+    const r = await fetch(WORKER_URL + '/inv/plantilla?almacen=' + almacen);
+    const d = await r.json();
+    if (d.ok && d.found) {
+      const date  = d.updatedAt ? new Date(d.updatedAt).toLocaleString('es-MX') : '—';
+      const count = Object.keys(d.rowMap || {}).length;
+      const pres  = Object.keys(d.presMap || {}).length;
+      statusEl.innerHTML = `<div class="plt-status-card">
+        <div style="font-weight:700;color:#16a34a;margin-bottom:6px">✅ Plantilla configurada</div>
+        <div style="font-size:13px;color:#555"><strong>${count}</strong> artículos · <strong>${pres}</strong> con presentaciones</div>
+        <div style="font-size:12px;color:#94a3b8;margin-top:4px">Actualizada: ${date}</div>
+        <div style="font-size:11px;color:#cbd5e1;margin-top:2px">Hash: ${d.templateHash || '—'}</div>
+      </div>`;
+    } else {
+      statusEl.innerHTML = `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px;color:#92400e;font-size:13px;margin-bottom:14px">
+        ⚠️ No hay plantilla configurada para <strong>${almacen}</strong>.
+      </div>`;
+    }
+    uploadEl.style.display = 'block';
+  } catch(e) {
+    statusEl.innerHTML = `<div style="color:#dc2626;font-size:13px">Error: ${e.message}</div>`;
+  }
+}
+
+function parsePlantilla(buf) {
+  const wb   = XLSX.read(buf, { type:'array' });
+  const ws   = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+  const norm = s => String(s??'').replace(/^﻿/,'').trim();
+
+  const hIdx = rows.findIndex(r => r.some(h => /^c[oó]digo$/i.test(norm(h))));
+  if (hIdx === -1) throw new Error('Columna "Código" no encontrada');
+  const H    = rows[hIdx].map(norm);
+  const iCod = H.findIndex(h => /^c[oó]digo$/i.test(h));
+  const iCan = H.findIndex(h => /^cantidad$/i.test(h));
+  const iPres= H.findIndex(h => /presentaci[oó]n/i.test(h));
+  const iFac = H.findIndex(h => /^factor$/i.test(h));
+  const iUni = H.findIndex(h => /^unidad$/i.test(h));
+  if (iCan < 0) throw new Error('Columna "Cantidad" no encontrada');
+
+  const rowMap = {}, unitMap = {}, presRaw = {};
+  let curCod = null, curUni = null;
+  for (let r = hIdx + 1; r < rows.length; r++) {
+    const row = rows[r];
+    const num = norm(row[0]), cod = norm(row[iCod]);
+    if (num && cod) {
+      curCod = cod; curUni = iUni >= 0 ? norm(row[iUni]) : '';
+      rowMap[cod] = r; unitMap[cod] = curUni; presRaw[cod] = [];
+    } else if (curCod && iPres >= 0) {
+      const presNom = norm(row[iPres]);
+      const facVal  = iFac >= 0 ? parseFloat(row[iFac]) : NaN;
+      if (presNom && !isNaN(facVal) && facVal > 0) presRaw[curCod].push({ nombre:presNom, factor:facVal, uni:curUni });
+    }
+  }
+
+  const presMap = {};
+  for (const [cod, list] of Object.entries(presRaw)) {
+    const uni = unitMap[cod] || '', isVW = /^(LT|KG)$/i.test(uni);
+    const filtered = list.filter(p => p.factor !== 1.0 && !(isVW && p.factor > 10));
+    const seen = new Map();
+    for (const p of filtered) if (!seen.has(p.factor)) seen.set(p.factor, p);
+    const unique = [...seen.values()];
+    if (unique.length) presMap[cod] = unique;
+  }
+  return { rowMap, cantidadColIdx: iCan, presMap };
+}
+
+async function uploadPlantilla(file) {
+  const almacen = document.getElementById('plt-almacen').value;
+  if (!almacen || !file) return;
+  const msg = document.getElementById('plt-msg');
+  msg.style.color = '#888'; msg.textContent = 'Leyendo archivo…';
+  try {
+    const buf = await file.arrayBuffer();
+    const { rowMap, cantidadColIdx, presMap } = parsePlantilla(buf);
+    msg.textContent = `✓ ${Object.keys(rowMap).length} artículos · calculando hash…`;
+
+    const bytes = new Uint8Array(buf);
+    let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
+    const raw = btoa(bin);
+    const templateHash = await hashRaw(raw);
+
+    msg.textContent = `✓ ${Object.keys(rowMap).length} artículos · subiendo al servidor…`;
+    const r = await fetch(WORKER_URL + '/inv/plantilla', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action:'inv_plantilla', almacen, rowMap, cantidadColIdx, presMap, raw, templateHash, templateTs: Date.now() })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      msg.style.color = '#16a34a';
+      msg.textContent = `✓ Plantilla de ${almacen} guardada correctamente`;
+      document.getElementById('plt-file').value = '';
+      loadPlantillaStatus();
+    } else {
+      msg.style.color = '#dc2626';
+      msg.textContent = '⚠️ Error: ' + (d.error || 'desconocido');
+    }
+  } catch(e) {
+    msg.style.color = '#dc2626';
+    msg.textContent = 'Error: ' + e.message;
+  }
+}
+
+// drag & drop en plt-drop
+document.addEventListener('DOMContentLoaded', () => {
+  const dz = document.getElementById('plt-drop');
+  if (!dz) return;
+  dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('over');
+    const f = e.dataTransfer.files[0];
+    if (f) uploadPlantilla(f);
+  });
+});
 </script>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 </body>
 </html>

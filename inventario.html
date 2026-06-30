@@ -32,13 +32,13 @@ label{display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:5px}
 input[type=text],input[type=date],select{width:100%;padding:13px 14px;border:1px solid rgba(47,62,30,.16);border-radius:10px;font-size:16px;font-family:inherit;background:rgba(255,253,248,.82);color:var(--brand-green);-webkit-appearance:none;appearance:none}
 input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
 .content{flex:1;padding:16px;overflow-y:auto}
-.card{background:color-mix(in srgb,var(--brand-paper) 94%,white);border:1px solid var(--brand-border);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 14px 36px rgba(47,62,30,.06)}
+.card{background:var(--brand-paper);background:color-mix(in srgb,var(--brand-paper) 94%,white);border:1px solid var(--brand-border);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 14px 36px rgba(47,62,30,.06)}
 .divider{height:1px;background:var(--brand-border);margin:16px 0}
 .section-label{font-size:11px;font-weight:700;color:var(--brand-muted);text-transform:uppercase;letter-spacing:.8px;margin:18px 0 8px}
 .row{display:flex;gap:8px;margin-top:10px}
 .progress-bar{height:4px;background:#e5e7eb;border-radius:4px;overflow:hidden;margin:4px 0 0}
 .progress-fill{height:100%;background:#22c55e;border-radius:4px;transition:width .3s}
-.zone-card{background:color-mix(in srgb,var(--brand-paper) 94%,white);border:1px solid var(--brand-border);border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px rgba(47,62,30,.05);cursor:pointer;border-left:4px solid var(--brand-border)}
+.zone-card{background:var(--brand-paper);background:color-mix(in srgb,var(--brand-paper) 94%,white);border:1px solid var(--brand-border);border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px rgba(47,62,30,.05);cursor:pointer;border-left:4px solid var(--brand-border)}
 .zone-card:active{opacity:.8}
 .zone-card.done{border-left-color:#22c55e}
 .zone-card.partial{border-left-color:#f59e0b}
@@ -62,15 +62,11 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
 .qty-label{font-size:11px;color:#aaa;white-space:nowrap}
 .lt-badge{font-size:11px;font-weight:700;color:var(--color,#667eea);background:#ede9fe;padding:2px 6px;border-radius:6px;white-space:nowrap;min-width:54px;text-align:right}
 .pres-sel{font-size:12px;border:1px solid #ddd;border-radius:6px;padding:3px 6px;background:white;color:#333;max-width:110px}
-.search-bar{background:rgba(255,253,248,.9);backdrop-filter:blur(8px);padding:10px 16px;border-bottom:1px solid var(--brand-border);display:flex;gap:8px;position:sticky;top:53px;z-index:40}
+.search-bar{background:rgba(255,253,248,.9);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:10px 16px;border-bottom:1px solid var(--brand-border);display:flex;gap:8px;position:sticky;top:53px;z-index:40}
 .search-bar input{flex:1;padding:10px 14px;border:1.5px solid #ddd;border-radius:10px;font-size:16px;font-family:inherit}
 .search-bar input:focus{outline:none;border-color:var(--color,#667eea)}
 .search-bar button{background:#f3f4f6;color:#555;padding:10px 14px;border-radius:10px;font-size:14px}
-.fab-bar{position:fixed;bottom:0;left:0;right:0;padding:12px 16px;background:rgba(255,253,248,.92);backdrop-filter:blur(10px);border-top:1px solid var(--brand-border);z-index:50;display:flex;gap:8px}
-.drop-zone{border:2px dashed #c4b5fd;border-radius:16px;padding:40px 20px;text-align:center;background:white;cursor:pointer;transition:all .2s}
-.drop-zone.over{border-color:var(--color,#667eea);background:#f5f3ff}
-.drop-icon{font-size:48px;margin-bottom:10px}
-.drop-zone p{color:#888;font-size:14px;margin-bottom:14px}
+.fab-bar{position:fixed;bottom:0;left:0;right:0;padding:12px 16px;background:rgba(255,253,248,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--brand-border);z-index:50;display:flex;gap:8px}
 .alert{border-radius:10px;padding:12px 14px;margin-bottom:10px;font-size:13px;line-height:1.4}
 .alert-warn{background:#fffbeb;border:1px solid #fcd34d;color:#92400e}
 .alert-error{background:#fef2f2;border:1px solid #fca5a5;color:#991b1b}
@@ -79,7 +75,7 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
 .alert-title{font-weight:700;margin-bottom:4px}
 /* Area selector */
 .area-list{padding:0 16px 16px}
-.area-item{background:color-mix(in srgb,var(--brand-paper) 94%,white);border:1px solid var(--brand-border);padding:16px;display:flex;align-items:center;gap:14px;border-radius:12px;margin-bottom:8px;box-shadow:0 4px 14px rgba(47,62,30,.05);cursor:pointer;border-left:4px solid var(--ac,#667eea);transition:opacity .15s}
+.area-item{background:var(--brand-paper);background:color-mix(in srgb,var(--brand-paper) 94%,white);border:1px solid var(--brand-border);padding:16px;display:flex;align-items:center;gap:14px;border-radius:12px;margin-bottom:8px;box-shadow:0 4px 14px rgba(47,62,30,.05);cursor:pointer;border-left:4px solid var(--ac,#667eea);transition:opacity .15s}
 .area-item:active{opacity:.75}
 .area-item-badge{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:800;flex-shrink:0}
 .area-item-info{flex:1;min-width:0}
@@ -113,27 +109,6 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
     </div>
   </div>
   <div id="welcome-body" class="content" style="padding-top:0"></div>
-</div>
-
-<!-- PANTALLA: importar plantilla -->
-<div id="screen-import" class="screen">
-  <div class="hdr" id="import-hdr">
-    <button class="hdr-back" onclick="go('welcome')">←</button>
-    <h1>Importar plantilla Xetux</h1>
-  </div>
-  <div class="content">
-    <p style="font-size:14px;color:#555;margin-bottom:16px">Usa la plantilla <strong>con presentaciones</strong> activadas.</p>
-    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
-      <div class="drop-icon">📄</div>
-      <p>Arrastra el .xlsx aquí<br>o toca para seleccionar</p>
-      <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none" onchange="handleFileInput(this)">
-      <div id="import-msg" style="margin-top:10px;font-size:13px;font-weight:600"></div>
-    </div>
-    <div class="card" style="background:#f5f3ff;margin-top:16px;font-size:13px;color:#555;line-height:1.6">
-      <strong>En Xetux:</strong> Inventarios → Gestión de inventario → Exportar<br>
-      Activa "Incluir presentaciones" para que la app detecte factores automáticamente.
-    </div>
-  </div>
 </div>
 
 <!-- PANTALLA: nueva sesión -->
@@ -301,7 +276,6 @@ function go(id) {
   if (id === 'welcome')  { ALMACEN = null; renderWelcome(); }
   if (id === 'overview') { renderOverview(); startPoll(); } else stopPoll();
   if (id === 'generate') renderValidation();
-  if (id === 'import')   { document.getElementById('import-hdr').style.background = CFG?.color || '#667eea'; }
   if (id === 'session')  { document.getElementById('session-hdr').style.background = CFG?.color || '#667eea'; }
 }
 
@@ -313,23 +287,9 @@ async function fetchPlantillaWorker() {
     if (!r.ok) return false;
     const d = await r.json();
     if (!d.ok || !d.found) return false;
-    const t = { rowMap: d.rowMap, cantidadColIdx: d.cantidadColIdx, presMap: d.presMap || {}, templateHash: d.templateHash || '', templateTs: Date.now() };
-    lsSet('t', t);
-    if (d.raw) localStorage.setItem(lsKey('raw'), d.raw);
-    T = t;
+    T = { rowMap: d.rowMap, cantidadColIdx: d.cantidadColIdx, presMap: d.presMap || {}, templateHash: d.templateHash || '', templateTs: Date.now(), raw: d.raw || null };
     return true;
   } catch(e) { console.warn('plantilla fetch:', e); return false; }
-}
-
-async function pushPlantillaWorker() {
-  const raw = localStorage.getItem(lsKey('raw'));
-  if (!T || !raw) return;
-  try {
-    await fetch(WORKER_URL + '/inv/plantilla', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ action:'inv_plantilla', almacen:ALMACEN, rowMap:T.rowMap, cantidadColIdx:T.cantidadColIdx, presMap:T.presMap||{}, raw, templateHash:T.templateHash||'', templateTs:T.templateTs })
-    });
-  } catch(e) { console.warn('plantilla push:', e); }
 }
 
 async function fetchSesionWorker(fecha) {
@@ -410,25 +370,22 @@ async function resolveZonas() {
 async function selectArea(key) {
   ALMACEN = key;
   CFG     = AREA_CONFIG[key];
+  const savedKey = key;
   setColor(CFG.color);
   document.getElementById('inp-fecha').value = new Date().toISOString().slice(0,10);
 
-  T = lsGet('t');
   S = lsGet('s');
-
-  // Resolver zonas
   ZONAS = await resolveZonas();
+  if (ALMACEN !== savedKey) return;
 
-  if (!T) {
-    const ok = await fetchPlantillaWorker();
-    if (!ok) T = null;
-  } else {
-    pushPlantillaWorker();
-  }
+  const ok = await fetchPlantillaWorker();
+  if (ALMACEN !== savedKey) return;
+  if (!ok) T = null;
 
   if (!S) {
     const hoy = new Date().toISOString().slice(0,10);
     _remoteSes = await fetchSesionWorker(hoy);
+    if (ALMACEN !== savedKey) return;
   }
 
   renderAreaWelcome();
@@ -444,8 +401,11 @@ function renderWelcome() {
 
   const sorted = Object.entries(AREA_CONFIG).sort((a, b) =>
     a[1].titulo.localeCompare(b[1].titulo, 'es'));
-  const options = sorted.map(([key, cfg]) =>
-    `<option value="${key}">${cfg.titulo}</option>`).join('');
+  const options = sorted.map(([key, cfg]) => {
+    const disabled = cfg.appsScriptUrl === null ? ' disabled' : '';
+    const label    = cfg.appsScriptUrl === null ? `${cfg.titulo} (sin configurar)` : cfg.titulo;
+    return `<option value="${key}"${disabled}>${label}</option>`;
+  }).join('');
 
   body.innerHTML = `
     <div style="padding:24px 16px 16px">
@@ -467,6 +427,9 @@ function onAreaSelectGo() {
 }
 
 function renderAreaWelcome() {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-welcome').classList.add('active');
+
   const totalItems = ZONAS.reduce((a,z) => a + z.items.length, 0);
   const sub  = document.getElementById('welcome-sub');
   const body = document.getElementById('welcome-body');
@@ -475,9 +438,7 @@ function renderAreaWelcome() {
   let html = `<button class="btn btn-gray" style="margin-bottom:12px" onclick="ALMACEN=null;go('welcome')">← Cambiar almacén</button>`;
 
   if (!T) {
-    html += `<div class="card"><div style="font-size:15px;margin-bottom:12px">Importa la plantilla de Xetux para generar el Excel de carga.</div>
-      <button class="btn btn-primary" onclick="go('import')">📥 Importar plantilla</button></div>
-      <div class="divider"></div>
+    html += `<div class="alert alert-warn"><div class="alert-title">⚠️ Plantilla no configurada</div>Contacta al administrador para subir la plantilla de este almacén. Puedes contar, pero no podrás generar el Excel para Xetux.</div>
       <div class="section-label">Zonas</div>` +
       ZONAS.map(z => `<div class="zone-card" style="border-left-color:${z.color}">
         <div class="zone-dot" style="background:${z.color}"></div>
@@ -485,9 +446,6 @@ function renderAreaWelcome() {
       </div>`).join('') +
       `<div style="margin-top:12px"><button class="btn btn-gray" onclick="go('session')">Iniciar conteo sin plantilla</button></div>`;
     body.innerHTML = html;
-    // No llamar go('welcome') — resetea ALMACEN=null
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById('screen-welcome').classList.add('active');
     return;
   }
 
@@ -503,9 +461,7 @@ function renderAreaWelcome() {
       <div class="row">
         <button class="btn btn-primary" style="flex:2" onclick="go('overview')">Continuar →</button>
         <button class="btn btn-gray btn-sm" style="flex:1" onclick="confirmNewSession()">Nueva</button>
-      </div></div>
-    <div class="divider"></div>
-    <button class="btn btn-gray" onclick="go('import')">📥 Reimportar plantilla</button>`;
+      </div></div>`;
   } else {
     let remoteCard = '';
     if (_remoteSes) {
@@ -519,12 +475,9 @@ function renderAreaWelcome() {
         </div></div>`;
     }
     html += remoteCard +
-      `<button class="btn btn-primary" onclick="go('session')">Iniciar nueva toma →</button>
-      <div class="divider"></div>
-      <button class="btn btn-gray" onclick="go('import')">📥 Reimportar plantilla</button>`;
+      `<button class="btn btn-primary" onclick="go('session')">Iniciar nueva toma →</button>`;
   }
   body.innerHTML = html;
-  document.getElementById('screen-welcome').classList.add('active');
 }
 
 function loadRemoteSesion() {
@@ -538,109 +491,6 @@ function loadRemoteSesion() {
 function confirmNewSession() {
   if (!confirm('¿Iniciar nueva toma? Se perderán los conteos actuales.')) return;
   S = null; lsDel('s'); renderAreaWelcome();
-}
-
-// ── Import plantilla ───────────────────────────────────────────────────────
-
-function handleFileInput(inp) { if (inp.files[0]) handleFile(inp.files[0]); }
-
-async function handleFile(file) {
-  if (!file) return;
-  const msg = document.getElementById('import-msg');
-  msg.style.color = '#888'; msg.textContent = 'Leyendo…';
-  try {
-    const buf = await file.arrayBuffer();
-    T = parseTemplate(buf);
-    lsSet('t', T);
-    const bytes = new Uint8Array(buf);
-    let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
-    const rawB64 = btoa(bin);
-    localStorage.setItem(lsKey('raw'), rawB64);
-    msg.style.color = '#888'; msg.textContent = '✓ ' + Object.keys(T.rowMap).length + ' artículos · subiendo al servidor…';
-    try {
-      const wr = await fetch(WORKER_URL + '/inv/plantilla', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ action:'inv_plantilla', almacen:ALMACEN, rowMap:T.rowMap, cantidadColIdx:T.cantidadColIdx, presMap:T.presMap, raw:rawB64, templateHash:T.templateHash })
-      });
-      const wd = await wr.json();
-      msg.style.color = wd.ok ? '#16a34a' : '#ef4444';
-      msg.textContent = wd.ok ? '✓ Plantilla guardada en servidor' : '⚠️ Error servidor';
-    } catch(e) {
-      msg.style.color = '#ef4444'; msg.textContent = '⚠️ Sin conexión al servidor';
-    }
-    setTimeout(() => renderAreaWelcome(), 1200);
-  } catch(e) {
-    msg.style.color = '#ef4444'; msg.textContent = 'Error: ' + e.message;
-  }
-}
-
-function parseTemplate(buf) {
-  const wb   = XLSX.read(buf, { type:'array' });
-  const ws   = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
-  const norm = s => String(s??'').replace(/^﻿/,'').trim();
-
-  // Encontrar fila de encabezado
-  const hIdx = rows.findIndex(r => r.some(h => /^c[oó]digo$/i.test(norm(h))));
-  if (hIdx === -1) throw new Error('Columna "Código" no encontrada');
-  const H    = rows[hIdx].map(norm);
-  const iCod = H.findIndex(h => /^c[oó]digo$/i.test(h));
-  const iCan = H.findIndex(h => /^cantidad$/i.test(h));
-  const iPres= H.findIndex(h => /presentaci[oó]n/i.test(h));
-  const iFac = H.findIndex(h => /^factor$/i.test(h));
-  const iUni = H.findIndex(h => /^unidad$/i.test(h));
-  if (iCan < 0) throw new Error('Columna "Cantidad" no encontrada');
-
-  const rowMap  = {};
-  const unitMap = {};
-  const presRaw = {}; // cod → [{ nombre, factor }]
-  let curCod = null, curUni = null;
-
-  for (let r = hIdx + 1; r < rows.length; r++) {
-    const row = rows[r];
-    const num = norm(row[0]);
-    const cod = norm(row[iCod]);
-    if (num && cod) {
-      curCod = cod;
-      curUni = iUni >= 0 ? norm(row[iUni]) : '';
-      rowMap[cod]  = r;
-      unitMap[cod] = curUni;
-      presRaw[cod] = [];
-    } else if (curCod && iPres >= 0) {
-      const presNom = norm(row[iPres]);
-      const facVal  = iFac >= 0 ? parseFloat(row[iFac]) : NaN;
-      if (presNom && !isNaN(facVal) && facVal > 0) {
-        presRaw[curCod].push({ nombre: presNom, factor: facVal, uni: curUni });
-      }
-    }
-  }
-
-  // Aplicar reglas de filtrado
-  const presMap = {};
-  for (const [cod, list] of Object.entries(presRaw)) {
-    const uni = unitMap[cod] || '';
-    const isVolWeight = /^(LT|KG)$/i.test(uni);
-    const filtered = list.filter(p => {
-      if (p.factor === 1.0) return false;                    // R1: base unit
-      if (isVolWeight && p.factor > 10) return false;        // R2: error datos (mL/g)
-      return true;
-    });
-    // Deduplicar por valor de factor
-    const seen = new Map();
-    for (const p of filtered) {
-      if (!seen.has(p.factor)) seen.set(p.factor, p);
-    }
-    const unique = [...seen.values()];
-    if (unique.length > 0) presMap[cod] = unique;
-  }
-
-  // templateHash: determinístico para el mismo archivo
-  const rawB64Preview = buf.byteLength.toString(36);
-  const arr8 = new Uint8Array(buf);
-  const sample = Array.from(arr8.slice(100, 108)).map(b => b.toString(16).padStart(2,'0')).join('');
-  const templateHash = rawB64Preview + '-' + sample;
-
-  return { rowMap, cantidadColIdx: iCan, presMap, templateHash, templateTs: Date.now() };
 }
 
 // ── Sesión ─────────────────────────────────────────────────────────────────
@@ -937,6 +787,11 @@ function renderOverview() {
   const pct = total ? filled / total * 100 : 0;
   document.getElementById('ov-bar').style.width = pct + '%';
   const btn = document.getElementById('btn-generate');
+  if (!T || !T.raw) {
+    btn.style.display = 'none';
+    return;
+  }
+  btn.style.display = 'block';
   btn.style.background = CFG.color;
   const pending = ZONAS.length - (S.completedZones?.length || 0);
   btn.textContent = allDone ? 'Generar Excel para Xetux →'
@@ -966,8 +821,8 @@ function renderValidation() {
   const withConv   = countedCods.filter(cod => (T?.presMap?.[cod]?.length||0) > 0);
 
   let html = '';
-  if (!T || !localStorage.getItem(lsKey('raw'))) {
-    html += `<div class="alert alert-error"><div class="alert-title">❌ Plantilla Xetux no importada</div>Importa el .xlsx antes de generar.</div>`;
+  if (!T || !T.raw) {
+    html += `<div class="alert alert-error"><div class="alert-title">❌ Plantilla Xetux no disponible</div>El administrador debe configurar la plantilla de este almacén.</div>`;
   }
   if (notCounted.length) {
     const sample = notCounted.slice(0,5).map(cod => allItems.find(i=>i.cod===cod)?.art||cod);
@@ -985,14 +840,16 @@ function renderValidation() {
     html += `<div class="alert alert-warn"><div class="alert-title">⚠️ Envío a Sheets no configurado</div>Solo se descargará el Excel. El envío a Google Sheets está pendiente para este almacén.</div>`;
   }
   el.innerHTML = html;
+  const sendBtn = document.getElementById('btn-send');
+  sendBtn.textContent = CFG.appsScriptUrl ? '⬇️ Descargar y Enviar a Sheets' : '⬇️ Descargar Excel';
 }
 
 // ── Generar y enviar ───────────────────────────────────────────────────────
 
 async function generateAndSend() {
-  if (!T || !S) { alert('Importa la plantilla y crea una sesión primero.'); return; }
-  const rawB64 = localStorage.getItem(lsKey('raw'));
-  if (!rawB64) { alert('No encuentro la plantilla original. Reimporta el .xlsx.'); return; }
+  if (!T || !S) { alert('Sin sesión activa.'); return; }
+  const rawB64 = T.raw;
+  if (!rawB64) { alert('Plantilla sin datos. Contacta al administrador.'); return; }
 
   const btn = document.getElementById('btn-send');
   const status = document.getElementById('send-status');
@@ -1000,12 +857,10 @@ async function generateAndSend() {
 
   // Calcular totales por cod
   const totales = {};
-  const factoresUsados = {};
   for (const [zid, zc] of Object.entries(S.countsByZone||{})) {
     for (const [cod, qty] of Object.entries(zc)) {
       const f = (S.presChoiceByZone?.[zid]?.[cod]) ?? (T.presMap?.[cod]?.[0]?.factor ?? 1);
       totales[cod] = (totales[cod] || 0) + qty * f;
-      factoresUsados[cod] = f;
     }
   }
 
@@ -1038,16 +893,14 @@ async function generateAndSend() {
   let sheetsOk = false;
   if (CFG.appsScriptUrl) {
     try {
-      const seen = {}, productos = [];
+      const productos = [];
       ZONAS.forEach((zone, zi) => {
+        const zid = String(zi);
         zone.items.forEach(item => {
-          if (seen[item.cod]) return;
-          const qty = totales[item.cod];
-          if (qty === undefined) return;
-          seen[item.cod] = true;
-          const zid = String(zi);
           const rawQty = (S.countsByZone?.[zid])?.[item.cod];
-          const f = factoresUsados[item.cod] ?? 1;
+          if (rawQty === undefined) return;
+          const f = (S.presChoiceByZone?.[zid]?.[item.cod]) ?? (T.presMap?.[item.cod]?.[0]?.factor ?? 1);
+          const qty = rawQty * f;
           const presOpt = T.presMap?.[item.cod]?.find(p => p.factor === f);
           productos.push({ cod:item.cod, art:item.art, cantidad:parseFloat(qty.toFixed(4)), cantidadRaw:rawQty, factorUsado:f, presentacion:presOpt?.nombre||null, uni:item.uni, zona:zone.nombre, area:ALMACEN, catalogado:true });
         });
@@ -1066,7 +919,8 @@ async function generateAndSend() {
   if (sheetsOk) status.innerHTML += `<div class="alert alert-ok">✅ Enviado a Google Sheets (sin confirmación por no-cors)</div>`;
   if (!CFG.appsScriptUrl) status.innerHTML += `<div class="alert alert-warn">⚠️ Sheets no configurado para este almacén</div>`;
 
-  btn.disabled = false; btn.textContent = '⬇️ Descargar y Enviar a Sheets';
+  btn.disabled = false;
+  btn.textContent = CFG.appsScriptUrl ? '⬇️ Descargar y Enviar a Sheets' : '⬇️ Descargar Excel';
 }
 
 // ── Manuales ───────────────────────────────────────────────────────────────
@@ -1134,11 +988,6 @@ async function compartirManuales() {
 }
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────
-
-const dz = document.getElementById('drop-zone');
-dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('over'); });
-dz.addEventListener('dragleave', () => dz.classList.remove('over'));
-dz.addEventListener('drop',      e => { e.preventDefault(); dz.classList.remove('over'); handleFile(e.dataTransfer.files[0]); });
 
 document.getElementById('inp-fecha').value = new Date().toISOString().slice(0,10);
 go('welcome');
