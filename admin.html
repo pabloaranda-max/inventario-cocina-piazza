@@ -577,23 +577,35 @@ async function verDetalleSesion(almacen, fecha) {
       </tr>`;
     }).join('');
     // Totales por artículo con correcciones aplicadas
+    // Incluye también códigos que solo existen en _admin (agregados vía "Añadir artículo")
     const adminCorr = S.correctionsByZone?.['_admin'] || {};
     const totalesPorCod = {};
     for (const [cod, baseQty] of Object.entries(totales)) {
       totalesPorCod[cod] = cod in adminCorr ? adminCorr[cod].qty : parseFloat(baseQty.toFixed(4));
     }
+    for (const [cod, corr] of Object.entries(adminCorr)) {
+      if (!(cod in totalesPorCod)) totalesPorCod[cod] = corr.qty ?? 0;
+    }
     const sortedCods = Object.keys(totalesPorCod).sort((a,b) => a.localeCompare(b));
     const editRows = sortedCods.map(cod => {
       const item = rawLookup[cod] || { nombre:cod, unidad:template.unitMap?.[cod] || '' };
       const corrected = cod in adminCorr;
-      const original = corrected ? parseFloat((totales[cod] || 0).toFixed(4)) : null;
+      const adminOnly = corrected && !(cod in totales);
+      const original  = adminOnly ? null : corrected ? parseFloat((totales[cod] || 0).toFixed(4)) : null;
       const currentVal = totalesPorCod[cod];
-      const corrInfo = corrected ? `<div class="corr-badge" style="margin-top:3px">Corregido — orig: ${original}</div>` : '';
+      const corrInfo = adminOnly
+        ? `<div class="corr-badge" style="margin-top:3px">Agregado por admin</div>`
+        : corrected ? `<div class="corr-badge" style="margin-top:3px">Corregido — orig: ${original}</div>` : '';
+      const calculadoCell = adminOnly
+        ? `<span style="color:#94a3b8">—</span>`
+        : corrected
+          ? `<span style="color:#94a3b8;text-decoration:line-through">${original}</span>`
+          : parseFloat((totales[cod]||0).toFixed(4));
       return `<tr class="${corrected ? 'corr-row' : ''}">
         <td>${esc(cod)}</td>
         <td>${esc(item.nombre)}</td>
         <td>${esc(item.unidad)}</td>
-        <td style="text-align:right">${corrected ? `<span style="color:#94a3b8;text-decoration:line-through">${original}</span>` : parseFloat((totales[cod]||0).toFixed(4))}</td>
+        <td style="text-align:right">${calculadoCell}</td>
         <td style="text-align:right">
           <input type="number" step="any" class="edit-qty-input" data-cod="${esc(cod)}" data-original="${currentVal}"
             value="${currentVal}" onchange="this.classList.toggle('modified',parseFloat(this.value)!==parseFloat(this.dataset.original))">
