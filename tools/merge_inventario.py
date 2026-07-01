@@ -234,7 +234,9 @@ def diff_snapshots(
     before: dict[str, dict[tuple[int, int], Any]],
     after: dict[str, dict[tuple[int, int], Any]],
     allowed: set[tuple[str, int, int]],
+    blank_equivalent: set[tuple[str, int, int]] | None = None,
 ) -> list[dict[str, Any]]:
+    blank_equivalent = blank_equivalent or set()
     diffs = []
     for sheet in sorted(set(before) | set(after)):
         before_cells = before.get(sheet, {})
@@ -242,13 +244,21 @@ def diff_snapshots(
         for coord in sorted(set(before_cells) | set(after_cells)):
             if (sheet, coord[0], coord[1]) in allowed:
                 continue
-            if before_cells.get(coord) != after_cells.get(coord):
+            before_value = before_cells.get(coord)
+            after_value = after_cells.get(coord)
+            if (
+                (sheet, coord[0], coord[1]) in blank_equivalent
+                and before_value in (None, "")
+                and after_value in (None, "")
+            ):
+                continue
+            if before_value != after_value:
                 diffs.append({
                     "sheet": sheet,
                     "row": coord[0],
                     "column": coord[1],
-                    "before": before_cells.get(coord),
-                    "after": after_cells.get(coord),
+                    "before": before_value,
+                    "after": after_value,
                 })
     return diffs
 
@@ -318,16 +328,19 @@ def apply_counts(
     wb = openpyxl.load_workbook(tmp_path, data_only=False)
     ws = wb[sheet_name]
     allowed = set()
+    blank_equivalent = set()
     for code in applied_codes:
         row_idx = rows_by_code[code]
         cell = ws.cell(row=row_idx, column=headers.qty_col)
         cell.value = float(counts[code])
         cell.number_format = "0.###"
         allowed.add((sheet_name, row_idx, headers.qty_col))
+    for row_idx in rows_by_code.values():
+        blank_equivalent.add((sheet_name, row_idx, headers.qty_col))
     wb.save(tmp_path)
 
     after = workbook_value_snapshot(tmp_path)
-    report["non_quantity_value_diffs"] = diff_snapshots(before, after, allowed)
+    report["non_quantity_value_diffs"] = diff_snapshots(before, after, allowed, blank_equivalent)
 
     wb_check = openpyxl.load_workbook(tmp_path, data_only=False)
     ws_check = wb_check[sheet_name]

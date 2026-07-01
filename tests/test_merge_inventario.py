@@ -4,7 +4,7 @@ from pathlib import Path
 
 import openpyxl
 
-from tools.merge_inventario import apply_counts, parse_source_xlsx
+from tools.merge_inventario import apply_counts, diff_snapshots, parse_source_xlsx
 
 
 def make_book(path: Path, rows):
@@ -56,6 +56,12 @@ class MergeInventarioTest(unittest.TestCase):
             report = apply_counts(dst, {"MISSING": 1}, tmp / "out")
             self.assertFalse(report["ok"])
             self.assertEqual(report["unmatched_source_codes"], ["MISSING"])
+
+    def test_blank_quantity_normalization_is_not_structural_diff(self):
+        before = {"Inventario": {(2, 8): ""}}
+        after = {"Inventario": {(2, 8): None}}
+        diffs = diff_snapshots(before, after, set(), {("Inventario", 2, 8)})
+        self.assertEqual(diffs, [])
 
 
 if __name__ == "__main__":
