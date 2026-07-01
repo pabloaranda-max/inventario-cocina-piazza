@@ -128,7 +128,14 @@ def parse_source_xlsx(src_path: Path, sheet_name: str = SHEET_NAME) -> dict[str,
 
 def fetch_json(path: str, params: dict[str, str]) -> dict[str, Any]:
     url = WORKER_URL + path + "?" + urllib.parse.urlencode(params)
-    with urllib.request.urlopen(url, timeout=30) as response:
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "inventario-merge/1.0",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
