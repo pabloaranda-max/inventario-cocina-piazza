@@ -659,15 +659,12 @@ async function handleInvPost(db, body, env = {}) {
   }
 
   if (body.action === 'inv_supervisor_login') {
-    const { nombre, password } = body;
-    if (!nombre || !password) return json({ ok: false, error: 'Faltan datos' }, 400);
-    const hash = await hashPassword(password);
-    const user = await db.prepare(
-      'SELECT id, nombre, rol FROM usuarios WHERE nombre = ? AND password_hash = ?'
-    ).bind(nombre, hash).first();
-    if (!user) return json({ ok: false, error: 'Usuario o contraseña incorrectos' }, 401);
-    if (!['admin', 'revisor'].includes(user.rol)) return json({ ok: false, error: 'Sin permisos de supervisor' }, 403);
-    return json({ ok: true, usuario: { id: user.id, nombre: user.nombre, rol: user.rol } });
+    const { nombre, pin } = body;
+    if (!nombre?.trim() || !pin) return json({ ok: false, error: 'Faltan datos' }, 400);
+    const pinCorrecto = env.INV_SUPERVISOR_PIN;
+    if (!pinCorrecto) return json({ ok: false, error: 'PIN de supervisor no configurado' }, 500);
+    if (String(pin) !== String(pinCorrecto)) return json({ ok: false, error: 'PIN incorrecto' }, 401);
+    return json({ ok: true, usuario: { nombre: nombre.trim(), rol: 'supervisor' } });
   }
 
   if (body.action === 'inv_delete') {

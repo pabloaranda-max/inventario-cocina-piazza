@@ -254,17 +254,17 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
 <div id="modal-supervisor-login" class="modal-overlay">
   <div class="modal-box">
     <button class="modal-close" onclick="document.getElementById('modal-supervisor-login').classList.remove('active')">✕</button>
-    <div class="modal-title">Acceso supervisor</div>
+    <div class="modal-title">Modo supervisor</div>
     <div class="form-group">
-      <label>Nombre</label>
-      <input type="text" id="sup-nombre" placeholder="Tu nombre" autocomplete="username">
+      <label>Tu nombre</label>
+      <input type="text" id="sup-nombre" placeholder="Ej: Pablo" autocomplete="name">
     </div>
     <div class="form-group">
-      <label>Contraseña</label>
-      <input type="password" id="sup-pass" placeholder="••••••" autocomplete="current-password" onkeyup="if(event.key==='Enter')loginSupervisor()">
+      <label>PIN de supervisor</label>
+      <input type="password" id="sup-pin" inputmode="numeric" placeholder="••••••" onkeyup="if(event.key==='Enter')loginSupervisor()">
     </div>
     <div id="sup-login-error" style="color:#dc2626;font-size:13px;margin-bottom:8px;display:none"></div>
-    <button class="btn btn-primary" onclick="loginSupervisor()">Entrar como supervisor</button>
+    <button class="btn btn-primary" onclick="loginSupervisor()">Activar modo supervisor</button>
   </div>
 </div>
 
@@ -1264,21 +1264,22 @@ function renderSupBadge() {
 
 async function loginSupervisor() {
   const nombre = document.getElementById('sup-nombre').value.trim();
-  const pass   = document.getElementById('sup-pass').value;
+  const pin    = document.getElementById('sup-pin').value.trim();
   const errEl  = document.getElementById('sup-login-error');
   errEl.style.display = 'none';
-  if (!nombre || !pass) { errEl.textContent = 'Ingresa nombre y contraseña'; errEl.style.display = ''; return; }
+  if (!nombre) { errEl.textContent = 'Escribe tu nombre'; errEl.style.display = ''; return; }
+  if (!pin)    { errEl.textContent = 'Escribe el PIN'; errEl.style.display = ''; return; }
   try {
     const r = await fetch(WORKER_URL + '/inv/sesion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'inv_supervisor_login', nombre, password: pass })
+      body: JSON.stringify({ action: 'inv_supervisor_login', nombre, pin })
     });
     const d = await r.json();
-    if (!d.ok) { errEl.textContent = d.error || 'Error'; errEl.style.display = ''; return; }
+    if (!d.ok) { errEl.textContent = d.error || 'PIN incorrecto'; errEl.style.display = ''; return; }
     _supervisorActual = d.usuario;
     localStorage.setItem('inv_supervisor', JSON.stringify(_supervisorActual));
     document.getElementById('modal-supervisor-login').classList.remove('active');
-    document.getElementById('sup-pass').value = '';
+    document.getElementById('sup-pin').value = '';
     renderSupBadge();
     renderCountListIfActive();
   } catch(e) { errEl.textContent = 'Error de conexión'; errEl.style.display = ''; }
