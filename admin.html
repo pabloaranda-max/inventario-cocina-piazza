@@ -98,6 +98,14 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
 .btn-pdf-card:hover { background: #bbf7d0; }
 .modal-notas-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:200; overflow-y:auto; padding:20px 12px; }
 .modal-notas-box { background:white; border-radius:12px; max-width:560px; margin:auto; padding:20px; }
+.modal-detalle-box { max-width:760px; }
+.detalle-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin-bottom:12px; }
+.detalle-stat { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px; }
+.detalle-stat-num { font-size:20px; font-weight:800; color:#1e293b; }
+.detalle-stat-label { font-size:11px; color:#64748b; margin-top:2px; }
+.detalle-table { width:100%; border-collapse:collapse; font-size:12px; }
+.detalle-table th { text-align:left; color:#64748b; font-size:11px; border-bottom:1px solid #e2e8f0; padding:6px 4px; }
+.detalle-table td { border-bottom:1px solid #f1f5f9; padding:6px 4px; vertical-align:top; }
 .corr-block { border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:8px; background:#f8fafc; }
 .corr-input { width:100%; border:1px solid #ddd; border-radius:6px; padding:7px; font-size:13px; margin-bottom:6px; box-sizing:border-box; }
 /* PLANTILLAS */
@@ -149,7 +157,10 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
     <div id="sesiones-container" style="margin-bottom:22px">
       <div class="loading-state"><div class="spinner-sm"></div>Cargando sesiones...</div>
     </div>
-    <div style="font-weight:800;color:#1e293b;margin-bottom:10px">Tomas enviadas a Sheets</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
+      <div style="font-weight:800;color:#1e293b" id="titulo-tomas-sheets">Tomas enviadas a Sheets · últimos 30 días</div>
+      <button class="btn-notas" onclick="toggleHistoricasSheets()" id="btn-historicas-sheets">Ver históricos</button>
+    </div>
     <div class="filtros-row" id="filtros-almacen">
       <button class="filtro-chip active" onclick="filtrarAlmacen('TODOS', this)">Todos</button>
       <button class="filtro-chip" onclick="filtrarAlmacen('COCINA', this)">Cocina</button>
@@ -273,6 +284,17 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
   </div>
 </div>
 
+<!-- MODAL DETALLE SESIÓN D1 -->
+<div id="modal-detalle-sesion" class="modal-notas-overlay">
+  <div class="modal-notas-box modal-detalle-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h2 style="font-size:17px;">Detalle de sesión</h2>
+      <button onclick="cerrarDetalleSesion()" style="background:#e2e8f0;color:#333;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:bold;">Cerrar</button>
+    </div>
+    <div id="detalle-sesion-body" style="font-size:13px;color:#334155;line-height:1.5;"></div>
+  </div>
+</div>
+
 <script>
 const ADMIN_PASSWORD = 'adminpasticcio2026';
 const GROQ_MODEL = 'llama-3.1-8b-instant';
@@ -307,6 +329,8 @@ let todasLasTomas = [];
 let sesionesInventario = [];
 let filtroActual = 'TODOS';
 let adminPasswordActual = '';
+let mostrarHistoricasSheets = false;
+const DIAS_SHEETS_RECIENTES = 30;
 const exportandoSesiones = new Set();
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
@@ -380,6 +404,26 @@ function filtroIncluyeAlmacen(almacen) {
   return almacen === filtroActual;
 }
 
+function tomaSheetsReciente(toma) {
+  if (mostrarHistoricasSheets) return true;
+  const fecha = String(toma.fecha || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return false;
+  const ts = new Date(fecha + 'T00:00:00').getTime();
+  if (!Number.isFinite(ts)) return false;
+  return ts >= Date.now() - DIAS_SHEETS_RECIENTES * 24 * 60 * 60 * 1000;
+}
+
+function toggleHistoricasSheets() {
+  mostrarHistoricasSheets = !mostrarHistoricasSheets;
+  document.getElementById('titulo-tomas-sheets').textContent = mostrarHistoricasSheets
+    ? 'Tomas enviadas a Sheets · históricos'
+    : `Tomas enviadas a Sheets · últimos ${DIAS_SHEETS_RECIENTES} días`;
+  document.getElementById('btn-historicas-sheets').textContent = mostrarHistoricasSheets
+    ? `Ver últimos ${DIAS_SHEETS_RECIENTES} días`
+    : 'Ver históricos';
+  renderTomas();
+}
+
 async function cargarSesionesInventario() {
   const el = document.getElementById('sesiones-container');
   if (!el) return;
@@ -421,12 +465,138 @@ function renderSesionesInventario() {
       <div class="toma-footer" style="flex-wrap:wrap;gap:6px;">
         <div class="toma-items">Operario inicial: ${esc(s.operario || '—')}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn-notas" onclick="verDetalleSesion('${esc(s.almacen)}','${esc(s.fecha)}')">Explorar</button>
           <button class="btn-pdf-card" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',false)">Generar XLSX y enviar</button>
           ${s.exportedAt ? `<button class="btn-notas" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',true)">Re-exportar</button>` : ''}
+          <button class="btn-borrar" onclick="borrarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}')">Borrar sesión</button>
         </div>
       </div>
     </div>`;
   }).join('');
+}
+
+function zonaNombre(almacen, zid) {
+  const idx = parseInt(zid, 10);
+  const cfg = INVENTARIO_AREAS[almacen] || {};
+  return cfg.zonaNames?.[idx] || (Number.isFinite(idx) ? `Zona ${idx + 1}` : zid);
+}
+
+function baseZone(key) {
+  return parseInt(key, 10);
+}
+
+function detalleTotalesPorZona(S, T) {
+  const filas = [];
+  const totales = {};
+  for (const [zid, zc] of Object.entries(S.countsByZone || {})) {
+    for (const [cod, qty] of Object.entries(zc || {})) {
+      const f = (S.presChoiceByZone?.[zid]?.[cod]) ?? factorDefault(T, cod);
+      const baseQty = qty * f;
+      totales[cod] = (totales[cod] || 0) + baseQty;
+      filas.push({ zid, cod, qty, factor:f, baseQty });
+    }
+  }
+  return { filas, totales };
+}
+
+async function verDetalleSesion(almacen, fecha) {
+  const modal = document.getElementById('modal-detalle-sesion');
+  const body = document.getElementById('detalle-sesion-body');
+  modal.style.display = 'block';
+  body.innerHTML = '<div class="loading-state"><div class="spinner-sm"></div>Cargando sesión...</div>';
+  try {
+    const [sr, tr] = await Promise.all([
+      fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(fecha)),
+      fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen))
+    ]);
+    const S = await sr.json();
+    const T = await tr.json();
+    if (!S.ok || !S.found) throw new Error('Sesión no encontrada');
+    const template = T.ok && T.found ? T : {};
+    const { filas, totales } = detalleTotalesPorZona(S, template);
+    const rawLookup = template.raw ? itemsFromRaw(template.raw, template) : {};
+    const countedCods = Object.keys(totales);
+    const zones = new Set(Object.keys(S.countsByZone || {}).map(k => baseZone(k)));
+    const completed = new Set((S.completedZones || []).map(k => baseZone(k)));
+    const manuales = S.manuales || [];
+    const updated = S.updatedAt ? new Date(S.updatedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short' }) : '—';
+    const exported = S.exportedAt ? new Date(S.exportedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short' }) : 'No';
+    const rows = filas
+      .sort((a,b) => String(a.zid).localeCompare(String(b.zid)) || String(a.cod).localeCompare(String(b.cod)))
+      .slice(0, 350)
+      .map(f => {
+        const item = rawLookup[f.cod] || { nombre:f.cod, unidad:template.unitMap?.[f.cod] || '' };
+        return `<tr>
+          <td>${esc(zonaNombre(almacen, f.zid))}</td>
+          <td>${esc(f.cod)}</td>
+          <td>${esc(item.nombre)}</td>
+          <td style="text-align:right">${esc(f.qty)}</td>
+          <td style="text-align:right">${esc(parseFloat(f.baseQty.toFixed(4)))}</td>
+          <td>${esc(item.unidad)}</td>
+        </tr>`;
+      }).join('');
+    const manualRows = manuales.map(m => `<tr>
+      <td>${esc(m.zona || '—')}</td>
+      <td>${esc(m.nombre || '—')}</td>
+      <td style="text-align:right">${esc(m.cantidad ?? '—')}</td>
+      <td>${esc(m.uni || m.unidad || '')}</td>
+    </tr>`).join('');
+    body.innerHTML = `
+      <div class="detalle-grid">
+        <div class="detalle-stat"><div class="detalle-stat-num">${countedCods.length}</div><div class="detalle-stat-label">Artículos con cantidad</div></div>
+        <div class="detalle-stat"><div class="detalle-stat-num">${zones.size}</div><div class="detalle-stat-label">Zonas con captura</div></div>
+        <div class="detalle-stat"><div class="detalle-stat-num">${completed.size}</div><div class="detalle-stat-label">Zonas cerradas</div></div>
+        <div class="detalle-stat"><div class="detalle-stat-num">${manuales.length}</div><div class="detalle-stat-label">No catalogados</div></div>
+      </div>
+      <div style="background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:12px">
+        <strong>${esc(almacen)}</strong> · ${esc(fecha)} · Operario sesión: ${esc(S.operario || '—')}<br>
+        Actualizada: ${updated} · Exportada: ${esc(exported)}${S.exportedBy ? ` por ${esc(S.exportedBy)}` : ''}
+      </div>
+      <div style="font-weight:800;margin:12px 0 6px">Capturas por zona</div>
+      <div style="max-height:320px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">
+        <table class="detalle-table">
+          <thead><tr><th>Zona</th><th>Código</th><th>Artículo</th><th style="text-align:right">Captura</th><th style="text-align:right">Base</th><th>Unidad</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">Sin cantidades capturadas</td></tr>'}</tbody>
+        </table>
+      </div>
+      ${filas.length > 350 ? `<div style="font-size:12px;color:#64748b;margin-top:6px">Mostrando 350 de ${filas.length} renglones.</div>` : ''}
+      <div style="font-weight:800;margin:14px 0 6px">No catalogados</div>
+      <div style="max-height:180px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">
+        <table class="detalle-table">
+          <thead><tr><th>Zona</th><th>Artículo</th><th style="text-align:right">Cantidad</th><th>Unidad</th></tr></thead>
+          <tbody>${manualRows || '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:16px">Sin no catalogados</td></tr>'}</tbody>
+        </table>
+      </div>`;
+  } catch(e) {
+    body.innerHTML = `<div class="error-msg">No se pudo cargar el detalle: ${esc(e.message)}</div>`;
+  }
+}
+
+function cerrarDetalleSesion() {
+  document.getElementById('modal-detalle-sesion').style.display = 'none';
+}
+
+async function borrarSesionInventario(almacen, fecha) {
+  if (!confirm(`Borrar la sesión activa ${almacen} del ${fecha}?\nEsto borra la sesión del Worker/Admin. No borra registros ya enviados a Google Sheets.`)) return;
+  try {
+    const r = await fetch(WORKER_URL + '/inv/sesion', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        action:'inv_delete',
+        almacen,
+        fecha,
+        operario:adminActual,
+        adminPassword:adminPasswordActual
+      })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'No se pudo borrar la sesión');
+    await cargarSesionesInventario();
+    alert('Sesión borrada del Admin/Worker. Los registros enviados a Sheets no se tocaron.');
+  } catch(e) {
+    alert('Error al borrar: ' + e.message);
+  }
 }
 
 function b64ToArrayBuffer(rawB64) {
@@ -636,12 +806,14 @@ function detectarDuplicados(tomas) {
 
 function renderTomas() {
   const container = document.getElementById('tomas-container');
-  const tomas = filtroActual === 'TODOS'
-    ? todasLasTomas
-    : todasLasTomas.filter(t => t.almacen_nombre === filtroActual);
+  const tomas = todasLasTomas
+    .filter(t => filtroIncluyeAlmacen(t.almacen_nombre))
+    .filter(tomaSheetsReciente);
 
   if (tomas.length === 0) {
-    container.innerHTML = '<div class="empty-state">Sin tomas registradas</div>';
+    container.innerHTML = mostrarHistoricasSheets
+      ? '<div class="empty-state">Sin tomas registradas</div>'
+      : '<div class="empty-state">Sin tomas recientes. Usa "Ver históricos" para buscar tomas antiguas.</div>';
     return;
   }
 
@@ -661,7 +833,7 @@ function renderTomas() {
         <div style="display:flex;gap:6px;">
           <button class="btn-notas" onclick="abrirModalNotasByTs('${t.timestamp}')">📝 Notas</button>
           <button class="btn-pdf-card" onclick="imprimirTomaByTs('${t.timestamp}')">📄 PDF</button>
-          <button class="btn-borrar" onclick="borrarToma('${t.timestamp}','${t.area}','${t.fecha}','${t.almacen_nombre}','${t.script_url}')">🗑 Borrar</button>
+          <button class="btn-borrar" onclick="borrarToma('${t.timestamp}','${t.area}','${t.fecha}','${t.almacen_nombre}','${t.script_url}')">Borrar Sheets</button>
         </div>
       </div>
     </div>
@@ -669,7 +841,7 @@ function renderTomas() {
 }
 
 async function borrarToma(timestamp, area, fecha, almacen, scriptUrl) {
-  if (!confirm(`¿Borrar toma de ${area} (${almacen})?\nEsta acción no se puede deshacer.`)) return;
+  if (!confirm(`Borrar de Google Sheets la toma de ${area} (${almacen})?\n\nEsto elimina el renglón maestro y la hoja detalle en el Apps Script. No borra la sesión activa del Worker.`)) return;
   
   const id = timestamp.replace(/[:.]/g,'-');
   const card = document.getElementById('toma-' + id);
@@ -677,13 +849,12 @@ async function borrarToma(timestamp, area, fecha, almacen, scriptUrl) {
 
   try {
     const url = `${scriptUrl}?action=borrar&timestamp=${encodeURIComponent(timestamp)}&area=${encodeURIComponent(area)}&fecha=${encodeURIComponent(fecha)}`;
-    await fetch(url);
-    // Con no-cors no podemos leer respuesta, asumimos éxito
-    todasLasTomas = todasLasTomas.filter(t => t.timestamp !== timestamp);
-    renderTomas();
+    await fetch(url, { mode:'no-cors', cache:'no-store' });
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    await cargarTodasLasTomas();
   } catch(e) {
     if (card) card.style.opacity = '1';
-    alert('Error al borrar. Intenta de nuevo.');
+    alert('No se pudo enviar el borrado a Apps Script. Intenta de nuevo.');
   }
 }
 

@@ -27,6 +27,8 @@ button:active{opacity:.75}
 .btn-green{background:#22c55e;color:white}
 .btn-gray{background:#e5e7eb;color:#374151}
 .btn-sm{padding:8px 14px;font-size:13px;border-radius:8px}
+.zone-done-banner{background:#f0fdf4;border:1px solid #86efac;color:#166534;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:13px;line-height:1.4}
+.zone-done-banner strong{display:block;margin-bottom:2px}
 .form-group{margin-bottom:14px}
 label{display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:5px}
 input[type=text],input[type=date],select{width:100%;padding:13px 14px;border:1px solid rgba(47,62,30,.16);border-radius:10px;font-size:16px;font-family:inherit;background:rgba(255,253,248,.82);color:var(--brand-green);-webkit-appearance:none;appearance:none}
@@ -139,6 +141,7 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
   <div class="content">
     <div id="ov-meta" style="font-size:13px;color:#888;margin-bottom:4px"></div>
     <div id="ov-warn" style="margin-bottom:8px"></div>
+    <div id="ov-feedback"></div>
     <div style="margin-bottom:16px"><div class="progress-bar"><div class="progress-fill" id="ov-bar" style="width:0%"></div></div></div>
     <div id="ov-zones"></div>
     <div style="margin-top:20px">
@@ -163,7 +166,7 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
   </div>
   <div id="count-list" style="padding-bottom:90px"></div>
   <div class="fab-bar">
-    <button class="btn btn-green" style="flex:2" onclick="doneZone()">Zona lista ✓</button>
+    <button class="btn btn-green" style="flex:2" onclick="doneZone()">Cerrar zona ✓</button>
     <button class="btn btn-gray btn-sm" style="flex:1" onclick="openManualModal()">+ No catalogado</button>
   </div>
 </div>
@@ -245,6 +248,7 @@ let _syncTimer      = null;
 let _pollTimer      = null;
 let _remoteLockedZones = {};
 let _manFotoB64     = null;
+let _lastZoneClosedMsg = '';
 
 const lsKey = k => `xtux_${k}_${ALMACEN}`;
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(lsKey(k))); } catch { return null; } };
@@ -555,6 +559,7 @@ async function startCount(zoneIdx) {
   // Si otro dispositivo está contando la misma zona, el overview lo muestra — pero no bloqueamos
   lockZone(zoneIdx, false).catch(() => {}); // registrar presencia; no bloquear si falla
   _remoteLockedZones[zoneIdx] = { device_id: getDeviceId(), operario: S.operario };
+  _lastZoneClosedMsg = '';
   CZ = zoneIdx;
   const zone = ZONAS[zoneIdx];
   document.getElementById('count-zone-name').textContent = zone.nombre;
@@ -766,10 +771,17 @@ function exitCount() {
 }
 
 function doneZone() {
-  if (CZ !== null && (S.completedZones||[]).indexOf(myZoneKey(CZ)) === -1) {
+  if (CZ === null) return;
+  const zone = ZONAS[CZ];
+  const zid = myZoneKey(CZ);
+  const zbz = S.countsByZone?.[zid] || {};
+  const filled = zone.items.filter(i => zbz[i.cod] !== undefined).length;
+  if (!confirm(`Cerrar "${zone.nombre}"?\n\nCapturaste ${filled} de ${zone.items.length} artículos en esta zona. Después volverás al listado para elegir otra zona.`)) return;
+  if ((S.completedZones||[]).indexOf(zid) === -1) {
     if (!S.completedZones) S.completedZones = [];
-    S.completedZones.push(myZoneKey(CZ));
+    S.completedZones.push(zid);
   }
+  _lastZoneClosedMsg = `${zone.nombre} quedó cerrada para ${S.operario}. Elige otra zona para continuar la toma.`;
   lsSet('s', S);
   if (CZ !== null) { lockZone(CZ, true); delete _remoteLockedZones[CZ]; }
   syncSesionWorker();
@@ -784,6 +796,9 @@ function renderOverview() {
   document.getElementById('ov-title').textContent = 'Toma · ' + S.fecha;
   document.getElementById('ov-meta').textContent  = S.operario + ' · ' + CFG.titulo;
   document.getElementById('ov-hdr').style.background = CFG.color;
+  document.getElementById('ov-feedback').innerHTML = _lastZoneClosedMsg
+    ? `<div class="zone-done-banner"><strong>Zona cerrada</strong>${esc(_lastZoneClosedMsg)}</div>`
+    : '';
 
   // Advertencia de plantilla cambiada
   const ov_warn = document.getElementById('ov-warn');

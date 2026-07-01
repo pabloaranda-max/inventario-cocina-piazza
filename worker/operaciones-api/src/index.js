@@ -433,7 +433,10 @@ async function handleInvGet(db, url) {
     const almacen = url.searchParams.get('almacen');
     const dias = Math.max(1, Math.min(90, parseInt(url.searchParams.get('dias') || '14', 10) || 14));
     const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const where = almacen ? 'WHERE almacen = ? AND fecha >= ?' : 'WHERE fecha >= ?';
+    const validDate = "fecha GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'";
+    const where = almacen
+      ? `WHERE almacen = ? AND ${validDate} AND fecha >= ?`
+      : `WHERE ${validDate} AND fecha >= ?`;
     const binds = almacen ? [almacen, desde] : [desde];
     let rows;
     try {
@@ -628,6 +631,23 @@ async function handleInvPost(db, body, env = {}) {
     await db.prepare(
       'UPDATE inv_sesiones SET exported_at = ?, exported_by = ?, updated_at = ? WHERE almacen = ? AND fecha = ?'
     ).bind(now, operario, now, almacen, fecha).run();
+    return json({ ok: true });
+  }
+
+  if (body.action === 'inv_delete') {
+    const { almacen, fecha, operario, adminPassword } = body;
+    if (!almacen || !fecha || !operario) return json({ error: 'Datos incompletos' }, 400);
+    const expectedAdminPassword = env.INV_ADMIN_PASSWORD || 'adminpasticcio2026';
+    if (!adminPassword || adminPassword !== expectedAdminPassword) {
+      return json({ ok: false, error: 'Sin permiso para borrar' }, 403);
+    }
+    const row = await db.prepare(
+      'SELECT almacen FROM inv_sesiones WHERE almacen = ? AND fecha = ?'
+    ).bind(almacen, fecha).first();
+    if (!row) return json({ error: 'Sesión no encontrada' }, 404);
+    await db.prepare(
+      'DELETE FROM inv_sesiones WHERE almacen = ? AND fecha = ?'
+    ).bind(almacen, fecha).run();
     return json({ ok: true });
   }
 
