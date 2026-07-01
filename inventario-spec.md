@@ -1,6 +1,26 @@
-# inventario.html — Especificación técnica v4.5
+# inventario.html — Especificación técnica v4.6
 
-> Última actualización: 2026-06-30. Estado: **EN PRODUCCIÓN** (CAVA probado; todas las plantillas subidas excepto GENERAL). v4.5 migra export a admin.html.
+> Última actualización: 2026-07-01. Estado: **EN PRODUCCIÓN** (CAVA probado; BARRA_RESTAURANTE inventariado en producción real con workarounds — ver §0 bugs urgentes).
+
+---
+
+## 0. BUGS URGENTES — BARRA_RESTAURANTE (inventario 2026-07-01)
+
+Pablo completó el primer inventario real de BARRA_RESTAURANTE. Funcionó pero con problemas:
+
+### Problemas detectados (detalle pendiente)
+- **Plantilla incompleta:** muchos artículos faltaban → tuvo que sumar conteos manualmente para cuadrar
+- **Bugs en zonas:** problemas en el flujo de zonas (detalles a confirmar con Pablo)
+
+### Acción requerida (primera prioridad)
+1. Completar la toma actual sin modificar las cuatro zonas ya capturadas.
+2. `inventario.html` debe complementar las zonas hardcodeadas con una zona adicional `En plantilla` que contiene artículos presentes en la plantilla Xetux pero ausentes de las zonas configuradas.
+3. Los artículos capturados en `En plantilla` se suman al export como cualquier otro `countsByZone`; no se borran ni transforman los no catalogados existentes hasta que Pablo los valide.
+4. Re-subir plantilla BARRA_RESTAURANTE solo si es indispensable y solo después de confirmar que no rompe el `templateHash` de la sesión a exportar.
+5. Verificar que el export del conteo 2026-07-01 salga correctamente.
+
+### Restricción
+**No tocar, borrar ni migrar la sesión guardada de BARRA_RESTAURANTE 2026-07-01 hasta que Pablo confirme el export ok.** Cualquier corrección debe ser aditiva: nueva zona `En plantilla`, corrección admin o comentario; nunca reindexar zonas existentes.
 
 ---
 
@@ -27,8 +47,11 @@
 - defaultPres configurable desde admin.html (ej: LT → BOTELLA 0.75)
 - Artículos sin presentaciones en Xetux reciben defaultPres según su unidad
 
+**BARRA_AMICI:** inventario 2026-07-01 completado sin problemas.
+**BARRA_RESTAURANTE:** inventario 2026-07-01 completado con workarounds (ver §0).
+
 **Pendiente:**
-- Subir plantillas de COCINA, BARRA, ALIMENTARI, GENERAL, SALUMERIA desde admin.html
+- Subir plantillas de COCINA, ALIMENTARI, GENERAL, SALUMERIA desde admin.html
 - Configurar defaultPres para cada almacén que lo necesite
 - Corregir unidades del catálogo (gradual — unitMap ya resuelve en el contador)
 - BARRA_AMICI: appsScriptUrl aún null (sin catálogo en Xetux)
@@ -544,3 +567,96 @@ Nota sobre unitMap: `parsePlantilla` captura la unidad tal como aparece en la pl
 `.welcome-logo`, `.welcome-sub-title` — del viejo hero oscuro.
 `.welcome-logo-text {}` — regla vacía.
 `.welcome-hero p { display:none }` — objetivo ya es `<div>`.
+
+---
+
+## 14. Plan posterior — preparación editable de conteo
+
+Objetivo: eliminar zonas hardcodeadas y permitir que admin prepare cada toma sin volver frágil la operación.
+
+### Principio
+
+La plantilla Xetux es la fuente total de artículos. La preparación de conteo define cómo se presentan esos artículos por almacén:
+
+- zonas editables desde `admin.html`
+- artículos activos/inactivos por zona
+- orden editable por zona
+- un artículo puede existir en una o varias zonas
+- búsqueda global sobre toda la plantilla
+- sesiones existentes nunca cambian cuando se edita una preparación futura
+
+### Experiencia recomendada
+
+No usar bloqueo duro para artículos inactivos. En operación real genera más no catalogados.
+
+Comportamiento deseado:
+
+- Artículo activo en zona: aparece normalmente.
+- Artículo en plantilla pero no activo en la zona: aparece al buscar bajo `En plantilla · no asignado a esta zona`.
+- El operario puede capturarlo, pero queda marcado como fuera de zona.
+- Admin puede revisar esos casos después y decidir si el artículo debe activarse en esa zona para futuras tomas.
+
+### Modelo propuesto D1
+
+```sql
+CREATE TABLE IF NOT EXISTS inv_zone_configs (
+  id            TEXT PRIMARY KEY,
+  almacen       TEXT NOT NULL,
+  template_hash TEXT NOT NULL DEFAULT '',
+  zones_json    TEXT NOT NULL DEFAULT '[]',
+  active        INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL
+);
+```
+
+`zones_json`:
+
+```json
+[
+  {
+    "id": "almacen_barra",
+    "nombre": "Almacén Barra",
+    "color": "#667eea",
+    "items": [
+      { "cod": "XMAT...", "orden": 10, "activo": true },
+      { "cod": "MP...", "orden": 20, "activo": false }
+    ]
+  }
+]
+```
+
+### Snapshot de sesión
+
+Al iniciar una toma, la app debe guardar el snapshot de preparación usado:
+
+```js
+S = {
+  zoneConfigId: 'cfg_...',
+  templateHash: '...',
+  zoneSnapshot: [ /* zonas, orden y activos al iniciar */ ],
+  countsByZone: {}
+}
+```
+
+Regla crítica: `inventario.html` renderiza una sesión existente desde `S.zoneSnapshot`, no desde la preparación activa actual. Así, cambiar la preparación mañana no altera una toma abierta o ya exportada.
+
+### Endpoints propuestos
+
+```
+GET  /inv/zone-config?almacen=X
+POST /inv/zone-config          action=inv_zone_config_save
+POST /inv/zone-config          action=inv_zone_config_activate
+```
+
+Guardar/activar debe requerir password admin.
+
+### Migración gradual
+
+1. Mantener el rescate actual con zona automática `En plantilla` para hardcodeados.
+2. Crear editor de preparación en `admin.html`.
+3. Guardar configs en D1 sin que `inventario.html` las use todavía.
+4. Agregar snapshot al crear sesión nueva.
+5. Hacer que `inventario.html` use `zoneSnapshot` si existe.
+6. Migrar BARRA_RESTAURANTE fuera de `AREA_CONFIG.zonas`.
+7. Eliminar hardcode cuando haya al menos una toma completa verificada con preparación editable.

@@ -499,7 +499,25 @@ async function buildItemsFromRaw(raw) {
 }
 
 async function resolveZonas() {
-  if (CFG.zonas) return CFG.zonas;
+  if (CFG.zonas) {
+    const zones = CFG.zonas.map(z => ({ ...z, items: [...(z.items || [])] }));
+    if (T?.raw) {
+      try {
+        const fromRaw = await buildItemsFromRaw(T.raw);
+        const existing = new Set(zones.flatMap(z => z.items.map(i => i.cod)));
+        const missing = fromRaw.filter(i => (i.cod in (T.rowMap || {})) && !existing.has(i.cod));
+        if (missing.length) {
+          console.info('Complementando zonas hardcodeadas con', missing.length, 'artículos del xlsx:', missing.map(i => i.cod));
+          zones.push({
+            nombre: 'En plantilla',
+            color: CFG.color,
+            items: missing
+          });
+        }
+      } catch(e) { console.warn('buildItemsFromRaw hardcoded complement:', e); }
+    }
+    return zones;
+  }
   // Cargar catálogo desde D1
   let items = [];
   try {

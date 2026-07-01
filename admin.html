@@ -980,11 +980,20 @@ async function exportarSesionInventario(almacen, fecha, force) {
     const T = await tr.json();
     if (!S.ok || !S.found) throw new Error('Sesión no encontrada');
     if (!T.ok || !T.found || !T.raw) throw new Error('Plantilla Xetux no disponible');
+    if (S.templateHash && T.templateHash && S.templateHash !== T.templateHash) {
+      throw new Error('La plantilla actual no coincide con la usada al capturar esta sesión. No se exportó nada; revisa la plantilla antes de cerrar.');
+    }
     if (S.exportedAt && !force) {
       const msg = S.exportedBy ? `Ya fue exportada por ${S.exportedBy}.` : 'Ya fue exportada.';
       if (!confirm(`${msg}\n¿Re-exportar de todos modos?`)) return;
       force = true;
     }
+    const manualesPendientes = (S.manuales || []).filter(m => m.type !== 'comment');
+    if (manualesPendientes.length && !confirm(
+      `Esta sesión tiene ${manualesPendientes.length} ítem(s) no catalogado(s).\n\n` +
+      'Si alguno sí existe en la plantilla, primero agrégalo como corrección en el detalle de sesión para que entre al XLSX.\n\n' +
+      '¿Exportar de todos modos?'
+    )) return;
 
     const totales = calcularTotalesSesion(S, T);
     const corrections = correctionsByCod(S);
