@@ -23,13 +23,13 @@ const SHEET_MAESTRA   = 'MAESTRA';
 const HEADERS_MAESTRA = [
   'Timestamp', 'Fecha', 'Operario', 'Área', 'Almacén',
   'Código', 'Nombre', 'Unidad', 'Cantidad', 'Catalogado',
-  'Descripción', 'URL Foto', 'Observación'
+  'Descripción', 'URL Foto', 'Observación', 'Estado Export'
 ];
 
 const HEADERS_DETALLE = [
   'Timestamp', 'Fecha', 'Operario', 'Área', 'Almacén',
   'Código', 'Nombre', 'Unidad', 'Cantidad', 'Catalogado',
-  'Descripción', 'URL Foto', 'Observación', 'Miniatura'
+  'Descripción', 'URL Foto', 'Observación', 'Miniatura', 'Estado Export'
 ];
 // ───────────────────────────────────────────────────────────
 
@@ -78,6 +78,7 @@ function procesarInventario(payload) {
   const maestra = obtenerOCrearHoja(ss, SHEET_MAESTRA, HEADERS_MAESTRA);
 
   // 2. Crear pestaña de detalle para este envío
+  bloquearExportacionesPrevias(ss, maestra, area, fecha, almacen);
   const nombreDetalle = generarNombreDetalle(area, fecha);
   const detalle = obtenerOCrearHoja(ss, nombreDetalle, HEADERS_DETALLE);
 
@@ -88,7 +89,7 @@ function procesarInventario(payload) {
   const filasCatalogados = (productos || []).map(p => [
     timestamp, fecha, operario, area, almacen,
     p.codigo, p.nombre, p.unidad, p.cantidad, 'SÍ',
-    '', '', p.observacion || ''
+    '', '', p.observacion || '', 'ACTUAL'
   ]);
 
   // 5. Filas de ítems manuales (con foto)
@@ -112,11 +113,11 @@ function procesarInventario(payload) {
     const filaBase = [
       timestamp, fecha, operario, area, almacen,
       'MANUAL', m.nombre, m.unidad, m.cantidad, 'NO',
-      m.descripcion || '', urlFoto, m.observacion || ''
+      m.descripcion || '', urlFoto, m.observacion || '', 'ACTUAL'
     ];
 
     filasManualesTotales.push(filaBase);
-    filasDetalleManuales.push([...filaBase, miniatura]);
+    filasDetalleManuales.push([...filaBase.slice(0, -1), miniatura, filaBase[filaBase.length - 1]]);
   }
 
   // 6. Escribir en MAESTRA (sin miniatura — columna Drive URL es suficiente)
@@ -131,7 +132,7 @@ function procesarInventario(payload) {
 
   // 7. Escribir en pestaña de detalle (con miniatura en col 13)
   const todasFilasDetalle = [
-    ...filasCatalogados.map(f => [...f, '']), // catalogados no tienen miniatura
+    ...filasCatalogados.map(f => [...f.slice(0, -1), '', f[f.length - 1]]), // catalogados no tienen miniatura
     ...filasDetalleManuales
   ];
   if (todasFilasDetalle.length > 0) {
@@ -181,14 +182,47 @@ function obtenerOCrearHoja(ss, nombre, headers) {
   return hoja;
 }
 
+function bloquearExportacionesPrevias(ss, maestra, area, fecha, almacen) {
+  const estadoCol = HEADERS_MAESTRA.indexOf('Estado Export') + 1;
+  if (estadoCol <= 0 || !maestra || maestra.getLastRow() <= 1) return;
+  const lastRow = maestra.getLastRow();
+  const data = maestra.getRange(2, 1, lastRow - 1, HEADERS_MAESTRA.length).getValues();
+  const detalles = new Set();
+  data.forEach((row, i) => {
+    if (String(row[1]) === String(fecha) && String(row[3]) === String(area) && String(row[4]) === String(almacen)) {
+      maestra.getRange(i + 2, estadoCol).setValue('REFERENCIA');
+      const ts = row[0] instanceof Date ? row[0] : new Date(row[0]);
+      if (!isNaN(ts.getTime())) {
+        detalles.add(nombreDetalleDesdeTimestamp(area, fecha, ts, 'HHmm'));
+        detalles.add(nombreDetalleDesdeTimestamp(area, fecha, ts, 'HHmmss'));
+      }
+    }
+  });
+  detalles.forEach(nombre => protegerHojaReferencia(ss.getSheetByName(nombre)));
+}
+
+function protegerHojaReferencia(hoja) {
+  if (!hoja) return;
+  hoja.setTabColor('#9ca3af');
+  const protections = hoja.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  if (!protections.length) {
+    const protection = hoja.protect().setDescription('Referencia bloqueada por re-export de inventario');
+    protection.setWarningOnly(false);
+  }
+}
+
 /**
  * Genera nombre de pestaña de detalle: AREA_YYYYMMDD_HHMM
  * Limita a 100 chars (límite de Sheets) y reemplaza caracteres inválidos.
  */
 function generarNombreDetalle(area, fecha) {
+  return nombreDetalleDesdeTimestamp(area, fecha, new Date(), 'HHmmss');
+}
+
+function nombreDetalleDesdeTimestamp(area, fecha, date, pattern) {
   const areaLimpia = area.replace(/[\/\\?\*\[\]]/g, '').substring(0, 30).trim();
   const fechaLimpia = fecha.replace(/-/g, '');
-  const hora = Utilities.formatDate(new Date(), 'America/Mexico_City', 'HHmm');
+  const hora = Utilities.formatDate(date, 'America/Mexico_City', pattern);
   return `${areaLimpia}_${fechaLimpia}_${hora}`.substring(0, 100);
 }
 
