@@ -1,0 +1,12 @@
+name = "operaciones-api"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+account_id = "ee88d3b7085fc0e166ee75e77918e6c6"
+
+[triggers]
+crons = ["0 10 * * 6", "0 10 28-31 * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "operaciones-db"
+database_id = "5ebb6fac-baca-418d-9361-bb13d7cc1190"

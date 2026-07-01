@@ -1,6 +1,6 @@
 # inventario.html — Especificación técnica v4.3
 
-> Última actualización: 2026-06-30. Estado: **EN PRODUCCIÓN** (CAVA probado, resto pendiente de plantillas).
+> Última actualización: 2026-06-30. Estado: **EN PRODUCCIÓN** (CAVA probado; todas las plantillas subidas excepto GENERAL).
 
 ---
 
@@ -209,14 +209,18 @@ S = {
   fecha:             '2026-06-26',
   templateHash:      '1f4a2b-c3d4e5f6',
   countsByZone: {
-    '0': { 'MP0001': 3.5, 'XMAT001': 2 },
-    '2': { 'MP0001': 1 }       // mismo cod, zona distinta = cantidad independiente
+    // Clave colaborativa: "zoneIdx:deviceId" — cada dispositivo tiene su propia slice
+    // myZoneKey(zoneIdx) = `${zoneIdx}:${getDeviceId()}`
+    // baseZone(key) = parseInt(key)  ← parseInt se detiene en ':' → extrae zoneIdx
+    '0:dev_xyz': { 'MP0001': 3.5, 'XMAT001': 2 },
+    '0:dev_abc': { 'MP0001': 1.0 },   // mismo cod, otro dispositivo = se suma al exportar
+    '2:dev_xyz': { 'MP0001': 1 }
   },
-  presChoiceByZone: {           // por zona — mismo cod puede tener factor distinto por zona
-    '0': { 'XMAT2409000106': 2.9 },
-    '2': { 'XMAT2409000106': 4.2 }
+  presChoiceByZone: {
+    '0:dev_xyz': { 'XMAT2409000106': 2.9 },
+    '0:dev_abc': { 'XMAT2409000106': 0.75 }  // factor propio por dispositivo
   },
-  completedZones: [0, 2],
+  completedZones: ['0:dev_xyz', '2:dev_xyz'],  // strings "zoneIdx:deviceId"
   manuales: [
     {
       id:        'dev_xyz-abc123-r4nd',
@@ -233,6 +237,8 @@ S = {
 ```
 
 **Sync parcial:** cada dispositivo solo manda su zona activa (`CZ`). Si `CZ = null`, `countsByZone = {}` — el Worker interpreta `{}` como "sin cambios en conteos", no como "borrar todo".
+
+**Conteo colaborativo:** dos o más usuarios pueden contar la misma zona simultáneamente. La clave `"zoneIdx:deviceId"` garantiza que el Worker nunca mezcle conteos de dispositivos distintos. Para claves con ':', el Worker reemplaza la slice completa (permite borrar cantidades); para claves legacy sin ':', sigue haciendo merge superficial. Al exportar el Excel/Sheets, el cliente baja la sesión más reciente del Worker y suma todos los deviceId para cada zoneIdx antes de procesar.
 
 ---
 
