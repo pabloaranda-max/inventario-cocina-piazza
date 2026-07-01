@@ -437,9 +437,17 @@ async function resolveZonas() {
     }
   } catch(e) { console.warn('articulos fetch:', e); }
 
-  // Sin catálogo en D1 pero hay plantilla con raw → leer artículos del xlsx
-  if (items.length === 0 && T?.raw) {
-    try { items = await buildItemsFromRaw(T.raw); } catch(e) { console.warn('buildItemsFromRaw:', e); }
+  // Complementar con artículos del xlsx que estén en rowMap pero falten en D1
+  if (T?.raw) {
+    try {
+      const fromRaw = await buildItemsFromRaw(T.raw);
+      const existing = new Set(items.map(i => i.cod));
+      const missing = fromRaw.filter(i => (i.cod in (T.rowMap || {})) && !existing.has(i.cod));
+      if (missing.length) {
+        console.info('Complementando catálogo con', missing.length, 'artículos del xlsx:', missing.map(i => i.cod));
+        items = [...items, ...missing];
+      }
+    } catch(e) { console.warn('buildItemsFromRaw complement:', e); }
   }
 
   // Si hay zonaNames, replicar el catálogo en N zonas independientes
