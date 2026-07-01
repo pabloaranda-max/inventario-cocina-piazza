@@ -338,6 +338,8 @@ let adminPasswordActual = '';
 let mostrarHistoricasSheets = false;
 const DIAS_SHEETS_RECIENTES = 30;
 const exportandoSesiones = new Set();
+let _modalSesion = null;
+let _modalTemplate = null;
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 // ── AUTH ──────────────────────────────────────────────────
@@ -532,6 +534,8 @@ async function verDetalleSesion(almacen, fecha) {
     const T = await tr.json();
     if (!S.ok || !S.found) throw new Error('Sesión no encontrada');
     const template = T.ok && T.found ? T : {};
+    _modalSesion = S;
+    _modalTemplate = template;
     const { filas, totales } = detalleTotalesPorZona(S, template);
     const rawLookup = template.raw ? itemsFromRaw(template.raw, template) : {};
     const countedCods = Object.keys(totales);
@@ -610,6 +614,31 @@ async function verDetalleSesion(almacen, fecha) {
       </div>
       <button class="btn-guardar-corr" onclick="guardarCorrecciones('${esc(almacen)}','${esc(fecha)}')">Guardar correcciones</button>
       <div id="corr-save-msg" style="margin-top:8px;font-size:13px"></div>
+      <div style="font-weight:800;margin:16px 0 4px">Añadir artículo</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:8px">Si contaste el artículo incorrecto: pon el código equivocado en 0 arriba, y aquí agrega el correcto.</div>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;background:#f8fafc;padding:10px;border-radius:8px;border:1px solid #e2e8f0">
+        <div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:3px">Código</div>
+          <input id="add-cod-input" type="text" placeholder="ej: MP0553" list="add-cod-list"
+            style="width:130px;border:1px solid #c4b5fd;border-radius:5px;padding:5px 8px;font-size:13px"
+            oninput="actualizarNombreArticulo()">
+          <datalist id="add-cod-list">${Object.keys(template.rowMap || {}).map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:3px">Nombre</div>
+          <div id="add-nombre-display" style="font-size:12px;color:#374151;min-width:120px;padding:6px 0">—</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:3px">Cantidad (base)</div>
+          <input id="add-qty-input" type="number" step="any" min="0" placeholder="0"
+            style="width:80px;border:1px solid #c4b5fd;border-radius:5px;padding:5px 8px;font-size:13px">
+        </div>
+        <button onclick="agregarArticuloCorrecion('${esc(almacen)}','${esc(fecha)}')"
+          style="background:#7c3aed;color:white;padding:7px 16px;border-radius:6px;font-size:13px;white-space:nowrap">
+          Agregar →
+        </button>
+      </div>
+      <div id="add-art-msg" style="margin-top:6px;font-size:13px"></div>
       <div style="font-weight:800;margin:14px 0 6px">Detalle por zona</div>
       <div style="max-height:240px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">
         <table class="detalle-table">
@@ -632,6 +661,52 @@ async function verDetalleSesion(almacen, fecha) {
 
 function cerrarDetalleSesion() {
   document.getElementById('modal-detalle-sesion').style.display = 'none';
+  _modalSesion = null;
+  _modalTemplate = null;
+}
+
+function actualizarNombreArticulo() {
+  const cod = document.getElementById('add-cod-input')?.value?.trim().toUpperCase();
+  const el  = document.getElementById('add-nombre-display');
+  if (!el) return;
+  if (!cod) { el.textContent = '—'; return; }
+  const T = _modalTemplate || {};
+  const rawLookup = T.raw ? itemsFromRaw(T.raw, T) : {};
+  const nombre = rawLookup[cod]?.nombre || (T.rowMap?.[cod] !== undefined ? cod : null);
+  el.textContent = nombre || '⚠ Código no en plantilla';
+  el.style.color  = nombre ? '#374151' : '#dc2626';
+}
+
+async function agregarArticuloCorrecion(almacen, fecha) {
+  const codEl = document.getElementById('add-cod-input');
+  const qtyEl = document.getElementById('add-qty-input');
+  const msg   = document.getElementById('add-art-msg');
+  const cod   = codEl?.value?.trim().toUpperCase();
+  const qty   = parseFloat(qtyEl?.value);
+  if (!cod) { msg.innerHTML = '<span style="color:#dc2626">Escribe un código.</span>'; return; }
+  if (isNaN(qty) || qty < 0) { msg.innerHTML = '<span style="color:#dc2626">Cantidad inválida.</span>'; return; }
+  const T = _modalTemplate || {};
+  if (T.rowMap && !(cod in T.rowMap)) {
+    if (!confirm(`El código "${cod}" no está en la plantilla y no se exportará al XLSX.\n¿Agregarlo de todas formas?`)) return;
+  }
+  msg.innerHTML = '<span style="color:#64748b">Guardando…</span>';
+  try {
+    const r = await fetch(WORKER_URL + '/inv/sesion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'inv_sesion', almacen, fecha, operario: adminActual,
+        correctionsByZone: { '_admin': { [cod]: { qty, operario: adminActual, ts: new Date().toISOString() } } } })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al guardar');
+    msg.innerHTML = `<span style="color:#16a34a">✅ ${cod} agregado con cantidad ${qty}.</span>`;
+    codEl.value = '';
+    qtyEl.value = '';
+    document.getElementById('add-nombre-display').textContent = '—';
+    await cargarSesionesInventario();
+  } catch(e) {
+    msg.innerHTML = `<span style="color:#dc2626">❌ ${esc(e.message)}</span>`;
+  }
 }
 
 async function guardarCorrecciones(almacen, fecha) {
