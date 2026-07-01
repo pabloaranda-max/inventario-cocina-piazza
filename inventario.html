@@ -29,6 +29,7 @@ button:active{opacity:.75}
 .btn-sm{padding:8px 14px;font-size:13px;border-radius:8px}
 .zone-done-banner{background:#f0fdf4;border:1px solid #86efac;color:#166534;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:13px;line-height:1.4}
 .zone-done-banner strong{display:block;margin-bottom:2px}
+.correction-badge{display:inline-block;margin-top:4px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:700}
 .form-group{margin-bottom:14px}
 label{display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:5px}
 input[type=text],input[type=date],select{width:100%;padding:13px 14px;border:1px solid rgba(47,62,30,.16);border-radius:10px;font-size:16px;font-family:inherit;background:rgba(255,253,248,.82);color:var(--brand-green);-webkit-appearance:none;appearance:none}
@@ -44,6 +45,7 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
 .zone-card:active{opacity:.8}
 .zone-card.done{border-left-color:#22c55e}
 .zone-card.partial{border-left-color:#f59e0b}
+.zone-card.corrected{border-left-color:#facc15;background:#fffbeb}
 .zone-card.locked{border-left-color:#94a3b8;cursor:not-allowed;opacity:.6}
 .zone-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .zone-info{flex:1;min-width:0}
@@ -52,6 +54,7 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
 .zone-status{font-size:20px}
 .subgrupo-hdr{font-size:11px;font-weight:700;color:var(--brand-muted);text-transform:uppercase;letter-spacing:1px;padding:10px 16px 4px;background:rgba(47,62,30,.04)}
 .item-row{background:var(--brand-paper);padding:11px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--brand-border)}
+.item-row.corrected{background:#fffbeb}
 .item-row.hidden{display:none}
 .item-text{flex:1;min-width:0}
 .item-name{font-size:14px;font-weight:600}
@@ -269,6 +272,22 @@ function newManualId() {
   return getDeviceId() + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,6);
 }
 
+function normalizeSesion(d) {
+  return {
+    operario:d.operario,
+    fecha:d.fecha,
+    templateHash:d.templateHash||'',
+    countsByZone:d.countsByZone||{},
+    presChoiceByZone:d.presChoiceByZone||{},
+    correctionsByZone:d.correctionsByZone||{},
+    completedZones:d.completedZones||[],
+    manuales:d.manuales||[],
+    lockedZones:d.lockedZones||{},
+    reopenedZones:d.reopenedZones||{},
+    pendingCompletedZoneRemovals:d.pendingCompletedZoneRemovals||[]
+  };
+}
+
 const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fmtNum = v => parseFloat(v.toFixed(4)).toString();
 
@@ -306,7 +325,7 @@ async function fetchSesionWorker(fecha) {
     if (!r.ok) return null;
     const d = await r.json();
     if (!d.ok || !d.found) return null;
-    return { operario:d.operario, fecha:d.fecha, templateHash:d.templateHash||'', countsByZone:d.countsByZone||{}, presChoiceByZone:d.presChoiceByZone||{}, completedZones:d.completedZones||[], manuales:d.manuales||[], lockedZones:d.lockedZones||{} };
+    return normalizeSesion(d);
   } catch(e) { console.warn('sesion fetch:', e); return null; }
 }
 
@@ -317,10 +336,30 @@ function syncSesionWorker() {
   const myKey = CZ !== null ? myZoneKey(CZ) : null;
   const cbz   = myKey ? { [myKey]: S.countsByZone?.[myKey]  || {} } : {};
   const pcbz  = myKey ? { [myKey]: S.presChoiceByZone?.[myKey] || {} } : {};
+  const removeCompletedZones = S.pendingCompletedZoneRemovals || [];
   fetch(WORKER_URL + '/inv/sesion', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ action:'inv_sesion', almacen:ALMACEN, operario:S.operario, fecha:S.fecha, templateHash:S.templateHash||'', countsByZone:cbz, presChoiceByZone:pcbz, completedZones:S.completedZones||[], manuales:S.manuales||[] })
-  }).catch(e => console.warn('sesion sync:', e));
+    body: JSON.stringify({
+      action:'inv_sesion',
+      almacen:ALMACEN,
+      operario:S.operario,
+      fecha:S.fecha,
+      templateHash:S.templateHash||'',
+      countsByZone:cbz,
+      presChoiceByZone:pcbz,
+      correctionsByZone:S.correctionsByZone||{},
+      completedZones:S.completedZones||[],
+      removeCompletedZones,
+      manuales:S.manuales||[]
+    })
+  })
+  .then(() => {
+    if (removeCompletedZones.length && S) {
+      S.pendingCompletedZoneRemovals = (S.pendingCompletedZoneRemovals || []).filter(z => !removeCompletedZones.includes(z));
+      lsSet('s', S);
+    }
+  })
+  .catch(e => console.warn('sesion sync:', e));
 }
 
 function scheduleSyncSesion() { clearTimeout(_syncTimer); _syncTimer = setTimeout(syncSesionWorker, 3000); }
@@ -341,7 +380,11 @@ async function pollLocks() {
     const r = await fetch(WORKER_URL + '/inv/sesion?almacen=' + ALMACEN + '&fecha=' + encodeURIComponent(S.fecha));
     if (!r.ok) return;
     const d = await r.json();
-    if (d.ok && d.found) { _remoteLockedZones = d.lockedZones || {}; renderOverview(); }
+    if (d.ok && d.found) {
+      _remoteLockedZones = d.lockedZones || {};
+      S.correctionsByZone = d.correctionsByZone || S.correctionsByZone || {};
+      renderOverview();
+    }
   } catch(e) {}
 }
 
@@ -527,7 +570,7 @@ function renderAreaWelcome() {
 
 function loadRemoteSesion() {
   _remoteLockedZones = _remoteSes.lockedZones || {};
-  S = { operario:_remoteSes.operario, fecha:_remoteSes.fecha, templateHash:_remoteSes.templateHash||'', countsByZone:_remoteSes.countsByZone||{}, presChoiceByZone:_remoteSes.presChoiceByZone||{}, completedZones:_remoteSes.completedZones||[], manuales:_remoteSes.manuales||[] };
+  S = normalizeSesion(_remoteSes);
   _remoteSes = null;
   lsSet('s', S);
   go('overview');
@@ -545,7 +588,7 @@ function startSession() {
   const fecha    = document.getElementById('inp-fecha').value;
   if (!operario) { alert('Ingresa tu nombre'); return; }
   if (!fecha)    { alert('Selecciona la fecha'); return; }
-  S = { operario, fecha, templateHash: T?.templateHash||'', countsByZone:{}, presChoiceByZone:{}, completedZones:[], manuales:[] };
+  S = { operario, fecha, templateHash: T?.templateHash||'', countsByZone:{}, presChoiceByZone:{}, correctionsByZone:{}, completedZones:[], manuales:[], reopenedZones:{}, pendingCompletedZoneRemovals:[] };
   lsSet('s', S);
   syncSesionWorker();
   go('overview');
@@ -570,6 +613,25 @@ async function startCount(zoneIdx) {
   go('count');
 }
 
+function reopenZone(zoneIdx) {
+  const zid = myZoneKey(zoneIdx);
+  const zone = ZONAS[zoneIdx];
+  if ((S.completedZones||[]).indexOf(zid) === -1) {
+    startCount(zoneIdx);
+    return;
+  }
+  if (!confirm(`Editar "${zone.nombre}"?\n\nLos cambios que hagas se marcarán en amarillo en Admin y Sheets.`)) return;
+  S.completedZones = (S.completedZones || []).filter(z => z !== zid);
+  if (!S.reopenedZones) S.reopenedZones = {};
+  if (!S.pendingCompletedZoneRemovals) S.pendingCompletedZoneRemovals = [];
+  S.reopenedZones[zid] = true;
+  if (!S.pendingCompletedZoneRemovals.includes(zid)) S.pendingCompletedZoneRemovals.push(zid);
+  _lastZoneClosedMsg = `${zone.nombre} reabierta. Los cambios quedarán marcados como corrección.`;
+  lsSet('s', S);
+  syncSesionWorker();
+  startCount(zoneIdx);
+}
+
 function getQtyForZone(zid, cod) {
   return (S.countsByZone?.[zid])?.[cod];
 }
@@ -585,12 +647,29 @@ function getPresChoice(zid, cod) {
   return (S.presChoiceByZone?.[zid])?.[cod] ?? null;
 }
 
+function markCorrection(zid, cod, tipo) {
+  if (!S.reopenedZones?.[zid]) return;
+  if (!S.correctionsByZone) S.correctionsByZone = {};
+  if (!S.correctionsByZone[zid]) S.correctionsByZone[zid] = {};
+  S.correctionsByZone[zid][cod] = {
+    tipo,
+    operario:S.operario,
+    at:new Date().toISOString(),
+    zona:ZONAS[baseZone(zid)]?.nombre || ''
+  };
+}
+
+function hasCorrection(zid, cod) {
+  return !!S.correctionsByZone?.[zid]?.[cod];
+}
+
 function renderItemRow(item, zid, inOtherZone) {
   const raw    = getQtyForZone(zid, item.cod);
   const flt    = raw !== undefined ? parseFloat(raw) : NaN;
   const opts   = getPresOptions(item.cod);
   const chosen = getPresChoice(zid, item.cod) ?? (opts[0]?.factor ?? null);
   const filled = raw !== undefined ? 'filled' : '';
+  const corrected = hasCorrection(zid, item.cod);
   const dataZ  = `data-zid="${zid}"`;
 
   let presHtml = '';
@@ -611,10 +690,11 @@ function renderItemRow(item, zid, inOtherZone) {
   const unitWarn  = (item.uni === 'LT' || item.uni === 'KG') && opts.length === 0 ? ' warn' : '';
   const inputStep = opts.length > 0 && item.uni !== 'PZA' ? '0.5' : '0.01';
 
-  return `<div class="item-row${inOtherZone?' other-zone':''}" data-search="${esc(item.art)} ${esc(item.cod)}">
+  return `<div class="item-row${inOtherZone?' other-zone':''}${corrected?' corrected':''}" data-search="${esc(item.art)} ${esc(item.cod)}">
     <div class="item-text">
       <div class="item-name">${esc(item.art)}</div>
       <div class="item-unit${unitWarn}">${unitLabel}</div>
+      ${corrected ? '<span class="correction-badge">Editado despues de cerrar</span>' : ''}
     </div>
     <div class="qty-wrap">
       ${presHtml}
@@ -649,6 +729,7 @@ function onQty(inp) {
 
   if (v !== '' && !isNaN(num) && num >= 0) {
     S.countsByZone[zid][cod] = num;
+    markCorrection(zid, cod, 'cantidad');
     // Actualizar badge LT
     const chosen = getPresChoice(zid, cod) ?? (getPresOptions(cod)[0]?.factor ?? null);
     if (chosen) {
@@ -657,6 +738,7 @@ function onQty(inp) {
     }
   } else {
     delete S.countsByZone[zid][cod];
+    markCorrection(zid, cod, 'borrado');
     const badge = document.getElementById('ltb_' + zid + '_' + cod);
     if (badge) badge.textContent = '— ' + (getPresOptions(cod)[0] ? (ZONAS[CZ]?.items.find(i=>i.cod===cod)?.uni||'LT') : 'LT');
   }
@@ -674,6 +756,7 @@ function onPresChange(sel) {
   if (!S.presChoiceByZone) S.presChoiceByZone = {};
   if (!S.presChoiceByZone[zid]) S.presChoiceByZone[zid] = {};
   S.presChoiceByZone[zid][cod] = f;
+  markCorrection(zid, cod, 'presentacion');
   // Recalcular badge
   const qty = getQtyForZone(zid, cod);
   const badge = document.getElementById('ltb_' + zid + '_' + cod);
@@ -816,20 +899,24 @@ function renderOverview() {
         for (const [cod, qty] of Object.entries(counts)) zbz[cod] = (zbz[cod]||0) + qty;
       }
     }
-    const zoneFilled = zone.items.filter(it => zbz[it.cod] !== undefined).length;
-    const done       = (S.completedZones||[]).indexOf(myZoneKey(i)) !== -1;
-    const pct        = zone.items.length ? Math.round(zoneFilled / zone.items.length * 100) : 0;
+	    const zoneFilled = zone.items.filter(it => zbz[it.cod] !== undefined).length;
+	    const done       = (S.completedZones||[]).indexOf(myZoneKey(i)) !== -1;
+	    const zid        = myZoneKey(i);
+	    const correctedCount = Object.keys(S.correctionsByZone?.[zid] || {}).length;
+	    const pct        = zone.items.length ? Math.round(zoneFilled / zone.items.length * 100) : 0;
     total  += zone.items.length;
     filled += zoneFilled;
     if (!done) allDone = false;
     const remoteLock    = _remoteLockedZones[i];
     const otherCounting = !done && remoteLock && remoteLock.device_id !== getDeviceId();
     const myLock        = !done && remoteLock && remoteLock.device_id === getDeviceId();
-    const cls    = done ? 'done' : zoneFilled > 0 ? 'partial' : '';
-    const icon   = done ? '✅' : myLock ? '✏️' : zoneFilled > 0 ? '⏳' : '○';
-    let metaLine = zoneFilled + '/' + zone.items.length + ' · ' + pct + '%';
-    if (otherCounting) metaLine += ' · ' + esc(remoteLock.operario) + ' contando';
-    const clickAttr = !done ? ` onclick="startCount(${i})"` : '';
+	    const cls    = correctedCount ? 'corrected' : done ? 'done' : zoneFilled > 0 ? 'partial' : '';
+	    const icon   = correctedCount ? '!' : done ? '✓' : myLock ? '✎' : zoneFilled > 0 ? '...' : '○';
+	    let metaLine = zoneFilled + '/' + zone.items.length + ' · ' + pct + '%';
+	    if (otherCounting) metaLine += ' · ' + esc(remoteLock.operario) + ' contando';
+	    if (done) metaLine += ' · cerrada, toca para editar';
+	    if (correctedCount) metaLine += ` · ${correctedCount} correccion${correctedCount!==1?'es':''}`;
+	    const clickAttr = done ? ` onclick="reopenZone(${i})"` : ` onclick="startCount(${i})"`;
     return `<div class="zone-card ${cls}"${clickAttr}>
       <div class="zone-dot" style="background:${zone.color}"></div>
       <div class="zone-info">

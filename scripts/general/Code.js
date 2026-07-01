@@ -12,13 +12,13 @@ const SHEET_MAESTRA   = 'MAESTRA';
 const HEADERS_MAESTRA = [
   'Timestamp', 'Fecha', 'Operario', 'Área', 'Almacén',
   'Código', 'Nombre', 'Unidad', 'Cantidad', 'Catalogado',
-  'Descripción', 'URL Foto'
+  'Descripción', 'URL Foto', 'Observación'
 ];
 
 const HEADERS_DETALLE = [
   'Timestamp', 'Fecha', 'Operario', 'Área', 'Almacén',
   'Código', 'Nombre', 'Unidad', 'Cantidad', 'Catalogado',
-  'Descripción', 'URL Foto', 'Miniatura'
+  'Descripción', 'URL Foto', 'Observación', 'Miniatura'
 ];
 
 function doPost(e) {
@@ -67,7 +67,7 @@ function procesarInventario(payload) {
   const filasCatalogados = (productos || []).map(p => [
     timestamp, fecha, operario, area, almacen,
     p.codigo, p.nombre, p.unidad, p.cantidad, 'SÍ',
-    '', ''
+    '', '', p.observacion || ''
   ]);
 
   const filasManualesTotales = [];
@@ -90,7 +90,7 @@ function procesarInventario(payload) {
     const filaBase = [
       timestamp, fecha, operario, area, almacen,
       'MANUAL', m.nombre, m.unidad, m.cantidad, 'NO',
-      m.descripcion || '', urlFoto
+      m.descripcion || '', urlFoto, m.observacion || ''
     ];
     filasManualesTotales.push(filaBase);
     filasDetalleManuales.push([...filaBase, miniatura]);
@@ -102,6 +102,7 @@ function procesarInventario(payload) {
       maestra.getLastRow() + 1, 1,
       todasFilasMaestra.length, HEADERS_MAESTRA.length
     ).setValues(todasFilasMaestra);
+    resaltarCorrecciones(maestra, maestra.getLastRow() - todasFilasMaestra.length + 1, todasFilasMaestra, HEADERS_MAESTRA.indexOf('Observación'));
   }
 
   const todasFilasDetalle = [
@@ -113,6 +114,7 @@ function procesarInventario(payload) {
       detalle.getLastRow() + 1, 1,
       todasFilasDetalle.length, HEADERS_DETALLE.length
     ).setValues(todasFilasDetalle);
+    resaltarCorrecciones(detalle, detalle.getLastRow() - todasFilasDetalle.length + 1, todasFilasDetalle, HEADERS_DETALLE.indexOf('Observación'));
   }
 
   if (detalle.getLastRow() > 1) {
@@ -277,6 +279,13 @@ function procesarNotas(payload) {
   return { notas: correcciones ? correcciones.length : 0 };
 }
 
+function resaltarCorrecciones(hoja, startRow, filas, obsIdx) {
+  if (obsIdx < 0 || startRow < 2) return;
+  filas.forEach((fila, i) => {
+    if (fila[obsIdx]) hoja.getRange(startRow + i, 1, 1, fila.length).setBackground('#fef3c7');
+  });
+}
+
 function obtenerOCrearHoja(ss, nombre, headers) {
   let hoja = ss.getSheetByName(nombre);
   if (!hoja) {
@@ -285,6 +294,9 @@ function obtenerOCrearHoja(ss, nombre, headers) {
     hoja.setFrozenRows(1);
     hoja.getRange(1, 1, 1, headers.length).setFontWeight('bold');
   }
+  hoja.getRange(1, 1, 1, headers.length).setValues([headers]);
+  hoja.setFrozenRows(1);
+  hoja.getRange(1, 1, 1, headers.length).setFontWeight('bold');
   return hoja;
 }
 

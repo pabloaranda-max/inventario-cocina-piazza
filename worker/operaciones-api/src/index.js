@@ -400,7 +400,7 @@ async function handleInvGet(db, url) {
     try {
       row = await db.prepare(
         `SELECT operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
-                completed_zones, locked_zones, manuales, template_hash, updated_at,
+                corrections_by_zone, completed_zones, locked_zones, manuales, template_hash, updated_at,
                 exported_at, exported_by
          FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
       ).bind(almacen, fecha).first();
@@ -419,6 +419,7 @@ async function handleInvGet(db, url) {
       templateHash:     row.template_hash || '',
       countsByZone:     JSON.parse(row.counts_by_zone || '{}'),
       presChoiceByZone: JSON.parse(row.pres_choice_by_zone || '{}'),
+      correctionsByZone: JSON.parse(row.corrections_by_zone || '{}'),
       completedZones:   JSON.parse(row.completed_zones || '[]'),
       lockedZones:      JSON.parse(row.locked_zones || '{}'),
       manuales:         JSON.parse(row.manuales || '[]'),
@@ -442,7 +443,7 @@ async function handleInvGet(db, url) {
     try {
       rows = await db.prepare(
         `SELECT almacen, operario, fecha, updated_at, exported_at, exported_by,
-                counts_by_zone, completed_zones, manuales
+                counts_by_zone, corrections_by_zone, completed_zones, manuales
          FROM inv_sesiones ${where}
          ORDER BY fecha DESC, updated_at DESC
          LIMIT 200`
@@ -462,6 +463,9 @@ async function handleInvGet(db, url) {
       for (const zc of Object.values(cbz)) for (const cod of Object.keys(zc)) cods.add(cod);
       const completedZones = JSON.parse(row.completed_zones || '[]');
       const uniqueZones = new Set(completedZones.map(k => parseInt(k)));
+      const correctionsByZone = JSON.parse(row.corrections_by_zone || '{}');
+      const correctedCods = new Set();
+      for (const zc of Object.values(correctionsByZone)) for (const cod of Object.keys(zc || {})) correctedCods.add(cod);
       return {
         almacen:          row.almacen,
         operario:         row.operario,
@@ -470,7 +474,8 @@ async function handleInvGet(db, url) {
         exportedAt:       row.exported_at || '',
         exportedBy:       row.exported_by || '',
         articulosContados: cods.size,
-        zonasCompletadas: uniqueZones.size
+        zonasCompletadas: uniqueZones.size,
+        correcciones:     correctedCods.size
       };
     });
     return json({ ok: true, sesiones });
@@ -509,14 +514,22 @@ async function handleInvPost(db, body, env = {}) {
   }
 
   if (body.action === 'inv_sesion') {
-    const { almacen, operario, fecha, countsByZone, presChoiceByZone, completedZones, manuales, templateHash,
-            counts } = body; // counts legacy para barra.html
+    const { almacen, operario, fecha, countsByZone, presChoiceByZone, correctionsByZone,
+            completedZones, removeCompletedZones, manuales, templateHash, counts } = body; // counts legacy para barra.html
     if (!almacen || !operario || !fecha) return json({ error: 'Datos incompletos' }, 400);
 
-    const existing = await db.prepare(
-      `SELECT counts, counts_by_zone, pres_choice_by_zone, completed_zones, manuales
-       FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
-    ).bind(almacen, fecha).first();
+    let existing;
+    try {
+      existing = await db.prepare(
+        `SELECT counts, counts_by_zone, pres_choice_by_zone, corrections_by_zone, completed_zones, manuales
+         FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
+      ).bind(almacen, fecha).first();
+    } catch (err) {
+      existing = await db.prepare(
+        `SELECT counts, counts_by_zone, pres_choice_by_zone, completed_zones, manuales
+         FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
+      ).bind(almacen, fecha).first();
+    }
 
     // Merge countsByZone por zona. Las claves colaborativas "zona:deviceId"
     // representan el estado completo de ese dispositivo, así que se reemplazan
@@ -538,6 +551,13 @@ async function handleInvPost(db, body, env = {}) {
       else mergedPCBZ[zid] = { ...(mergedPCBZ[zid] || {}), ...zpc };
     }
 
+    const existingCorrections = JSON.parse(existing?.corrections_by_zone || '{}');
+    const incomingCorrections = correctionsByZone || {};
+    const mergedCorrections = { ...existingCorrections };
+    for (const [zid, corr] of Object.entries(incomingCorrections)) {
+      mergedCorrections[zid] = { ...(mergedCorrections[zid] || {}), ...(corr || {}) };
+    }
+
     // Merge manuales por id
     const existingManuales = JSON.parse(existing?.manuales || '[]');
     const manMap = Object.fromEntries(existingManuales.map(m => [m.id, m]));
@@ -546,7 +566,8 @@ async function handleInvPost(db, body, env = {}) {
 
     // completedZones: union
     const existingZones = JSON.parse(existing?.completed_zones || '[]');
-    const mergedZones = [...new Set([...existingZones, ...(completedZones || [])])];
+    const removedZones = new Set(removeCompletedZones || []);
+    const mergedZones = [...new Set([...existingZones.filter(z => !removedZones.has(z)), ...(completedZones || [])])];
 
     // Legacy counts merge (para barra.html)
     const existingCounts = JSON.parse(existing?.counts || '{}');
@@ -555,13 +576,14 @@ async function handleInvPost(db, body, env = {}) {
     await db.prepare(`
       INSERT INTO inv_sesiones
         (almacen, operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
-         completed_zones, locked_zones, manuales, template_hash, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?)
+         corrections_by_zone, completed_zones, locked_zones, manuales, template_hash, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?)
       ON CONFLICT(almacen, fecha) DO UPDATE SET
         operario           = excluded.operario,
         counts             = excluded.counts,
         counts_by_zone     = excluded.counts_by_zone,
         pres_choice_by_zone = excluded.pres_choice_by_zone,
+        corrections_by_zone = excluded.corrections_by_zone,
         completed_zones    = excluded.completed_zones,
         manuales           = excluded.manuales,
         template_hash      = excluded.template_hash,
@@ -571,6 +593,7 @@ async function handleInvPost(db, body, env = {}) {
       JSON.stringify(mergedCounts),
       JSON.stringify(mergedCBZ),
       JSON.stringify(mergedPCBZ),
+      JSON.stringify(mergedCorrections),
       JSON.stringify(mergedZones),
       JSON.stringify(mergedManuales),
       templateHash || '',

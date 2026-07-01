@@ -106,6 +106,8 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
 .detalle-table { width:100%; border-collapse:collapse; font-size:12px; }
 .detalle-table th { text-align:left; color:#64748b; font-size:11px; border-bottom:1px solid #e2e8f0; padding:6px 4px; }
 .detalle-table td { border-bottom:1px solid #f1f5f9; padding:6px 4px; vertical-align:top; }
+.detalle-table tr.corr-row td { background:#fffbeb; }
+.corr-badge { display:inline-block;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:700; }
 .corr-block { border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:8px; background:#f8fafc; }
 .corr-input { width:100%; border:1px solid #ddd; border-radius:6px; padding:7px; font-size:13px; margin-bottom:6px; box-sizing:border-box; }
 /* PLANTILLAS */
@@ -454,13 +456,14 @@ function renderSesionesInventario() {
       : `<span style="background:#fffbeb;color:#92400e;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">Pendiente</span>`;
     const updated = s.updatedAt ? new Date(s.updatedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short' }) : '—';
     const exportTxt = s.exportedAt ? ` · Exportada por ${esc(s.exportedBy || '—')}` : '';
+    const corrTxt = s.correcciones ? ` · ${s.correcciones} corrección${s.correcciones!==1?'es':''}` : '';
     return `<div class="toma-card" style="border-left-color:${s.exportedAt ? '#16a34a' : '#f59e0b'}">
       <div class="toma-header">
         <div class="toma-operario">${esc(cfg.titulo)} ${exp}</div>
         <div class="toma-almacen">${esc(s.almacen)}</div>
       </div>
       <div class="toma-meta">
-        Fecha ${esc(s.fecha)} · ${s.articulosContados || s.countedItems || 0} artículos · ${s.zonasCompletadas || 0} zonas listas · Actualizada ${updated}${exportTxt}
+        Fecha ${esc(s.fecha)} · ${s.articulosContados || s.countedItems || 0} artículos · ${s.zonasCompletadas || 0} zonas listas${corrTxt} · Actualizada ${updated}${exportTxt}
       </div>
       <div class="toma-footer" style="flex-wrap:wrap;gap:6px;">
         <div class="toma-items">Operario inicial: ${esc(s.operario || '—')}</div>
@@ -492,11 +495,23 @@ function detalleTotalesPorZona(S, T) {
     for (const [cod, qty] of Object.entries(zc || {})) {
       const f = (S.presChoiceByZone?.[zid]?.[cod]) ?? factorDefault(T, cod);
       const baseQty = qty * f;
+      const correction = S.correctionsByZone?.[zid]?.[cod] || null;
       totales[cod] = (totales[cod] || 0) + baseQty;
-      filas.push({ zid, cod, qty, factor:f, baseQty });
+      filas.push({ zid, cod, qty, factor:f, baseQty, correction });
     }
   }
   return { filas, totales };
+}
+
+function correctionsByCod(S) {
+  const out = {};
+  for (const [zid, zc] of Object.entries(S.correctionsByZone || {})) {
+    for (const [cod, corr] of Object.entries(zc || {})) {
+      if (!out[cod]) out[cod] = [];
+      out[cod].push({ zid, ...corr });
+    }
+  }
+  return out;
 }
 
 async function verDetalleSesion(almacen, fecha) {
@@ -516,6 +531,8 @@ async function verDetalleSesion(almacen, fecha) {
     const { filas, totales } = detalleTotalesPorZona(S, template);
     const rawLookup = template.raw ? itemsFromRaw(template.raw, template) : {};
     const countedCods = Object.keys(totales);
+    const correctedCods = new Set();
+    for (const zc of Object.values(S.correctionsByZone || {})) for (const cod of Object.keys(zc || {})) correctedCods.add(cod);
     const zones = new Set(Object.keys(S.countsByZone || {}).map(k => baseZone(k)));
     const completed = new Set((S.completedZones || []).map(k => baseZone(k)));
     const manuales = S.manuales || [];
@@ -526,10 +543,11 @@ async function verDetalleSesion(almacen, fecha) {
       .slice(0, 350)
       .map(f => {
         const item = rawLookup[f.cod] || { nombre:f.cod, unidad:template.unitMap?.[f.cod] || '' };
-        return `<tr>
+        const corrLabel = f.correction ? `<br><span class="corr-badge">Editado por ${esc(f.correction.operario || '—')}</span>` : '';
+        return `<tr class="${f.correction ? 'corr-row' : ''}">
           <td>${esc(zonaNombre(almacen, f.zid))}</td>
           <td>${esc(f.cod)}</td>
-          <td>${esc(item.nombre)}</td>
+          <td>${esc(item.nombre)}${corrLabel}</td>
           <td style="text-align:right">${esc(f.qty)}</td>
           <td style="text-align:right">${esc(parseFloat(f.baseQty.toFixed(4)))}</td>
           <td>${esc(item.unidad)}</td>
@@ -547,6 +565,7 @@ async function verDetalleSesion(almacen, fecha) {
         <div class="detalle-stat"><div class="detalle-stat-num">${zones.size}</div><div class="detalle-stat-label">Zonas con captura</div></div>
         <div class="detalle-stat"><div class="detalle-stat-num">${completed.size}</div><div class="detalle-stat-label">Zonas cerradas</div></div>
         <div class="detalle-stat"><div class="detalle-stat-num">${manuales.length}</div><div class="detalle-stat-label">No catalogados</div></div>
+        <div class="detalle-stat"><div class="detalle-stat-num">${correctedCods.size}</div><div class="detalle-stat-label">Correcciones</div></div>
       </div>
       <div style="background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:12px">
         <strong>${esc(almacen)}</strong> · ${esc(fecha)} · Operario sesión: ${esc(S.operario || '—')}<br>
@@ -729,6 +748,7 @@ async function exportarSesionInventario(almacen, fecha, force) {
     }
 
     const totales = calcularTotalesSesion(S, T);
+    const corrections = correctionsByCod(S);
     const rawLookup = itemsFromRaw(T.raw, T);
     const catLookup = await catalogoLookup(almacen, T);
     const productos = Object.entries(totales)
@@ -743,7 +763,11 @@ async function exportarSesionInventario(almacen, fecha, force) {
           cod,
           art: item.nombre,
           uni: item.unidad,
-          catalogado: true
+          catalogado: true,
+          corregido: !!corrections[cod],
+          observacion: corrections[cod]
+            ? `Editado despues de cerrar zona: ${corrections[cod].map(c => `${zonaNombre(almacen, c.zid)} por ${c.operario || '—'}`).join('; ')}`
+            : ''
         };
       });
     const manuales = (S.manuales || []).map(m => ({

@@ -123,6 +123,7 @@ CREATE TABLE IF NOT EXISTS inv_sesiones (
   counts               TEXT NOT NULL DEFAULT '{}', -- legacy JSON: {cod: cantidad}
   counts_by_zone       TEXT NOT NULL DEFAULT '{}', -- JSON: {zoneIdx: {cod: cantidad}}
   pres_choice_by_zone  TEXT NOT NULL DEFAULT '{}', -- JSON: {zoneIdx: {cod: factor}}
+  corrections_by_zone  TEXT NOT NULL DEFAULT '{}', -- JSON: {zoneIdx: {cod: metadata}}
   completed_zones      TEXT NOT NULL DEFAULT '[]', -- JSON: [zoneIdx, ...]
   locked_zones         TEXT NOT NULL DEFAULT '{}', -- JSON: {zoneIdx: {device_id, operario, ts}}
   manuales             TEXT NOT NULL DEFAULT '[]',
