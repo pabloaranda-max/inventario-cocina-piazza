@@ -515,7 +515,7 @@ async function handleInvPost(db, body, env = {}) {
 
   if (body.action === 'inv_sesion') {
     const { almacen, operario, fecha, countsByZone, presChoiceByZone, correctionsByZone,
-            completedZones, removeCompletedZones, manuales, templateHash, counts } = body; // counts legacy para barra.html
+            completedZones, removeCompletedZones, manuales, removeManuales, templateHash, counts } = body; // counts legacy para barra.html
     if (!almacen || !operario || !fecha) return json({ error: 'Datos incompletos' }, 400);
 
     let existing;
@@ -558,9 +558,10 @@ async function handleInvPost(db, body, env = {}) {
       mergedCorrections[zid] = { ...(mergedCorrections[zid] || {}), ...(corr || {}) };
     }
 
-    // Merge manuales por id
+    // Merge manuales por id; removeManuales es array de ids a eliminar
     const existingManuales = JSON.parse(existing?.manuales || '[]');
-    const manMap = Object.fromEntries(existingManuales.map(m => [m.id, m]));
+    const removedManIds = new Set(removeManuales || []);
+    const manMap = Object.fromEntries(existingManuales.filter(m => !removedManIds.has(m.id)).map(m => [m.id, m]));
     for (const m of (manuales || [])) if (m.id) manMap[m.id] = m;
     const mergedManuales = Object.values(manMap);
 

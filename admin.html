@@ -561,12 +561,21 @@ async function verDetalleSesion(almacen, fecha) {
           <td>${esc(item.unidad)}</td>
         </tr>`;
       }).join('');
-    const manualRows = manuales.map(m => `<tr>
-      <td>${esc(m.zona || '—')}</td>
-      <td>${esc(m.nombre || '—')}</td>
-      <td style="text-align:right">${esc(m.cantidad ?? '—')}</td>
-      <td>${esc(m.uni || m.unidad || '')}</td>
-    </tr>`).join('');
+    const manualRows = manuales.map(m => {
+      const id = esc(m.id || '');
+      return `<tr id="mrow-${id}">
+        <td>${esc(m.zona || '—')}</td>
+        <td class="mrow-nombre">${esc(m.nombre || '—')}</td>
+        <td class="mrow-cantidad" style="text-align:right">${esc(m.cantidad ?? '—')}</td>
+        <td class="mrow-uni">${esc(m.uni || m.unidad || '')}</td>
+        <td style="white-space:nowrap">
+          <button onclick="editarManual('${esc(almacen)}','${esc(fecha)}',${JSON.stringify(m).replace(/"/g,'&quot;')})"
+            style="background:#dbeafe;color:#1d4ed8;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:bold;margin-right:4px">✏</button>
+          <button onclick="borrarManual('${esc(almacen)}','${esc(fecha)}','${id}')"
+            style="background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:bold">🗑</button>
+        </td>
+      </tr>`;
+    }).join('');
     // Totales por artículo con correcciones aplicadas
     const adminCorr = S.correctionsByZone?.['_admin'] || {};
     const totalesPorCod = {};
@@ -650,8 +659,8 @@ async function verDetalleSesion(almacen, fecha) {
       <div style="font-weight:800;margin:14px 0 6px">No catalogados</div>
       <div style="max-height:180px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">
         <table class="detalle-table">
-          <thead><tr><th>Zona</th><th>Artículo</th><th style="text-align:right">Cantidad</th><th>Unidad</th></tr></thead>
-          <tbody>${manualRows || '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:16px">Sin no catalogados</td></tr>'}</tbody>
+          <thead><tr><th>Zona</th><th>Artículo</th><th style="text-align:right">Cantidad</th><th>Unidad</th><th></th></tr></thead>
+          <tbody>${manualRows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">Sin no catalogados</td></tr>'}</tbody>
         </table>
       </div>`;
   } catch(e) {
@@ -707,6 +716,49 @@ async function agregarArticuloCorrecion(almacen, fecha) {
   } catch(e) {
     msg.innerHTML = `<span style="color:#dc2626">❌ ${esc(e.message)}</span>`;
   }
+}
+
+async function borrarManual(almacen, fecha, manId) {
+  if (!confirm('¿Borrar este ítem no catalogado?')) return;
+  try {
+    const r = await fetch(WORKER_URL + '/inv/sesion', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'inv_sesion', almacen, fecha, operario: adminActual,
+        removeManuales: [manId] })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al borrar');
+    document.getElementById('mrow-' + manId)?.remove();
+    await cargarSesionesInventario();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function editarManual(almacen, fecha, m) {
+  const nombre   = prompt('Nombre del artículo:', m.nombre || '');
+  if (nombre === null) return;
+  const cantStr  = prompt('Cantidad:', m.cantidad ?? '');
+  if (cantStr === null) return;
+  const cantidad = parseFloat(cantStr);
+  if (isNaN(cantidad)) { alert('Cantidad inválida'); return; }
+  const uni      = prompt('Unidad:', m.uni || m.unidad || '');
+  if (uni === null) return;
+  try {
+    const updated = { ...m, nombre, cantidad, uni, unidad: uni };
+    const r = await fetch(WORKER_URL + '/inv/sesion', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'inv_sesion', almacen, fecha, operario: adminActual,
+        manuales: [updated] })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al guardar');
+    const row = document.getElementById('mrow-' + m.id);
+    if (row) {
+      row.querySelector('.mrow-nombre').textContent = nombre;
+      row.querySelector('.mrow-cantidad').textContent = cantidad;
+      row.querySelector('.mrow-uni').textContent = uni;
+    }
+    await cargarSesionesInventario();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 async function guardarCorrecciones(almacen, fecha) {
