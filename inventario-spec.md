@@ -1,6 +1,6 @@
-# inventario.html — Especificación técnica v4.3
+# inventario.html — Especificación técnica v4.5
 
-> Última actualización: 2026-06-30. Estado: **EN PRODUCCIÓN** (CAVA probado; todas las plantillas subidas excepto GENERAL).
+> Última actualización: 2026-06-30. Estado: **EN PRODUCCIÓN** (CAVA probado; todas las plantillas subidas excepto GENERAL). v4.5 migra export a admin.html.
 
 ---
 
@@ -63,15 +63,17 @@
        inv_device_id       → ID único del dispositivo
 
   └─ Cloudflare Worker: operaciones-api.pablo-aranda.workers.dev
-       GET  /articulos?almacen=X            ← catálogo D1 (público)
-       GET  /inv/plantilla?almacen=X        ← plantilla Xetux (público)
-       POST /inv/plantilla (action: inv_plantilla)   ← solo desde admin.html
-       POST /inv/plantilla (action: inv_defaults)    ← solo desde admin.html
-       GET  /inv/sesion?almacen=X&fecha=Y
+       GET  /articulos?almacen=X                       ← catálogo D1 (público)
+       GET  /inv/plantilla?almacen=X                   ← plantilla Xetux (público)
+       POST /inv/plantilla (action: inv_plantilla)     ← solo desde admin.html
+       POST /inv/plantilla (action: inv_defaults)      ← solo desde admin.html
+       GET  /inv/sesion?almacen=X&fecha=Y              ← incluye exportedAt, exportedBy
+       GET  /inv/sesiones[?almacen=X]                  ← listado para admin (v4.5)
        POST /inv/sesion  (inv_sesion | inv_lock)
+       POST /inv/sesion  (action: inv_export)          ← marca sesión como exportada (v4.5)
        POST /sync/catalogo  ← sync_d1.py con X-Sync-Token
 
-  └─ [admin.html] → gestiona plantillas por almacén
+  └─ [admin.html] → gestiona plantillas, muestra sesiones, genera Excel, envía Sheets
   └─ Google Apps Script (por almacén) → Sheets
 ```
 
@@ -284,6 +286,22 @@ Desde admin.html únicamente. No modifica row_map ni raw — solo actualiza defa
 
 Response: `{ "ok": true }`. Error 404 si no existe plantilla para ese almacén (subir primero).
 
+### GET /inv/sesiones[?almacen=X&dias=N] (v4.5)
+
+Lista sesiones recientes (default 14 días, max 90). Respuesta:
+```json
+{
+  "ok": true,
+  "sesiones": [
+    { "almacen": "CAVA", "operario": "Juan", "fecha": "2026-06-26",
+      "updatedAt": "2026-06-26T20:00:00Z",
+      "exportedAt": "", "exportedBy": "",
+      "articulosContados": 131, "zonasCompletadas": 3 }
+  ]
+}
+```
+`articulosContados`: códigos únicos en `counts_by_zone`. `zonasCompletadas`: zonas base únicas (parseInt de las claves `"0:dev_abc"`).
+
 ### GET /inv/sesion?almacen=X&fecha=Y
 
 Response:
@@ -292,11 +310,12 @@ Response:
   "ok": true, "found": true,
   "operario": "Juan", "fecha": "2026-06-26",
   "templateHash": "1f4a2b",
-  "countsByZone": { "0": { "MP001": 2 } },
-  "presChoiceByZone": { "0": { "XMAT001": 0.75 } },
-  "completedZones": [0],
+  "countsByZone": { "0:dev_abc": { "MP001": 2 } },
+  "presChoiceByZone": { "0:dev_abc": { "XMAT001": 0.75 } },
+  "completedZones": ["0:dev_abc"],
   "lockedZones": { "1": { "device_id": "dev_x", "operario": "Ana", "ts": "..." } },
   "manuales": [],
+  "exportedAt": "", "exportedBy": "",
   "updatedAt": "2026-06-26T20:00:00Z"
 }
 ```
@@ -332,6 +351,18 @@ for (const [zid, zc] of Object.entries(incomingCBZ)) {
 
 Lock TTL: 30 minutos. Al inicio de cualquier operación de lock, expirar locks viejos.
 
+### POST /inv/sesion (action: inv_export) (v4.5)
+
+```json
+{ "action": "inv_export", "almacen": "CAVA", "fecha": "2026-06-26", "operario": "Javier", "force": false }
+```
+
+- Si ya fue exportada y `force: false` → 409 `{ ok: false, error: "Ya exportada", exportedAt, exportedBy }`
+- Si `force: true` → sobrescribe `exported_at` y `exported_by`
+- Éxito → `{ ok: true }`
+
+Solo admin.html debe llamar este endpoint. La lógica de doble-export se gestiona en el cliente (confirmar antes de llamar con `force: true`).
+
 ---
 
 ## 8. Esquema D1
@@ -366,6 +397,8 @@ CREATE TABLE IF NOT EXISTS inv_sesiones (
   locked_zones         TEXT NOT NULL DEFAULT '{}',
   manuales             TEXT NOT NULL DEFAULT '[]',
   template_hash        TEXT NOT NULL DEFAULT '',
+  exported_at          TEXT NOT NULL DEFAULT '',
+  exported_by          TEXT NOT NULL DEFAULT '',
   updated_at           TEXT NOT NULL,
   PRIMARY KEY (almacen, fecha)
 );
@@ -374,6 +407,21 @@ CREATE TABLE IF NOT EXISTS inv_sesiones (
 ---
 
 ## 9. Generación del Excel
+
+La exportación oficial vive en `admin.html`. `inventario.html` solo captura, sincroniza y muestra un resumen de toma; no debe descargar XLSX ni enviar a Google Sheets desde dispositivos de conteo.
+
+Flujo:
+
+```
+admin.html
+  → GET /inv/sesiones?dias=30
+  → seleccionar almacen+fecha
+  → GET /inv/sesion?almacen=X&fecha=Y
+  → GET /inv/plantilla?almacen=X
+  → POST /inv/sesion action=inv_export  ← reserva/marca export oficial
+  → generar XLSX desde T.raw
+  → POST Apps Script del almacén
+```
 
 ```js
 for (const cod of Object.keys(T.rowMap)) {
@@ -390,7 +438,7 @@ for (const cod of Object.keys(T.rowMap)) {
 }
 ```
 
-El xlsx se regenera desde `T.raw` (base64): se parsea, se sobreescriben las celdas de cantidad y se descarga.
+El xlsx se regenera desde `T.raw` (base64): se parsea, se sobreescriben las celdas de cantidad y se descarga desde admin.
 
 Ítems manuales: no incluir en xlsx. Mostrar en pantalla de validación.
 
@@ -398,7 +446,9 @@ El xlsx se regenera desde `T.raw` (base64): se parsea, se sobreescriben las celd
 
 ## 10. Envío a Google Sheets
 
-POST a `appsScriptUrl` con `mode: 'no-cors'`.
+POST a `appsScriptUrl` con `mode: 'no-cors'` desde `admin.html`.
+
+Regla operativa: varios dispositivos pueden capturar simultáneamente, pero solo admin hace el cierre oficial. Esto evita que dos teléfonos creen dos hojas de detalle con los mismos totales combinados.
 
 Si `appsScriptUrl === null` → no hacer fetch, mostrar "Envío a Sheets no disponible".
 
@@ -414,6 +464,24 @@ Payload — filas por zona:
 ```
 
 ---
+
+## 10.1 Estado de exportación en Worker
+
+`inv_sesiones` conserva el estado de cierre:
+
+```sql
+exported_at TEXT NOT NULL DEFAULT '',
+exported_by TEXT NOT NULL DEFAULT ''
+```
+
+`POST /inv/sesion` con `action: inv_export`:
+
+```json
+{ "action": "inv_export", "almacen": "CAVA", "fecha": "2026-06-30",
+  "operario": "Javier", "force": false }
+```
+
+Si ya está exportada y `force` no es true, responde 409. `admin.html` permite re-exportar explícitamente.
 
 ## 11. Ítems no catalogados (manuales)
 

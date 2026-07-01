@@ -127,6 +127,8 @@ CREATE TABLE IF NOT EXISTS inv_sesiones (
   locked_zones         TEXT NOT NULL DEFAULT '{}', -- JSON: {zoneIdx: {device_id, operario, ts}}
   manuales             TEXT NOT NULL DEFAULT '[]',
   template_hash        TEXT NOT NULL DEFAULT '',
+  exported_at          TEXT NOT NULL DEFAULT '',
+  exported_by          TEXT NOT NULL DEFAULT '',
   updated_at           TEXT NOT NULL,
   PRIMARY KEY (almacen, fecha)
 );

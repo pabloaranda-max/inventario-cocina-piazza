@@ -106,6 +106,7 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
 .plt-drop p { color:#888; font-size:14px; margin-top:8px; }
 .plt-status-card { background:white; border-radius:8px; padding:14px; border:1px solid #e2e8f0; margin-bottom:14px; }
 </style>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -141,6 +142,14 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
 
   <!-- TAB: TOMAS -->
   <div id="tab-tomas" class="tab-content active">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-weight:800;color:#1e293b">Sesiones activas</div>
+      <button class="btn-notas" onclick="cargarSesionesInventario()">Actualizar</button>
+    </div>
+    <div id="sesiones-container" style="margin-bottom:22px">
+      <div class="loading-state"><div class="spinner-sm"></div>Cargando sesiones...</div>
+    </div>
+    <div style="font-weight:800;color:#1e293b;margin-bottom:10px">Tomas enviadas a Sheets</div>
     <div class="filtros-row" id="filtros-almacen">
       <button class="filtro-chip active" onclick="filtrarAlmacen('TODOS', this)">Todos</button>
       <button class="filtro-chip" onclick="filtrarAlmacen('COCINA', this)">Cocina</button>
@@ -282,8 +291,22 @@ const ALMACENES = {
   GENERAL:    'https://script.google.com/macros/s/AKfycbyg1vJUxEGFaHs8V1co2rLxY8IA5h-Ol23-peGDg-Hdon-kI81F_r7Rx9Yey9OdNFQtVg/exec'
 };
 
+const WORKER_URL = 'https://operaciones-api.pablo-aranda.workers.dev';
+const INVENTARIO_AREAS = {
+  BARRA_RESTAURANTE: { titulo:'Barra Restaurante', scriptUrl: ALMACENES.BARRA,
+                       zonaNames:['Almacén Barra','Refri Almacén Barra','Contra Barra','Refris de Servicio'] },
+  COCINA:            { titulo:'Cocina',     scriptUrl: ALMACENES.COCINA,     zonaNames:['Cocina'] },
+  ALIMENTARI:        { titulo:'Alimentari', scriptUrl: ALMACENES.ALIMENTARI, zonaNames:['Almacén','Tienda'] },
+  CAVA:              { titulo:'Cava',       scriptUrl: ALMACENES.CAVA,       zonaNames:['Racks cava','Refri cava 1','Refri cava 2'] },
+  SALUMERIA:         { titulo:'Salumeria',  scriptUrl: ALMACENES.SALUMERIA,  zonaNames:['Camara maduracion','Congelador horizontal','Refri','Camara fria'] },
+  GENERAL:           { titulo:'General',    scriptUrl: ALMACENES.GENERAL,    zonaNames:['General'] },
+  BARRA_AMICI:       { titulo:'Barra Amici', scriptUrl: null,                zonaNames:['Barra Amici'] }
+};
+
 let todasLasTomas = [];
+let sesionesInventario = [];
 let filtroActual = 'TODOS';
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 // ── AUTH ──────────────────────────────────────────────────
 function login() {
@@ -297,6 +320,7 @@ function login() {
   document.getElementById('pantalla-login').style.display = 'none';
   document.getElementById('pantalla-admin').style.display = 'block';
   document.getElementById('admin-nombre-display').textContent = `⚙️ Admin — ${adminActual}`;
+  cargarSesionesInventario();
   cargarTodasLasTomas();
 }
 
@@ -342,7 +366,233 @@ function filtrarAlmacen(almacen, btn) {
   filtroActual = almacen;
   document.querySelectorAll('.filtro-chip').forEach(c => c.classList.remove('active'));
   btn.classList.add('active');
+  renderSesionesInventario();
   renderTomas();
+}
+
+function filtroIncluyeAlmacen(almacen) {
+  if (filtroActual === 'TODOS') return true;
+  if (filtroActual === 'BARRA') return String(almacen).startsWith('BARRA');
+  return almacen === filtroActual;
+}
+
+async function cargarSesionesInventario() {
+  const el = document.getElementById('sesiones-container');
+  if (!el) return;
+  el.innerHTML = '<div class="loading-state"><div class="spinner-sm"></div>Cargando sesiones activas...</div>';
+  try {
+    const r = await fetch(WORKER_URL + '/inv/sesiones?dias=30');
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al cargar sesiones');
+    sesionesInventario = d.sesiones || [];
+    renderSesionesInventario();
+  } catch(e) {
+    el.innerHTML = `<div class="error-msg">No se pudieron cargar sesiones D1: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderSesionesInventario() {
+  const el = document.getElementById('sesiones-container');
+  if (!el) return;
+  const sesiones = sesionesInventario.filter(s => filtroIncluyeAlmacen(s.almacen));
+  if (!sesiones.length) {
+    el.innerHTML = '<div class="empty-state" style="background:white;border-radius:10px">Sin sesiones activas recientes</div>';
+    return;
+  }
+  el.innerHTML = sesiones.map(s => {
+    const cfg = INVENTARIO_AREAS[s.almacen] || { titulo:s.almacen, scriptUrl:null };
+    const exp = s.exportedAt
+      ? `<span style="background:#dcfce7;color:#166534;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">Exportada</span>`
+      : `<span style="background:#fffbeb;color:#92400e;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">Pendiente</span>`;
+    const updated = s.updatedAt ? new Date(s.updatedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short' }) : '—';
+    const exportTxt = s.exportedAt ? ` · Exportada por ${esc(s.exportedBy || '—')}` : '';
+    return `<div class="toma-card" style="border-left-color:${s.exportedAt ? '#16a34a' : '#f59e0b'}">
+      <div class="toma-header">
+        <div class="toma-operario">${esc(cfg.titulo)} ${exp}</div>
+        <div class="toma-almacen">${esc(s.almacen)}</div>
+      </div>
+      <div class="toma-meta">
+        Fecha ${esc(s.fecha)} · ${s.articulosContados || s.countedItems || 0} artículos · ${s.zonasCompletadas || 0} zonas listas · Actualizada ${updated}${exportTxt}
+      </div>
+      <div class="toma-footer" style="flex-wrap:wrap;gap:6px;">
+        <div class="toma-items">Operario inicial: ${esc(s.operario || '—')}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn-pdf-card" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',false)">Generar XLSX y enviar</button>
+          ${s.exportedAt ? `<button class="btn-notas" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',true)">Re-exportar</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function b64ToArrayBuffer(rawB64) {
+  const bin = atob(rawB64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+
+function factorDefault(T, cod) {
+  const explicit = T?.presMap?.[cod];
+  if (explicit?.length) return explicit[0].factor;
+  const uni = T?.unitMap?.[cod] || '';
+  const defaults = T?.defaultPres?.[uni];
+  return defaults?.[0]?.factor ?? 1;
+}
+
+function itemsFromRaw(rawB64, T) {
+  const wb = XLSX.read(b64ToArrayBuffer(rawB64), { type:'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+  const norm = s => String(s ?? '').replace(/^﻿/,'').trim();
+  const hIdx = rows.findIndex(r => r.some(h => /^c[oó]digo$/i.test(norm(h))));
+  if (hIdx === -1) return {};
+  const H = rows[hIdx].map(norm);
+  const iCod = H.findIndex(h => /^c[oó]digo$/i.test(h));
+  const iArt = H.findIndex(h => /^art[ií]culo$/i.test(h));
+  const iUni = H.findIndex(h => /^unidad$/i.test(h));
+  const out = {};
+  for (let r = hIdx + 1; r < rows.length; r++) {
+    const row = rows[r];
+    const cod = norm(row[iCod]);
+    if (!cod || /_\d+$/.test(cod)) continue;
+    out[cod] = {
+      codigo: cod,
+      nombre: iArt >= 0 ? norm(row[iArt]) : cod,
+      unidad: (T?.unitMap?.[cod]) || (iUni >= 0 ? norm(row[iUni]) : '')
+    };
+  }
+  return out;
+}
+
+async function catalogoLookup(almacen, T) {
+  const lookup = {};
+  const posibles = almacen === 'BARRA_RESTAURANTE' ? ['BARRA_RESTAURANTE', 'BARRA'] : [almacen];
+  for (const key of posibles) {
+    try {
+      const r = await fetch(WORKER_URL + '/articulos?almacen=' + encodeURIComponent(key));
+      if (!r.ok) continue;
+      const d = await r.json();
+      for (const a of (d.articulos || [])) {
+        lookup[a.codigo] = { codigo:a.codigo, nombre:a.nombre, unidad:(T?.unitMap?.[a.codigo]) || a.unidad || '' };
+      }
+      if (Object.keys(lookup).length) break;
+    } catch(e) {}
+  }
+  return lookup;
+}
+
+function calcularTotalesSesion(S, T) {
+  const totales = {};
+  for (const [zid, zc] of Object.entries(S.countsByZone || {})) {
+    for (const [cod, qty] of Object.entries(zc || {})) {
+      const f = (S.presChoiceByZone?.[zid]?.[cod]) ?? factorDefault(T, cod);
+      totales[cod] = (totales[cod] || 0) + qty * f;
+    }
+  }
+  return totales;
+}
+
+function descargarXlsxInventario(almacen, fecha, T, totales) {
+  const wb = XLSX.read(b64ToArrayBuffer(T.raw), { type:'array', cellStyles:true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  for (const [cod, qty] of Object.entries(totales)) {
+    const rowIdx = T.rowMap?.[cod];
+    if (rowIdx === undefined) continue;
+    const addr = XLSX.utils.encode_cell({ r: rowIdx, c: T.cantidadColIdx });
+    ws[addr] = { t:'n', v: parseFloat(qty.toFixed(4)) };
+  }
+  const out = XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles:true });
+  const blob = new Blob([out], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Inventario_${almacen}_${fecha}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function reservarExportacion(almacen, fecha, force) {
+  const r = await fetch(WORKER_URL + '/inv/sesion', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json' },
+    body: JSON.stringify({ action:'inv_export', almacen, fecha, operario:adminActual, force:!!force })
+  });
+  const d = await r.json();
+  if (r.status === 409 && !force) {
+    const msg = d.exportedBy ? `Ya fue exportada por ${d.exportedBy}.` : 'Ya fue exportada.';
+    if (confirm(`${msg}\n¿Re-exportar de todos modos?`)) return reservarExportacion(almacen, fecha, true);
+  }
+  if (!d.ok) throw new Error(d.error || 'No se pudo reservar la exportación');
+  return d;
+}
+
+async function exportarSesionInventario(almacen, fecha, force) {
+  const cfg = INVENTARIO_AREAS[almacen] || {};
+  if (!force && !confirm(`Exportar sesión ${almacen} del ${fecha} desde admin?\nEsto marcará la sesión como exportada.`)) return;
+  try {
+    const [sr, tr] = await Promise.all([
+      fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(fecha)),
+      fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen))
+    ]);
+    const S = await sr.json();
+    const T = await tr.json();
+    if (!S.ok || !S.found) throw new Error('Sesión no encontrada');
+    if (!T.ok || !T.found || !T.raw) throw new Error('Plantilla Xetux no disponible');
+
+    const totales = calcularTotalesSesion(S, T);
+    const rawLookup = itemsFromRaw(T.raw, T);
+    const catLookup = await catalogoLookup(almacen, T);
+    const productos = Object.entries(totales)
+      .filter(([cod]) => T.rowMap?.[cod] !== undefined)
+      .map(([cod, qty]) => {
+        const item = catLookup[cod] || rawLookup[cod] || { codigo:cod, nombre:cod, unidad:T.unitMap?.[cod] || '' };
+        return {
+          codigo: cod,
+          nombre: item.nombre,
+          unidad: item.unidad,
+          cantidad: parseFloat(qty.toFixed(4)),
+          cod,
+          art: item.nombre,
+          uni: item.unidad,
+          catalogado: true
+        };
+      });
+    const manuales = (S.manuales || []).map(m => ({
+      ...m,
+      unidad: m.unidad || m.uni || '',
+      descripcion: m.descripcion || m.zona || '',
+      foto_base64: m.foto_base64 || m.foto || null
+    }));
+
+    await reservarExportacion(almacen, fecha, force);
+    descargarXlsxInventario(almacen, fecha, T, totales);
+
+    if (cfg.scriptUrl) {
+      await fetch(cfg.scriptUrl, {
+        method:'POST',
+        mode:'no-cors',
+        headers:{ 'Content-Type':'text/plain' },
+        body: JSON.stringify({
+          operario: adminActual,
+          area: almacen,
+          almacen,
+          fecha,
+          timestamp: new Date().toISOString(),
+          productos,
+          manuales
+        })
+      });
+      alert('Excel descargado y enviado a Sheets.');
+    } else {
+      alert('Excel descargado. Sin Sheets configurado para este almacén.');
+    }
+
+    await cargarSesionesInventario();
+    await cargarTodasLasTomas();
+  } catch(e) {
+    alert('Error al exportar: ' + e.message);
+  }
 }
 
 function detectarDuplicados(tomas) {
@@ -764,7 +1014,6 @@ async function enviarChat() {
 }
 
 // ── PLANTILLAS XETUX ──────────────────────────────────────
-const WORKER_URL = 'https://operaciones-api.pablo-aranda.workers.dev';
 
 async function hashRaw(raw) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
@@ -958,6 +1207,5 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 </script>
-<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 </body>
 </html>

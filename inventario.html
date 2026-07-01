@@ -142,7 +142,7 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
     <div style="margin-bottom:16px"><div class="progress-bar"><div class="progress-fill" id="ov-bar" style="width:0%"></div></div></div>
     <div id="ov-zones"></div>
     <div style="margin-top:20px">
-      <button class="btn btn-primary" id="btn-generate" onclick="go('generate')">Generar Excel para Xetux →</button>
+      <button class="btn btn-primary" id="btn-generate" onclick="go('generate')">Ver resumen →</button>
     </div>
   </div>
 </div>
@@ -168,18 +168,18 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
   </div>
 </div>
 
-<!-- PANTALLA: validación y descarga -->
+<!-- PANTALLA: resumen de toma (solo lectura) -->
 <div id="screen-generate" class="screen">
   <div class="hdr" id="gen-hdr">
     <button class="hdr-back" onclick="go('overview')">←</button>
-    <h1>Validación y descarga</h1>
+    <h1>Resumen de toma</h1>
   </div>
   <div class="content">
     <div id="validation-out"></div>
-    <div style="margin-top:16px">
-      <button class="btn btn-green" id="btn-send" onclick="generateAndSend()">⬇️ Descargar y Enviar a Sheets</button>
+    <div class="alert alert-info" style="margin-top:16px">
+      <div class="alert-title">📤 Exportación desde Admin</div>
+      El Excel y el envío a Sheets se generan desde <strong>admin.html</strong> una vez que el equipo termine de contar.
     </div>
-    <div id="send-status" style="margin-top:12px"></div>
   </div>
 </div>
 
@@ -838,8 +838,9 @@ function renderOverview() {
   btn.style.background = CFG.color;
   const myCompleted = (S.completedZones||[]).filter(k => k.endsWith(myDev)).length;
   const pending = ZONAS.length - myCompleted;
-  btn.textContent = allDone ? 'Generar Excel para Xetux →'
-    : `Generar Excel (${pending} zona${pending!==1?'s':''} pendiente${pending!==1?'s':''})`;
+  btn.textContent = allDone ? 'Ver resumen →'
+    : `Ver resumen (${pending} zona${pending!==1?'s':''} pendiente${pending!==1?'s':''})`;
+  btn.title = 'El Excel se genera desde admin.html';
 }
 
 // ── Validación ─────────────────────────────────────────────────────────────
@@ -880,113 +881,9 @@ function renderValidation() {
   html += `<div class="alert alert-ok"><div class="alert-title">✅ ${countedCods.length} artículos con cantidad</div>
     <div>${withConv.length} con conversión · ${countedCods.length - withConv.length} directos</div></div>`;
 
-  if (!CFG.appsScriptUrl) {
-    html += `<div class="alert alert-warn"><div class="alert-title">⚠️ Envío a Sheets no configurado</div>Solo se descargará el Excel. El envío a Google Sheets está pendiente para este almacén.</div>`;
-  }
   el.innerHTML = html;
-  const sendBtn = document.getElementById('btn-send');
-  sendBtn.textContent = CFG.appsScriptUrl ? '⬇️ Descargar y Enviar a Sheets' : '⬇️ Descargar Excel';
 }
 
-// ── Generar y enviar ───────────────────────────────────────────────────────
-
-async function generateAndSend() {
-  if (!T || !S) { alert('Sin sesión activa.'); return; }
-  const rawB64 = T.raw;
-  if (!rawB64) { alert('Plantilla sin datos. Contacta al administrador.'); return; }
-
-  const btn = document.getElementById('btn-send');
-  const status = document.getElementById('send-status');
-  btn.disabled = true; btn.textContent = 'Procesando…'; status.innerHTML = '';
-
-  // Antes de generar: traer la sesión más reciente para incluir conteos de todos los dispositivos
-  try {
-    const lr = await fetch(WORKER_URL + '/inv/sesion?almacen=' + ALMACEN + '&fecha=' + S.fecha);
-    if (lr.ok) {
-      const ld = await lr.json();
-      if (ld.found && ld.countsByZone) {
-        S.countsByZone     = ld.countsByZone;
-        S.presChoiceByZone = ld.presChoiceByZone || S.presChoiceByZone;
-      }
-    }
-  } catch(e) { console.warn('fetch latest session for export:', e); }
-
-  // Calcular totales por cod (suma automática de todos los dispositivos via claves device-keyed)
-  const totales = {};
-  for (const [zid, zc] of Object.entries(S.countsByZone||{})) {
-    for (const [cod, qty] of Object.entries(zc)) {
-      const f = (S.presChoiceByZone?.[zid]?.[cod]) ?? (T.presMap?.[cod]?.[0]?.factor ?? 1);
-      totales[cod] = (totales[cod] || 0) + qty * f;
-    }
-  }
-
-  // 1. Generar y descargar Excel
-  let excelOk = false;
-  try {
-    const bin = atob(rawB64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    const wb = XLSX.read(bytes.buffer, { type:'array', cellStyles:true });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    for (const [cod, qty] of Object.entries(totales)) {
-      const rowIdx = T.rowMap[cod];
-      if (rowIdx === undefined) continue;
-      const addr = XLSX.utils.encode_cell({ r: rowIdx, c: T.cantidadColIdx });
-      ws[addr] = { t:'n', v: parseFloat(qty.toFixed(4)) };
-    }
-    const out  = XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles:true });
-    const blob = new Blob([out], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = `Inventario_${ALMACEN}_${S.fecha}.xlsx`; a.click();
-    URL.revokeObjectURL(url);
-    excelOk = true;
-  } catch(e) {
-    status.innerHTML += `<div class="alert alert-error"><div class="alert-title">❌ Excel: error</div>${esc(e.message)}</div>`;
-  }
-
-  // 2. Enviar a Sheets (solo si hay URL)
-  let sheetsOk = false;
-  if (CFG.appsScriptUrl) {
-    try {
-      const productos = [];
-      ZONAS.forEach((zone, zi) => {
-        // Agregar conteos de todos los dispositivos para esta zona
-        zone.items.forEach(item => {
-          let rawQty = 0, convertedQty = 0, counted = false;
-          const factors = new Set();
-          for (const [key, zc] of Object.entries(S.countsByZone || {})) {
-            if (baseZone(key) !== zi || zc[item.cod] === undefined) continue;
-            const f = (S.presChoiceByZone?.[key]?.[item.cod]) ?? (T.presMap?.[item.cod]?.[0]?.factor ?? 1);
-            rawQty += zc[item.cod];
-            convertedQty += zc[item.cod] * f;
-            factors.add(f);
-            counted = true;
-          }
-          if (!counted) return;
-          const factorList = [...factors];
-          const fUsed = factorList.length === 1 ? factorList[0] : null;
-          const presOpt = fUsed == null ? null : T.presMap?.[item.cod]?.find(p => p.factor === fUsed);
-          productos.push({ cod:item.cod, art:item.art, cantidad:parseFloat(convertedQty.toFixed(4)), cantidadRaw:rawQty, factorUsado:fUsed, presentacion:presOpt?.nombre||null, uni:item.uni, zona:zone.nombre, area:ALMACEN, catalogado:true });
-        });
-      });
-      await fetch(CFG.appsScriptUrl, {
-        method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({ operario:S.operario, area:ALMACEN, fecha:S.fecha, almacen:ALMACEN, timestamp:new Date().toISOString(), productos, manuales:S.manuales||[] })
-      });
-      sheetsOk = true;
-    } catch(e) {
-      status.innerHTML += `<div class="alert alert-error"><div class="alert-title">❌ Sheets: error de red</div>${esc(e.message)}</div>`;
-    }
-  }
-
-  if (excelOk)  status.innerHTML += `<div class="alert alert-ok">✅ Excel descargado</div>`;
-  if (sheetsOk) status.innerHTML += `<div class="alert alert-ok">✅ Enviado a Google Sheets (sin confirmación por no-cors)</div>`;
-  if (!CFG.appsScriptUrl) status.innerHTML += `<div class="alert alert-warn">⚠️ Sheets no configurado para este almacén</div>`;
-
-  btn.disabled = false;
-  btn.textContent = CFG.appsScriptUrl ? '⬇️ Descargar y Enviar a Sheets' : '⬇️ Descargar Excel';
-}
 
 // ── Manuales ───────────────────────────────────────────────────────────────
 

@@ -396,11 +396,21 @@ async function handleInvGet(db, url) {
     const almacen = url.searchParams.get('almacen');
     const fecha   = url.searchParams.get('fecha');
     if (!almacen || !fecha) return json({ error: 'Falta almacen o fecha' }, 400);
-    const row = await db.prepare(
-      `SELECT operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
-              completed_zones, locked_zones, manuales, template_hash, updated_at
-       FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
-    ).bind(almacen, fecha).first();
+    let row;
+    try {
+      row = await db.prepare(
+        `SELECT operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
+                completed_zones, locked_zones, manuales, template_hash, updated_at,
+                exported_at, exported_by
+         FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
+      ).bind(almacen, fecha).first();
+    } catch (err) {
+      row = await db.prepare(
+        `SELECT operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
+                completed_zones, locked_zones, manuales, template_hash, updated_at
+         FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
+      ).bind(almacen, fecha).first();
+    }
     if (!row) return json({ ok: true, found: false });
     return json({
       ok: true, found: true,
@@ -412,10 +422,55 @@ async function handleInvGet(db, url) {
       completedZones:   JSON.parse(row.completed_zones || '[]'),
       lockedZones:      JSON.parse(row.locked_zones || '{}'),
       manuales:         JSON.parse(row.manuales || '[]'),
-      // legacy counts para barra.html
-      counts:           JSON.parse(row.counts || '{}'),
+      counts:           JSON.parse(row.counts || '{}'), // legacy barra.html
+      exportedAt:       row.exported_at || '',
+      exportedBy:       row.exported_by || '',
       updatedAt:        row.updated_at
     });
+  }
+
+  if (path === '/inv/sesiones') {
+    const almacen = url.searchParams.get('almacen');
+    const dias = Math.max(1, Math.min(90, parseInt(url.searchParams.get('dias') || '14', 10) || 14));
+    const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const where = almacen ? 'WHERE almacen = ? AND fecha >= ?' : 'WHERE fecha >= ?';
+    const binds = almacen ? [almacen, desde] : [desde];
+    let rows;
+    try {
+      rows = await db.prepare(
+        `SELECT almacen, operario, fecha, updated_at, exported_at, exported_by,
+                counts_by_zone, completed_zones, manuales
+         FROM inv_sesiones ${where}
+         ORDER BY fecha DESC, updated_at DESC
+         LIMIT 200`
+      ).bind(...binds).all();
+    } catch (err) {
+      rows = await db.prepare(
+        `SELECT almacen, operario, fecha, updated_at,
+                counts_by_zone, completed_zones, manuales
+         FROM inv_sesiones ${where}
+         ORDER BY fecha DESC, updated_at DESC
+         LIMIT 200`
+      ).bind(...binds).all();
+    }
+    const sesiones = (rows.results || []).map(row => {
+      const cbz = JSON.parse(row.counts_by_zone || '{}');
+      const cods = new Set();
+      for (const zc of Object.values(cbz)) for (const cod of Object.keys(zc)) cods.add(cod);
+      const completedZones = JSON.parse(row.completed_zones || '[]');
+      const uniqueZones = new Set(completedZones.map(k => parseInt(k)));
+      return {
+        almacen:          row.almacen,
+        operario:         row.operario,
+        fecha:            row.fecha,
+        updatedAt:        row.updated_at,
+        exportedAt:       row.exported_at || '',
+        exportedBy:       row.exported_by || '',
+        articulosContados: cods.size,
+        zonasCompletadas: uniqueZones.size
+      };
+    });
+    return json({ ok: true, sesiones });
   }
 
   return json({ error: 'Ruta no encontrada' }, 404);
@@ -548,6 +603,28 @@ async function handleInvPost(db, body) {
       'UPDATE inv_sesiones SET locked_zones = ?, updated_at = ? WHERE almacen = ? AND fecha = ?'
     ).bind(JSON.stringify(locks), new Date().toISOString(), almacen, fecha).run();
     return json({ ok: true, locks });
+  }
+
+  if (body.action === 'inv_export') {
+    const { almacen, fecha, operario, force } = body;
+    if (!almacen || !fecha || !operario) return json({ error: 'Datos incompletos' }, 400);
+    let row;
+    try {
+      row = await db.prepare(
+        'SELECT exported_at, exported_by FROM inv_sesiones WHERE almacen = ? AND fecha = ?'
+      ).bind(almacen, fecha).first();
+    } catch (err) {
+      return json({ ok: false, error: 'Falta migración inv_sesiones export_*: ' + err.message }, 500);
+    }
+    if (!row) return json({ error: 'Sesión no encontrada' }, 404);
+    if (row.exported_at && !force) {
+      return json({ ok: false, error: 'Ya exportada', exportedAt: row.exported_at, exportedBy: row.exported_by }, 409);
+    }
+    const now = new Date().toISOString();
+    await db.prepare(
+      'UPDATE inv_sesiones SET exported_at = ?, exported_by = ?, updated_at = ? WHERE almacen = ? AND fecha = ?'
+    ).bind(now, operario, now, almacen, fecha).run();
+    return json({ ok: true });
   }
 
   return json({ error: 'Acción no válida' }, 400);
