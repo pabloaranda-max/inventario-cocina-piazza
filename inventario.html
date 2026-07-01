@@ -364,6 +364,14 @@ function normalizeSesion(d) {
   };
 }
 
+function countedCodCount(sesion) {
+  const cods = new Set();
+  Object.values(sesion?.countsByZone || {}).forEach(zoneCounts => {
+    Object.keys(zoneCounts || {}).forEach(cod => cods.add(cod));
+  });
+  return cods.size;
+}
+
 const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fmtNum = v => parseFloat(v.toFixed(4)).toString();
 
@@ -573,11 +581,9 @@ async function selectArea(key) {
   ZONAS = await resolveZonas();
   if (ALMACEN !== savedKey) return;
 
-  if (!S) {
-    const hoy = new Date().toISOString().slice(0,10);
-    _remoteSes = await fetchSesionWorker(hoy);
-    if (ALMACEN !== savedKey) return;
-  }
+  const hoy = new Date().toISOString().slice(0,10);
+  _remoteSes = await fetchSesionWorker(S?.fecha || hoy);
+  if (ALMACEN !== savedKey) return;
 
   renderAreaWelcome();
 }
@@ -640,8 +646,15 @@ function renderAreaWelcome() {
   }
 
   if (S && S.fecha) {
-    const countedCods = new Set(); Object.values(S.countsByZone||{}).forEach(z => Object.keys(z).forEach(c => countedCods.add(c)));
-    const counted = countedCods.size;
+    const counted = countedCodCount(S);
+    const remoteCount = countedCodCount(_remoteSes);
+    const remotePrompt = _remoteSes && _remoteSes.fecha === S.fecha && remoteCount > counted
+      ? `<div class="alert alert-warn" style="margin-top:8px">
+          <div class="alert-title">🔄 Hay una toma con más conteos en servidor</div>
+          Servidor: ${remoteCount} artículos · Este dispositivo: ${counted}
+          <div style="margin-top:8px"><button class="btn btn-primary btn-sm" style="width:auto;display:inline-block" onclick="loadRemoteSesion()">Cargar toma del servidor</button></div>
+        </div>`
+      : '';
     const done    = new Set((S.completedZones||[]).map(k => baseZone(k))).size;
     const warnHash = T.templateHash && S.templateHash && T.templateHash !== S.templateHash
       ? `<div class="alert alert-warn" style="margin-top:8px"><div class="alert-title">⚠️ La plantilla cambió desde que inició esta toma</div>Los factores de conversión pueden haber cambiado.</div>` : '';
@@ -649,6 +662,7 @@ function renderAreaWelcome() {
       <div style="font-weight:700;margin-bottom:2px">Toma del ${S.fecha}</div>
       <div style="font-size:13px;color:#888">${S.operario} · ${done}/${ZONAS.length} zonas · ${counted} artículos contados</div>
       ${warnHash}
+      ${remotePrompt}
       <div class="row">
         <button class="btn btn-primary" style="flex:2" onclick="go('overview')">Continuar →</button>
         <button class="btn btn-gray btn-sm" style="flex:1" onclick="confirmNewSession()">Nueva</button>
@@ -672,6 +686,7 @@ function renderAreaWelcome() {
 }
 
 function loadRemoteSesion() {
+  if (S && countedCodCount(S) > 0 && !confirm('Esto reemplazará la sesión local de este dispositivo con la toma del servidor. ¿Continuar?')) return;
   _remoteLockedZones = _remoteSes.lockedZones || {};
   S = normalizeSesion(_remoteSes);
   _remoteSes = null;
