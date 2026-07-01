@@ -8,9 +8,9 @@ App interna de mantenimiento para restaurante implementada en:
 
 `/home/lilp/proyectos/mantenimiento-restaurante`
 
-Deploy publico:
+Deploy publico canonico:
 
-`https://mantenimiento-restaurante.nixsub.workers.dev/login`
+`https://mantenimiento-restaurante.pablo-aranda.workers.dev/login`
 
 ## Stack
 
@@ -44,9 +44,15 @@ Hecho:
 
 ## Cloudflare
 
-Deploy verificado:
+Deploy verificado en la cuenta correcta:
 
-`https://mantenimiento-restaurante.nixsub.workers.dev/login`
+`https://mantenimiento-restaurante.pablo-aranda.workers.dev/login`
+
+Cuenta/host correcto:
+
+`mantenimiento-restaurante.pablo-aranda.workers.dev`
+
+No usar como referencia de produccion URLs bajo otras cuentas de Cloudflare, por ejemplo `*.nixsub.workers.dev`.
 
 Secrets cargados en Worker:
 

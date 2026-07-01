@@ -36,10 +36,18 @@ El adaptador mantenido actualmente para Next.js en Cloudflare es OpenNext:
 npm run pages:build
 ```
 
+URL publica canonica:
+
+`https://mantenimiento-restaurante.pablo-aranda.workers.dev`
+
 Para desplegar desde CI o local, configura las variables de Supabase en Cloudflare y usa:
 
 ```bash
 npm run pages:deploy
 ```
+
+Verifica el deploy en:
+
+`https://mantenimiento-restaurante.pablo-aranda.workers.dev/login`
 
 No hay Workers de negocio en este proyecto; el adaptador solo empaqueta Next para Cloudflare.

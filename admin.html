@@ -108,6 +108,10 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
 .detalle-table td { border-bottom:1px solid #f1f5f9; padding:6px 4px; vertical-align:top; }
 .detalle-table tr.corr-row td { background:#fffbeb; }
 .corr-badge { display:inline-block;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:700; }
+.edit-qty-input { width:70px;border:1px solid #c7d2fe;border-radius:5px;padding:3px 6px;font-size:12px;text-align:right; }
+.edit-qty-input.modified { border-color:#8b5cf6;background:#f5f3ff; }
+.btn-guardar-corr { background:#7c3aed;color:white;padding:8px 18px;border-radius:6px;font-size:13px;margin-top:12px; }
+.btn-guardar-corr:disabled { opacity:.5;cursor:not-allowed; }
 .corr-block { border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:8px; background:#f8fafc; }
 .corr-input { width:100%; border:1px solid #ddd; border-radius:6px; padding:7px; font-size:13px; margin-bottom:6px; box-sizing:border-box; }
 /* PLANTILLAS */
@@ -559,23 +563,58 @@ async function verDetalleSesion(almacen, fecha) {
       <td style="text-align:right">${esc(m.cantidad ?? '—')}</td>
       <td>${esc(m.uni || m.unidad || '')}</td>
     </tr>`).join('');
+    // Totales por artículo con correcciones aplicadas
+    const adminCorr = S.correctionsByZone?.['_admin'] || {};
+    const totalesPorCod = {};
+    for (const [cod, baseQty] of Object.entries(totales)) {
+      totalesPorCod[cod] = cod in adminCorr ? adminCorr[cod].qty : parseFloat(baseQty.toFixed(4));
+    }
+    const sortedCods = Object.keys(totalesPorCod).sort((a,b) => a.localeCompare(b));
+    const editRows = sortedCods.map(cod => {
+      const item = rawLookup[cod] || { nombre:cod, unidad:template.unitMap?.[cod] || '' };
+      const corrected = cod in adminCorr;
+      const original = corrected ? parseFloat((totales[cod] || 0).toFixed(4)) : null;
+      const currentVal = totalesPorCod[cod];
+      const corrInfo = corrected ? `<div class="corr-badge" style="margin-top:3px">Corregido — orig: ${original}</div>` : '';
+      return `<tr class="${corrected ? 'corr-row' : ''}">
+        <td>${esc(cod)}</td>
+        <td>${esc(item.nombre)}</td>
+        <td>${esc(item.unidad)}</td>
+        <td style="text-align:right">${corrected ? `<span style="color:#94a3b8;text-decoration:line-through">${original}</span>` : parseFloat((totales[cod]||0).toFixed(4))}</td>
+        <td style="text-align:right">
+          <input type="number" step="any" class="edit-qty-input" data-cod="${esc(cod)}" data-original="${currentVal}"
+            value="${currentVal}" onchange="this.classList.toggle('modified',parseFloat(this.value)!==parseFloat(this.dataset.original))">
+          ${corrInfo}
+        </td>
+      </tr>`;
+    }).join('');
+
     body.innerHTML = `
       <div class="detalle-grid">
-        <div class="detalle-stat"><div class="detalle-stat-num">${countedCods.length}</div><div class="detalle-stat-label">Artículos con cantidad</div></div>
-        <div class="detalle-stat"><div class="detalle-stat-num">${zones.size}</div><div class="detalle-stat-label">Zonas con captura</div></div>
+        <div class="detalle-stat"><div class="detalle-stat-num">${countedCods.length}</div><div class="detalle-stat-label">Artículos</div></div>
+        <div class="detalle-stat"><div class="detalle-stat-num">${zones.size}</div><div class="detalle-stat-label">Zonas capturadas</div></div>
         <div class="detalle-stat"><div class="detalle-stat-num">${completed.size}</div><div class="detalle-stat-label">Zonas cerradas</div></div>
-        <div class="detalle-stat"><div class="detalle-stat-num">${manuales.length}</div><div class="detalle-stat-label">No catalogados</div></div>
-        <div class="detalle-stat"><div class="detalle-stat-num">${correctedCods.size}</div><div class="detalle-stat-label">Correcciones</div></div>
+        <div class="detalle-stat"><div class="detalle-stat-num">${Object.keys(adminCorr).length}</div><div class="detalle-stat-label">Correcciones admin</div></div>
       </div>
       <div style="background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:12px">
         <strong>${esc(almacen)}</strong> · ${esc(fecha)} · Operario sesión: ${esc(S.operario || '—')}<br>
         Actualizada: ${updated} · Exportada: ${esc(exported)}${S.exportedBy ? ` por ${esc(S.exportedBy)}` : ''}
       </div>
-      <div style="font-weight:800;margin:12px 0 6px">Capturas por zona</div>
-      <div style="max-height:320px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">
+      <div style="font-weight:800;margin:12px 0 4px">Totales — edita y guarda si hay un error</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:8px">Cambia el valor en la columna "Corregido". El original queda registrado como referencia.</div>
+      <div style="max-height:380px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">
+        <table class="detalle-table">
+          <thead><tr><th>Código</th><th>Artículo</th><th>Unidad</th><th style="text-align:right">Calculado</th><th style="text-align:right">Corregido</th></tr></thead>
+          <tbody>${editRows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">Sin cantidades</td></tr>'}</tbody>
+        </table>
+      </div>
+      <button class="btn-guardar-corr" onclick="guardarCorrecciones('${esc(almacen)}','${esc(fecha)}')">Guardar correcciones</button>
+      <div id="corr-save-msg" style="margin-top:8px;font-size:13px"></div>
+      <div style="font-weight:800;margin:14px 0 6px">Detalle por zona</div>
+      <div style="max-height:240px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">
         <table class="detalle-table">
           <thead><tr><th>Zona</th><th>Código</th><th>Artículo</th><th style="text-align:right">Captura</th><th style="text-align:right">Base</th><th>Unidad</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">Sin cantidades capturadas</td></tr>'}</tbody>
+          <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">Sin capturas</td></tr>'}</tbody>
         </table>
       </div>
       ${filas.length > 350 ? `<div style="font-size:12px;color:#64748b;margin-top:6px">Mostrando 350 de ${filas.length} renglones.</div>` : ''}
@@ -593,6 +632,40 @@ async function verDetalleSesion(almacen, fecha) {
 
 function cerrarDetalleSesion() {
   document.getElementById('modal-detalle-sesion').style.display = 'none';
+}
+
+async function guardarCorrecciones(almacen, fecha) {
+  const btn = document.querySelector('.btn-guardar-corr');
+  const msg = document.getElementById('corr-save-msg');
+  const inputs = document.querySelectorAll('.edit-qty-input');
+  const corrections = {};
+  const ts = new Date().toISOString();
+  inputs.forEach(inp => {
+    const cod = inp.dataset.cod;
+    const original = parseFloat(inp.dataset.original);
+    const val = parseFloat(inp.value);
+    if (!isNaN(val) && val !== original) corrections[cod] = { qty: val, operario: adminActual, ts };
+  });
+  if (!Object.keys(corrections).length) { msg.innerHTML = '<span style="color:#64748b">Sin cambios.</span>'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+  try {
+    const r = await fetch(WORKER_URL + '/inv/sesion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'inv_sesion', almacen, fecha, operario: adminActual,
+        correctionsByZone: { '_admin': corrections } })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al guardar');
+    msg.innerHTML = `<span style="color:#16a34a">✅ ${Object.keys(corrections).length} corrección${Object.keys(corrections).length!==1?'es':''} guardada${Object.keys(corrections).length!==1?'s':''}.</span>`;
+    await cargarSesionesInventario();
+  } catch(e) {
+    msg.innerHTML = `<span style="color:#dc2626">❌ ${esc(e.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Guardar correcciones';
+  }
 }
 
 async function borrarSesionInventario(almacen, fecha) {
@@ -682,6 +755,11 @@ function calcularTotalesSesion(S, T) {
       const f = (S.presChoiceByZone?.[zid]?.[cod]) ?? factorDefault(T, cod);
       totales[cod] = (totales[cod] || 0) + qty * f;
     }
+  }
+  // Correcciones admin sobreescriben el total calculado
+  const adminCorr = S.correctionsByZone?.['_admin'] || {};
+  for (const [cod, corr] of Object.entries(adminCorr)) {
+    if (corr?.qty != null) totales[cod] = corr.qty;
   }
   return totales;
 }
