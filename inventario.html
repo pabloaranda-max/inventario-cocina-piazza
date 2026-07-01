@@ -53,9 +53,13 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
 .zone-meta{font-size:12px;color:#888;margin-top:2px}
 .zone-status{font-size:20px}
 .subgrupo-hdr{font-size:11px;font-weight:700;color:var(--brand-muted);text-transform:uppercase;letter-spacing:1px;padding:10px 16px 4px;background:rgba(47,62,30,.04)}
+.subgrupo-hdr.hidden{display:none}
 .item-row{background:var(--brand-paper);padding:11px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--brand-border)}
 .item-row.corrected{background:#fffbeb}
 .item-row.hidden{display:none}
+.item-row.search-match{border-left:3px solid var(--color,#667eea);padding-left:13px}
+.item-row.search-match .item-name{color:#1e293b}
+mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
 .item-text{flex:1;min-width:0}
 .item-name{font-size:14px;font-weight:600}
 .item-unit{font-size:11px;color:#aaa;margin-top:2px}
@@ -783,11 +787,27 @@ function updateProgress() {
   document.getElementById('count-pct').textContent = filled + '/' + zone.items.length;
 }
 
+function hlMatch(text, q) {
+  if (!q) return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const idx = text.toLowerCase().indexOf(q);
+  if (idx < 0) return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const esc2 = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return esc2(text.slice(0,idx)) + '<mark>' + esc2(text.slice(idx,idx+q.length)) + '</mark>' + esc2(text.slice(idx+q.length));
+}
+
 function filterCount(q) {
   const ql = q.toLowerCase().trim();
-  document.querySelectorAll('#count-list .item-row').forEach(r =>
-    r.classList.toggle('hidden', !!ql && !(r.dataset.search||'').toLowerCase().includes(ql))
-  );
+  document.querySelectorAll('#count-list .item-row').forEach(r => {
+    const searchStr = (r.dataset.search || '').toLowerCase();
+    const matches = !!ql && searchStr.includes(ql);
+    r.classList.toggle('hidden', !!ql && !matches);
+    r.classList.toggle('search-match', matches);
+    const nameEl = r.querySelector('.item-name');
+    if (nameEl) {
+      if (!nameEl.dataset.name) nameEl.dataset.name = nameEl.textContent;
+      nameEl.innerHTML = matches ? hlMatch(nameEl.dataset.name, ql) : nameEl.dataset.name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+  });
   document.querySelectorAll('#count-list .subgrupo-hdr').forEach(hdr => {
     let next = hdr.nextElementSibling, vis = false;
     while (next && !next.classList.contains('subgrupo-hdr')) {
