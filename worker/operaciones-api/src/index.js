@@ -460,20 +460,24 @@ async function handleInvPost(db, body) {
        FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
     ).bind(almacen, fecha).first();
 
-    // Merge countsByZone por zona
+    // Merge countsByZone por zona. Las claves colaborativas "zona:deviceId"
+    // representan el estado completo de ese dispositivo, así que se reemplazan
+    // para que borrar un input también se propague al servidor.
     const existingCBZ = JSON.parse(existing?.counts_by_zone || '{}');
     const incomingCBZ = countsByZone || {};
     const mergedCBZ = { ...existingCBZ };
     for (const [zid, zc] of Object.entries(incomingCBZ)) {
-      mergedCBZ[zid] = { ...(mergedCBZ[zid] || {}), ...zc };
+      if (String(zid).includes(':')) mergedCBZ[zid] = { ...zc };
+      else mergedCBZ[zid] = { ...(mergedCBZ[zid] || {}), ...zc };
     }
 
-    // Merge presChoiceByZone por zona
+    // Mismo criterio para presentaciones por dispositivo.
     const existingPCBZ = JSON.parse(existing?.pres_choice_by_zone || '{}');
     const incomingPCBZ = presChoiceByZone || {};
     const mergedPCBZ = { ...existingPCBZ };
     for (const [zid, zpc] of Object.entries(incomingPCBZ)) {
-      mergedPCBZ[zid] = { ...(mergedPCBZ[zid] || {}), ...zpc };
+      if (String(zid).includes(':')) mergedPCBZ[zid] = { ...zpc };
+      else mergedPCBZ[zid] = { ...(mergedPCBZ[zid] || {}), ...zpc };
     }
 
     // Merge manuales por id

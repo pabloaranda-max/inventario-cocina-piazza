@@ -953,16 +953,21 @@ async function generateAndSend() {
       ZONAS.forEach((zone, zi) => {
         // Agregar conteos de todos los dispositivos para esta zona
         zone.items.forEach(item => {
-          let rawQty = 0, fUsed = T.presMap?.[item.cod]?.[0]?.factor ?? 1, counted = false;
+          let rawQty = 0, convertedQty = 0, counted = false;
+          const factors = new Set();
           for (const [key, zc] of Object.entries(S.countsByZone || {})) {
             if (baseZone(key) !== zi || zc[item.cod] === undefined) continue;
-            const f = (S.presChoiceByZone?.[key]?.[item.cod]) ?? fUsed;
-            rawQty += zc[item.cod]; fUsed = f; counted = true;
+            const f = (S.presChoiceByZone?.[key]?.[item.cod]) ?? (T.presMap?.[item.cod]?.[0]?.factor ?? 1);
+            rawQty += zc[item.cod];
+            convertedQty += zc[item.cod] * f;
+            factors.add(f);
+            counted = true;
           }
           if (!counted) return;
-          const qty = rawQty * fUsed;
-          const presOpt = T.presMap?.[item.cod]?.find(p => p.factor === fUsed);
-          productos.push({ cod:item.cod, art:item.art, cantidad:parseFloat(qty.toFixed(4)), cantidadRaw:rawQty, factorUsado:fUsed, presentacion:presOpt?.nombre||null, uni:item.uni, zona:zone.nombre, area:ALMACEN, catalogado:true });
+          const factorList = [...factors];
+          const fUsed = factorList.length === 1 ? factorList[0] : null;
+          const presOpt = fUsed == null ? null : T.presMap?.[item.cod]?.find(p => p.factor === fUsed);
+          productos.push({ cod:item.cod, art:item.art, cantidad:parseFloat(convertedQty.toFixed(4)), cantidadRaw:rawQty, factorUsado:fUsed, presentacion:presOpt?.nombre||null, uni:item.uni, zona:zone.nombre, area:ALMACEN, catalogado:true });
         });
       });
       await fetch(CFG.appsScriptUrl, {
