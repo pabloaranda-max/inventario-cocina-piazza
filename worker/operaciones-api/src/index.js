@@ -658,6 +658,18 @@ async function handleInvPost(db, body, env = {}) {
     return json({ ok: true });
   }
 
+  if (body.action === 'inv_supervisor_login') {
+    const { nombre, password } = body;
+    if (!nombre || !password) return json({ ok: false, error: 'Faltan datos' }, 400);
+    const hash = await hashPassword(password);
+    const user = await db.prepare(
+      'SELECT id, nombre, rol FROM usuarios WHERE nombre = ? AND password_hash = ?'
+    ).bind(nombre, hash).first();
+    if (!user) return json({ ok: false, error: 'Usuario o contraseña incorrectos' }, 401);
+    if (!['admin', 'revisor'].includes(user.rol)) return json({ ok: false, error: 'Sin permisos de supervisor' }, 403);
+    return json({ ok: true, usuario: { id: user.id, nombre: user.nombre, rol: user.rol } });
+  }
+
   if (body.action === 'inv_delete') {
     const { almacen, fecha, operario, adminPassword } = body;
     if (!almacen || !fecha || !operario) return json({ error: 'Datos incompletos' }, 400);

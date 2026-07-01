@@ -561,7 +561,9 @@ async function verDetalleSesion(almacen, fecha) {
           <td>${esc(item.unidad)}</td>
         </tr>`;
       }).join('');
-    const manualRows = manuales.map(m => {
+    const comentarios = manuales.filter(m => m.type === 'comment');
+    const manualesReales = manuales.filter(m => m.type !== 'comment');
+    const manualRows = manualesReales.map(m => {
       const id = esc(m.id || '');
       return `<tr id="mrow-${id}">
         <td>${esc(m.zona || '—')}</td>
@@ -576,6 +578,25 @@ async function verDetalleSesion(almacen, fecha) {
         </td>
       </tr>`;
     }).join('');
+    const comentariosHtml = comentarios.length ? `
+      <h3 style="margin:24px 0 8px;font-size:14px;font-weight:700;color:#7c3aed">Comentarios de supervisor (${comentarios.length})</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:#f3e8ff;color:#6d28d9">
+          <th style="padding:6px 8px;text-align:left">Artículo</th>
+          <th style="padding:6px 8px;text-align:left">Zona</th>
+          <th style="padding:6px 8px;text-align:left">Supervisor</th>
+          <th style="padding:6px 8px;text-align:left">Comentario</th>
+        </tr></thead>
+        <tbody>${comentarios.map(c => {
+          const item = rawLookup[c.cod] || {};
+          return `<tr style="border-bottom:1px solid #e9d5ff">
+            <td style="padding:6px 8px"><strong>${esc(c.cod)}</strong><br><small style="color:#6b7280">${esc(item.nombre || '')}</small></td>
+            <td style="padding:6px 8px">${esc(c.zona || '—')}</td>
+            <td style="padding:6px 8px">${esc(c.supervisor || '—')}</td>
+            <td style="padding:6px 8px;font-style:italic">${esc(c.texto)}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>` : '';
     // Totales por artículo con correcciones aplicadas
     // Incluye también códigos que solo existen en _admin (agregados vía "Añadir artículo")
     const adminCorr = S.correctionsByZone?.['_admin'] || {};
@@ -674,7 +695,8 @@ async function verDetalleSesion(almacen, fecha) {
           <thead><tr><th>Zona</th><th>Artículo</th><th style="text-align:right">Cantidad</th><th>Unidad</th><th></th></tr></thead>
           <tbody>${manualRows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">Sin no catalogados</td></tr>'}</tbody>
         </table>
-      </div>`;
+      </div>
+      ${comentariosHtml}`;
   } catch(e) {
     body.innerHTML = `<div class="error-msg">No se pudo cargar el detalle: ${esc(e.message)}</div>`;
   }
@@ -987,7 +1009,7 @@ async function exportarSesionInventario(almacen, fecha, force) {
             : ''
         };
       });
-    const manuales = (S.manuales || []).map(m => ({
+    const manuales = (S.manuales || []).filter(m => m.type !== 'comment').map(m => ({
       ...m,
       unidad: m.unidad || m.uni || '',
       descripcion: m.descripcion || m.zona || '',

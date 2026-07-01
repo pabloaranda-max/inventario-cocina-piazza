@@ -97,6 +97,13 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
 .modal-box{background:white;border-radius:20px 20px 0 0;padding:24px 20px;width:100%;max-height:90vh;overflow-y:auto}
 .modal-title{font-size:18px;font-weight:800;margin-bottom:16px}
 .modal-close{float:right;background:none;border:none;font-size:22px;color:#999;padding:0;margin-top:-4px}
+/* Supervisor */
+.sup-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.25);color:#6d28d9;border-radius:20px;padding:3px 10px 3px 8px;font-size:12px;font-weight:700;cursor:pointer}
+.sup-badge:hover{background:rgba(124,58,237,.2)}
+.comment-btn{background:none;border:none;cursor:pointer;font-size:14px;padding:0 4px;opacity:.45;line-height:1;flex-shrink:0}
+.comment-btn.has-comment{opacity:1;color:#7c3aed}
+.comment-btn:hover{opacity:1}
+.item-comment-text{font-size:11px;color:#7c3aed;margin-top:2px;font-style:italic}
 /* Welcome */
 .welcome-hero{background:rgba(255,253,248,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--brand-border);padding:20px 16px 16px;display:flex;align-items:center;gap:14px}
 .welcome-logo-img{width:48px;height:48px;object-fit:contain;border-radius:10px;border:1px solid rgba(155,30,33,.14);background:rgba(255,253,248,.7);padding:5px;flex-shrink:0}
@@ -112,10 +119,11 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
 <div id="screen-welcome" class="screen">
   <div class="welcome-hero">
     <img class="welcome-logo-img" src="branding/logo.png" alt="Piazza Pasticcio">
-    <div class="welcome-logo-text">
+    <div class="welcome-logo-text" style="flex:1;min-width:0">
       <div class="welcome-logo-name">Piazza Pasticcio</div>
       <div class="welcome-logo-sub" id="welcome-sub">Inventarios · selecciona el almacén</div>
     </div>
+    <div id="sup-badge-wrap"></div>
   </div>
   <div id="welcome-body" class="content" style="padding-top:0"></div>
 </div>
@@ -242,6 +250,37 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
   </div>
 </div>
 
+<!-- MODAL: login supervisor -->
+<div id="modal-supervisor-login" class="modal-overlay">
+  <div class="modal-box">
+    <button class="modal-close" onclick="document.getElementById('modal-supervisor-login').classList.remove('active')">✕</button>
+    <div class="modal-title">Acceso supervisor</div>
+    <div class="form-group">
+      <label>Nombre</label>
+      <input type="text" id="sup-nombre" placeholder="Tu nombre" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Contraseña</label>
+      <input type="password" id="sup-pass" placeholder="••••••" autocomplete="current-password" onkeyup="if(event.key==='Enter')loginSupervisor()">
+    </div>
+    <div id="sup-login-error" style="color:#dc2626;font-size:13px;margin-bottom:8px;display:none"></div>
+    <button class="btn btn-primary" onclick="loginSupervisor()">Entrar como supervisor</button>
+  </div>
+</div>
+
+<!-- MODAL: comentario de supervisor -->
+<div id="modal-comment" class="modal-overlay">
+  <div class="modal-box">
+    <button class="modal-close" onclick="document.getElementById('modal-comment').classList.remove('active')">✕</button>
+    <div class="modal-title" id="comment-modal-title">Comentario</div>
+    <textarea id="comment-text" rows="4" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:10px;font-size:15px;font-family:inherit;resize:vertical" placeholder="Ej: Stock físico difiere, revisar con proveedor…"></textarea>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveComment()">Guardar</button>
+      <button class="btn btn-gray" id="btn-delete-comment" style="flex:0;display:none" onclick="deleteComment()">Borrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: lista de no catalogados -->
 <div id="modal-manuales-lista" class="modal-overlay">
   <div class="modal-box" style="max-height:85vh;overflow-y:auto">
@@ -284,6 +323,8 @@ let CZ      = null;   // índice de zona en curso
 let _remoteSes      = null;
 let _syncTimer      = null;
 let _pollTimer      = null;
+let _supervisorActual = JSON.parse(localStorage.getItem('inv_supervisor') || 'null');
+let _commentTargetCod = null; // cod del artículo que se está comentando
 let _remoteLockedZones = {};
 let _manFotoB64     = null;
 let _lastZoneClosedMsg = '';
@@ -548,6 +589,7 @@ function renderWelcome() {
       </div>
       <button class="btn btn-primary" onclick="onAreaSelectGo()">Continuar →</button>
     </div>`;
+  renderSupBadge();
 }
 
 function onAreaSelectGo() {
@@ -734,11 +776,21 @@ function renderItemRow(item, zid, inOtherZone) {
   const unitWarn  = (item.uni === 'LT' || item.uni === 'KG') && opts.length === 0 ? ' warn' : '';
   const inputStep = opts.length > 0 && item.uni !== 'PZA' ? '0.5' : '0.01';
 
+  const comment = getComment(item.cod);
+  const commentBtn = _supervisorActual
+    ? `<button class="comment-btn${comment?' has-comment':''}" onclick="openCommentModal('${esc(item.cod)}','${esc(item.art)}')" title="${comment?'Ver comentario':'Agregar comentario'}">💬</button>`
+    : '';
+  const commentText = comment ? `<div class="item-comment-text">${esc(comment.texto)}</div>` : '';
+
   return `<div class="item-row${inOtherZone?' other-zone':''}${corrected?' corrected':''}" data-search="${esc(item.art)} ${esc(item.cod)}">
     <div class="item-text">
-      <div class="item-name">${esc(item.art)}</div>
+      <div style="display:flex;align-items:flex-start;gap:4px">
+        <div class="item-name" style="flex:1">${esc(item.art)}</div>
+        ${commentBtn}
+      </div>
       <div class="item-unit${unitWarn}">${unitLabel}</div>
       ${corrected ? '<span class="correction-badge">Editado despues de cerrar</span>' : ''}
+      ${commentText}
     </div>
     <div class="qty-wrap">
       ${presHtml}
@@ -1035,10 +1087,15 @@ function renderValidation() {
     const sample = notCounted.slice(0,5).map(cod => allItems.find(i=>i.cod===cod)?.art||cod);
     html += `<div class="alert alert-warn"><div class="alert-title">⚠️ ${notCounted.length} artículos sin contar → quedarán en blanco</div><div>${sample.join(', ')}${notCounted.length>5?' y '+(notCounted.length-5)+' más…':''}</div></div>`;
   }
-  if (S.manuales?.length) {
-    html += `<div class="alert alert-info"><div class="alert-title">📝 ${S.manuales.length} ítem${S.manuales.length!==1?'s':''} no catalogado${S.manuales.length!==1?'s':''}</div>
-      <div>${S.manuales.map(m=>esc(m.nombre)+' — '+m.cantidad+' '+esc(m.uni)).join(', ')}</div>
+  const manualesReales = (S.manuales || []).filter(m => m.type !== 'comment');
+  if (manualesReales.length) {
+    html += `<div class="alert alert-info"><div class="alert-title">📝 ${manualesReales.length} ítem${manualesReales.length!==1?'s':''} no catalogado${manualesReales.length!==1?'s':''}</div>
+      <div>${manualesReales.map(m=>esc(m.nombre)+' — '+m.cantidad+' '+esc(m.uni)).join(', ')}</div>
       <div style="margin-top:8px"><button class="btn btn-gray btn-sm" style="width:auto;display:inline-block" onclick="compartirManuales()">Compartir lista</button></div></div>`;
+  }
+  const comentariosSup = (S.manuales || []).filter(m => m.type === 'comment');
+  if (comentariosSup.length) {
+    html += `<div class="alert" style="background:#f3e8ff;border-color:#c4b5fd;color:#6d28d9"><div class="alert-title">💬 ${comentariosSup.length} comentario${comentariosSup.length!==1?'s':''} de supervisor</div></div>`;
   }
   html += `<div class="alert alert-ok"><div class="alert-title">✅ ${countedCods.length} artículos con cantidad</div>
     <div>${withConv.length} con conversión · ${countedCods.length - withConv.length} directos</div></div>`;
@@ -1097,7 +1154,7 @@ function updateManualCantidadLabel() {
 
 function openManualesLista() {
   const lista = document.getElementById('manuales-lista-body');
-  const manuales = S.manuales || [];
+  const manuales = (S.manuales || []).filter(m => m.type !== 'comment');
   if (!manuales.length) { lista.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:20px">Sin no catalogados aún.</p>'; }
   else {
     lista.innerHTML = manuales.map(m => {
@@ -1132,7 +1189,7 @@ function deleteManual(id) {
 }
 
 function updateManualesBadge() {
-  const n = (S.manuales || []).length;
+  const n = (S.manuales || []).filter(m => m.type !== 'comment').length;
   const btn = document.getElementById('btn-ver-manuales');
   const badge = document.getElementById('manuales-count-badge');
   if (btn) btn.style.display = n > 0 ? '' : 'none';
@@ -1193,10 +1250,109 @@ function saveManual() {
   alert(editId ? '✓ Actualizado' : '✓ Guardado');
 }
 
+// ── Supervisor ─────────────────────────────────────────────────────────────
+
+function renderSupBadge() {
+  const wrap = document.getElementById('sup-badge-wrap');
+  if (!wrap) return;
+  if (_supervisorActual) {
+    wrap.innerHTML = `<span class="sup-badge" onclick="logoutSupervisor()" title="Toca para cerrar sesión">🔐 ${esc(_supervisorActual.nombre)}</span>`;
+  } else {
+    wrap.innerHTML = `<span class="sup-badge" onclick="document.getElementById('modal-supervisor-login').classList.add('active')" title="Acceso supervisor">🔐 Supervisar</span>`;
+  }
+}
+
+async function loginSupervisor() {
+  const nombre = document.getElementById('sup-nombre').value.trim();
+  const pass   = document.getElementById('sup-pass').value;
+  const errEl  = document.getElementById('sup-login-error');
+  errEl.style.display = 'none';
+  if (!nombre || !pass) { errEl.textContent = 'Ingresa nombre y contraseña'; errEl.style.display = ''; return; }
+  try {
+    const r = await fetch(WORKER_URL + '/inv/sesion', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'inv_supervisor_login', nombre, password: pass })
+    });
+    const d = await r.json();
+    if (!d.ok) { errEl.textContent = d.error || 'Error'; errEl.style.display = ''; return; }
+    _supervisorActual = d.usuario;
+    localStorage.setItem('inv_supervisor', JSON.stringify(_supervisorActual));
+    document.getElementById('modal-supervisor-login').classList.remove('active');
+    document.getElementById('sup-pass').value = '';
+    renderSupBadge();
+    renderCountListIfActive();
+  } catch(e) { errEl.textContent = 'Error de conexión'; errEl.style.display = ''; }
+}
+
+function logoutSupervisor() {
+  if (!confirm('¿Cerrar sesión de supervisor?')) return;
+  _supervisorActual = null;
+  localStorage.removeItem('inv_supervisor');
+  renderSupBadge();
+  renderCountListIfActive();
+}
+
+function renderCountListIfActive() {
+  if (CZ !== null && ZONAS?.[CZ]) renderCountList(ZONAS[CZ].items, myZoneKey(CZ));
+}
+
+// ── Comentarios de supervisor ───────────────────────────────────────────────
+
+function getComment(cod) {
+  return (S.manuales || []).find(m => m.type === 'comment' && m.cod === cod) || null;
+}
+
+function openCommentModal(cod, nombre) {
+  if (!_supervisorActual) return;
+  _commentTargetCod = cod;
+  const existing = getComment(cod);
+  document.getElementById('comment-modal-title').textContent = nombre;
+  document.getElementById('comment-text').value = existing?.texto || '';
+  const delBtn = document.getElementById('btn-delete-comment');
+  delBtn.style.display = existing ? '' : 'none';
+  document.getElementById('modal-comment').classList.add('active');
+  setTimeout(() => document.getElementById('comment-text').focus(), 100);
+}
+
+function saveComment() {
+  const texto = document.getElementById('comment-text').value.trim();
+  const cod   = _commentTargetCod;
+  if (!cod) return;
+  if (!S.manuales) S.manuales = [];
+  const idx = S.manuales.findIndex(m => m.type === 'comment' && m.cod === cod);
+  if (texto) {
+    const entry = { id: idx >= 0 ? S.manuales[idx].id : newManualId(),
+      type: 'comment', cod, texto,
+      supervisor: _supervisorActual.nombre, zona: CZ !== null ? ZONAS[CZ].nombre : '',
+      ts: new Date().toISOString() };
+    if (idx >= 0) S.manuales[idx] = entry; else S.manuales.push(entry);
+  } else if (idx >= 0) {
+    S.manuales.splice(idx, 1);
+  }
+  lsSet('s', S);
+  scheduleSyncSesion();
+  document.getElementById('modal-comment').classList.remove('active');
+  _commentTargetCod = null;
+  renderCountListIfActive();
+  updateManualesBadge();
+}
+
+function deleteComment() {
+  const cod = _commentTargetCod;
+  if (!cod) return;
+  S.manuales = (S.manuales || []).filter(m => !(m.type === 'comment' && m.cod === cod));
+  lsSet('s', S);
+  scheduleSyncSesion();
+  document.getElementById('modal-comment').classList.remove('active');
+  _commentTargetCod = null;
+  renderCountListIfActive();
+}
+
 async function compartirManuales() {
-  if (!S.manuales?.length) return;
+  const lista = (S.manuales || []).filter(m => m.type !== 'comment');
+  if (!lista.length) return;
   const texto = `📋 No catalogados · ${CFG.titulo} · ${S.fecha}\n\n` +
-    S.manuales.map(m => `• ${m.nombre} — ${m.cantidad} ${m.uni} (${m.zona})`).join('\n');
+    lista.map(m => `• ${m.nombre} — ${m.cantidad} ${m.uni} (${m.zona})`).join('\n');
   if (navigator.share) {
     try { await navigator.share({ title: 'Inventario no catalogados', text: texto }); return; } catch(e) {}
   }
