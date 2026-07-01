@@ -175,6 +175,7 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
   <div class="fab-bar">
     <button class="btn btn-green" style="flex:2" onclick="doneZone()">Cerrar zona ✓</button>
     <button class="btn btn-gray btn-sm" style="flex:1" onclick="openManualModal()">+ No catalogado</button>
+    <button class="btn btn-gray btn-sm" id="btn-ver-manuales" style="flex:1;display:none" onclick="openManualesLista()">📋 <span id="manuales-count-badge">0</span></button>
   </div>
 </div>
 
@@ -197,20 +198,40 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
 <div id="modal-manual" class="modal-overlay">
   <div class="modal-box">
     <button class="modal-close" onclick="closeManualModal()">✕</button>
-    <div class="modal-title">Ítem no catalogado</div>
+    <div class="modal-title" id="man-modal-title">Ítem no catalogado</div>
+    <input type="hidden" id="man-edit-id">
     <div class="form-group">
       <label>Nombre *</label>
-      <input type="text" id="man-nombre" placeholder="Ej: Salsa de la casa">
+      <input type="text" id="man-nombre" placeholder="Ej: Herradura Reposado">
     </div>
     <div class="row">
       <div class="form-group" style="flex:1">
-        <label>Cantidad *</label>
+        <label id="man-cantidad-label">Cantidad *</label>
         <input type="number" id="man-cantidad" inputmode="decimal" step="0.01" min="0" placeholder="0">
       </div>
       <div class="form-group" style="flex:1">
-        <label>Unidad</label>
+        <label>Unidad base</label>
         <input type="text" id="man-unidad" placeholder="KG, LT, PZA…">
       </div>
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="man-pres-toggle" onchange="toggleManualPres(this.checked)" style="width:18px;height:18px">
+        Tiene presentación (botella, caja, paquete…)
+      </label>
+    </div>
+    <div id="man-pres-block" style="display:none;background:#f5f3ff;border-radius:8px;padding:12px;margin-bottom:12px">
+      <div class="row">
+        <div class="form-group" style="flex:1">
+          <label>Nombre presentación</label>
+          <input type="text" id="man-pres-nombre" placeholder="Ej: BOTELLA 750ml" oninput="updateManualCantidadLabel()">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>Factor (LT/KG por unidad)</label>
+          <input type="number" id="man-pres-factor" inputmode="decimal" step="0.001" min="0.001" placeholder="0.75" oninput="updateManualCantidadLabel()">
+        </div>
+      </div>
+      <div id="man-pres-hint" style="font-size:12px;color:#7c3aed;margin-top:4px"></div>
     </div>
     <div class="form-group">
       <label>Foto (opcional)</label>
@@ -218,6 +239,16 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
       <div id="man-foto-preview" style="margin-top:8px"></div>
     </div>
     <button class="btn btn-primary" onclick="saveManual()">Guardar</button>
+  </div>
+</div>
+
+<!-- MODAL: lista de no catalogados -->
+<div id="modal-manuales-lista" class="modal-overlay">
+  <div class="modal-box" style="max-height:85vh;overflow-y:auto">
+    <button class="modal-close" onclick="document.getElementById('modal-manuales-lista').classList.remove('active')">✕</button>
+    <div class="modal-title">Mis no catalogados</div>
+    <div id="manuales-lista-body"></div>
+    <button class="btn btn-primary" style="margin-top:12px" onclick="document.getElementById('modal-manuales-lista').classList.remove('active');openManualModal()">+ Agregar nuevo</button>
   </div>
 </div>
 
@@ -622,6 +653,7 @@ async function startCount(zoneIdx) {
   document.getElementById('count-search').value = '';
   renderCountList(zone.items, myZoneKey(zoneIdx));
   updateProgress();
+  updateManualesBadge();
   go('count');
 }
 
@@ -1017,18 +1049,94 @@ function renderValidation() {
 
 // ── Manuales ───────────────────────────────────────────────────────────────
 
-function openManualModal() {
-  document.getElementById('man-nombre').value = '';
-  document.getElementById('man-cantidad').value = '';
-  document.getElementById('man-unidad').value = '';
-  document.getElementById('man-foto-preview').innerHTML = '';
+function openManualModal(editId) {
+  const existing = editId ? (S.manuales||[]).find(m => m.id === editId) : null;
+  document.getElementById('man-modal-title').textContent = existing ? 'Editar no catalogado' : 'Ítem no catalogado';
+  document.getElementById('man-edit-id').value = editId || '';
+  document.getElementById('man-nombre').value = existing?.nombre || '';
+  document.getElementById('man-unidad').value = existing?.uni || existing?.unidad || '';
+  const hasPres = !!(existing?.factor && existing.factor !== 1);
+  document.getElementById('man-pres-toggle').checked = hasPres;
+  document.getElementById('man-pres-block').style.display = hasPres ? '' : 'none';
+  document.getElementById('man-pres-nombre').value = existing?.presentacion || '';
+  document.getElementById('man-pres-factor').value = existing?.factor || '';
+  // Si tiene presentación mostrar cantidadRaw, si no la cantidad base
+  document.getElementById('man-cantidad').value = existing ? (hasPres ? (existing.cantidadRaw ?? existing.cantidad) : existing.cantidad) : '';
+  _manFotoB64 = existing?.foto || null;
+  document.getElementById('man-foto-preview').innerHTML = _manFotoB64 ? `<img src="${_manFotoB64}" style="max-width:100%;border-radius:8px;margin-top:4px">` : '';
   document.getElementById('man-foto').value = '';
-  _manFotoB64 = null;
+  updateManualCantidadLabel();
+  document.getElementById('modal-manuales-lista').classList.remove('active');
   document.getElementById('modal-manual').classList.add('active');
 }
 
 function closeManualModal() {
   document.getElementById('modal-manual').classList.remove('active');
+}
+
+function toggleManualPres(on) {
+  document.getElementById('man-pres-block').style.display = on ? '' : 'none';
+  updateManualCantidadLabel();
+}
+
+function updateManualCantidadLabel() {
+  const on     = document.getElementById('man-pres-toggle').checked;
+  const factor = parseFloat(document.getElementById('man-pres-factor').value);
+  const pres   = document.getElementById('man-pres-nombre').value.trim();
+  const uni    = document.getElementById('man-unidad').value.trim();
+  const label  = document.getElementById('man-cantidad-label');
+  const hint   = document.getElementById('man-pres-hint');
+  if (on && factor > 0) {
+    label.textContent = `Cantidad (${pres || 'presentaciones'}) *`;
+    hint.textContent  = `→ 1 ${pres || 'unidad'} = ${factor} ${uni || 'unidad base'}`;
+  } else {
+    label.textContent = 'Cantidad *';
+    if (hint) hint.textContent = '';
+  }
+}
+
+function openManualesLista() {
+  const lista = document.getElementById('manuales-lista-body');
+  const manuales = S.manuales || [];
+  if (!manuales.length) { lista.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:20px">Sin no catalogados aún.</p>'; }
+  else {
+    lista.innerHTML = manuales.map(m => {
+      const factor = m.factor && m.factor !== 1 ? m.factor : null;
+      const cantStr = factor
+        ? `${m.cantidadRaw ?? m.cantidad} ${m.presentacion || 'uds'} = ${m.cantidad} ${m.uni}`
+        : `${m.cantidad} ${m.uni}`;
+      const fotoHtml = m.foto ? `<img src="${m.foto}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0">` : '';
+      return `<div style="display:flex;gap:10px;align-items:flex-start;padding:12px 0;border-bottom:1px solid #f1f5f9">
+        ${fotoHtml}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:14px">${esc(m.nombre)}</div>
+          <div style="font-size:13px;color:#64748b">${esc(cantStr)} · ${esc(m.zona || '')}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button onclick="openManualModal('${m.id}')" style="background:#dbeafe;color:#1d4ed8;border:none;border-radius:6px;padding:6px 10px;font-size:13px;font-weight:bold;cursor:pointer">✏</button>
+          <button onclick="deleteManual('${m.id}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:6px 10px;font-size:13px;font-weight:bold;cursor:pointer">🗑</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('modal-manuales-lista').classList.add('active');
+}
+
+function deleteManual(id) {
+  if (!confirm('¿Borrar este ítem?')) return;
+  S.manuales = (S.manuales || []).filter(m => m.id !== id);
+  lsSet('s', S);
+  scheduleSyncSesion();
+  updateManualesBadge();
+  openManualesLista(); // refrescar lista
+}
+
+function updateManualesBadge() {
+  const n = (S.manuales || []).length;
+  const btn = document.getElementById('btn-ver-manuales');
+  const badge = document.getElementById('manuales-count-badge');
+  if (btn) btn.style.display = n > 0 ? '' : 'none';
+  if (badge) badge.textContent = n;
 }
 
 async function previewFoto(inp) {
@@ -1048,25 +1156,41 @@ async function previewFoto(inp) {
 }
 
 function saveManual() {
-  const nombre   = document.getElementById('man-nombre').value.trim();
-  const cantidad = parseFloat(document.getElementById('man-cantidad').value);
-  const uni      = document.getElementById('man-unidad').value.trim();
-  if (!nombre)       { alert('Ingresa el nombre'); return; }
-  if (isNaN(cantidad)) { alert('Ingresa la cantidad'); return; }
+  const nombre      = document.getElementById('man-nombre').value.trim();
+  const cantidadRaw = parseFloat(document.getElementById('man-cantidad').value);
+  const uni         = document.getElementById('man-unidad').value.trim();
+  const hasPres     = document.getElementById('man-pres-toggle').checked;
+  const factor      = hasPres ? parseFloat(document.getElementById('man-pres-factor').value) : 1;
+  const presNombre  = hasPres ? document.getElementById('man-pres-nombre').value.trim() : '';
+  const editId      = document.getElementById('man-edit-id').value;
+  if (!nombre)            { alert('Ingresa el nombre'); return; }
+  if (isNaN(cantidadRaw)) { alert('Ingresa la cantidad'); return; }
+  if (hasPres && (isNaN(factor) || factor <= 0)) { alert('Ingresa un factor válido'); return; }
+  const cantidad = parseFloat((cantidadRaw * (hasPres ? factor : 1)).toFixed(4));
   const zona = CZ !== null ? ZONAS[CZ].nombre : CFG.titulo;
   const manual = {
-    id: newManualId(),
+    id:           editId || newManualId(),
     nombre, cantidad, uni, zona,
-    foto: _manFotoB64 || null,
-    deviceId: getDeviceId(),
-    createdAt: new Date().toISOString()
+    cantidadRaw:  hasPres ? cantidadRaw : undefined,
+    factor:       hasPres ? factor : undefined,
+    presentacion: hasPres ? presNombre : undefined,
+    foto:         _manFotoB64 !== null ? _manFotoB64 : (editId ? (S.manuales||[]).find(m=>m.id===editId)?.foto || null : null),
+    deviceId:     getDeviceId(),
+    createdAt:    editId ? (S.manuales||[]).find(m=>m.id===editId)?.createdAt : new Date().toISOString(),
+    updatedAt:    new Date().toISOString()
   };
   if (!S.manuales) S.manuales = [];
-  S.manuales.push(manual);
+  if (editId) {
+    const idx = S.manuales.findIndex(m => m.id === editId);
+    if (idx >= 0) S.manuales[idx] = manual; else S.manuales.push(manual);
+  } else {
+    S.manuales.push(manual);
+  }
   lsSet('s', S);
   scheduleSyncSesion();
+  updateManualesBadge();
   closeManualModal();
-  alert('✓ Guardado');
+  alert(editId ? '✓ Actualizado' : '✓ Guardado');
 }
 
 async function compartirManuales() {
