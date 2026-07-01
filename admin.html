@@ -306,6 +306,8 @@ const INVENTARIO_AREAS = {
 let todasLasTomas = [];
 let sesionesInventario = [];
 let filtroActual = 'TODOS';
+let adminPasswordActual = '';
+const exportandoSesiones = new Set();
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 // ── AUTH ──────────────────────────────────────────────────
@@ -315,6 +317,7 @@ function login() {
   if (!nombre) { document.getElementById('login-error').textContent = 'Ingresa tu nombre'; return; }
   if (pwd !== ADMIN_PASSWORD) { document.getElementById('login-error').textContent = 'Contraseña incorrecta'; return; }
   adminActual = nombre;
+  adminPasswordActual = pwd;
   const key = document.getElementById('groq-key-input').value.trim();
   if (key) localStorage.setItem('groq_api_key', key);
   document.getElementById('pantalla-login').style.display = 'none';
@@ -328,6 +331,7 @@ function logout() {
   document.getElementById('pantalla-login').style.display = 'flex';
   document.getElementById('pantalla-admin').style.display = 'none';
   document.getElementById('pwd-input').value = '';
+  adminPasswordActual = '';
 }
 
 // ── TABS ──────────────────────────────────────────────────
@@ -512,24 +516,33 @@ function descargarXlsxInventario(almacen, fecha, T, totales) {
   URL.revokeObjectURL(url);
 }
 
-async function reservarExportacion(almacen, fecha, force) {
+async function marcarExportacion(almacen, fecha, force) {
   const r = await fetch(WORKER_URL + '/inv/sesion', {
     method:'POST',
     headers:{ 'Content-Type':'application/json' },
-    body: JSON.stringify({ action:'inv_export', almacen, fecha, operario:adminActual, force:!!force })
+    body: JSON.stringify({
+      action:'inv_export',
+      almacen,
+      fecha,
+      operario:adminActual,
+      adminPassword:adminPasswordActual,
+      force:!!force
+    })
   });
   const d = await r.json();
-  if (r.status === 409 && !force) {
-    const msg = d.exportedBy ? `Ya fue exportada por ${d.exportedBy}.` : 'Ya fue exportada.';
-    if (confirm(`${msg}\n¿Re-exportar de todos modos?`)) return reservarExportacion(almacen, fecha, true);
-  }
-  if (!d.ok) throw new Error(d.error || 'No se pudo reservar la exportación');
+  if (!d.ok) throw new Error(d.error || 'No se pudo marcar la exportación');
   return d;
 }
 
 async function exportarSesionInventario(almacen, fecha, force) {
   const cfg = INVENTARIO_AREAS[almacen] || {};
+  const exportKey = `${almacen}:${fecha}`;
+  if (exportandoSesiones.has(exportKey)) {
+    alert('Esta sesión ya se está exportando en esta ventana.');
+    return;
+  }
   if (!force && !confirm(`Exportar sesión ${almacen} del ${fecha} desde admin?\nEsto marcará la sesión como exportada.`)) return;
+  exportandoSesiones.add(exportKey);
   try {
     const [sr, tr] = await Promise.all([
       fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(fecha)),
@@ -539,6 +552,11 @@ async function exportarSesionInventario(almacen, fecha, force) {
     const T = await tr.json();
     if (!S.ok || !S.found) throw new Error('Sesión no encontrada');
     if (!T.ok || !T.found || !T.raw) throw new Error('Plantilla Xetux no disponible');
+    if (S.exportedAt && !force) {
+      const msg = S.exportedBy ? `Ya fue exportada por ${S.exportedBy}.` : 'Ya fue exportada.';
+      if (!confirm(`${msg}\n¿Re-exportar de todos modos?`)) return;
+      force = true;
+    }
 
     const totales = calcularTotalesSesion(S, T);
     const rawLookup = itemsFromRaw(T.raw, T);
@@ -565,7 +583,6 @@ async function exportarSesionInventario(almacen, fecha, force) {
       foto_base64: m.foto_base64 || m.foto || null
     }));
 
-    await reservarExportacion(almacen, fecha, force);
     descargarXlsxInventario(almacen, fecha, T, totales);
 
     if (cfg.scriptUrl) {
@@ -574,7 +591,8 @@ async function exportarSesionInventario(almacen, fecha, force) {
         mode:'no-cors',
         headers:{ 'Content-Type':'text/plain' },
         body: JSON.stringify({
-          operario: adminActual,
+          operario: S.operario || adminActual,
+          exportadoPor: adminActual,
           area: almacen,
           almacen,
           fecha,
@@ -588,10 +606,13 @@ async function exportarSesionInventario(almacen, fecha, force) {
       alert('Excel descargado. Sin Sheets configurado para este almacén.');
     }
 
+    await marcarExportacion(almacen, fecha, force);
     await cargarSesionesInventario();
     await cargarTodasLasTomas();
   } catch(e) {
     alert('Error al exportar: ' + e.message);
+  } finally {
+    exportandoSesiones.delete(exportKey);
   }
 }
 

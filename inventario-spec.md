@@ -354,14 +354,16 @@ Lock TTL: 30 minutos. Al inicio de cualquier operación de lock, expirar locks v
 ### POST /inv/sesion (action: inv_export) (v4.5)
 
 ```json
-{ "action": "inv_export", "almacen": "CAVA", "fecha": "2026-06-26", "operario": "Javier", "force": false }
+{ "action": "inv_export", "almacen": "CAVA", "fecha": "2026-06-26",
+  "operario": "Javier", "adminPassword": "***", "force": false }
 ```
 
+- Requiere password admin. En Worker se valida contra `INV_ADMIN_PASSWORD` si existe; si no, usa el password admin legacy.
 - Si ya fue exportada y `force: false` → 409 `{ ok: false, error: "Ya exportada", exportedAt, exportedBy }`
 - Si `force: true` → sobrescribe `exported_at` y `exported_by`
 - Éxito → `{ ok: true }`
 
-Solo admin.html debe llamar este endpoint. La lógica de doble-export se gestiona en el cliente (confirmar antes de llamar con `force: true`).
+Solo admin.html debe llamar este endpoint. Se llama después de generar XLSX y enviar a Sheets; no antes.
 
 ---
 
@@ -418,9 +420,9 @@ admin.html
   → seleccionar almacen+fecha
   → GET /inv/sesion?almacen=X&fecha=Y
   → GET /inv/plantilla?almacen=X
-  → POST /inv/sesion action=inv_export  ← reserva/marca export oficial
   → generar XLSX desde T.raw
   → POST Apps Script del almacén
+  → POST /inv/sesion action=inv_export  ← marca export oficial
 ```
 
 ```js
@@ -455,11 +457,11 @@ Si `appsScriptUrl === null` → no hacer fetch, mostrar "Envío a Sheets no disp
 Payload — filas por zona:
 ```js
 {
-  operario, area: almacen, fecha, timestamp,
+  operario, exportadoPor, area: almacen, fecha, timestamp,
   productos: [
-    { cod, art, cantidad: qty_zona, factorUsado, uni, zona: nombreZona, catalogado: true }
+    { codigo, nombre, unidad, cantidad, cod, art, uni, catalogado: true }
   ],
-  manuales: S.manuales
+  manuales
 }
 ```
 
@@ -478,10 +480,10 @@ exported_by TEXT NOT NULL DEFAULT ''
 
 ```json
 { "action": "inv_export", "almacen": "CAVA", "fecha": "2026-06-30",
-  "operario": "Javier", "force": false }
+  "operario": "Javier", "adminPassword": "***", "force": false }
 ```
 
-Si ya está exportada y `force` no es true, responde 409. `admin.html` permite re-exportar explícitamente.
+Si ya está exportada y `force` no es true, responde 409. `admin.html` permite re-exportar explícitamente. `exported_at` se considera cierre administrativo, no reserva previa.
 
 ## 11. Ítems no catalogados (manuales)
 

@@ -476,7 +476,7 @@ async function handleInvGet(db, url) {
   return json({ error: 'Ruta no encontrada' }, 404);
 }
 
-async function handleInvPost(db, body) {
+async function handleInvPost(db, body, env = {}) {
   if (body.action === 'inv_plantilla') {
     const { almacen, rowMap, cantidadColIdx, presMap, unitMap, raw, templateHash } = body;
     if (!almacen || !rowMap || cantidadColIdx == null) return json({ error: 'Datos incompletos' }, 400);
@@ -606,8 +606,12 @@ async function handleInvPost(db, body) {
   }
 
   if (body.action === 'inv_export') {
-    const { almacen, fecha, operario, force } = body;
+    const { almacen, fecha, operario, adminPassword, force } = body;
     if (!almacen || !fecha || !operario) return json({ error: 'Datos incompletos' }, 400);
+    const expectedAdminPassword = env.INV_ADMIN_PASSWORD || 'adminpasticcio2026';
+    if (!adminPassword || adminPassword !== expectedAdminPassword) {
+      return json({ ok: false, error: 'Sin permiso para exportar' }, 403);
+    }
     let row;
     try {
       row = await db.prepare(
@@ -687,7 +691,7 @@ export default {
     if (url.pathname.startsWith('/inv/')) {
       try {
         if (request.method === 'GET')  return await handleInvGet(env.DB, url);
-        if (request.method === 'POST') return await handleInvPost(env.DB, await request.json());
+        if (request.method === 'POST') return await handleInvPost(env.DB, await request.json(), env);
         return new Response('Method not allowed', { status: 405, headers: CORS });
       } catch (err) {
         return json({ error: err.message }, 500);
