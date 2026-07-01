@@ -256,6 +256,10 @@ function getDeviceId() {
   if (!id) { id = Date.now().toString(36) + Math.random().toString(36).slice(2); localStorage.setItem('inv_device_id', id); }
   return id;
 }
+// Conteo colaborativo: cada dispositivo escribe a su propia clave "zoneIdx:deviceId"
+// El Worker hace merge clave por clave → no hay conflictos aunque dos personas cuenten la misma zona
+function myZoneKey(zoneIdx) { return zoneIdx + ':' + getDeviceId(); }
+function baseZone(key) { return parseInt(key); } // parseInt se detiene en ':' — extrae el índice de zona
 
 function newManualId() {
   return getDeviceId() + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,6);
@@ -304,11 +308,11 @@ async function fetchSesionWorker(fecha) {
 
 function syncSesionWorker() {
   if (!S) return;
-  // Solo enviamos la zona activa para no pisar trabajo de otros dispositivos.
-  // El Worker hace merge por zona, así que mandar solo {zid: {...}} es seguro.
-  const zid  = CZ !== null ? String(CZ) : null;
-  const cbz  = zid ? { [zid]: S.countsByZone?.[zid]  || {} } : {};
-  const pcbz = zid ? { [zid]: S.presChoiceByZone?.[zid] || {} } : {};
+  // Solo enviamos la zona activa de este dispositivo. Clave "zoneIdx:deviceId" garantiza
+  // que el merge del Worker no pise los conteos de otros dispositivos en la misma zona.
+  const myKey = CZ !== null ? myZoneKey(CZ) : null;
+  const cbz   = myKey ? { [myKey]: S.countsByZone?.[myKey]  || {} } : {};
+  const pcbz  = myKey ? { [myKey]: S.presChoiceByZone?.[myKey] || {} } : {};
   fetch(WORKER_URL + '/inv/sesion', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ action:'inv_sesion', almacen:ALMACEN, operario:S.operario, fecha:S.fecha, templateHash:S.templateHash||'', countsByZone:cbz, presChoiceByZone:pcbz, completedZones:S.completedZones||[], manuales:S.manuales||[] })
@@ -342,6 +346,35 @@ function stopPoll()  { if (_pollTimer) { clearInterval(_pollTimer); _pollTimer =
 
 // ── Resolución de zonas dinámicas ──────────────────────────────────────────
 
+// Fallback cuando D1 no tiene catálogo: leer artículos directo del xlsx de la plantilla
+async function buildItemsFromRaw(raw) {
+  const bin = atob(raw), bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const wb   = XLSX.read(bytes.buffer, { type:'array' });
+  const ws   = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+  const norm = s => String(s ?? '').replace(/^﻿/,'').trim();
+  const hIdx = rows.findIndex(r => r.some(h => /^c[oó]digo$/i.test(norm(h))));
+  if (hIdx === -1) return [];
+  const H    = rows[hIdx].map(norm);
+  const iCod = H.findIndex(h => /^c[oó]digo$/i.test(h));
+  const iArt = H.findIndex(h => /^art[ií]culo$/i.test(h));
+  const iUni = H.findIndex(h => /^unidad$/i.test(h));
+  const iSub = H.findIndex(h => /^subgrupo$/i.test(h));
+  const iGrp = H.findIndex(h => /^grupo$/i.test(h));
+  const out  = [];
+  for (let r = hIdx + 1; r < rows.length; r++) {
+    const row = rows[r];
+    const num = norm(row[0]), cod = norm(row[iCod]);
+    if (!num || !cod || /_\d+$/.test(cod)) continue;
+    const art = iArt >= 0 ? norm(row[iArt]) : cod;
+    const uni = (T?.unitMap?.[cod]) || (iUni >= 0 ? norm(row[iUni]) : '');
+    const grp = (iSub >= 0 && norm(row[iSub])) || (iGrp >= 0 ? norm(row[iGrp]) : '');
+    out.push({ cod, art, uni, grp });
+  }
+  return out;
+}
+
 async function resolveZonas() {
   if (CFG.zonas) return CFG.zonas;
   // Cargar catálogo desde D1
@@ -356,6 +389,11 @@ async function resolveZonas() {
         .map(a => ({ cod: a.codigo, art: a.nombre, uni: (T?.unitMap?.[a.codigo]) || a.unidad, grp: a.subgrupo || a.grupo || '' }));
     }
   } catch(e) { console.warn('articulos fetch:', e); }
+
+  // Sin catálogo en D1 pero hay plantilla con raw → leer artículos del xlsx
+  if (items.length === 0 && T?.raw) {
+    try { items = await buildItemsFromRaw(T.raw); } catch(e) { console.warn('buildItemsFromRaw:', e); }
+  }
 
   // Si hay zonaNames, replicar el catálogo en N zonas independientes
   if (CFG.zonaNames?.length) {
@@ -406,9 +444,7 @@ function renderWelcome() {
   const sorted = Object.entries(AREA_CONFIG).sort((a, b) =>
     a[1].titulo.localeCompare(b[1].titulo, 'es'));
   const options = sorted.map(([key, cfg]) => {
-    const disabled = cfg.appsScriptUrl === null ? ' disabled' : '';
-    const label    = cfg.appsScriptUrl === null ? `${cfg.titulo} (sin configurar)` : cfg.titulo;
-    return `<option value="${key}"${disabled}>${label}</option>`;
+    return `<option value="${key}">${cfg.titulo}</option>`;
   }).join('');
 
   body.innerHTML = `
@@ -454,8 +490,9 @@ function renderAreaWelcome() {
   }
 
   if (S && S.fecha) {
-    const counted = Object.values(S.countsByZone||{}).reduce((a,z) => a + Object.keys(z).length, 0);
-    const done    = (S.completedZones||[]).length;
+    const countedCods = new Set(); Object.values(S.countsByZone||{}).forEach(z => Object.keys(z).forEach(c => countedCods.add(c)));
+    const counted = countedCods.size;
+    const done    = new Set((S.completedZones||[]).map(k => baseZone(k))).size;
     const warnHash = T.templateHash && S.templateHash && T.templateHash !== S.templateHash
       ? `<div class="alert alert-warn" style="margin-top:8px"><div class="alert-title">⚠️ La plantilla cambió desde que inició esta toma</div>Los factores de conversión pueden haber cambiado.</div>` : '';
     html += `<div class="card" style="border-left:4px solid ${CFG.color}">
@@ -513,22 +550,17 @@ function startSession() {
 // ── Conteo ─────────────────────────────────────────────────────────────────
 
 async function startCount(zoneIdx) {
-  if ((S.completedZones||[]).indexOf(zoneIdx) !== -1) return;
-  const existing = _remoteLockedZones[zoneIdx];
-  if (existing && existing.device_id !== getDeviceId()) {
-    alert('Zona en uso por ' + existing.operario); return;
-  }
-  const result = await lockZone(zoneIdx, false);
-  if (!result.ok && result.locked_by) {
-    alert('Zona en uso por ' + result.locked_by.operario); return;
-  }
+  // Bloquear solo si ESTE dispositivo ya completó esta zona
+  if ((S.completedZones||[]).indexOf(myZoneKey(zoneIdx)) !== -1) return;
+  // Si otro dispositivo está contando la misma zona, el overview lo muestra — pero no bloqueamos
+  lockZone(zoneIdx, false).catch(() => {}); // registrar presencia; no bloquear si falla
   _remoteLockedZones[zoneIdx] = { device_id: getDeviceId(), operario: S.operario };
   CZ = zoneIdx;
   const zone = ZONAS[zoneIdx];
   document.getElementById('count-zone-name').textContent = zone.nombre;
   document.getElementById('count-hdr').style.background = zone.color;
   document.getElementById('count-search').value = '';
-  renderCountList(zone.items, zoneIdx);
+  renderCountList(zone.items, myZoneKey(zoneIdx));
   updateProgress();
   go('count');
 }
@@ -648,7 +680,7 @@ function onPresChange(sel) {
 function updateProgress() {
   if (CZ === null) return;
   const zone   = ZONAS[CZ];
-  const zbz    = S.countsByZone?.[String(CZ)] || {};
+  const zbz    = S.countsByZone?.[myZoneKey(CZ)] || {};
   const filled = zone.items.filter(i => zbz[i.cod] !== undefined).length;
   const pct    = zone.items.length ? filled / zone.items.length * 100 : 0;
   document.getElementById('count-bar').style.width = pct + '%';
@@ -685,7 +717,7 @@ function filterCount(q) {
     );
     if (!matches.length) return;
     html += `<div class="subgrupo-hdr" style="background:#fef3c7;color:#92400e">${esc(zone.nombre)}</div>`;
-    matches.forEach(item => { html += renderItemRow(item, String(zi), true); currentCods.add(item.cod); });
+    matches.forEach(item => { html += renderItemRow(item, myZoneKey(zi), true); currentCods.add(item.cod); });
   });
 
   // Fuera de zona: en plantilla pero no en ninguna zona
@@ -734,9 +766,9 @@ function exitCount() {
 }
 
 function doneZone() {
-  if (CZ !== null && (S.completedZones||[]).indexOf(CZ) === -1) {
+  if (CZ !== null && (S.completedZones||[]).indexOf(myZoneKey(CZ)) === -1) {
     if (!S.completedZones) S.completedZones = [];
-    S.completedZones.push(CZ);
+    S.completedZones.push(myZoneKey(CZ));
   }
   lsSet('s', S);
   if (CZ !== null) { lockZone(CZ, true); delete _remoteLockedZones[CZ]; }
@@ -760,25 +792,29 @@ function renderOverview() {
   } else ov_warn.innerHTML = '';
 
   let total = 0, filled = 0, allDone = true;
+  const myDev = ':' + getDeviceId();
   const html = ZONAS.map((zone, i) => {
-    const zbz      = S.countsByZone?.[String(i)] || {};
+    // Sumar conteos de TODOS los dispositivos para esta zona (para mostrar progreso real)
+    const zbz = {};
+    for (const [key, counts] of Object.entries(S.countsByZone || {})) {
+      if (baseZone(key) === i) {
+        for (const [cod, qty] of Object.entries(counts)) zbz[cod] = (zbz[cod]||0) + qty;
+      }
+    }
     const zoneFilled = zone.items.filter(it => zbz[it.cod] !== undefined).length;
-    const done       = (S.completedZones||[]).indexOf(i) !== -1;
+    const done       = (S.completedZones||[]).indexOf(myZoneKey(i)) !== -1;
     const pct        = zone.items.length ? Math.round(zoneFilled / zone.items.length * 100) : 0;
     total  += zone.items.length;
     filled += zoneFilled;
     if (!done) allDone = false;
     const remoteLock    = _remoteLockedZones[i];
-    const lockedByOther = !done && remoteLock && remoteLock.device_id !== getDeviceId();
+    const otherCounting = !done && remoteLock && remoteLock.device_id !== getDeviceId();
     const myLock        = !done && remoteLock && remoteLock.device_id === getDeviceId();
-    const cls      = done ? 'done' : lockedByOther ? 'locked' : zoneFilled > 0 ? 'partial' : '';
-    const icon     = done ? '✅' : lockedByOther ? '🔒' : myLock ? '✏️' : zoneFilled > 0 ? '⏳' : '○';
-    let metaLine   = zoneFilled + '/' + zone.items.length + ' · ' + pct + '%';
-    if (lockedByOther) {
-      const lockAge = remoteLock.ts ? Math.round((Date.now() - new Date(remoteLock.ts).getTime()) / 60000) : 0;
-      metaLine = 'En uso · ' + esc(remoteLock.operario) + (lockAge > 0 ? ` (hace ${lockAge}m)` : '');
-    }
-    const clickAttr = (!done && !lockedByOther) ? ` onclick="startCount(${i})"` : '';
+    const cls    = done ? 'done' : zoneFilled > 0 ? 'partial' : '';
+    const icon   = done ? '✅' : myLock ? '✏️' : zoneFilled > 0 ? '⏳' : '○';
+    let metaLine = zoneFilled + '/' + zone.items.length + ' · ' + pct + '%';
+    if (otherCounting) metaLine += ' · ' + esc(remoteLock.operario) + ' contando';
+    const clickAttr = !done ? ` onclick="startCount(${i})"` : '';
     return `<div class="zone-card ${cls}"${clickAttr}>
       <div class="zone-dot" style="background:${zone.color}"></div>
       <div class="zone-info">
@@ -800,7 +836,8 @@ function renderOverview() {
   }
   btn.style.display = 'block';
   btn.style.background = CFG.color;
-  const pending = ZONAS.length - (S.completedZones?.length || 0);
+  const myCompleted = (S.completedZones||[]).filter(k => k.endsWith(myDev)).length;
+  const pending = ZONAS.length - myCompleted;
   btn.textContent = allDone ? 'Generar Excel para Xetux →'
     : `Generar Excel (${pending} zona${pending!==1?'s':''} pendiente${pending!==1?'s':''})`;
 }
@@ -862,7 +899,19 @@ async function generateAndSend() {
   const status = document.getElementById('send-status');
   btn.disabled = true; btn.textContent = 'Procesando…'; status.innerHTML = '';
 
-  // Calcular totales por cod
+  // Antes de generar: traer la sesión más reciente para incluir conteos de todos los dispositivos
+  try {
+    const lr = await fetch(WORKER_URL + '/inv/sesion?almacen=' + ALMACEN + '&fecha=' + S.fecha);
+    if (lr.ok) {
+      const ld = await lr.json();
+      if (ld.found && ld.countsByZone) {
+        S.countsByZone     = ld.countsByZone;
+        S.presChoiceByZone = ld.presChoiceByZone || S.presChoiceByZone;
+      }
+    }
+  } catch(e) { console.warn('fetch latest session for export:', e); }
+
+  // Calcular totales por cod (suma automática de todos los dispositivos via claves device-keyed)
   const totales = {};
   for (const [zid, zc] of Object.entries(S.countsByZone||{})) {
     for (const [cod, qty] of Object.entries(zc)) {
@@ -902,14 +951,18 @@ async function generateAndSend() {
     try {
       const productos = [];
       ZONAS.forEach((zone, zi) => {
-        const zid = String(zi);
+        // Agregar conteos de todos los dispositivos para esta zona
         zone.items.forEach(item => {
-          const rawQty = (S.countsByZone?.[zid])?.[item.cod];
-          if (rawQty === undefined) return;
-          const f = (S.presChoiceByZone?.[zid]?.[item.cod]) ?? (T.presMap?.[item.cod]?.[0]?.factor ?? 1);
-          const qty = rawQty * f;
-          const presOpt = T.presMap?.[item.cod]?.find(p => p.factor === f);
-          productos.push({ cod:item.cod, art:item.art, cantidad:parseFloat(qty.toFixed(4)), cantidadRaw:rawQty, factorUsado:f, presentacion:presOpt?.nombre||null, uni:item.uni, zona:zone.nombre, area:ALMACEN, catalogado:true });
+          let rawQty = 0, fUsed = T.presMap?.[item.cod]?.[0]?.factor ?? 1, counted = false;
+          for (const [key, zc] of Object.entries(S.countsByZone || {})) {
+            if (baseZone(key) !== zi || zc[item.cod] === undefined) continue;
+            const f = (S.presChoiceByZone?.[key]?.[item.cod]) ?? fUsed;
+            rawQty += zc[item.cod]; fUsed = f; counted = true;
+          }
+          if (!counted) return;
+          const qty = rawQty * fUsed;
+          const presOpt = T.presMap?.[item.cod]?.find(p => p.factor === fUsed);
+          productos.push({ cod:item.cod, art:item.art, cantidad:parseFloat(qty.toFixed(4)), cantidadRaw:rawQty, factorUsado:fUsed, presentacion:presOpt?.nombre||null, uni:item.uni, zona:zone.nombre, area:ALMACEN, catalogado:true });
         });
       });
       await fetch(CFG.appsScriptUrl, {
