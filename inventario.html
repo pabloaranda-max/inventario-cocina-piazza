@@ -260,8 +260,8 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
       <input type="text" id="sup-nombre" placeholder="Ej: Pablo" autocomplete="name">
     </div>
     <div class="form-group">
-      <label>Contraseña</label>
-      <input type="password" id="sup-pin" placeholder="••••••" autocomplete="current-password" onkeyup="if(event.key==='Enter')loginSupervisor()">
+      <label>PIN de supervisor</label>
+      <input type="password" id="sup-pin" inputmode="numeric" placeholder="••••••" onkeyup="if(event.key==='Enter')loginSupervisor()">
     </div>
     <div id="sup-login-error" style="color:#dc2626;font-size:13px;margin-bottom:8px;display:none"></div>
     <button class="btn btn-primary" onclick="loginSupervisor()">Activar modo supervisor</button>
