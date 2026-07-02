@@ -635,8 +635,8 @@ async function handleInvPost(db, body, env = {}) {
   if (body.action === 'inv_export') {
     const { almacen, fecha, operario, adminPassword, force } = body;
     if (!almacen || !fecha || !operario) return json({ error: 'Datos incompletos' }, 400);
-    const expectedAdminPassword = env.INV_ADMIN_PASSWORD || 'adminpasticcio2026';
-    if (!adminPassword || adminPassword !== expectedAdminPassword) {
+    if (!env.INV_ADMIN_PASSWORD) return json({ ok: false, error: 'Admin password no configurado' }, 500);
+    if (!adminPassword || adminPassword !== env.INV_ADMIN_PASSWORD) {
       return json({ ok: false, error: 'Sin permiso para exportar' }, 403);
     }
     let row;
@@ -669,8 +669,8 @@ async function handleInvPost(db, body, env = {}) {
   if (body.action === 'inv_delete') {
     const { almacen, fecha, operario, adminPassword } = body;
     if (!almacen || !fecha || !operario) return json({ error: 'Datos incompletos' }, 400);
-    const expectedAdminPassword = env.INV_ADMIN_PASSWORD || 'adminpasticcio2026';
-    if (!adminPassword || adminPassword !== expectedAdminPassword) {
+    if (!env.INV_ADMIN_PASSWORD) return json({ ok: false, error: 'Admin password no configurado' }, 500);
+    if (!adminPassword || adminPassword !== env.INV_ADMIN_PASSWORD) {
       return json({ ok: false, error: 'Sin permiso para borrar' }, 403);
     }
     const row = await db.prepare(

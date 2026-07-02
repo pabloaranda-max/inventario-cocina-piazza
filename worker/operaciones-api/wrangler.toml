@@ -10,3 +10,11 @@ crons = ["0 10 * * 6", "0 10 28-31 * *"]
 binding = "DB"
 database_name = "operaciones-db"
 database_id = "5ebb6fac-baca-418d-9361-bb13d7cc1190"
+
+[env.staging]
+triggers = { crons = [] }
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "operaciones-db-staging"
+database_id = "56ecc5a3-9ae4-4dc6-943d-95301bbdd8f5"
