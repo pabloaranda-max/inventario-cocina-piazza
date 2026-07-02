@@ -836,6 +836,10 @@ function hasCorrection(zid, cod) {
 }
 
 function renderItemRow(item, zid, inOtherZone) {
+  const templateItem = _templateItemsByCod[item.cod] || null;
+  const displayItem = templateItem
+    ? { ...item, art: templateItem.art || item.art, uni: templateItem.uni || item.uni, grp: templateItem.grp || item.grp }
+    : item;
   const raw    = getQtyForZone(zid, item.cod);
   const flt    = raw !== undefined ? parseFloat(raw) : NaN;
   const opts   = getPresOptions(item.cod);
@@ -856,30 +860,25 @@ function renderItemRow(item, zid, inOtherZone) {
       <span class="lt-badge" id="ltb_${zid}_${esc(item.cod)}">${ltStr} ${item.uni}</span>`;
   }
 
-  const unitLabel = opts.length === 1 ? `bots × ${opts[0].factor} ${item.uni}`
-                  : opts.length > 1   ? `${item.uni} · selecciona presentación`
-                  : item.uni;
-  const unitWarn  = (item.uni === 'LT' || item.uni === 'KG') && opts.length === 0 ? ' warn' : '';
-  const inputStep = opts.length > 0 && item.uni !== 'PZA' ? '0.5' : '0.01';
-  const templateName = _templateItemsByCod[item.cod]?.art || '';
-  const aliasHtml = templateName && templateName !== item.art
-    ? `<div class="item-unit" style="color:#166534">${esc(templateName)}</div>`
-    : '';
+  const unitLabel = opts.length === 1 ? `bots × ${opts[0].factor} ${displayItem.uni}`
+                  : opts.length > 1   ? `${displayItem.uni} · selecciona presentación`
+                  : displayItem.uni;
+  const unitWarn  = (displayItem.uni === 'LT' || displayItem.uni === 'KG') && opts.length === 0 ? ' warn' : '';
+  const inputStep = opts.length > 0 && displayItem.uni !== 'PZA' ? '0.5' : '0.01';
 
   const comment = getComment(item.cod);
   const commentBtn = _supervisorActual
-    ? `<button class="comment-btn${comment?' has-comment':''}" onclick="openCommentModal('${esc(item.cod)}','${esc(item.art)}')" title="${comment?'Ver comentario':'Agregar comentario'}">💬</button>`
+    ? `<button class="comment-btn${comment?' has-comment':''}" onclick="openCommentModal('${esc(item.cod)}','${esc(displayItem.art)}')" title="${comment?'Ver comentario':'Agregar comentario'}">💬</button>`
     : '';
   const commentText = comment ? `<div class="item-comment-text">${esc(comment.texto)}</div>` : '';
 
   return `<div class="item-row${inOtherZone?' other-zone':''}${corrected?' corrected':''}" data-search="${esc(itemSearchText(item))}">
     <div class="item-text">
       <div style="display:flex;align-items:flex-start;gap:4px">
-        <div class="item-name" style="flex:1">${esc(item.art)}</div>
+        <div class="item-name" style="flex:1">${esc(displayItem.art)}</div>
         ${commentBtn}
       </div>
       <div class="item-unit${unitWarn}">${unitLabel}</div>
-      ${aliasHtml}
       ${corrected ? '<span class="correction-badge">Editado despues de cerrar</span>' : ''}
       ${commentText}
     </div>
@@ -1032,9 +1031,9 @@ function filterCount(q) {
         html += `<div class="item-row" data-search="${esc(itemSearchText(item))}">
           <div class="item-text"><div class="item-name">${esc(item.art)}</div><div class="item-unit">fuera de zona · ${esc(item.uni || '')}</div></div>
           <div class="qty-wrap">
-            ${f ? `<span class="lt-badge" id="ltb_ext_${esc(cod)}">${ltStr} LT</span>` : ''}
+            ${f ? `<span class="lt-badge" id="ltb_${esc(zid)}_${esc(cod)}">${ltStr} LT</span>` : ''}
             <input type="number" class="qty-input ${filled}" inputmode="decimal" step="0.01" min="0" placeholder="0"
-              value="${raw!==undefined?raw:''}" data-zid="ext" data-cod="${esc(cod)}" oninput="onQty(this)" onfocus="this.select()">
+              value="${raw!==undefined?raw:''}" data-zid="${esc(zid)}" data-cod="${esc(cod)}" oninput="onQty(this)" onfocus="this.select()">
           </div></div>`;
       });
     }
