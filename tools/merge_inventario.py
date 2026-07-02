@@ -246,6 +246,8 @@ def diff_snapshots(
                 continue
             before_value = before_cells.get(coord)
             after_value = after_cells.get(coord)
+            if before_value in (None, "") and after_value in (None, ""):
+                continue
             if (
                 (sheet, coord[0], coord[1]) in blank_equivalent
                 and before_value in (None, "")
