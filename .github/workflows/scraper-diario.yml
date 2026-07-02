@@ -1,8 +1,8 @@
 name: Scraper diario — ventas, compras, inventario
 
 on:
-  schedule:
-    - cron: '0 9 * * *'   # 3am Ciudad de México (UTC-6)
+  # schedule:  # DESACTIVADO 2026-07-02 (slice 0 — scraper falla a diario, estacionado)
+    # - cron: '0 9 * * *'   # 3am Ciudad de México (UTC-6)
   workflow_dispatch:        # permite correr manualmente desde GitHub
 
 jobs:

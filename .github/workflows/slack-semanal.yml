@@ -1,8 +1,8 @@
 name: Reporte semanal de costos — Slack
 
 on:
-  schedule:
-    - cron: '0 14 * * 1'   # lunes 8am Ciudad de México (UTC-6)
+  # schedule:  # DESACTIVADO 2026-07-02 (slice 0 — scraper falla a diario, estacionado)
+    # - cron: '0 14 * * 1'   # lunes 8am Ciudad de México (UTC-6)
   workflow_dispatch:
 
 jobs:

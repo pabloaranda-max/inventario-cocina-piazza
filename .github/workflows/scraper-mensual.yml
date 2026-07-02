@@ -1,8 +1,8 @@
 name: Scraper mensual — día 2 del mes
 
 on:
-  schedule:
-    - cron: '0 10 2 * *'   # día 2 de cada mes, 4am Ciudad de México
+  # schedule:  # DESACTIVADO 2026-07-02 (slice 0 — scraper falla a diario, estacionado)
+    # - cron: '0 10 2 * *'   # día 2 de cada mes, 4am Ciudad de México
   workflow_dispatch:
 
 jobs:

@@ -1,8 +1,8 @@
 name: Scraper domingos — catálogos, recetas e inventarios cerrados
 
 on:
-  schedule:
-    - cron: '0 4 * * 0'   # domingos 10pm Ciudad de México (UTC-6)
+  # schedule:  # DESACTIVADO 2026-07-02 (slice 0 — scraper falla a diario, estacionado)
+    # - cron: '0 4 * * 0'   # domingos 10pm Ciudad de México (UTC-6)
   workflow_dispatch:
 
 jobs:
