@@ -328,6 +328,7 @@ let _commentTargetCod = null; // cod del artículo que se está comentando
 let _remoteLockedZones = {};
 let _manFotoB64     = null;
 let _lastZoneClosedMsg = '';
+let _templateItemsByCod = {};
 
 const lsKey = k => `xtux_${k}_${ALMACEN}`;
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(lsKey(k))); } catch { return null; } };
@@ -506,12 +507,18 @@ async function buildItemsFromRaw(raw) {
   return out;
 }
 
+function indexTemplateItems(items) {
+  _templateItemsByCod = {};
+  (items || []).forEach(item => { if (item.cod) _templateItemsByCod[item.cod] = item; });
+}
+
 async function resolveZonas() {
   if (CFG.zonas) {
     const zones = CFG.zonas.map(z => ({ ...z, items: [...(z.items || [])] }));
     if (T?.raw) {
       try {
         const fromRaw = await buildItemsFromRaw(T.raw);
+        indexTemplateItems(fromRaw);
         const existing = new Set(zones.flatMap(z => z.items.map(i => i.cod)));
         const missing = fromRaw.filter(i => (i.cod in (T.rowMap || {})) && !existing.has(i.cod));
         if (missing.length) {
@@ -543,6 +550,7 @@ async function resolveZonas() {
   if (T?.raw) {
     try {
       const fromRaw = await buildItemsFromRaw(T.raw);
+      indexTemplateItems(fromRaw);
       const existing = new Set(items.map(i => i.cod));
       const missing = fromRaw.filter(i => (i.cod in (T.rowMap || {})) && !existing.has(i.cod));
       if (missing.length) {
@@ -570,6 +578,7 @@ async function selectArea(key) {
   CFG     = AREA_CONFIG[key];
   const savedKey = key;
   T = null;
+  _templateItemsByCod = {};
   setColor(CFG.color);
   document.getElementById('inp-fecha').value = new Date().toISOString().slice(0,10);
 
@@ -957,7 +966,8 @@ function filterCount(q) {
   if (T?.rowMap) {
     const allZoneCods = new Set(ZONAS.flatMap(z => z.items.map(i => i.cod)));
     const fuera = Object.keys(T.rowMap).filter(cod =>
-      !allZoneCods.has(cod) && cod.toLowerCase().includes(ql)
+      !allZoneCods.has(cod) &&
+      ((cod.toLowerCase().includes(ql)) || ((_templateItemsByCod[cod]?.art || '').toLowerCase().includes(ql)))
     );
     if (fuera.length) {
       html += `<div class="subgrupo-hdr" style="background:#f0fdf4;color:#166534;border-top:2px solid #e5e7eb">Fuera de zona · en plantilla</div>`;
@@ -969,10 +979,9 @@ function filterCount(q) {
         const flt   = raw !== undefined ? parseFloat(raw) : NaN;
         const f     = opts[0]?.factor ?? null;
         const ltStr = f && !isNaN(flt) ? fmtNum(flt * f) : (raw!==undefined?String(raw):'—');
-        // Mostrar nombre desde plantilla si disponible, si no el código
-        const nombre = cod; // solo el cod está disponible aquí
-        html += `<div class="item-row" data-search="${esc(cod)}">
-          <div class="item-text"><div class="item-name">${esc(nombre)}</div><div class="item-unit">fuera de zona</div></div>
+        const item = _templateItemsByCod[cod] || { cod, art: cod, uni: T.unitMap?.[cod] || '' };
+        html += `<div class="item-row" data-search="${esc(item.art)} ${esc(cod)}">
+          <div class="item-text"><div class="item-name">${esc(item.art)}</div><div class="item-unit">fuera de zona · ${esc(item.uni || '')}</div></div>
           <div class="qty-wrap">
             ${f ? `<span class="lt-badge" id="ltb_ext_${esc(cod)}">${ltStr} LT</span>` : ''}
             <input type="number" class="qty-input ${filled}" inputmode="decimal" step="0.01" min="0" placeholder="0"

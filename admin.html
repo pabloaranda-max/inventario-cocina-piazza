@@ -538,6 +538,10 @@ async function verDetalleSesion(almacen, fecha) {
     _modalTemplate = template;
     const { filas, totales } = detalleTotalesPorZona(S, template);
     const rawLookup = template.raw ? itemsFromRaw(template.raw, template) : {};
+    const templateOptions = Object.values(templateLookup(template))
+      .sort((a,b) => String(a.nombre || a.codigo).localeCompare(String(b.nombre || b.codigo)))
+      .map(item => `<option value="${esc(item.codigo)} - ${esc(item.nombre || item.codigo)}"></option>`)
+      .join('');
     const countedCods = Object.keys(totales);
     const correctedCods = new Set();
     for (const zc of Object.values(S.correctionsByZone || {})) for (const cod of Object.keys(zc || {})) correctedCods.add(cod);
@@ -660,11 +664,11 @@ async function verDetalleSesion(almacen, fecha) {
       <div style="font-size:12px;color:#64748b;margin-bottom:8px">Si contaste el artículo incorrecto: pon el código equivocado en 0 arriba, y aquí agrega el correcto.</div>
       <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;background:#f8fafc;padding:10px;border-radius:8px;border:1px solid #e2e8f0">
         <div>
-          <div style="font-size:11px;color:#64748b;margin-bottom:3px">Código</div>
-          <input id="add-cod-input" type="text" placeholder="ej: MP0553" list="add-cod-list"
-            style="width:130px;border:1px solid #c4b5fd;border-radius:5px;padding:5px 8px;font-size:13px"
+          <div style="font-size:11px;color:#64748b;margin-bottom:3px">Código o nombre</div>
+          <input id="add-cod-input" type="text" placeholder="MP0553 o nombre" list="add-cod-list"
+            style="width:240px;border:1px solid #c4b5fd;border-radius:5px;padding:5px 8px;font-size:13px"
             oninput="actualizarNombreArticulo()">
-          <datalist id="add-cod-list">${Object.keys(template.rowMap || {}).map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+          <datalist id="add-cod-list">${templateOptions}</datalist>
         </div>
         <div>
           <div style="font-size:11px;color:#64748b;margin-bottom:3px">Nombre</div>
@@ -709,29 +713,31 @@ function cerrarDetalleSesion() {
 }
 
 function actualizarNombreArticulo() {
-  const cod = document.getElementById('add-cod-input')?.value?.trim().toUpperCase();
+  const raw = document.getElementById('add-cod-input')?.value?.trim();
   const el  = document.getElementById('add-nombre-display');
   if (!el) return;
-  if (!cod) { el.textContent = '—'; return; }
+  if (!raw) { el.textContent = '—'; return; }
   const T = _modalTemplate || {};
-  const rawLookup = T.raw ? itemsFromRaw(T.raw, T) : {};
-  const nombre = rawLookup[cod]?.nombre || (T.rowMap?.[cod] !== undefined ? cod : null);
-  el.textContent = nombre || '⚠ Código no en plantilla';
-  el.style.color  = nombre ? '#374151' : '#dc2626';
+  const item = resolveTemplateArticle(raw, T);
+  el.textContent = item ? `${item.nombre || item.codigo} (${item.codigo})` : '⚠ Código/nombre no en plantilla';
+  el.style.color  = item ? '#374151' : '#dc2626';
 }
 
 async function agregarArticuloCorrecion(almacen, fecha) {
   const codEl = document.getElementById('add-cod-input');
   const qtyEl = document.getElementById('add-qty-input');
   const msg   = document.getElementById('add-art-msg');
-  const cod   = codEl?.value?.trim().toUpperCase();
+  const raw   = codEl?.value?.trim();
   const qty   = parseFloat(qtyEl?.value);
-  if (!cod) { msg.innerHTML = '<span style="color:#dc2626">Escribe un código.</span>'; return; }
+  if (!raw) { msg.innerHTML = '<span style="color:#dc2626">Escribe un código o nombre.</span>'; return; }
   if (isNaN(qty) || qty < 0) { msg.innerHTML = '<span style="color:#dc2626">Cantidad inválida.</span>'; return; }
   const T = _modalTemplate || {};
+  const resolved = resolveTemplateArticle(raw, T);
+  const cod = resolved?.codigo || raw.toUpperCase();
   if (T.rowMap && !(cod in T.rowMap)) {
     if (!confirm(`El código "${cod}" no está en la plantilla y no se exportará al XLSX.\n¿Agregarlo de todas formas?`)) return;
   }
+  if (resolved) codEl.value = resolved.codigo;
   msg.innerHTML = '<span style="color:#64748b">Guardando…</span>';
   try {
     const r = await fetch(WORKER_URL + '/inv/sesion', {
@@ -890,6 +896,35 @@ function itemsFromRaw(rawB64, T) {
     };
   }
   return out;
+}
+
+function normalizeTemplateSearch(s) {
+  return String(s ?? '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim();
+}
+
+function templateLookup(T) {
+  const lookup = T?.raw ? itemsFromRaw(T.raw, T) : {};
+  for (const cod of Object.keys(T?.rowMap || {})) {
+    if (!lookup[cod]) lookup[cod] = { codigo: cod, nombre: cod, unidad: T?.unitMap?.[cod] || '' };
+  }
+  return lookup;
+}
+
+function resolveTemplateArticle(input, T) {
+  const lookup = templateLookup(T);
+  const raw = String(input || '').trim();
+  if (!raw) return null;
+  const codeLike = raw.split(/\s+[-·]\s+/)[0].trim().toUpperCase();
+  if (lookup[codeLike]) return lookup[codeLike];
+
+  const q = normalizeTemplateSearch(raw);
+  const items = Object.values(lookup);
+  return items.find(i => normalizeTemplateSearch(i.codigo) === q)
+      || items.find(i => normalizeTemplateSearch(i.nombre) === q)
+      || items.find(i => normalizeTemplateSearch(i.codigo).includes(q) || normalizeTemplateSearch(i.nombre).includes(q))
+      || null;
 }
 
 async function catalogoLookup(almacen, T) {
