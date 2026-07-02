@@ -514,6 +514,17 @@ function indexTemplateItems(items) {
   (items || []).forEach(item => { if (item.cod) _templateItemsByCod[item.cod] = item; });
 }
 
+function applyTemplateItem(item) {
+  const tpl = _templateItemsByCod[item.cod];
+  if (!tpl) return item;
+  return {
+    ...item,
+    art: tpl.art || item.art,
+    uni: tpl.uni || item.uni,
+    grp: tpl.grp || item.grp
+  };
+}
+
 function normalizeSearchText(s) {
   return String(s ?? '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -595,6 +606,7 @@ async function resolveZonas() {
       }
     } catch(e) { console.warn('buildItemsFromRaw complement:', e); }
   }
+  items = items.map(applyTemplateItem);
 
   // Si hay zonaNames, replicar el catálogo en N zonas independientes
   if (CFG.zonaNames?.length) {
