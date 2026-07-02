@@ -210,7 +210,9 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
     <input type="hidden" id="man-edit-id">
     <div class="form-group">
       <label>Nombre *</label>
-      <input type="text" id="man-nombre" placeholder="Ej: Herradura Reposado">
+      <input type="text" id="man-nombre" placeholder="Ej: Herradura Reposado" list="manual-template-list" oninput="updateManualTemplateHint()">
+      <datalist id="manual-template-list"></datalist>
+      <div id="man-template-hint" style="font-size:12px;color:#64748b;margin-top:4px"></div>
     </div>
     <div class="row">
       <div class="form-group" style="flex:1">
@@ -512,6 +514,40 @@ function indexTemplateItems(items) {
   (items || []).forEach(item => { if (item.cod) _templateItemsByCod[item.cod] = item; });
 }
 
+function normalizeSearchText(s) {
+  return String(s ?? '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim();
+}
+
+function matchesSearchText(text, query) {
+  const haystack = normalizeSearchText(text);
+  const tokens = normalizeSearchText(query).split(/\s+/).filter(Boolean);
+  return tokens.length > 0 && tokens.every(t => haystack.includes(t));
+}
+
+function resolveTemplateItem(input) {
+  const raw = String(input || '').trim();
+  if (!raw) return null;
+  const codeLike = raw.split(/\s+[-·]\s+/)[0].trim().toUpperCase();
+  if (_templateItemsByCod[codeLike]) return _templateItemsByCod[codeLike];
+  const q = normalizeSearchText(raw);
+  const items = Object.values(_templateItemsByCod);
+  return items.find(i => normalizeSearchText(i.cod) === q)
+      || items.find(i => normalizeSearchText(i.art) === q)
+      || items.find(i => matchesSearchText(itemSearchText(i), q))
+      || null;
+}
+
+function renderTemplateDatalist() {
+  const dl = document.getElementById('manual-template-list');
+  if (!dl) return;
+  dl.innerHTML = Object.values(_templateItemsByCod)
+    .sort((a,b) => String(a.art || a.cod).localeCompare(String(b.art || b.cod)))
+    .map(i => `<option value="${esc(i.cod)} - ${esc(i.art || i.cod)}"></option>`)
+    .join('');
+}
+
 async function resolveZonas() {
   if (CFG.zonas) {
     const zones = CFG.zonas.map(z => ({ ...z, items: [...(z.items || [])] }));
@@ -775,6 +811,14 @@ function getPresChoice(zid, cod) {
   return (S.presChoiceByZone?.[zid])?.[cod] ?? null;
 }
 
+function itemSearchText(item) {
+  const templateItem = _templateItemsByCod[item.cod] || null;
+  const pres = getPresOptions(item.cod)
+    .map(o => `${o.nombre || ''} ${o.factor || ''}`)
+    .join(' ');
+  return `${item.art || ''} ${templateItem?.art || ''} ${item.cod || ''} ${item.uni || ''} ${pres}`;
+}
+
 function markCorrection(zid, cod, tipo) {
   if (!S.reopenedZones?.[zid]) return;
   if (!S.correctionsByZone) S.correctionsByZone = {};
@@ -817,6 +861,10 @@ function renderItemRow(item, zid, inOtherZone) {
                   : item.uni;
   const unitWarn  = (item.uni === 'LT' || item.uni === 'KG') && opts.length === 0 ? ' warn' : '';
   const inputStep = opts.length > 0 && item.uni !== 'PZA' ? '0.5' : '0.01';
+  const templateName = _templateItemsByCod[item.cod]?.art || '';
+  const aliasHtml = templateName && templateName !== item.art
+    ? `<div class="item-unit" style="color:#166534">${esc(templateName)}</div>`
+    : '';
 
   const comment = getComment(item.cod);
   const commentBtn = _supervisorActual
@@ -824,13 +872,14 @@ function renderItemRow(item, zid, inOtherZone) {
     : '';
   const commentText = comment ? `<div class="item-comment-text">${esc(comment.texto)}</div>` : '';
 
-  return `<div class="item-row${inOtherZone?' other-zone':''}${corrected?' corrected':''}" data-search="${esc(item.art)} ${esc(item.cod)}">
+  return `<div class="item-row${inOtherZone?' other-zone':''}${corrected?' corrected':''}" data-search="${esc(itemSearchText(item))}">
     <div class="item-text">
       <div style="display:flex;align-items:flex-start;gap:4px">
         <div class="item-name" style="flex:1">${esc(item.art)}</div>
         ${commentBtn}
       </div>
       <div class="item-unit${unitWarn}">${unitLabel}</div>
+      ${aliasHtml}
       ${corrected ? '<span class="correction-badge">Editado despues de cerrar</span>' : ''}
       ${commentText}
     </div>
@@ -924,8 +973,8 @@ function hlMatch(text, q) {
 function filterCount(q) {
   const ql = q.toLowerCase().trim();
   document.querySelectorAll('#count-list .item-row').forEach(r => {
-    const searchStr = (r.dataset.search || '').toLowerCase();
-    const matches = !!ql && searchStr.includes(ql);
+    const searchStr = r.dataset.search || '';
+    const matches = !!ql && matchesSearchText(searchStr, ql);
     r.classList.toggle('hidden', !!ql && !matches);
     r.classList.toggle('search-match', matches);
     const nameEl = r.querySelector('.item-name');
@@ -955,11 +1004,11 @@ function filterCount(q) {
     if (zi === CZ) return;
     const matches = zone.items.filter(item =>
       !currentCods.has(item.cod) &&
-      (item.art.toLowerCase().includes(ql) || item.cod.toLowerCase().includes(ql))
+      matchesSearchText(itemSearchText(item), ql)
     );
     if (!matches.length) return;
     html += `<div class="subgrupo-hdr" style="background:#fef3c7;color:#92400e">${esc(zone.nombre)}</div>`;
-    matches.forEach(item => { html += renderItemRow(item, myZoneKey(zi), true); currentCods.add(item.cod); });
+    matches.forEach(item => { html += renderItemRow(item, myZoneKey(CZ), true); currentCods.add(item.cod); });
   });
 
   // Fuera de zona: en plantilla pero no en ninguna zona
@@ -967,20 +1016,20 @@ function filterCount(q) {
     const allZoneCods = new Set(ZONAS.flatMap(z => z.items.map(i => i.cod)));
     const fuera = Object.keys(T.rowMap).filter(cod =>
       !allZoneCods.has(cod) &&
-      ((cod.toLowerCase().includes(ql)) || ((_templateItemsByCod[cod]?.art || '').toLowerCase().includes(ql)))
+      matchesSearchText(itemSearchText(_templateItemsByCod[cod] || { cod, art: cod, uni: T.unitMap?.[cod] || '' }), ql)
     );
     if (fuera.length) {
       html += `<div class="subgrupo-hdr" style="background:#f0fdf4;color:#166534;border-top:2px solid #e5e7eb">Fuera de zona · en plantilla</div>`;
       fuera.forEach(cod => {
-        const zid   = 'ext';
-        const raw   = (S.countsByZone?.ext)?.[cod];
+        const zid   = myZoneKey(CZ);
+        const raw   = (S.countsByZone?.[zid])?.[cod];
         const opts  = getPresOptions(cod);
         const filled= raw !== undefined ? 'filled' : '';
         const flt   = raw !== undefined ? parseFloat(raw) : NaN;
         const f     = opts[0]?.factor ?? null;
         const ltStr = f && !isNaN(flt) ? fmtNum(flt * f) : (raw!==undefined?String(raw):'—');
         const item = _templateItemsByCod[cod] || { cod, art: cod, uni: T.unitMap?.[cod] || '' };
-        html += `<div class="item-row" data-search="${esc(item.art)} ${esc(cod)}">
+        html += `<div class="item-row" data-search="${esc(itemSearchText(item))}">
           <div class="item-text"><div class="item-name">${esc(item.art)}</div><div class="item-unit">fuera de zona · ${esc(item.uni || '')}</div></div>
           <div class="qty-wrap">
             ${f ? `<span class="lt-badge" id="ltb_ext_${esc(cod)}">${ltStr} LT</span>` : ''}
@@ -1153,6 +1202,7 @@ function openManualModal(editId) {
   document.getElementById('man-modal-title').textContent = existing ? 'Editar no catalogado' : 'Ítem no catalogado';
   document.getElementById('man-edit-id').value = editId || '';
   document.getElementById('man-nombre').value = existing?.nombre || '';
+  renderTemplateDatalist();
   document.getElementById('man-unidad').value = existing?.uni || existing?.unidad || '';
   const hasPres = !!(existing?.factor && existing.factor !== 1);
   document.getElementById('man-pres-toggle').checked = hasPres;
@@ -1165,6 +1215,7 @@ function openManualModal(editId) {
   document.getElementById('man-foto-preview').innerHTML = _manFotoB64 ? `<img src="${_manFotoB64}" style="max-width:100%;border-radius:8px;margin-top:4px">` : '';
   document.getElementById('man-foto').value = '';
   updateManualCantidadLabel();
+  updateManualTemplateHint();
   document.getElementById('modal-manuales-lista').classList.remove('active');
   document.getElementById('modal-manual').classList.add('active');
 }
@@ -1192,6 +1243,19 @@ function updateManualCantidadLabel() {
     label.textContent = 'Cantidad *';
     if (hint) hint.textContent = '';
   }
+}
+
+function updateManualTemplateHint() {
+  const hint = document.getElementById('man-template-hint');
+  if (!hint) return;
+  const item = resolveTemplateItem(document.getElementById('man-nombre')?.value);
+  if (!item) {
+    hint.textContent = 'Si existe en plantilla, puedes buscarlo por nombre o código aquí.';
+    hint.style.color = '#64748b';
+    return;
+  }
+  hint.textContent = `En plantilla: ${item.art} (${item.cod})`;
+  hint.style.color = '#166534';
 }
 
 function openManualesLista() {
@@ -1266,6 +1330,28 @@ function saveManual() {
   if (isNaN(cantidadRaw)) { alert('Ingresa la cantidad'); return; }
   if (hasPres && (isNaN(factor) || factor <= 0)) { alert('Ingresa un factor válido'); return; }
   const cantidad = parseFloat((cantidadRaw * (hasPres ? factor : 1)).toFixed(4));
+  const templateItem = resolveTemplateItem(nombre);
+  if (templateItem && CZ !== null) {
+    const zid = myZoneKey(CZ);
+    if (!S.countsByZone) S.countsByZone = {};
+    if (!S.countsByZone[zid]) S.countsByZone[zid] = {};
+    S.countsByZone[zid][templateItem.cod] = hasPres ? cantidadRaw : cantidad;
+    if (hasPres) {
+      if (!S.presChoiceByZone) S.presChoiceByZone = {};
+      if (!S.presChoiceByZone[zid]) S.presChoiceByZone[zid] = {};
+      S.presChoiceByZone[zid][templateItem.cod] = factor;
+    }
+    if (editId) S.manuales = (S.manuales || []).filter(m => m.id !== editId);
+    markCorrection(zid, templateItem.cod, editId ? 'manual_convertido' : 'manual_a_plantilla');
+    lsSet('s', S);
+    syncSesionWorker();
+    renderCountList(ZONAS[CZ].items, zid);
+    filterCount(document.getElementById('count-search')?.value || '');
+    updateProgress();
+    updateManualesBadge();
+    closeManualModal();
+    return;
+  }
   const zona = CZ !== null ? ZONAS[CZ].nombre : CFG.titulo;
   const manual = {
     id:           editId || newManualId(),
