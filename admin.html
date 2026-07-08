@@ -878,13 +878,8 @@ function b64ToArrayBuffer(rawB64) {
   return bytes.buffer;
 }
 
-function factorDefault(T, cod) {
-  const explicit = T?.presMap?.[cod];
-  if (explicit?.length) return explicit[0].factor;
-  const uni = T?.unitMap?.[cod] || '';
-  const defaults = T?.defaultPres?.[uni];
-  return defaults?.[0]?.factor ?? 1;
-}
+// factorDefault y calcularTotalesSesion viven en js/sesion-merge.js (módulo
+// compartido con el Worker) y se exponen en window al final de este archivo.
 
 function itemsFromRaw(rawB64, T) {
   const wb = XLSX.read(b64ToArrayBuffer(rawB64), { type:'array' });
@@ -955,22 +950,6 @@ async function catalogoLookup(almacen, T) {
     } catch(e) {}
   }
   return lookup;
-}
-
-function calcularTotalesSesion(S, T) {
-  const totales = {};
-  for (const [zid, zc] of Object.entries(S.countsByZone || {})) {
-    for (const [cod, qty] of Object.entries(zc || {})) {
-      const f = (S.presChoiceByZone?.[zid]?.[cod]) ?? factorDefault(T, cod);
-      totales[cod] = (totales[cod] || 0) + qty * f;
-    }
-  }
-  // Correcciones admin sobreescriben el total calculado
-  const adminCorr = S.correctionsByZone?.['_admin'] || {};
-  for (const [cod, corr] of Object.entries(adminCorr)) {
-    if (corr?.qty != null) totales[cod] = corr.qty;
-  }
-  return totales;
 }
 
 function descargarXlsxInventario(almacen, fecha, T, totales) {
@@ -1670,8 +1649,11 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 <script type="module">
 import { parsePlantilla, hashRaw } from './js/plantilla-parser.js';
+import { factorDefault, calcularTotalesSesion } from './js/sesion-merge.js';
 window.parsePlantilla = parsePlantilla;
 window.hashRaw = hashRaw;
+window.factorDefault = factorDefault;
+window.calcularTotalesSesion = calcularTotalesSesion;
 </script>
 </body>
 </html>
