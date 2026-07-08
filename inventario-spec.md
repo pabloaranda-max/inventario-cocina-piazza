@@ -594,7 +594,21 @@ Nota sobre unitMap: `parsePlantilla` captura la unidad tal como aparece en la pl
 
 ---
 
-## 14. Plan posterior — preparación editable de conteo
+## 14. Preparación editable de conteo — IMPLEMENTADO (R5, 2026-07-08)
+
+> Implementado tal como se describe abajo. Notas de la implementación real:
+> - Editor: admin.html tab **Preparación** (borrador / guardar y activar / desactivar).
+>   Desactivar regresa el almacén al comportamiento legacy (AREA_CONFIG o catálogo).
+> - El snapshot se persiste en `inv_sesiones.zone_snapshot` (migración 0005,
+>   first-write-wins): un segundo dispositivo que continúa la toma hereda las
+>   MISMAS zonas aunque el admin edite la preparación a media toma (E2E verificado).
+> - Los artículos inactivos/no asignados aparecen al buscar bajo
+>   "Fuera de zona · en plantilla" y se pueden capturar (mecanismo previo, reusado).
+> - ⚠️ Edge conocido: "Nueva toma" el MISMO día sobre el mismo almacén reusa la fila
+>   D1 (PK almacen+fecha) y conserva el snapshot original por first-write-wins. Para
+>   un reset real ese día: borrar la sesión desde admin y luego iniciar la nueva.
+> - Vista reducida de Cocina: mismo mecanismo (pocos activos). Falta configurar la
+>   preparación real (~60 proteínas) cuando se suba la plantilla COCINA.
 
 Objetivo: eliminar zonas hardcodeadas y permitir que admin prepare cada toma sin volver frágil la operación.
 
@@ -715,12 +729,17 @@ Guardar/activar debe requerir password admin.
 | R1 | **Continuidad de toma** — sin sesión local, `selectArea()` consulta `GET /inv/sesiones` (7 días), filtra no-exportadas con conteos y ofrece "Continuar esta toma" cargándola con su fecha original. Con sesión local el flujo no cambia. `inventario-beta.html` creado (= inventario.html apuntando a staging, banner visible) | HECHO 2026-07-08 (E2E Playwright en staging: dispositivo limpio ve y continúa toma de otro día sin crear fila nueva) |
 | R3 | **Auth endpoints admin** — header `X-Admin-Password` obligatorio en `inv_plantilla` e `inv_defaults`; acción nueva `inv_admin_check` valida el login de admin.html contra el Worker. **El password ya NO está hardcodeado en admin.html** — rotar es solo `wrangler secret put INV_ADMIN_PASSWORD` (⚠️ pendiente: Pablo debe rotarlo, el valor viejo quedó en el historial público de git). `inv_sesion`/`inv_lock` sin auth a propósito | HECHO 2026-07-08 (matriz 401/200 en staging y prod; login E2E Playwright) |
 | R4 | **Módulos puros + tests** — `js/plantilla-parser.js` (admin lo expone en window) y `js/sesion-merge.js` (compartido Worker+admin: merge de sesiones y totales con factor). `tests/test-parser.html` (15 asserts, fixture `cava-synthetic.xlsx`), `tests/test-merge.mjs` (12 asserts, correr con node). inventario.html aún tiene su lógica interna de render — unificarla queda para R5 | HECHO 2026-07-08 (tests verdes; upload E2E staging; merge verificado en staging y prod) |
-| R5 | **Preparación editable de conteo** — §14 completo + vista reducida de Cocina (mismo mecanismo: `items[].activo` por zona). Fusiona Slice 4 v1 + Prioridad F del handoff | PLAN |
+| R5 | **Preparación editable de conteo** — §14 completo + vista reducida de Cocina (mismo mecanismo: `items[].activo` por zona). Fusiona Slice 4 v1 + Prioridad F del handoff | HECHO 2026-07-08 (migraciones 0004/0005; tab Preparación en admin; `zoneSnapshot` congelado por sesión, first-write-wins en D1; E2E staging: editor 13 asserts, snapshot 11, vista reducida 7. La preparación REAL de COCINA queda pendiente de que se suba su plantilla) |
 | R6 | **Reporte de presentaciones sospechosas** — detección en admin (duplicadas, repetidas, factores sospechosos); marca y pide decisión humana, nunca autocorrige | PLAN |
 | — | Limpieza (CSS muerto §13, mover apps viejas a `legacy/`, chat GROQ) — oportunista, al colarse en otra sesión | OPORTUNISTA |
 | — | Sheets API en vez de Apps Script (4b v1) — solo si Apps Script falla en un cierre real | FUTURO |
 
 ### Pendientes fuera de slice
+
+- **Preparación real de COCINA (post-R5):** subir plantilla COCINA desde admin →
+  tab Preparación → "Crear: 1 zona con todo activo" → Desactivar visibles →
+  filtrar y activar las ~60 proteínas → Guardar y activar. El resto de artículos
+  queda capturable vía búsqueda ("Fuera de zona · en plantilla").
 
 - **Merge de datos BARRA_RESTAURANTE 2026-07-05/06:** dos filas `inv_sesiones` sin
   exportar (César 07-05, Daniel 07-06, mismo template_hash). Unir N-way por zona en la
