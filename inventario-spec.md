@@ -1,10 +1,17 @@
-# inventario.html — Especificación técnica v4.6
+# inventario.html — Especificación técnica v4.7
 
-> Última actualización: 2026-07-01. Estado: **EN PRODUCCIÓN** (CAVA probado; BARRA_RESTAURANTE inventariado en producción real con workarounds — ver §0 bugs urgentes).
+> Última actualización: 2026-07-08. Estado: **EN PRODUCCIÓN** (CAVA probado; BARRA_RESTAURANTE con dos tomas reales completadas).
+>
+> **Este documento es el ÚNICO contrato vivo del proyecto.** `plan-slices.md` (v1.0) y
+> `FABLE_HANDOFF.md` quedan [SUPERADOS] — sus decisiones vigentes están incorporadas
+> aquí (§15). No crear documentos de planeación paralelos; actualizar este.
 
 ---
 
-## 0. BUGS URGENTES — BARRA_RESTAURANTE (inventario 2026-07-01)
+## 0. [SUPERADO] BUGS URGENTES — BARRA_RESTAURANTE (inventario 2026-07-01)
+
+> Resuelto: la toma 2026-07-01 se cerró y cargó (decisión 2026-07-02). El fix
+> estructural de zonas es el Slice R5 (§15). Se conserva como registro histórico.
 
 Pablo completó el primer inventario real de BARRA_RESTAURANTE. Funcionó pero con problemas:
 
@@ -403,10 +410,16 @@ CREATE TABLE IF NOT EXISTS inv_plantillas (
   unit_map         TEXT NOT NULL DEFAULT '{}',   -- {cod: unidad} — override del catálogo
   default_pres     TEXT NOT NULL DEFAULT '{}',   -- {unidad: [{nombre, factor}]} — fallback
   raw              TEXT NOT NULL DEFAULT '',      -- XLSX original en base64
+  original_filename TEXT NOT NULL DEFAULT '',    -- nombre del archivo exportado por Xetux (v4.7, migración 0003)
   template_hash    TEXT NOT NULL DEFAULT '',
   updated_at       TEXT NOT NULL DEFAULT ''
 );
 ```
+
+`original_filename` se captura de `file.name` al subir la plantilla en admin.html y se
+usa como nombre del XLSX exportado (Xetux puede rechazar archivos renombrados — ver §9).
+Plantillas subidas antes de v4.7 lo tienen vacío → el export cae al nombre legacy
+`Inventario_{almacen}_{fecha}.xlsx` hasta que se re-suba la plantilla.
 
 ### inv_sesiones (en producción)
 
@@ -464,6 +477,17 @@ for (const cod of Object.keys(T.rowMap)) {
 ```
 
 El xlsx se regenera desde `T.raw` (base64): se parsea, se sobreescriben las celdas de cantidad y se descarga desde admin.
+
+**Nombre del archivo (v4.7):** el archivo descargado usa `T.originalFilename` (el nombre
+exacto con que Xetux exportó la plantilla); solo si está vacío cae al nombre legacy
+`Inventario_{almacen}_{fecha}.xlsx`. Motivo: Xetux puede bloquear la importación por
+nombre de archivo antes de validar contenido.
+
+**Diagnóstico de importación — método empírico, no especulativo:** si Xetux rechaza un
+archivo generado por la app, la única fuente de verdad es el error real de Xetux en un
+intento de importación. No "blindar" el archivo contra causas hipotéticas (metadata,
+hashes, encoding, etc.) sin un rechazo observado que lo justifique. El export ya
+preserva libro, hoja, formato y estructura al regenerar desde `T.raw` con `cellStyles`.
 
 Ítems manuales: no incluir en xlsx. Mostrar en pantalla de validación.
 
@@ -660,3 +684,61 @@ Guardar/activar debe requerir password admin.
 5. Hacer que `inventario.html` use `zoneSnapshot` si existe.
 6. Migrar BARRA_RESTAURANTE fuera de `AREA_CONFIG.zonas`.
 7. Eliminar hardcode cuando haya al menos una toma completa verificada con preparación editable.
+
+---
+
+## 15. PLAN — Slices v2 (2026-07-08)
+
+> Sustituye a `plan-slices.md` v1.0. Reordenado por dolor operativo real (tomas de
+> julio 2026), no por higiene técnica. Slice 0 del plan v1 (seguridad: password rotado,
+> fallback eliminado, staging Worker, PATs, crons scraper pausados, worker legacy
+> borrado) quedó COMPLETO.
+
+### Contexto operativo (resumen del handoff 2026-07-08)
+
+- 7 almacenes: General, Cocina, Cava, Barra Restaurante, Barra Amichi, Alimentari,
+  Salumería. Son nodos de una red (cualquiera puede transferir a cualquiera), no islas.
+- La app es capa de captura/validación/consolidación para Xetux; no lo reemplaza.
+- Human in the loop mientras los datos estén sucios: detectar y marcar, no autocorregir.
+- Cocina cuenta ~60 ítems (proteínas) pero su plantilla trae ~700+ que deben seguir
+  activos en Xetux → vista operativa reducida + catálogo consultable (cubierto por R5).
+- Cava: usuarios no expertos fallan buscando etiquetas italianas → buscador tolerante
+  (futuro; no bloquea slices actuales).
+- Visión futura (NO slices): voz, código de barras, API Xetux, cámaras, básculas,
+  inventario diario en barras, replicabilidad Tuétano.
+
+### Orden de ejecución
+
+| # | Slice | Estado |
+|---|---|---|
+| R2 | **Nombre de archivo Xetux** — capturar `file.name` al subir plantilla (columna `original_filename`, migración 0003), usarlo en la descarga del export | EN CURSO (esta rama) |
+| R1 | **Continuidad de toma** — en `selectArea()`, consultar `GET /inv/sesiones` (últimos ~7 días, no exportadas) y ofrecer "Continuar toma abierta del día X" cargándola con su fecha original. Elimina la fragmentación multi-día (caso BARRA_RESTAURANTE 5–6 jul). Prerrequisito: `inventario-beta.html` (ver abajo) | PLAN |
+| R3 | **Auth endpoints admin** — header `X-Admin-Password` en `POST /inv/plantilla` (acciones `inv_plantilla` e `inv_defaults`); admin.html lo manda desde su login. Era Slice 1 del plan v1 | PLAN |
+| R4 | **Módulos puros + fixture parser** — `js/plantilla-parser.js`, `js/sesion-merge.js`, `tests/test-parser.html` (era Slice 2 v1; ver §12 Fases 1+3). Habilitador de R5 y del merge multi-día | PLAN |
+| R5 | **Preparación editable de conteo** — §14 completo + vista reducida de Cocina (mismo mecanismo: `items[].activo` por zona). Fusiona Slice 4 v1 + Prioridad F del handoff | PLAN |
+| R6 | **Reporte de presentaciones sospechosas** — detección en admin (duplicadas, repetidas, factores sospechosos); marca y pide decisión humana, nunca autocorrige | PLAN |
+| — | Limpieza (CSS muerto §13, mover apps viejas a `legacy/`, chat GROQ) — oportunista, al colarse en otra sesión | OPORTUNISTA |
+| — | Sheets API en vez de Apps Script (4b v1) — solo si Apps Script falla en un cierre real | FUTURO |
+
+### Pendientes fuera de slice
+
+- **Merge de datos BARRA_RESTAURANTE 2026-07-05/06:** dos filas `inv_sesiones` sin
+  exportar (César 07-05, Daniel 07-06, mismo template_hash). Unir N-way por zona en la
+  fila más reciente ANTES de exportar; filas viejas se conservan como respaldo.
+- **Diagnóstico importación Xetux:** Pablo intenta importar un archivo generado por la
+  app (con R2 desplegado) y reporta el error exacto si lo hay. Empírico, ver §9.
+- **`inventario-beta.html`:** copia de inventario.html apuntando al Worker staging,
+  servida por el mismo GitHub Pages → staging real de frontend probable desde teléfono.
+  Crearla al inicio de R1 (primer slice que toca inventario.html).
+
+### Reglas transversales (heredadas de plan v1, vigentes)
+
+- Rama `feat/slice-*` desde main; merge a main solo con el "Done" cumplido y verificado.
+- Worker: staging primero; migración D1 primero en staging; backup antes de migrar prod.
+- Frontend: probar local (`python -m http.server`) + beta apuntando a staging.
+- Almacén de prueba: CAVA (multi-zona: también ALIMENTARI). BARRA_AMICI como entorno
+  poco viciado.
+- Antes de cualquier carga real a Xetux: `tools/merge_inventario.py` dry-run y revisar
+  `validation_report.json`.
+- Nunca committear secrets; viven en `wrangler secret`.
+- Cada slice termina actualizando ESTE documento.

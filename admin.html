@@ -974,7 +974,9 @@ function descargarXlsxInventario(almacen, fecha, T, totales) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `Inventario_${almacen}_${fecha}.xlsx`;
+  // Xetux puede rechazar la importación si el archivo no conserva el nombre con que
+  // exportó la plantilla; usar el original y caer al legacy solo si no existe (pre-v4.7)
+  a.download = T.originalFilename || `Inventario_${almacen}_${fecha}.xlsx`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -1675,7 +1677,7 @@ async function uploadPlantilla(file) {
     msg.textContent = `✓ ${Object.keys(rowMap).length} artículos · subiendo al servidor…`;
     const r = await fetch(WORKER_URL + '/inv/plantilla', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action:'inv_plantilla', almacen, rowMap, cantidadColIdx, presMap, unitMap, raw, templateHash, templateTs: Date.now() })
+      body: JSON.stringify({ action:'inv_plantilla', almacen, rowMap, cantidadColIdx, presMap, unitMap, raw, originalFilename: file.name || '', templateHash, templateTs: Date.now() })
     });
     const d = await r.json();
     if (d.ok) {

@@ -376,7 +376,7 @@ async function handleInvGet(db, url) {
     const almacen = url.searchParams.get('almacen');
     if (!almacen) return json({ error: 'Falta almacen' }, 400);
     const row = await db.prepare(
-      'SELECT row_map, cantidad_col_idx, pres_map, unit_map, default_pres, raw, template_hash, updated_at FROM inv_plantillas WHERE almacen = ?'
+      'SELECT row_map, cantidad_col_idx, pres_map, unit_map, default_pres, raw, original_filename, template_hash, updated_at FROM inv_plantillas WHERE almacen = ?'
     ).bind(almacen).first();
     if (!row) return json({ ok: true, found: false });
     return json({
@@ -387,6 +387,7 @@ async function handleInvGet(db, url) {
       unitMap: row.unit_map ? JSON.parse(row.unit_map) : {},
       defaultPres: row.default_pres ? JSON.parse(row.default_pres) : {},
       raw: row.raw,
+      originalFilename: row.original_filename || '',
       templateHash: row.template_hash || '',
       updatedAt: row.updated_at
     });
@@ -486,20 +487,21 @@ async function handleInvGet(db, url) {
 
 async function handleInvPost(db, body, env = {}) {
   if (body.action === 'inv_plantilla') {
-    const { almacen, rowMap, cantidadColIdx, presMap, unitMap, raw, templateHash } = body;
+    const { almacen, rowMap, cantidadColIdx, presMap, unitMap, raw, originalFilename, templateHash } = body;
     if (!almacen || !rowMap || cantidadColIdx == null) return json({ error: 'Datos incompletos' }, 400);
     await db.prepare(`
-      INSERT INTO inv_plantillas (almacen, row_map, cantidad_col_idx, pres_map, unit_map, raw, template_hash, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO inv_plantillas (almacen, row_map, cantidad_col_idx, pres_map, unit_map, raw, original_filename, template_hash, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(almacen) DO UPDATE SET
         row_map = excluded.row_map,
         cantidad_col_idx = excluded.cantidad_col_idx,
         pres_map = excluded.pres_map,
         unit_map = excluded.unit_map,
         raw = excluded.raw,
+        original_filename = excluded.original_filename,
         template_hash = excluded.template_hash,
         updated_at = excluded.updated_at
-    `).bind(almacen, JSON.stringify(rowMap), cantidadColIdx, JSON.stringify(presMap || {}), JSON.stringify(unitMap || {}), raw || '', templateHash || '', new Date().toISOString()).run();
+    `).bind(almacen, JSON.stringify(rowMap), cantidadColIdx, JSON.stringify(presMap || {}), JSON.stringify(unitMap || {}), raw || '', originalFilename || '', templateHash || '', new Date().toISOString()).run();
     return json({ ok: true });
   }
 
