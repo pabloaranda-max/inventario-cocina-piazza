@@ -1,7 +1,7 @@
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Session-Token, X-Sync-Token',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Session-Token, X-Sync-Token, X-Admin-Password',
 };
 
 // Revisores que participan en aprobaciones
@@ -485,7 +485,25 @@ async function handleInvGet(db, url) {
   return json({ error: 'Ruta no encontrada' }, 404);
 }
 
-async function handleInvPost(db, body, env = {}) {
+async function handleInvPost(db, body, env = {}, request = null) {
+  const adminHeader = request?.headers?.get('X-Admin-Password') || '';
+  const adminOk = !!env.INV_ADMIN_PASSWORD && adminHeader === env.INV_ADMIN_PASSWORD;
+
+  // Login de admin.html: valida el password sin exponerlo en el código del repo público
+  if (body.action === 'inv_admin_check') {
+    if (!env.INV_ADMIN_PASSWORD) return json({ ok: false, error: 'Admin password no configurado' }, 500);
+    const pwd = body.adminPassword || adminHeader;
+    if (!pwd || pwd !== env.INV_ADMIN_PASSWORD) return json({ ok: false, error: 'Contraseña incorrecta' }, 401);
+    return json({ ok: true });
+  }
+
+  // Subir/sobreescribir plantillas y defaults requiere admin (inv_sesion e inv_lock
+  // quedan sin auth a propósito: el operario no tiene credencial)
+  if (body.action === 'inv_plantilla' || body.action === 'inv_defaults') {
+    if (!env.INV_ADMIN_PASSWORD) return json({ ok: false, error: 'Admin password no configurado' }, 500);
+    if (!adminOk) return json({ ok: false, error: 'Sin permiso' }, 401);
+  }
+
   if (body.action === 'inv_plantilla') {
     const { almacen, rowMap, cantidadColIdx, presMap, unitMap, raw, originalFilename, templateHash } = body;
     if (!almacen || !rowMap || cantidadColIdx == null) return json({ error: 'Datos incompletos' }, 400);
@@ -745,7 +763,7 @@ export default {
     if (url.pathname.startsWith('/inv/')) {
       try {
         if (request.method === 'GET')  return await handleInvGet(env.DB, url);
-        if (request.method === 'POST') return await handleInvPost(env.DB, await request.json(), env);
+        if (request.method === 'POST') return await handleInvPost(env.DB, await request.json(), env, request);
         return new Response('Method not allowed', { status: 405, headers: CORS });
       } catch (err) {
         return json({ error: err.message }, 500);

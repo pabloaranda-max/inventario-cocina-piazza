@@ -302,7 +302,6 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
 </div>
 
 <script>
-const ADMIN_PASSWORD = 'pasticcio2026';
 const GROQ_MODEL = 'llama-3.1-8b-instant';
 let adminActual = null;
 
@@ -343,11 +342,25 @@ let _modalTemplate = null;
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 // ── AUTH ──────────────────────────────────────────────────
-function login() {
+async function login() {
   const nombre = document.getElementById('nombre-input').value.trim();
   const pwd = document.getElementById('pwd-input').value;
-  if (!nombre) { document.getElementById('login-error').textContent = 'Ingresa tu nombre'; return; }
-  if (pwd !== ADMIN_PASSWORD) { document.getElementById('login-error').textContent = 'Contraseña incorrecta'; return; }
+  const errEl = document.getElementById('login-error');
+  if (!nombre) { errEl.textContent = 'Ingresa tu nombre'; return; }
+  if (!pwd)    { errEl.textContent = 'Ingresa la contraseña'; return; }
+  // El password ya no vive en este archivo (repo público): lo valida el Worker
+  errEl.textContent = 'Verificando…';
+  try {
+    const r = await fetch(WORKER_URL + '/inv/plantilla', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'inv_admin_check', adminPassword: pwd })
+    });
+    const d = await r.json();
+    if (!d.ok) { errEl.textContent = d.error || 'Contraseña incorrecta'; return; }
+  } catch (e) {
+    errEl.textContent = 'Sin conexión con el servidor'; return;
+  }
+  errEl.textContent = '';
   adminActual = nombre;
   adminPasswordActual = pwd;
   const key = document.getElementById('groq-key-input').value.trim();
@@ -1597,7 +1610,7 @@ async function saveDefaults() {
   });
   try {
     const r = await fetch(WORKER_URL + '/inv/plantilla', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPasswordActual },
       body: JSON.stringify({ action: 'inv_defaults', almacen, defaultPres })
     });
     const d = await r.json();
@@ -1676,7 +1689,7 @@ async function uploadPlantilla(file) {
 
     msg.textContent = `✓ ${Object.keys(rowMap).length} artículos · subiendo al servidor…`;
     const r = await fetch(WORKER_URL + '/inv/plantilla', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPasswordActual },
       body: JSON.stringify({ action:'inv_plantilla', almacen, rowMap, cantidadColIdx, presMap, unitMap, raw, originalFilename: file.name || '', templateHash, templateTs: Date.now() })
     });
     const d = await r.json();
