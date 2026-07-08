@@ -597,6 +597,22 @@ async function verDetalleSesion(almacen, fecha) {
     const manuales = S.manuales || [];
     const updated = S.updatedAt ? new Date(S.updatedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short' }) : '—';
     const exported = S.exportedAt ? new Date(S.exportedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short' }) : 'No';
+    // R5.1: quién capturó qué — el deviceId de la clave "zona:deviceId" se traduce
+    // a nombre con operariosByDevice (acumulado por el Worker en cada sync)
+    const operarioDeZid = zid => {
+      const dev = String(zid).split(':')[1];
+      if (!dev) return '—';
+      return S.operariosByDevice?.[dev]?.operario || ('disp. …' + dev.slice(-5));
+    };
+    const opsPorDev = {};
+    for (const [key, zc] of Object.entries(S.countsByZone || {})) {
+      const dev = String(key).split(':')[1];
+      if (!dev) continue;
+      opsPorDev[dev] = (opsPorDev[dev] || 0) + Object.keys(zc || {}).length;
+    }
+    const opsResumen = Object.entries(opsPorDev)
+      .map(([dev, n]) => `${esc(S.operariosByDevice?.[dev]?.operario || 'disp. …' + dev.slice(-5))} (${n})`)
+      .join(' · ');
     const rows = filas
       .sort((a,b) => String(a.zid).localeCompare(String(b.zid)) || String(a.cod).localeCompare(String(b.cod)))
       .slice(0, 350)
@@ -605,6 +621,7 @@ async function verDetalleSesion(almacen, fecha) {
         const corrLabel = f.correction ? `<br><span class="corr-badge">Editado por ${esc(f.correction.operario || '—')}</span>` : '';
         return `<tr class="${f.correction ? 'corr-row' : ''}">
           <td>${esc(zonaNombre(almacen, f.zid))}</td>
+          <td>${esc(operarioDeZid(f.zid))}</td>
           <td>${esc(f.cod)}</td>
           <td>${esc(item.nombre)}${corrLabel}</td>
           <td style="text-align:right">${esc(f.qty)}</td>
@@ -695,6 +712,7 @@ async function verDetalleSesion(almacen, fecha) {
       </div>
       <div style="background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:12px">
         <strong>${esc(almacen)}</strong> · ${esc(fecha)} · Operario sesión: ${esc(S.operario || '—')}<br>
+        ${opsResumen ? `Capturaron: ${opsResumen} artículos<br>` : ''}
         Actualizada: ${updated} · Exportada: ${esc(exported)}${S.exportedBy ? ` por ${esc(S.exportedBy)}` : ''}
       </div>
       <div style="font-weight:800;margin:12px 0 4px">Totales — edita y guarda si hay un error</div>
@@ -735,8 +753,8 @@ async function verDetalleSesion(almacen, fecha) {
       <div style="font-weight:800;margin:14px 0 6px">Detalle por zona</div>
       <div style="max-height:240px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">
         <table class="detalle-table">
-          <thead><tr><th>Zona</th><th>Código</th><th>Artículo</th><th style="text-align:right">Captura</th><th style="text-align:right">Base</th><th>Unidad</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">Sin capturas</td></tr>'}</tbody>
+          <thead><tr><th>Zona</th><th>Operario</th><th>Código</th><th>Artículo</th><th style="text-align:right">Captura</th><th style="text-align:right">Base</th><th>Unidad</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">Sin capturas</td></tr>'}</tbody>
         </table>
       </div>
       ${filas.length > 350 ? `<div style="font-size:12px;color:#64748b;margin-top:6px">Mostrando 350 de ${filas.length} renglones.</div>` : ''}

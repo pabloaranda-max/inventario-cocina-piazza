@@ -404,7 +404,7 @@ async function handleInvGet(db, url) {
       row = await db.prepare(
         `SELECT operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
                 corrections_by_zone, completed_zones, locked_zones, manuales, template_hash, updated_at,
-                exported_at, exported_by, zone_config_id, zone_snapshot
+                exported_at, exported_by, zone_config_id, zone_snapshot, operarios_by_device
          FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
       ).bind(almacen, fecha).first();
     } catch (err) {
@@ -431,6 +431,7 @@ async function handleInvGet(db, url) {
       exportedBy:       row.exported_by || '',
       zoneConfigId:     row.zone_config_id || '',
       zoneSnapshot:     row.zone_snapshot ? JSON.parse(row.zone_snapshot) : null,
+      operariosByDevice: JSON.parse(row.operarios_by_device || '{}'),
       updatedAt:        row.updated_at
     });
   }
@@ -621,7 +622,7 @@ async function handleInvPost(db, body, env = {}, request = null) {
     let existing;
     try {
       existing = await db.prepare(
-        `SELECT counts, counts_by_zone, pres_choice_by_zone, corrections_by_zone, completed_zones, manuales
+        `SELECT counts, counts_by_zone, pres_choice_by_zone, corrections_by_zone, completed_zones, manuales, operarios_by_device
          FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
       ).bind(almacen, fecha).first();
     } catch (err) {
@@ -642,6 +643,19 @@ async function handleInvPost(db, body, env = {}, request = null) {
     const existingCounts = JSON.parse(existing?.counts || '{}');
     const mergedCounts = counts ? { ...existingCounts, ...counts } : existingCounts;
 
+    // Atribución (R5.1): las claves "zona:deviceId" de ESTE POST pertenecen al
+    // dispositivo que envía, y `operario` es quien lo opera → acumular el mapeo.
+    // (No usar completedZones: trae claves de otros dispositivos tras un merge.)
+    const mergedOps = JSON.parse(existing?.operarios_by_device || '{}');
+    const senderDevices = new Set();
+    for (const key of [...Object.keys(countsByZone || {}), ...Object.keys(presChoiceByZone || {})]) {
+      const dev = String(key).split(':')[1];
+      if (dev) senderDevices.add(dev);
+    }
+    for (const dev of senderDevices) {
+      mergedOps[dev] = { operario, at: new Date().toISOString() };
+    }
+
     const commonBinds = [
       almacen, operario, fecha,
       JSON.stringify(mergedCounts),
@@ -659,8 +673,8 @@ async function handleInvPost(db, body, env = {}, request = null) {
         INSERT INTO inv_sesiones
           (almacen, operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
            corrections_by_zone, completed_zones, locked_zones, manuales, template_hash,
-           zone_config_id, zone_snapshot, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?)
+           zone_config_id, zone_snapshot, operarios_by_device, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?, ?)
         ON CONFLICT(almacen, fecha) DO UPDATE SET
           operario           = excluded.operario,
           counts             = excluded.counts,
@@ -672,11 +686,13 @@ async function handleInvPost(db, body, env = {}, request = null) {
           template_hash      = excluded.template_hash,
           zone_config_id     = CASE WHEN zone_config_id = '' THEN excluded.zone_config_id ELSE zone_config_id END,
           zone_snapshot      = CASE WHEN zone_snapshot  = '' THEN excluded.zone_snapshot  ELSE zone_snapshot  END,
+          operarios_by_device = excluded.operarios_by_device,
           updated_at         = excluded.updated_at
       `).bind(
         ...commonBinds,
         zoneConfigId || '',
         zoneSnapshot ? JSON.stringify(zoneSnapshot) : '',
+        JSON.stringify(mergedOps),
         new Date().toISOString()
       ).run();
     } catch (err) {
