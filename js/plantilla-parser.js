@@ -21,6 +21,9 @@ export function parsePlantilla(buf, XLSX = globalThis.XLSX) {
   if (iCan < 0) throw new Error('Columna "Cantidad" no encontrada');
 
   const rowMap = {}, unitMap = {}, presRaw = {};
+  // R6: todo lo filtrado se REPORTA para decisión humana — nunca se autocorrige.
+  // motivo: factor_1 | ml_g | duplicada | factor_ilegible | nombre_ambiguo
+  const sospechosas = [];
   for (let r = hIdx + 1; r < rows.length; r++) {
     const row = rows[r];
     const num = norm(row[0]), cod = norm(row[iCod]);
@@ -39,6 +42,8 @@ export function parsePlantilla(buf, XLSX = globalThis.XLSX) {
       const facVal = m ? parseFloat(m[1]) : NaN;
       if (nom && !isNaN(facVal) && facVal > 0)
         presRaw[parentCod].push({ nombre: nom, factor: facVal, uni: unitMap[parentCod] || '' });
+      else if (nom)
+        sospechosas.push({ cod: parentCod, nombre: nom, factor: null, motivo: 'factor_ilegible' });
     }
   }
 
@@ -46,14 +51,29 @@ export function parsePlantilla(buf, XLSX = globalThis.XLSX) {
   for (const [cod, list] of Object.entries(presRaw)) {
     const uni = unitMap[cod] || '', isVW = /^(LT|KG)$/i.test(uni);
     // R1: factor 1.0 se ignora. R2: factor >10 en LT/KG = error Xetux (mL/g), se ignora.
-    const filtered = list.filter(p => p.factor !== 1.0 && !(isVW && p.factor > 10));
+    const filtered = [];
+    for (const p of list) {
+      if (p.factor === 1.0)      sospechosas.push({ cod, nombre: p.nombre, factor: p.factor, motivo: 'factor_1' });
+      else if (isVW && p.factor > 10) sospechosas.push({ cod, nombre: p.nombre, factor: p.factor, motivo: 'ml_g' });
+      else filtered.push(p);
+    }
     // R4: deduplicar por factor. R5: múltiples factores válidos se conservan todos.
     const seen = new Map();
-    for (const p of filtered) if (!seen.has(p.factor)) seen.set(p.factor, p);
+    for (const p of filtered) {
+      if (seen.has(p.factor)) sospechosas.push({ cod, nombre: p.nombre, factor: p.factor, motivo: 'duplicada' });
+      else seen.set(p.factor, p);
+    }
     const unique = [...seen.values()];
+    // Mismo nombre con factores distintos entre las conservadas: ambiguo al elegir
+    const porNombre = {};
+    for (const p of unique) (porNombre[p.nombre] = porNombre[p.nombre] || []).push(p.factor);
+    for (const [nom, facs] of Object.entries(porNombre)) {
+      if (facs.length > 1)
+        sospechosas.push({ cod, nombre: nom, factor: facs.join(' / '), motivo: 'nombre_ambiguo' });
+    }
     if (unique.length) presMap[cod] = unique;
   }
-  return { rowMap, cantidadColIdx: iCan, presMap, unitMap };
+  return { rowMap, cantidadColIdx: iCan, presMap, unitMap, sospechosas };
 }
 
 // SHA-256 truncado a 16 hex del raw base64 — versionado de plantilla (spec §5).

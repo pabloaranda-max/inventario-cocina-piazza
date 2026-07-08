@@ -219,6 +219,7 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
       </div>
       <div id="plt-msg" style="margin-top:10px;font-size:13px;font-weight:600"></div>
     </div>
+    <div id="plt-revision" style="margin-top:16px"></div>
     <div id="plt-defaults-section" style="display:none;margin-top:20px;border-top:1px solid #e5e7eb;padding-top:16px">
       <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:4px">Presentaciones por defecto</div>
       <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Se aplican a artículos sin presentaciones en Xetux, según su unidad.</div>
@@ -1591,10 +1592,71 @@ async function loadPlantillaStatus() {
       </div>`;
     }
     uploadEl.style.display = 'block';
-    if (d.ok && d.found) renderDefaultsEditor(d.defaultPres || {});
+    if (d.ok && d.found) {
+      renderDefaultsEditor(d.defaultPres || {});
+      renderRevisionPresentaciones(d);
+    } else {
+      document.getElementById('plt-revision').innerHTML = '';
+    }
   } catch(e) {
     statusEl.innerHTML = `<div style="color:#dc2626;font-size:13px">Error: ${e.message}</div>`;
   }
+}
+
+// ── R6: revisión de presentaciones sospechosas ─────────────
+// Se calcula al vuelo desde el raw de la plantilla (parser puro). Solo informa
+// y pide decisión humana — la corrección real se hace en Xetux o con defaultPres.
+const MOTIVOS_R6 = {
+  ml_g:            { titulo: 'Factor >10 en LT/KG — probable mL/g mal capturado en Xetux', accion: 'DESCARTADA al parsear. Corregir el factor en Xetux y re-subir la plantilla.', color: '#dc2626' },
+  factor_1:        { titulo: 'Factor 1.0 — no convierte nada', accion: 'DESCARTADA al parsear. Si el artículo sí necesita presentación, corregir en Xetux.', color: '#d97706' },
+  factor_ilegible: { titulo: 'Sin factor legible en el nombre', accion: 'DESCARTADA al parsear. El nombre del artículo presentación no trae "(0.75 LT)".', color: '#d97706' },
+  nombre_ambiguo:  { titulo: 'Mismo nombre con factores distintos', accion: 'CONSERVADAS ambas — el operario ve dos opciones iguales de nombre. Unificar en Xetux.', color: '#d97706' },
+  duplicada:       { titulo: 'Presentación repetida (mismo factor)', accion: 'Se usa una sola. Limpieza cosmética en Xetux, sin urgencia.', color: '#6b7280' },
+};
+
+function renderRevisionPresentaciones(d) {
+  const cont = document.getElementById('plt-revision');
+  cont.innerHTML = '';
+  if (!d.raw || typeof parsePlantilla !== 'function') return;
+  let P;
+  try { P = parsePlantilla(b64ToArrayBuffer(d.raw)); } catch(e) { return; }
+  const nombres = itemsFromRaw(d.raw, d);
+  const nom = cod => nombres[cod]?.nombre || cod;
+
+  const grupos = {};
+  for (const s of (P.sospechosas || [])) (grupos[s.motivo] = grupos[s.motivo] || []).push(s);
+  const sinPres = Object.keys(P.rowMap).filter(cod =>
+    /^(LT|KG)$/i.test(P.unitMap[cod] || '') && !P.presMap[cod] &&
+    !((d.defaultPres || {})[P.unitMap[cod]]?.length));
+
+  const total = (P.sospechosas || []).length + sinPres.length;
+  if (!total) {
+    cont.innerHTML = `<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px;font-size:13px;color:#166534">✓ Revisión de presentaciones: sin hallazgos.</div>`;
+    return;
+  }
+
+  let html = `<details style="border:1px solid #fcd34d;border-radius:10px;background:#fffbeb">
+    <summary style="padding:10px 12px;cursor:pointer;font-size:13px;font-weight:700;color:#92400e">⚠️ Revisión de presentaciones: ${total} hallazgo${total !== 1 ? 's' : ''} — requieren decisión humana, nada se corrige solo</summary>
+    <div style="padding:4px 12px 12px">`;
+  for (const [motivo, lista] of Object.entries(grupos)) {
+    const m = MOTIVOS_R6[motivo] || { titulo: motivo, accion: '', color: '#6b7280' };
+    html += `<div style="margin-top:10px">
+      <div style="font-size:12px;font-weight:700;color:${m.color}">${esc(m.titulo)} (${lista.length})</div>
+      <div style="font-size:11px;color:#78716c;margin-bottom:4px">${esc(m.accion)}</div>
+      ${lista.slice(0, 60).map(s => `<div style="font-size:12px;color:#44403c;padding:2px 0 2px 10px">${esc(s.cod)} · ${esc(nom(s.cod))} — <strong>${esc(s.nombre)}</strong>${s.factor != null ? ` (factor ${esc(s.factor)})` : ''}</div>`).join('')}
+      ${lista.length > 60 ? `<div style="font-size:11px;color:#a8a29e;padding:2px 0 2px 10px">… y ${lista.length - 60} más</div>` : ''}
+    </div>`;
+  }
+  if (sinPres.length) {
+    html += `<div style="margin-top:10px">
+      <div style="font-size:12px;font-weight:700;color:#b45309">LT/KG sin presentación ni default (${sinPres.length})</div>
+      <div style="font-size:11px;color:#78716c;margin-bottom:4px">El operario capturará 1:1 en la unidad (riesgo clásico: contar botellas y registrar litros). Normal en artículos que sí se pesan/miden directo; agregar presentación en Xetux o una regla en "Presentaciones por defecto" solo donde haga falta.</div>
+      ${sinPres.slice(0, 60).map(cod => `<div style="font-size:12px;color:#44403c;padding:2px 0 2px 10px">${esc(cod)} · ${esc(nom(cod))} — ${esc(P.unitMap[cod])}</div>`).join('')}
+      ${sinPres.length > 60 ? `<div style="font-size:11px;color:#a8a29e;padding:2px 0 2px 10px">… y ${sinPres.length - 60} más</div>` : ''}
+    </div>`;
+  }
+  html += '</div></details>';
+  cont.innerHTML = html;
 }
 
 function renderDefaultsEditor(defaultPres) {

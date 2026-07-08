@@ -64,6 +64,13 @@ assert(!P.presMap.MP0007, 'artículo sin presentación no aparece en presMap');
 // R4: dedup por factor
 assert(P.presMap.MP0008?.length === 1, `R4: mismo factor deduplicado (got ${P.presMap.MP0008?.length})`);
 
+// R6: lo filtrado se reporta como sospechoso, nunca se autocorrige
+const motivos = Object.fromEntries(P.sospechosas.map(s => [s.cod + ':' + s.motivo, s]));
+assert(motivos['MP0004:factor_1'], 'R6: MP0004 reportado como factor_1');
+assert(motivos['MP0005:ml_g']?.factor === 1000, 'R6: MP0005 reportado como ml_g con factor 1000');
+assert(motivos['MP0008:duplicada'], 'R6: MP0008 duplicado reportado');
+assert(!P.sospechosas.some(s => s.cod === 'MP0001'), 'R6: caso sano (MP0001) no genera sospechas');
+
 // hashRaw: determinístico y conocido (sha256("abc") truncado a 16 hex)
 assert(await hashRaw('abc') === 'ba7816bf8f01cfea', 'hashRaw determinístico (sha256 truncado)');
 assert(await hashRaw('abc') === await hashRaw('abc'), 'hashRaw estable entre llamadas');
