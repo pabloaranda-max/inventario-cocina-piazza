@@ -1,3 +1,5 @@
+import { mergeZoneMap, mergeCorrections, mergeManuales, mergeCompletedZones } from '../../../js/sesion-merge.js';
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -551,44 +553,12 @@ async function handleInvPost(db, body, env = {}, request = null) {
       ).bind(almacen, fecha).first();
     }
 
-    // Merge countsByZone por zona. Las claves colaborativas "zona:deviceId"
-    // representan el estado completo de ese dispositivo, así que se reemplazan
-    // para que borrar un input también se propague al servidor.
-    const existingCBZ = JSON.parse(existing?.counts_by_zone || '{}');
-    const incomingCBZ = countsByZone || {};
-    const mergedCBZ = { ...existingCBZ };
-    for (const [zid, zc] of Object.entries(incomingCBZ)) {
-      if (String(zid).includes(':')) mergedCBZ[zid] = { ...zc };
-      else mergedCBZ[zid] = { ...(mergedCBZ[zid] || {}), ...zc };
-    }
-
-    // Mismo criterio para presentaciones por dispositivo.
-    const existingPCBZ = JSON.parse(existing?.pres_choice_by_zone || '{}');
-    const incomingPCBZ = presChoiceByZone || {};
-    const mergedPCBZ = { ...existingPCBZ };
-    for (const [zid, zpc] of Object.entries(incomingPCBZ)) {
-      if (String(zid).includes(':')) mergedPCBZ[zid] = { ...zpc };
-      else mergedPCBZ[zid] = { ...(mergedPCBZ[zid] || {}), ...zpc };
-    }
-
-    const existingCorrections = JSON.parse(existing?.corrections_by_zone || '{}');
-    const incomingCorrections = correctionsByZone || {};
-    const mergedCorrections = { ...existingCorrections };
-    for (const [zid, corr] of Object.entries(incomingCorrections)) {
-      mergedCorrections[zid] = { ...(mergedCorrections[zid] || {}), ...(corr || {}) };
-    }
-
-    // Merge manuales por id; removeManuales es array de ids a eliminar
-    const existingManuales = JSON.parse(existing?.manuales || '[]');
-    const removedManIds = new Set(removeManuales || []);
-    const manMap = Object.fromEntries(existingManuales.filter(m => !removedManIds.has(m.id)).map(m => [m.id, m]));
-    for (const m of (manuales || [])) if (m.id) manMap[m.id] = m;
-    const mergedManuales = Object.values(manMap);
-
-    // completedZones: union
-    const existingZones = JSON.parse(existing?.completed_zones || '[]');
-    const removedZones = new Set(removeCompletedZones || []);
-    const mergedZones = [...new Set([...existingZones.filter(z => !removedZones.has(z)), ...(completedZones || [])])];
+    // Reglas de merge compartidas con admin.html — ver js/sesion-merge.js
+    const mergedCBZ = mergeZoneMap(JSON.parse(existing?.counts_by_zone || '{}'), countsByZone);
+    const mergedPCBZ = mergeZoneMap(JSON.parse(existing?.pres_choice_by_zone || '{}'), presChoiceByZone);
+    const mergedCorrections = mergeCorrections(JSON.parse(existing?.corrections_by_zone || '{}'), correctionsByZone);
+    const mergedManuales = mergeManuales(JSON.parse(existing?.manuales || '[]'), manuales, removeManuales);
+    const mergedZones = mergeCompletedZones(JSON.parse(existing?.completed_zones || '[]'), completedZones, removeCompletedZones);
 
     // Legacy counts merge (para barra.html)
     const existingCounts = JSON.parse(existing?.counts || '{}');
