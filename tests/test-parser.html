@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Tests · plantilla-parser.js</title>
+<style>
+  body { font: 14px/1.5 system-ui; max-width: 720px; margin: 24px auto; padding: 0 12px; }
+  .pass { color: #16a34a; } .fail { color: #dc2626; font-weight: 700; }
+  #summary { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+</style>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+<div id="summary">Corriendo…</div>
+<div id="out"></div>
+<script type="module">
+// Abrir vía http (python3 -m http.server), no file:// — los módulos ES lo requieren.
+import { parsePlantilla, hashRaw } from '../js/plantilla-parser.js';
+
+const out = document.getElementById('out');
+let passed = 0, failed = 0;
+function assert(cond, msg) {
+  const div = document.createElement('div');
+  div.className = cond ? 'pass' : 'fail';
+  div.textContent = (cond ? '✓ ' : '✗ ') + msg;
+  out.appendChild(div);
+  cond ? passed++ : failed++;
+}
+
+const buf = await (await fetch('fixtures/cava-synthetic.xlsx')).arrayBuffer();
+const P = parsePlantilla(buf);
+
+// estructura
+assert(P.cantidadColIdx === 7, `cantidadColIdx === 7 (got ${P.cantidadColIdx})`);
+assert(Object.keys(P.rowMap).length === 8, `8 artículos base en rowMap (got ${Object.keys(P.rowMap).length})`);
+assert(!Object.keys(P.rowMap).some(c => /_\d+$/.test(c)), 'ningún código _NNNN en rowMap');
+assert(P.rowMap.MP0001 === 1 && P.rowMap.MP0002 === 3 && P.rowMap.MP0007 === 14,
+       'rowMap apunta a las filas correctas del xlsx');
+
+// unitMap
+assert(P.unitMap.MP0001 === 'LT' && P.unitMap.MP0002 === 'KG' && P.unitMap.MP0003 === 'PZA',
+       'unitMap trae la unidad de la plantilla');
+
+// caso base + KG
+assert(JSON.stringify(P.presMap.MP0001) === JSON.stringify([{nombre:'BOTELLA',factor:0.75,uni:'LT'}]),
+       'MP0001 LT → BOTELLA 0.75');
+assert(P.presMap.MP0002?.[0]?.factor === 5, 'MP0002 KG → COSTAL 5');
+
+// R3: PZA factor grande es válido
+assert(P.presMap.MP0003?.[0]?.factor === 12, 'R3: PZA factor 12 (caja) válido');
+
+// R1: factor 1.0 ignorado
+assert(!P.presMap.MP0004, 'R1: factor 1.0 ignorado');
+
+// R2: LT factor 1000 ignorado
+assert(!P.presMap.MP0005, 'R2: LT factor 1000 (mL) ignorado');
+
+// R5: múltiples factores se conservan
+assert(P.presMap.MP0006?.length === 2, `R5: dos presentaciones válidas conservadas (got ${P.presMap.MP0006?.length})`);
+
+// sin presentación
+assert(!P.presMap.MP0007, 'artículo sin presentación no aparece en presMap');
+
+// R4: dedup por factor
+assert(P.presMap.MP0008?.length === 1, `R4: mismo factor deduplicado (got ${P.presMap.MP0008?.length})`);
+
+// hashRaw: determinístico y conocido (sha256("abc") truncado a 16 hex)
+assert(await hashRaw('abc') === 'ba7816bf8f01cfea', 'hashRaw determinístico (sha256 truncado)');
+assert(await hashRaw('abc') === await hashRaw('abc'), 'hashRaw estable entre llamadas');
+
+const s = document.getElementById('summary');
+s.textContent = failed === 0 ? `✅ ${passed}/${passed} tests OK` : `❌ ${failed} fallando de ${passed + failed}`;
+s.className = failed === 0 ? 'pass' : 'fail';
+</script>
+</body>
+</html>
