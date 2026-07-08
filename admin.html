@@ -530,6 +530,9 @@ function renderSesionesInventario() {
 
 function zonaNombre(almacen, zid) {
   const idx = parseInt(zid, 10);
+  // R5: si la sesión congeló su preparación, los nombres reales viven en el snapshot
+  const snap = _modalSesion?.zoneSnapshot;
+  if (snap?.[idx]?.nombre) return snap[idx].nombre;
   const cfg = INVENTARIO_AREAS[almacen] || {};
   return cfg.zonaNames?.[idx] || (Number.isFinite(idx) ? `Zona ${idx + 1}` : zid);
 }

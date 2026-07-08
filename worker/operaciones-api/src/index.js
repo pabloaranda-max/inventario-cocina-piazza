@@ -404,7 +404,7 @@ async function handleInvGet(db, url) {
       row = await db.prepare(
         `SELECT operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
                 corrections_by_zone, completed_zones, locked_zones, manuales, template_hash, updated_at,
-                exported_at, exported_by
+                exported_at, exported_by, zone_config_id, zone_snapshot
          FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
       ).bind(almacen, fecha).first();
     } catch (err) {
@@ -429,6 +429,8 @@ async function handleInvGet(db, url) {
       counts:           JSON.parse(row.counts || '{}'), // legacy barra.html
       exportedAt:       row.exported_at || '',
       exportedBy:       row.exported_by || '',
+      zoneConfigId:     row.zone_config_id || '',
+      zoneSnapshot:     row.zone_snapshot ? JSON.parse(row.zone_snapshot) : null,
       updatedAt:        row.updated_at
     });
   }
@@ -612,7 +614,8 @@ async function handleInvPost(db, body, env = {}, request = null) {
 
   if (body.action === 'inv_sesion') {
     const { almacen, operario, fecha, countsByZone, presChoiceByZone, correctionsByZone,
-            completedZones, removeCompletedZones, manuales, removeManuales, templateHash, counts } = body; // counts legacy para barra.html
+            completedZones, removeCompletedZones, manuales, removeManuales, templateHash, counts,
+            zoneConfigId, zoneSnapshot } = body; // counts legacy para barra.html
     if (!almacen || !operario || !fecha) return json({ error: 'Datos incompletos' }, 400);
 
     let existing;
@@ -639,22 +642,7 @@ async function handleInvPost(db, body, env = {}, request = null) {
     const existingCounts = JSON.parse(existing?.counts || '{}');
     const mergedCounts = counts ? { ...existingCounts, ...counts } : existingCounts;
 
-    await db.prepare(`
-      INSERT INTO inv_sesiones
-        (almacen, operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
-         corrections_by_zone, completed_zones, locked_zones, manuales, template_hash, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?)
-      ON CONFLICT(almacen, fecha) DO UPDATE SET
-        operario           = excluded.operario,
-        counts             = excluded.counts,
-        counts_by_zone     = excluded.counts_by_zone,
-        pres_choice_by_zone = excluded.pres_choice_by_zone,
-        corrections_by_zone = excluded.corrections_by_zone,
-        completed_zones    = excluded.completed_zones,
-        manuales           = excluded.manuales,
-        template_hash      = excluded.template_hash,
-        updated_at         = excluded.updated_at
-    `).bind(
+    const commonBinds = [
       almacen, operario, fecha,
       JSON.stringify(mergedCounts),
       JSON.stringify(mergedCBZ),
@@ -663,8 +651,53 @@ async function handleInvPost(db, body, env = {}, request = null) {
       JSON.stringify(mergedZones),
       JSON.stringify(mergedManuales),
       templateHash || '',
-      new Date().toISOString()
-    ).run();
+    ];
+    try {
+      // zone_snapshot/zone_config_id: first-write-wins — el snapshot lo congela el
+      // dispositivo que INICIA la toma; los demás dispositivos nunca lo pisan.
+      await db.prepare(`
+        INSERT INTO inv_sesiones
+          (almacen, operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
+           corrections_by_zone, completed_zones, locked_zones, manuales, template_hash,
+           zone_config_id, zone_snapshot, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?)
+        ON CONFLICT(almacen, fecha) DO UPDATE SET
+          operario           = excluded.operario,
+          counts             = excluded.counts,
+          counts_by_zone     = excluded.counts_by_zone,
+          pres_choice_by_zone = excluded.pres_choice_by_zone,
+          corrections_by_zone = excluded.corrections_by_zone,
+          completed_zones    = excluded.completed_zones,
+          manuales           = excluded.manuales,
+          template_hash      = excluded.template_hash,
+          zone_config_id     = CASE WHEN zone_config_id = '' THEN excluded.zone_config_id ELSE zone_config_id END,
+          zone_snapshot      = CASE WHEN zone_snapshot  = '' THEN excluded.zone_snapshot  ELSE zone_snapshot  END,
+          updated_at         = excluded.updated_at
+      `).bind(
+        ...commonBinds,
+        zoneConfigId || '',
+        zoneSnapshot ? JSON.stringify(zoneSnapshot) : '',
+        new Date().toISOString()
+      ).run();
+    } catch (err) {
+      // Fallback pre-migración 0005
+      await db.prepare(`
+        INSERT INTO inv_sesiones
+          (almacen, operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
+           corrections_by_zone, completed_zones, locked_zones, manuales, template_hash, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?)
+        ON CONFLICT(almacen, fecha) DO UPDATE SET
+          operario           = excluded.operario,
+          counts             = excluded.counts,
+          counts_by_zone     = excluded.counts_by_zone,
+          pres_choice_by_zone = excluded.pres_choice_by_zone,
+          corrections_by_zone = excluded.corrections_by_zone,
+          completed_zones    = excluded.completed_zones,
+          manuales           = excluded.manuales,
+          template_hash      = excluded.template_hash,
+          updated_at         = excluded.updated_at
+      `).bind(...commonBinds, new Date().toISOString()).run();
+    }
     return json({ ok: true });
   }
 

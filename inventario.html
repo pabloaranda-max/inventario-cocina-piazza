@@ -319,6 +319,7 @@ const AREA_CONFIG = {
 let ALMACEN = null;   // clave activa ej 'CAVA'
 let CFG     = null;   // AREA_CONFIG[ALMACEN]
 let ZONAS   = null;   // array de zonas resuelto
+let ZCFG    = null;   // preparación activa del Worker (inv_zone_configs) o null
 let T       = null;   // plantilla { rowMap, cantidadColIdx, presMap, templateHash, templateTs }
 let S       = null;   // sesión activa
 let CZ      = null;   // índice de zona en curso
@@ -363,7 +364,10 @@ function normalizeSesion(d) {
     manuales:d.manuales||[],
     lockedZones:d.lockedZones||{},
     reopenedZones:d.reopenedZones||{},
-    pendingCompletedZoneRemovals:d.pendingCompletedZoneRemovals||[]
+    pendingCompletedZoneRemovals:d.pendingCompletedZoneRemovals||[],
+    zoneConfigId:d.zoneConfigId||'',
+    zoneSnapshot:(d.zoneSnapshot && d.zoneSnapshot.length) ? d.zoneSnapshot : null,
+    snapshotSynced:true // viene del servidor: no re-enviar (y si es null, no inventarle uno)
   };
 }
 
@@ -406,6 +410,17 @@ async function fetchPlantillaWorker() {
   } catch(e) { console.warn('plantilla fetch:', e); return false; }
 }
 
+// Preparación activa (R5): zonas/artículos/orden editados en admin. Si no hay,
+// la app usa el comportamiento legacy (AREA_CONFIG hardcodeado o catálogo completo).
+async function fetchZoneConfigWorker() {
+  try {
+    const r = await fetch(WORKER_URL + '/inv/zone-config?almacen=' + ALMACEN);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return (d.ok && d.found && d.zones?.length) ? d : null;
+  } catch(e) { console.warn('zone-config fetch:', e); return null; }
+}
+
 async function fetchSesionWorker(fecha) {
   try {
     const r = await fetch(WORKER_URL + '/inv/sesion?almacen=' + ALMACEN + '&fecha=' + encodeURIComponent(fecha));
@@ -440,6 +455,9 @@ function syncSesionWorker() {
   const cbz   = myKey ? { [myKey]: S.countsByZone?.[myKey]  || {} } : {};
   const pcbz  = myKey ? { [myKey]: S.presChoiceByZone?.[myKey] || {} } : {};
   const removeCompletedZones = S.pendingCompletedZoneRemovals || [];
+  // El snapshot pesa (todas las zonas con artículos): se envía solo hasta que el
+  // Worker lo tenga (first-write-wins allá; snapshotSynced acá).
+  const sendSnapshot = !!(S.zoneSnapshot?.length && !S.snapshotSynced);
   fetch(WORKER_URL + '/inv/sesion', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
@@ -453,14 +471,19 @@ function syncSesionWorker() {
       correctionsByZone:S.correctionsByZone||{},
       completedZones:S.completedZones||[],
       removeCompletedZones,
-      manuales:S.manuales||[]
+      manuales:S.manuales||[],
+      zoneConfigId:S.zoneConfigId||'',
+      zoneSnapshot: sendSnapshot ? S.zoneSnapshot : undefined
     })
   })
   .then(() => {
+    let dirty = false;
     if (removeCompletedZones.length && S) {
       S.pendingCompletedZoneRemovals = (S.pendingCompletedZoneRemovals || []).filter(z => !removeCompletedZones.includes(z));
-      lsSet('s', S);
+      dirty = true;
     }
+    if (sendSnapshot && S) { S.snapshotSynced = true; dirty = true; }
+    if (dirty && S) lsSet('s', S);
   })
   .catch(e => console.warn('sesion sync:', e));
 }
@@ -575,7 +598,35 @@ function renderTemplateDatalist() {
     .join('');
 }
 
+// Zonas desde la preparación editable (inv_zone_configs): solo artículos activos,
+// en el orden del editor. Nombres/unidades salen del catálogo D1 + xlsx de plantilla.
+async function resolveZonasFromConfig(cfgZones) {
+  const lookup = {};
+  try {
+    const r = await fetch(WORKER_URL + '/articulos?almacen=' + ALMACEN);
+    if (r.ok) {
+      const d = await r.json();
+      (d.articulos || []).forEach(a => {
+        lookup[a.codigo] = { cod: a.codigo, art: a.nombre, uni: (T?.unitMap?.[a.codigo]) || a.unidad || '', grp: a.subgrupo || a.grupo || '' };
+      });
+    }
+  } catch(e) { console.warn('articulos fetch:', e); }
+  if (T?.raw) {
+    try { indexTemplateItems(await buildItemsFromRaw(T.raw)); } catch(e) { console.warn('buildItemsFromRaw config:', e); }
+  }
+  return cfgZones.map(z => ({
+    nombre: z.nombre,
+    color: z.color || CFG.color,
+    items: (z.items || [])
+      .filter(it => it.activo !== false)
+      .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+      .map(it => applyTemplateItem(lookup[it.cod] || { cod: it.cod, art: it.cod, uni: T?.unitMap?.[it.cod] || '', grp: '' }))
+  })).filter(z => z.items.length);
+}
+
 async function resolveZonas() {
+  // R5: la preparación activa manda sobre el hardcode y el catálogo completo
+  if (ZCFG?.zones?.length) return await resolveZonasFromConfig(ZCFG.zones);
   if (CFG.zonas) {
     const zones = CFG.zonas.map(z => ({ ...z, items: [...(z.items || [])] }));
     if (T?.raw) {
@@ -647,11 +698,19 @@ async function selectArea(key) {
   document.getElementById('inp-fecha').value = new Date().toISOString().slice(0,10);
 
   S = lsGet('s');
-  const ok = await fetchPlantillaWorker();
+  const [ok, zcfg] = await Promise.all([fetchPlantillaWorker(), fetchZoneConfigWorker()]);
   if (ALMACEN !== savedKey) return;
   if (!ok) T = null;
+  ZCFG = zcfg;
 
-  ZONAS = await resolveZonas();
+  // Regla crítica (§14): una sesión existente se renderiza desde SU zoneSnapshot,
+  // nunca desde la preparación activa actual. Sin snapshot: resolución normal.
+  if (S?.zoneSnapshot?.length) {
+    ZONAS = S.zoneSnapshot;
+    if (T?.raw) { try { indexTemplateItems(await buildItemsFromRaw(T.raw)); } catch(e) {} }
+  } else {
+    ZONAS = await resolveZonas();
+  }
   if (ALMACEN !== savedKey) return;
 
   // Con sesión local: sincronizar contra su misma fecha. Sin sesión local: ofrecer
@@ -769,13 +828,18 @@ function loadRemoteSesion() {
   _remoteLockedZones = _remoteSes.lockedZones || {};
   S = normalizeSesion(_remoteSes);
   _remoteSes = null;
+  // La toma remota trae su propio snapshot de zonas: usarlo tal cual
+  if (S.zoneSnapshot?.length) ZONAS = S.zoneSnapshot;
   lsSet('s', S);
   go('overview');
 }
 
-function confirmNewSession() {
+async function confirmNewSession() {
   if (!confirm('¿Iniciar nueva toma? Se perderán los conteos actuales.')) return;
-  S = null; lsDel('s'); renderAreaWelcome();
+  S = null; lsDel('s');
+  // La sesión vieja pudo renderizarse desde su snapshot: re-resolver zonas actuales
+  ZONAS = await resolveZonas();
+  renderAreaWelcome();
 }
 
 // ── Sesión ─────────────────────────────────────────────────────────────────
@@ -785,7 +849,10 @@ function startSession() {
   const fecha    = document.getElementById('inp-fecha').value;
   if (!operario) { alert('Ingresa tu nombre'); return; }
   if (!fecha)    { alert('Selecciona la fecha'); return; }
-  S = { operario, fecha, templateHash: T?.templateHash||'', countsByZone:{}, presChoiceByZone:{}, correctionsByZone:{}, completedZones:[], manuales:[], reopenedZones:{}, pendingCompletedZoneRemovals:[] };
+  // Snapshot §14: la toma congela zonas/orden/activos con los que inició — editar
+  // la preparación después no la altera. Se envía al Worker en el primer sync.
+  S = { operario, fecha, templateHash: T?.templateHash||'', countsByZone:{}, presChoiceByZone:{}, correctionsByZone:{}, completedZones:[], manuales:[], reopenedZones:{}, pendingCompletedZoneRemovals:[],
+        zoneConfigId: ZCFG?.id || '', zoneSnapshot: JSON.parse(JSON.stringify(ZONAS || [])), snapshotSynced: false };
   lsSet('s', S);
   syncSesionWorker();
   go('overview');
