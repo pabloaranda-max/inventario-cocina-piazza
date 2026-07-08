@@ -111,6 +111,7 @@ CREATE TABLE IF NOT EXISTS inv_plantillas (
   unit_map         TEXT NOT NULL DEFAULT '{}',   -- JSON: {cod: unidad} — fuente de verdad, override del catálogo
   default_pres     TEXT NOT NULL DEFAULT '{}',   -- JSON: {unidad: [{nombre, factor}]} — para artículos sin pres en Xetux
   raw              TEXT NOT NULL DEFAULT '',      -- XLSX original en base64
+  original_filename TEXT NOT NULL DEFAULT '',     -- nombre del archivo exportado por Xetux (migración 0003)
   template_hash    TEXT NOT NULL DEFAULT '',
   updated_at       TEXT NOT NULL DEFAULT ''
 );
