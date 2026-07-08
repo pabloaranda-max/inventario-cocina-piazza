@@ -3,7 +3,7 @@ import { mergeZoneMap, mergeCorrections, mergeManuales, mergeCompletedZones } fr
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Session-Token, X-Sync-Token, X-Admin-Password',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Session-Token, X-Sync-Token, X-Admin-Password, X-Admin-User',
 };
 
 // Revisores que participan en aprobaciones
@@ -518,24 +518,120 @@ async function handleInvGet(db, url) {
   return json({ error: 'Ruta no encontrada' }, 404);
 }
 
-async function handleInvPost(db, body, env = {}, request = null) {
-  const adminHeader = request?.headers?.get('X-Admin-Password') || '';
-  const adminOk = !!env.INV_ADMIN_PASSWORD && adminHeader === env.INV_ADMIN_PASSWORD;
+// R7: resuelve la credencial de admin. El password maestro (INV_ADMIN_PASSWORD)
+// administra todo; un perfil de inv_admins solo sus almacenes. El perfil se
+// identifica por nombre (X-Admin-User / adminUser) + password personal.
+async function invAdminAuth(db, env, pwd, nombre) {
+  if (!env.INV_ADMIN_PASSWORD) return { ok: false, error: 'Admin password no configurado', status: 500 };
+  if (!pwd) return { ok: false, error: 'Sin permiso', status: 401 };
+  if (pwd === env.INV_ADMIN_PASSWORD) return { ok: true, master: true, almacenes: '*' };
+  if (!nombre || !nombre.trim()) return { ok: false, error: 'Sin permiso', status: 401 };
+  let row;
+  try {
+    row = await db.prepare(
+      'SELECT id, nombre, password_hash, almacenes, active FROM inv_admins WHERE nombre = ?'
+    ).bind(nombre.trim()).first();
+  } catch (err) {
+    return { ok: false, error: 'Sin permiso', status: 401 }; // pre-migración 0007
+  }
+  if (!row || !row.active) return { ok: false, error: 'Sin permiso', status: 401 };
+  if (await hashPassword(pwd) !== row.password_hash) return { ok: false, error: 'Sin permiso', status: 401 };
+  let almacenes;
+  try { almacenes = JSON.parse(row.almacenes || '[]'); } catch { almacenes = []; }
+  return { ok: true, master: false, id: row.id, nombre: row.nombre, almacenes: Array.isArray(almacenes) ? almacenes : [] };
+}
 
-  // Login de admin.html: valida el password sin exponerlo en el código del repo público
+function almacenPermitido(auth, almacen) {
+  if (!auth?.ok) return false;
+  if (auth.master) return true;
+  return auth.almacenes.includes(almacen);
+}
+
+async function handleInvPost(db, body, env = {}, request = null) {
+  const pwd = request?.headers?.get('X-Admin-Password') || body.adminPassword || '';
+  const adminUser = request?.headers?.get('X-Admin-User') || body.adminUser || '';
+
+  // Login de admin.html: valida el password sin exponerlo en el código del repo público.
+  // R7: también acepta perfiles de inv_admins y devuelve sus almacenes permitidos.
   if (body.action === 'inv_admin_check') {
-    if (!env.INV_ADMIN_PASSWORD) return json({ ok: false, error: 'Admin password no configurado' }, 500);
-    const pwd = body.adminPassword || adminHeader;
-    if (!pwd || pwd !== env.INV_ADMIN_PASSWORD) return json({ ok: false, error: 'Contraseña incorrecta' }, 401);
-    return json({ ok: true });
+    const auth = await invAdminAuth(db, env, pwd, adminUser);
+    if (!auth.ok) return json({ ok: false, error: auth.status === 500 ? auth.error : 'Contraseña incorrecta' }, auth.status);
+    return json({ ok: true, master: auth.master, almacenes: auth.almacenes, nombre: auth.nombre || adminUser });
   }
 
-  // Subir/sobreescribir plantillas, defaults y preparaciones requiere admin
+  // Subir/sobreescribir plantillas, defaults y preparaciones requiere admin, y desde
+  // R7 el almacén de la acción debe estar permitido para el perfil.
   // (inv_sesion e inv_lock quedan sin auth a propósito: el operario no tiene credencial)
   const ADMIN_ACTIONS = ['inv_plantilla', 'inv_defaults', 'inv_zone_config_save', 'inv_zone_config_activate'];
   if (ADMIN_ACTIONS.includes(body.action)) {
-    if (!env.INV_ADMIN_PASSWORD) return json({ ok: false, error: 'Admin password no configurado' }, 500);
-    if (!adminOk) return json({ ok: false, error: 'Sin permiso' }, 401);
+    const auth = await invAdminAuth(db, env, pwd, adminUser);
+    if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status);
+    if (!almacenPermitido(auth, body.almacen)) {
+      return json({ ok: false, error: `Sin permiso para el almacén ${body.almacen || '?'}` }, 403);
+    }
+  }
+
+  // Gestión de perfiles de admin: SOLO el password maestro
+  if (['inv_admin_list', 'inv_admin_save', 'inv_admin_delete'].includes(body.action)) {
+    const auth = await invAdminAuth(db, env, pwd, adminUser);
+    if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status);
+    if (!auth.master) return json({ ok: false, error: 'Solo el password maestro administra perfiles' }, 403);
+
+    if (body.action === 'inv_admin_list') {
+      const rows = await db.prepare(
+        'SELECT id, nombre, almacenes, active, created_at, updated_at FROM inv_admins ORDER BY nombre'
+      ).all();
+      return json({
+        ok: true,
+        admins: (rows.results || []).map(r => ({
+          id: r.id, nombre: r.nombre,
+          almacenes: JSON.parse(r.almacenes || '[]'),
+          active: !!r.active,
+          createdAt: r.created_at, updatedAt: r.updated_at
+        }))
+      });
+    }
+
+    if (body.action === 'inv_admin_save') {
+      const { id, nombre, password, almacenes, active } = body;
+      if (!nombre?.trim()) return json({ error: 'Falta nombre' }, 400);
+      if (!Array.isArray(almacenes) || almacenes.some(a => typeof a !== 'string' || !a)) {
+        return json({ error: 'almacenes debe ser una lista de claves de almacén' }, 400);
+      }
+      if (password && pwd === password) {
+        return json({ error: 'El password del perfil no puede ser el maestro' }, 400);
+      }
+      const now = new Date().toISOString();
+      if (id) {
+        const existing = await db.prepare('SELECT id FROM inv_admins WHERE id = ?').bind(id).first();
+        if (!existing) return json({ error: 'Perfil no encontrado' }, 404);
+        const sets = ['nombre = ?', 'almacenes = ?', 'active = ?', 'updated_at = ?'];
+        const binds = [nombre.trim(), JSON.stringify(almacenes), active === false ? 0 : 1, now];
+        if (password) { sets.push('password_hash = ?'); binds.push(await hashPassword(password)); }
+        try {
+          await db.prepare(`UPDATE inv_admins SET ${sets.join(', ')} WHERE id = ?`).bind(...binds, id).run();
+        } catch (err) {
+          return json({ error: /UNIQUE/i.test(err.message) ? 'Ya existe un perfil con ese nombre' : err.message }, 400);
+        }
+        return json({ ok: true, id });
+      }
+      if (!password) return json({ error: 'Falta password para el perfil nuevo' }, 400);
+      const newId_ = 'adm_' + newId();
+      try {
+        await db.prepare(
+          'INSERT INTO inv_admins (id, nombre, password_hash, almacenes, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        ).bind(newId_, nombre.trim(), await hashPassword(password), JSON.stringify(almacenes), active === false ? 0 : 1, now, now).run();
+      } catch (err) {
+        return json({ error: /UNIQUE/i.test(err.message) ? 'Ya existe un perfil con ese nombre' : err.message }, 400);
+      }
+      return json({ ok: true, id: newId_ });
+    }
+
+    if (body.action === 'inv_admin_delete') {
+      if (!body.id) return json({ error: 'Falta id' }, 400);
+      await db.prepare('DELETE FROM inv_admins WHERE id = ?').bind(body.id).run();
+      return json({ ok: true });
+    }
   }
 
   if (body.action === 'inv_plantilla') {
@@ -747,11 +843,12 @@ async function handleInvPost(db, body, env = {}, request = null) {
   }
 
   if (body.action === 'inv_export') {
-    const { almacen, fecha, operario, adminPassword, force } = body;
+    const { almacen, fecha, operario, force } = body;
     if (!almacen || !fecha || !operario) return json({ error: 'Datos incompletos' }, 400);
-    if (!env.INV_ADMIN_PASSWORD) return json({ ok: false, error: 'Admin password no configurado' }, 500);
-    if (!adminPassword || adminPassword !== env.INV_ADMIN_PASSWORD) {
-      return json({ ok: false, error: 'Sin permiso para exportar' }, 403);
+    const auth = await invAdminAuth(db, env, pwd, adminUser);
+    if (!auth.ok) return json({ ok: false, error: auth.status === 500 ? auth.error : 'Sin permiso para exportar' }, auth.status === 500 ? 500 : 403);
+    if (!almacenPermitido(auth, almacen)) {
+      return json({ ok: false, error: `Sin permiso para el almacén ${almacen}` }, 403);
     }
     let row;
     try {
@@ -781,11 +878,12 @@ async function handleInvPost(db, body, env = {}, request = null) {
   }
 
   if (body.action === 'inv_delete') {
-    const { almacen, fecha, operario, adminPassword } = body;
+    const { almacen, fecha, operario } = body;
     if (!almacen || !fecha || !operario) return json({ error: 'Datos incompletos' }, 400);
-    if (!env.INV_ADMIN_PASSWORD) return json({ ok: false, error: 'Admin password no configurado' }, 500);
-    if (!adminPassword || adminPassword !== env.INV_ADMIN_PASSWORD) {
-      return json({ ok: false, error: 'Sin permiso para borrar' }, 403);
+    const auth = await invAdminAuth(db, env, pwd, adminUser);
+    if (!auth.ok) return json({ ok: false, error: auth.status === 500 ? auth.error : 'Sin permiso para borrar' }, auth.status === 500 ? 500 : 403);
+    if (!almacenPermitido(auth, almacen)) {
+      return json({ ok: false, error: `Sin permiso para el almacén ${almacen}` }, 403);
     }
     const row = await db.prepare(
       'SELECT almacen FROM inv_sesiones WHERE almacen = ? AND fecha = ?'

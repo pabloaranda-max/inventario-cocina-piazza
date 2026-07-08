@@ -131,6 +131,33 @@ CREATE TABLE IF NOT EXISTS inv_sesiones (
   template_hash        TEXT NOT NULL DEFAULT '',
   exported_at          TEXT NOT NULL DEFAULT '',
   exported_by          TEXT NOT NULL DEFAULT '',
+  zone_config_id       TEXT NOT NULL DEFAULT '',   -- migración 0005 (R5)
+  zone_snapshot        TEXT NOT NULL DEFAULT '',   -- migración 0005 (R5): zonas congeladas al iniciar la toma
+  operarios_by_device  TEXT NOT NULL DEFAULT '',   -- migración 0006 (R5.1): JSON {deviceId: {operario, at}}
   updated_at           TEXT NOT NULL,
   PRIMARY KEY (almacen, fecha)
+);
+
+-- ── Inventario: preparación editable de conteo (migración 0004, R5) ───────
+CREATE TABLE IF NOT EXISTS inv_zone_configs (
+  id            TEXT PRIMARY KEY,
+  almacen       TEXT NOT NULL,
+  template_hash TEXT NOT NULL DEFAULT '',
+  zones_json    TEXT NOT NULL DEFAULT '[]',
+  active        INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_zone_configs_almacen ON inv_zone_configs (almacen, active);
+
+-- ── Inventario: admins restringidos por almacén (migración 0007, R7) ──────
+-- Solo el password maestro (INV_ADMIN_PASSWORD) crea/edita perfiles.
+CREATE TABLE IF NOT EXISTS inv_admins (
+  id            TEXT PRIMARY KEY,
+  nombre        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  password_hash TEXT NOT NULL,
+  almacenes     TEXT NOT NULL DEFAULT '[]',       -- JSON: ["COCINA", "CAVA", ...]
+  active        INTEGER NOT NULL DEFAULT 1,
+  created_at    TEXT,
+  updated_at    TEXT
 );
