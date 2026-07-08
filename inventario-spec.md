@@ -711,8 +711,8 @@ Guardar/activar debe requerir password admin.
 
 | # | Slice | Estado |
 |---|---|---|
-| R2 | **Nombre de archivo Xetux** — capturar `file.name` al subir plantilla (columna `original_filename`, migración 0003), usarlo en la descarga del export | EN CURSO (esta rama) |
-| R1 | **Continuidad de toma** — en `selectArea()`, consultar `GET /inv/sesiones` (últimos ~7 días, no exportadas) y ofrecer "Continuar toma abierta del día X" cargándola con su fecha original. Elimina la fragmentación multi-día (caso BARRA_RESTAURANTE 5–6 jul). Prerrequisito: `inventario-beta.html` (ver abajo) | PLAN |
+| R2 | **Nombre de archivo Xetux** — capturar `file.name` al subir plantilla (columna `original_filename`, migración 0003), usarlo en la descarga del export | HECHO 2026-07-08 (prod; plantillas viejas usan nombre legacy hasta re-subirse) |
+| R1 | **Continuidad de toma** — sin sesión local, `selectArea()` consulta `GET /inv/sesiones` (7 días), filtra no-exportadas con conteos y ofrece "Continuar esta toma" cargándola con su fecha original. Con sesión local el flujo no cambia. `inventario-beta.html` creado (= inventario.html apuntando a staging, banner visible) | HECHO 2026-07-08 (E2E Playwright en staging: dispositivo limpio ve y continúa toma de otro día sin crear fila nueva) |
 | R3 | **Auth endpoints admin** — header `X-Admin-Password` en `POST /inv/plantilla` (acciones `inv_plantilla` e `inv_defaults`); admin.html lo manda desde su login. Era Slice 1 del plan v1 | PLAN |
 | R4 | **Módulos puros + fixture parser** — `js/plantilla-parser.js`, `js/sesion-merge.js`, `tests/test-parser.html` (era Slice 2 v1; ver §12 Fases 1+3). Habilitador de R5 y del merge multi-día | PLAN |
 | R5 | **Preparación editable de conteo** — §14 completo + vista reducida de Cocina (mismo mecanismo: `items[].activo` por zona). Fusiona Slice 4 v1 + Prioridad F del handoff | PLAN |
