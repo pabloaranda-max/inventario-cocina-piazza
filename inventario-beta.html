@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Inventario · Piazza Pasticcio</title>
+<title>[BETA] Inventario · Piazza Pasticcio</title>
 <style>
 @font-face{font-family:'Brand';font-weight:400;src:url(branding/fonts/FreightNeo%20W03%20Book.ttf)format('truetype')}
 @font-face{font-family:'BrandScript';font-weight:900;src:url(branding/fonts/TT%20Nooks%20Script%20Black.otf)format('opentype')}
@@ -114,6 +114,7 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
 </style>
 </head>
 <body>
+<div style="position:fixed;bottom:0;left:0;right:0;background:#b45309;color:#fff;text-align:center;font:600 11px system-ui;padding:3px 0;z-index:9999">BETA · Worker STAGING — no usar para conteos reales</div>
 
 <!-- PANTALLA: selector de área -->
 <div id="screen-welcome" class="screen">
@@ -297,7 +298,7 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
 <script>
 // ── Configuración ──────────────────────────────────────────────────────────
 
-const WORKER_URL = 'https://operaciones-api.pablo-aranda.workers.dev';
+const WORKER_URL = 'https://operaciones-api-staging.pablo-aranda.workers.dev'; // BETA: staging
 const APPS = 'https://script.google.com/macros/s/';
 
 const AREA_CONFIG = {
