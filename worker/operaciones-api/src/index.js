@@ -404,7 +404,7 @@ async function handleInvGet(db, url) {
       row = await db.prepare(
         `SELECT operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
                 corrections_by_zone, completed_zones, locked_zones, manuales, template_hash, updated_at,
-                exported_at, exported_by
+                exported_at, exported_by, zone_config_id, zone_snapshot
          FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
       ).bind(almacen, fecha).first();
     } catch (err) {
@@ -429,7 +429,37 @@ async function handleInvGet(db, url) {
       counts:           JSON.parse(row.counts || '{}'), // legacy barra.html
       exportedAt:       row.exported_at || '',
       exportedBy:       row.exported_by || '',
+      zoneConfigId:     row.zone_config_id || '',
+      zoneSnapshot:     row.zone_snapshot ? JSON.parse(row.zone_snapshot) : null,
       updatedAt:        row.updated_at
+    });
+  }
+
+  if (path === '/inv/zone-config') {
+    const almacen = url.searchParams.get('almacen');
+    if (!almacen) return json({ error: 'Falta almacen' }, 400);
+    // Sin id: la config activa (la que usa inventario.html al iniciar toma).
+    // Con id o all=1: para el editor de admin.
+    const id = url.searchParams.get('id');
+    if (url.searchParams.get('all') === '1') {
+      const rows = await db.prepare(
+        'SELECT id, almacen, template_hash, active, created_at, updated_at FROM inv_zone_configs WHERE almacen = ? ORDER BY updated_at DESC'
+      ).bind(almacen).all();
+      return json({ ok: true, configs: rows.results || [] });
+    }
+    const row = id
+      ? await db.prepare('SELECT * FROM inv_zone_configs WHERE id = ? AND almacen = ?').bind(id, almacen).first()
+      : await db.prepare('SELECT * FROM inv_zone_configs WHERE almacen = ? AND active = 1').bind(almacen).first();
+    if (!row) return json({ ok: true, found: false });
+    return json({
+      ok: true, found: true,
+      id: row.id,
+      almacen: row.almacen,
+      templateHash: row.template_hash || '',
+      zones: JSON.parse(row.zones_json || '[]'),
+      active: !!row.active,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
     });
   }
 
@@ -499,9 +529,10 @@ async function handleInvPost(db, body, env = {}, request = null) {
     return json({ ok: true });
   }
 
-  // Subir/sobreescribir plantillas y defaults requiere admin (inv_sesion e inv_lock
-  // quedan sin auth a propósito: el operario no tiene credencial)
-  if (body.action === 'inv_plantilla' || body.action === 'inv_defaults') {
+  // Subir/sobreescribir plantillas, defaults y preparaciones requiere admin
+  // (inv_sesion e inv_lock quedan sin auth a propósito: el operario no tiene credencial)
+  const ADMIN_ACTIONS = ['inv_plantilla', 'inv_defaults', 'inv_zone_config_save', 'inv_zone_config_activate'];
+  if (ADMIN_ACTIONS.includes(body.action)) {
     if (!env.INV_ADMIN_PASSWORD) return json({ ok: false, error: 'Admin password no configurado' }, 500);
     if (!adminOk) return json({ ok: false, error: 'Sin permiso' }, 401);
   }
@@ -535,9 +566,56 @@ async function handleInvPost(db, body, env = {}, request = null) {
     return json({ ok: true });
   }
 
+  if (body.action === 'inv_zone_config_save') {
+    const { almacen, templateHash, zones, id } = body;
+    if (!almacen || !Array.isArray(zones)) return json({ error: 'Datos incompletos' }, 400);
+    for (const z of zones) {
+      if (!z || typeof z.nombre !== 'string' || !z.nombre.trim() || !Array.isArray(z.items)) {
+        return json({ error: 'Zona inválida: cada zona necesita nombre e items[]' }, 400);
+      }
+      for (const it of z.items) {
+        if (!it || typeof it.cod !== 'string' || !it.cod) return json({ error: `Item sin cod en zona "${z.nombre}"` }, 400);
+      }
+    }
+    const now = new Date().toISOString();
+    if (id) {
+      const existing = await db.prepare('SELECT id FROM inv_zone_configs WHERE id = ? AND almacen = ?').bind(id, almacen).first();
+      if (!existing) return json({ error: 'Config no encontrada' }, 404);
+      await db.prepare(
+        'UPDATE inv_zone_configs SET template_hash = ?, zones_json = ?, updated_at = ? WHERE id = ?'
+      ).bind(templateHash || '', JSON.stringify(zones), now, id).run();
+      return json({ ok: true, id });
+    }
+    const newId_ = 'cfg_' + newId();
+    await db.prepare(
+      'INSERT INTO inv_zone_configs (id, almacen, template_hash, zones_json, active, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
+    ).bind(newId_, almacen, templateHash || '', JSON.stringify(zones), now, now).run();
+    return json({ ok: true, id: newId_ });
+  }
+
+  if (body.action === 'inv_zone_config_activate') {
+    const { almacen, id, deactivate } = body;
+    if (!almacen) return json({ error: 'Datos incompletos' }, 400);
+    const now = new Date().toISOString();
+    if (deactivate) {
+      // Sin config activa el almacén vuelve al comportamiento legacy (AREA_CONFIG)
+      await db.prepare('UPDATE inv_zone_configs SET active = 0, updated_at = ? WHERE almacen = ?').bind(now, almacen).run();
+      return json({ ok: true });
+    }
+    if (!id) return json({ error: 'Datos incompletos' }, 400);
+    const existing = await db.prepare('SELECT id FROM inv_zone_configs WHERE id = ? AND almacen = ?').bind(id, almacen).first();
+    if (!existing) return json({ error: 'Config no encontrada' }, 404);
+    await db.batch([
+      db.prepare('UPDATE inv_zone_configs SET active = 0, updated_at = ? WHERE almacen = ? AND active = 1').bind(now, almacen),
+      db.prepare('UPDATE inv_zone_configs SET active = 1, updated_at = ? WHERE id = ?').bind(now, id),
+    ]);
+    return json({ ok: true, id });
+  }
+
   if (body.action === 'inv_sesion') {
     const { almacen, operario, fecha, countsByZone, presChoiceByZone, correctionsByZone,
-            completedZones, removeCompletedZones, manuales, removeManuales, templateHash, counts } = body; // counts legacy para barra.html
+            completedZones, removeCompletedZones, manuales, removeManuales, templateHash, counts,
+            zoneConfigId, zoneSnapshot } = body; // counts legacy para barra.html
     if (!almacen || !operario || !fecha) return json({ error: 'Datos incompletos' }, 400);
 
     let existing;
@@ -564,22 +642,7 @@ async function handleInvPost(db, body, env = {}, request = null) {
     const existingCounts = JSON.parse(existing?.counts || '{}');
     const mergedCounts = counts ? { ...existingCounts, ...counts } : existingCounts;
 
-    await db.prepare(`
-      INSERT INTO inv_sesiones
-        (almacen, operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
-         corrections_by_zone, completed_zones, locked_zones, manuales, template_hash, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?)
-      ON CONFLICT(almacen, fecha) DO UPDATE SET
-        operario           = excluded.operario,
-        counts             = excluded.counts,
-        counts_by_zone     = excluded.counts_by_zone,
-        pres_choice_by_zone = excluded.pres_choice_by_zone,
-        corrections_by_zone = excluded.corrections_by_zone,
-        completed_zones    = excluded.completed_zones,
-        manuales           = excluded.manuales,
-        template_hash      = excluded.template_hash,
-        updated_at         = excluded.updated_at
-    `).bind(
+    const commonBinds = [
       almacen, operario, fecha,
       JSON.stringify(mergedCounts),
       JSON.stringify(mergedCBZ),
@@ -588,8 +651,53 @@ async function handleInvPost(db, body, env = {}, request = null) {
       JSON.stringify(mergedZones),
       JSON.stringify(mergedManuales),
       templateHash || '',
-      new Date().toISOString()
-    ).run();
+    ];
+    try {
+      // zone_snapshot/zone_config_id: first-write-wins — el snapshot lo congela el
+      // dispositivo que INICIA la toma; los demás dispositivos nunca lo pisan.
+      await db.prepare(`
+        INSERT INTO inv_sesiones
+          (almacen, operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
+           corrections_by_zone, completed_zones, locked_zones, manuales, template_hash,
+           zone_config_id, zone_snapshot, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?)
+        ON CONFLICT(almacen, fecha) DO UPDATE SET
+          operario           = excluded.operario,
+          counts             = excluded.counts,
+          counts_by_zone     = excluded.counts_by_zone,
+          pres_choice_by_zone = excluded.pres_choice_by_zone,
+          corrections_by_zone = excluded.corrections_by_zone,
+          completed_zones    = excluded.completed_zones,
+          manuales           = excluded.manuales,
+          template_hash      = excluded.template_hash,
+          zone_config_id     = CASE WHEN zone_config_id = '' THEN excluded.zone_config_id ELSE zone_config_id END,
+          zone_snapshot      = CASE WHEN zone_snapshot  = '' THEN excluded.zone_snapshot  ELSE zone_snapshot  END,
+          updated_at         = excluded.updated_at
+      `).bind(
+        ...commonBinds,
+        zoneConfigId || '',
+        zoneSnapshot ? JSON.stringify(zoneSnapshot) : '',
+        new Date().toISOString()
+      ).run();
+    } catch (err) {
+      // Fallback pre-migración 0005
+      await db.prepare(`
+        INSERT INTO inv_sesiones
+          (almacen, operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
+           corrections_by_zone, completed_zones, locked_zones, manuales, template_hash, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?)
+        ON CONFLICT(almacen, fecha) DO UPDATE SET
+          operario           = excluded.operario,
+          counts             = excluded.counts,
+          counts_by_zone     = excluded.counts_by_zone,
+          pres_choice_by_zone = excluded.pres_choice_by_zone,
+          corrections_by_zone = excluded.corrections_by_zone,
+          completed_zones    = excluded.completed_zones,
+          manuales           = excluded.manuales,
+          template_hash      = excluded.template_hash,
+          updated_at         = excluded.updated_at
+      `).bind(...commonBinds, new Date().toISOString()).run();
+    }
     return json({ ok: true });
   }
 

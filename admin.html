@@ -151,6 +151,7 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
     <button class="tab active" onclick="showTab('tomas')">📋 Tomas</button>
     <button class="tab" onclick="showTab('reporte')">📊 Resumen</button>
     <button class="tab" onclick="showTab('plantillas')">📥 Plantillas</button>
+    <button class="tab" onclick="showTab('preparacion')">🗂️ Preparación</button>
     <button class="tab" onclick="showTab('groq')">🤖 Asistente</button>
   </div>
 
@@ -234,6 +235,36 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
         <button onclick="addDefaultRow()" style="font-size:12px;padding:5px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;color:#374151">+ Agregar fila</button>
         <button onclick="saveDefaults()" style="font-size:12px;padding:5px 12px;border:none;border-radius:6px;background:#1d4ed8;color:#fff;cursor:pointer;font-weight:600">Guardar</button>
         <span id="plt-defs-msg" style="font-size:12px;color:#6b7280"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: PREPARACIÓN DE CONTEO -->
+  <div id="tab-preparacion" class="tab-content">
+    <div style="margin-bottom:16px">
+      <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:6px">Almacén</label>
+      <select id="prep-almacen" onchange="loadPreparacion()" style="padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;width:100%;max-width:340px">
+        <option value="" disabled selected>— Seleccionar —</option>
+        <option value="BARRA_RESTAURANTE">Barra Restaurante</option>
+        <option value="COCINA">Cocina</option>
+        <option value="ALIMENTARI">Alimentari</option>
+        <option value="CAVA">Cava</option>
+        <option value="SALUMERIA">Salumeria</option>
+        <option value="GENERAL">General</option>
+        <option value="BARRA_AMICI">Barra Amici</option>
+      </select>
+    </div>
+    <div id="prep-status"></div>
+    <div id="prep-editor" style="display:none">
+      <div id="prep-zonas"></div>
+      <div style="display:flex;gap:8px;margin:14px 0;flex-wrap:wrap">
+        <button onclick="prepAddZone()" style="font-size:13px;padding:8px 12px;border:1px dashed #94a3b8;border-radius:8px;background:#fff;cursor:pointer;color:#475569">+ Agregar zona</button>
+      </div>
+      <div style="border-top:1px solid #e5e7eb;padding-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button onclick="savePreparacion(false)" style="font-size:13px;padding:9px 14px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer;color:#374151;font-weight:600">💾 Guardar borrador</button>
+        <button onclick="savePreparacion(true)" style="font-size:13px;padding:9px 16px;border:none;border-radius:8px;background:#16a34a;color:#fff;cursor:pointer;font-weight:700">✓ Guardar y activar</button>
+        <button id="prep-btn-desactivar" onclick="deactivatePreparacion()" style="display:none;font-size:13px;padding:9px 14px;border:1px solid #fca5a5;border-radius:8px;background:#fff;cursor:pointer;color:#dc2626;font-weight:600">Desactivar preparación</button>
+        <span id="prep-msg" style="font-size:13px;color:#6b7280"></span>
       </div>
     </div>
   </div>
@@ -499,6 +530,9 @@ function renderSesionesInventario() {
 
 function zonaNombre(almacen, zid) {
   const idx = parseInt(zid, 10);
+  // R5: si la sesión congeló su preparación, los nombres reales viven en el snapshot
+  const snap = _modalSesion?.zoneSnapshot;
+  if (snap?.[idx]?.nombre) return snap[idx].nombre;
   const cfg = INVENTARIO_AREAS[almacen] || {};
   return cfg.zonaNames?.[idx] || (Number.isFinite(idx) ? `Zona ${idx + 1}` : zid);
 }
@@ -1631,6 +1665,318 @@ async function uploadPlantilla(file) {
   } catch(e) {
     msg.style.color = '#dc2626';
     msg.textContent = 'Error: ' + e.message;
+  }
+}
+
+// ── PREPARACIÓN DE CONTEO (R5, spec §14) ─────────────────────
+// Edita inv_zone_configs: zonas, artículos activos/inactivos y orden por almacén.
+// Las tomas abiertas no cambian: congelan su zoneSnapshot al iniciar.
+
+let _prep = null;       // { id, templateHash, zones, active } en edición
+let _prepT = null;      // plantilla del almacén seleccionado
+let _prepLookup = {};   // cod -> { codigo, nombre, unidad }
+let _prepOrder = [];    // cods en orden de aparición en la plantilla
+
+const PREP_COLORS = ['#667eea','#10b981','#f59e0b','#ef4444','#8b5cf6','#0d9488','#f97316','#6b7280'];
+
+function prepZoneId() { return 'z_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+async function loadPreparacion() {
+  const almacen = document.getElementById('prep-almacen').value;
+  if (!almacen) return;
+  const statusEl = document.getElementById('prep-status');
+  const editorEl = document.getElementById('prep-editor');
+  statusEl.innerHTML = '<div style="color:#888;font-size:13px">Cargando…</div>';
+  editorEl.style.display = 'none';
+  _prep = null; _prepT = null; _prepLookup = {}; _prepOrder = [];
+  try {
+    const rp = await fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen));
+    const dp = await rp.json();
+    if (!dp.ok || !dp.found) {
+      statusEl.innerHTML = `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px;color:#92400e;font-size:13px">
+        ⚠️ No hay plantilla configurada para <strong>${esc(almacen)}</strong>. Sube la plantilla primero (tab Plantillas).</div>`;
+      return;
+    }
+    _prepT = dp;
+    _prepLookup = templateLookup(dp);
+    _prepOrder = Object.keys(_prepLookup);
+
+    let rc = await fetch(WORKER_URL + '/inv/zone-config?almacen=' + encodeURIComponent(almacen));
+    let dc = await rc.json();
+    if (!dc.found) {
+      // Sin config activa: ofrecer el borrador más reciente si existe
+      const ra = await fetch(WORKER_URL + '/inv/zone-config?almacen=' + encodeURIComponent(almacen) + '&all=1');
+      const da = await ra.json();
+      if ((da.configs || []).length) {
+        const ri = await fetch(WORKER_URL + '/inv/zone-config?almacen=' + encodeURIComponent(almacen) + '&id=' + encodeURIComponent(da.configs[0].id));
+        dc = await ri.json();
+      }
+    }
+    if (dc.found) {
+      _prep = { id: dc.id, templateHash: dc.templateHash || '', zones: dc.zones || [], active: !!dc.active };
+    }
+    renderPreparacion();
+  } catch(e) {
+    statusEl.innerHTML = `<div style="color:#dc2626;font-size:13px">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderPreparacion() {
+  const statusEl = document.getElementById('prep-status');
+  const editorEl = document.getElementById('prep-editor');
+  const arts = _prepOrder.length;
+
+  if (!_prep) {
+    statusEl.innerHTML = `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;font-size:13px;color:#475569;margin-bottom:8px">
+      Sin preparación guardada. La app usa el comportamiento actual (zonas fijas o catálogo completo).
+      La plantilla tiene <strong>${arts}</strong> artículos.
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="prepSeed(true)" style="font-size:13px;padding:8px 12px;border:none;border-radius:8px;background:#1d4ed8;color:#fff;cursor:pointer;font-weight:600">Crear: 1 zona con todo activo</button>
+        <button onclick="prepSeed(false)" style="font-size:13px;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer;color:#374151">Crear vacía</button>
+      </div></div>`;
+    editorEl.style.display = 'none';
+    return;
+  }
+
+  const hashWarn = _prep.templateHash && _prepT.templateHash && _prep.templateHash !== _prepT.templateHash
+    ? `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px;color:#92400e;font-size:12px;margin-top:8px">⚠️ La plantilla cambió desde que se guardó esta preparación. Los artículos que ya no existen aparecen marcados en rojo; al guardar se conservan (decide tú si quitarlos).</div>`
+    : '';
+  statusEl.innerHTML = `<div style="background:${_prep.active?'#f0fdf4':'#f8fafc'};border:1px solid ${_prep.active?'#86efac':'#e2e8f0'};border-radius:8px;padding:12px;font-size:13px;color:#334155;margin-bottom:12px">
+    ${_prep.active ? '🟢 <strong>Preparación ACTIVA</strong> — las tomas nuevas de este almacén usan estas zonas.' : '📝 <strong>Borrador</strong> — guardada pero no activa; la app sigue con el comportamiento actual.'}
+    <span style="color:#94a3b8"> · ${arts} artículos en plantilla</span>
+    ${hashWarn}</div>`;
+  document.getElementById('prep-btn-desactivar').style.display = _prep.active ? '' : 'none';
+  renderPrepZonas();
+  renderPrepDatalist();
+  editorEl.style.display = 'block';
+}
+
+function prepSeed(conTodo) {
+  const almacen = document.getElementById('prep-almacen').value;
+  _prep = {
+    id: null, templateHash: _prepT.templateHash || '', active: false,
+    zones: conTodo ? [{
+      id: prepZoneId(), nombre: almacen.replace(/_/g,' '), color: PREP_COLORS[0],
+      items: _prepOrder.map(cod => ({ cod, activo: true }))
+    }] : []
+  };
+  renderPreparacion();
+}
+
+function prepAddZone() {
+  if (!_prep) return;
+  _prep.zones.push({ id: prepZoneId(), nombre: 'Zona ' + (_prep.zones.length + 1), color: PREP_COLORS[_prep.zones.length % PREP_COLORS.length], items: [] });
+  renderPrepZonas();
+}
+
+function prepItemLabel(cod) {
+  const a = _prepLookup[cod];
+  const enPlantilla = a || (cod in (_prepT?.rowMap || {}));
+  const nombre = a?.nombre || cod;
+  const uni = a?.unidad || '';
+  return { nombre, uni, enPlantilla };
+}
+
+function renderPrepZonas() {
+  const cont = document.getElementById('prep-zonas');
+  const btnStyle = 'border:none;background:#f1f5f9;border-radius:6px;cursor:pointer;font-size:13px;padding:4px 8px;color:#475569';
+  cont.innerHTML = _prep.zones.map((z, zi) => {
+    const activos = z.items.filter(i => i.activo !== false).length;
+    const rows = z.items.map((it, ii) => {
+      const { nombre, uni, enPlantilla } = prepItemLabel(it.cod);
+      return `<div class="prep-item" data-search="${esc(normalizeTemplateSearch(nombre + ' ' + it.cod))}" style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:13px">
+        <input type="checkbox" ${it.activo !== false ? 'checked' : ''} onchange="prepToggleItem(${zi},${ii},this.checked)" style="flex-shrink:0">
+        <div style="flex:1;min-width:0${enPlantilla ? '' : ';color:#dc2626'}">
+          <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(nombre)}${enPlantilla ? '' : ' ⚠️'}</div>
+          <div style="font-size:11px;color:#94a3b8">${esc(it.cod)}${uni ? ' · ' + esc(uni) : ''}${enPlantilla ? '' : ' · ya no está en plantilla'}</div>
+        </div>
+        <button onclick="prepMoveItem(${zi},${ii},-1)" style="${btnStyle}">↑</button>
+        <button onclick="prepMoveItem(${zi},${ii},1)" style="${btnStyle}">↓</button>
+        <button onclick="prepRemoveItem(${zi},${ii})" style="${btnStyle};color:#ef4444">×</button>
+      </div>`;
+    }).join('');
+    return `<details style="border:1px solid #e2e8f0;border-radius:10px;margin-bottom:10px;background:#fff;border-left:4px solid ${esc(z.color || '#667eea')}">
+      <summary style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;list-style:none;flex-wrap:wrap">
+        <input type="color" value="${esc(z.color || '#667eea')}" onchange="_prep.zones[${zi}].color=this.value" onclick="event.stopPropagation()" style="width:26px;height:26px;border:none;background:none;cursor:pointer;padding:0">
+        <input type="text" value="${esc(z.nombre)}" oninput="_prep.zones[${zi}].nombre=this.value" onclick="event.stopPropagation()" style="font-size:14px;font-weight:700;border:1px solid transparent;border-radius:6px;padding:4px 6px;flex:1;min-width:120px" onfocus="this.style.borderColor='#cbd5e1'" onblur="this.style.borderColor='transparent'">
+        <span id="prep-count-${zi}" style="font-size:12px;color:#64748b;white-space:nowrap">${z.items.length} arts · ${activos} activos</span>
+        <span onclick="event.preventDefault();prepMoveZone(${zi},-1)" style="${btnStyle}">↑</span>
+        <span onclick="event.preventDefault();prepMoveZone(${zi},1)" style="${btnStyle}">↓</span>
+        <span onclick="event.preventDefault();prepDupZone(${zi})" style="${btnStyle}" title="Duplicar zona">⧉</span>
+        <span onclick="event.preventDefault();prepDelZone(${zi})" style="${btnStyle};color:#ef4444">🗑</span>
+      </summary>
+      <div style="padding:8px 12px;border-top:1px solid #f1f5f9">
+        <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+          <input type="text" placeholder="Filtrar artículos…" oninput="prepFilterZone(this,${zi})" style="flex:1;min-width:140px;font-size:13px;border:1px solid #d1d5db;border-radius:6px;padding:6px 8px">
+          <button onclick="prepBulk(${zi},this,true)" style="${btnStyle}">Activar visibles</button>
+          <button onclick="prepBulk(${zi},this,false)" style="${btnStyle}">Desactivar visibles</button>
+        </div>
+        <div id="prep-items-${zi}" style="max-height:340px;overflow-y:auto;border:1px solid #f1f5f9;border-radius:8px">${rows || '<div style="padding:12px;font-size:13px;color:#94a3b8">Sin artículos. Agrégalos abajo.</div>'}</div>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <input type="text" id="prep-add-${zi}" list="prep-datalist" placeholder="Buscar artículo de la plantilla…" style="flex:1;min-width:160px;font-size:13px;border:1px solid #d1d5db;border-radius:6px;padding:6px 8px" onkeyup="if(event.key==='Enter')prepAddItem(${zi})">
+          <button onclick="prepAddItem(${zi})" style="${btnStyle};background:#1d4ed8;color:#fff">+ Agregar</button>
+          <button onclick="prepAddAll(${zi})" style="${btnStyle}">+ Todos los de la plantilla</button>
+        </div>
+      </div>
+    </details>`;
+  }).join('') || '<div style="font-size:13px;color:#94a3b8;padding:8px 0">Sin zonas todavía.</div>';
+}
+
+function renderPrepDatalist() {
+  let dl = document.getElementById('prep-datalist');
+  if (!dl) { dl = document.createElement('datalist'); dl.id = 'prep-datalist'; document.body.appendChild(dl); }
+  dl.innerHTML = _prepOrder.map(cod => {
+    const a = _prepLookup[cod];
+    return `<option value="${esc(cod)} - ${esc(a?.nombre || cod)}"></option>`;
+  }).join('');
+}
+
+function prepToggleItem(zi, ii, checked) {
+  _prep.zones[zi].items[ii].activo = checked;
+  const z = _prep.zones[zi];
+  const el = document.getElementById('prep-count-' + zi);
+  if (el) el.textContent = `${z.items.length} arts · ${z.items.filter(i => i.activo !== false).length} activos`;
+}
+
+function prepMoveItem(zi, ii, dir) {
+  const items = _prep.zones[zi].items;
+  const j = ii + dir;
+  if (j < 0 || j >= items.length) return;
+  [items[ii], items[j]] = [items[j], items[ii]];
+  renderPrepZonas();
+  document.querySelector(`#prep-items-${zi}`)?.closest('details')?.setAttribute('open','');
+}
+
+function prepRemoveItem(zi, ii) {
+  _prep.zones[zi].items.splice(ii, 1);
+  renderPrepZonas();
+  document.querySelector(`#prep-items-${zi}`)?.closest('details')?.setAttribute('open','');
+}
+
+function prepMoveZone(zi, dir) {
+  const j = zi + dir;
+  if (j < 0 || j >= _prep.zones.length) return;
+  [_prep.zones[zi], _prep.zones[j]] = [_prep.zones[j], _prep.zones[zi]];
+  renderPrepZonas();
+}
+
+function prepDupZone(zi) {
+  const z = _prep.zones[zi];
+  _prep.zones.splice(zi + 1, 0, { id: prepZoneId(), nombre: z.nombre + ' (copia)', color: z.color, items: z.items.map(i => ({ ...i })) });
+  renderPrepZonas();
+}
+
+function prepDelZone(zi) {
+  if (!confirm(`¿Eliminar la zona "${_prep.zones[zi].nombre}"?`)) return;
+  _prep.zones.splice(zi, 1);
+  renderPrepZonas();
+}
+
+function prepFilterZone(inp, zi) {
+  const q = normalizeTemplateSearch(inp.value);
+  document.querySelectorAll(`#prep-items-${zi} .prep-item`).forEach(r => {
+    r.style.display = !q || (r.dataset.search || '').includes(q) ? '' : 'none';
+  });
+}
+
+function prepBulk(zi, btn, activo) {
+  const visibles = new Set();
+  document.querySelectorAll(`#prep-items-${zi} .prep-item`).forEach((r, ii) => {
+    if (r.style.display !== 'none') visibles.add(ii);
+  });
+  _prep.zones[zi].items.forEach((it, ii) => { if (visibles.has(ii)) it.activo = activo; });
+  const filtro = btn.closest('div').querySelector('input')?.value || '';
+  renderPrepZonas();
+  const det = document.querySelector(`#prep-items-${zi}`)?.closest('details');
+  if (det) {
+    det.setAttribute('open','');
+    const finp = det.querySelector('input[placeholder^="Filtrar"]');
+    if (finp && filtro) { finp.value = filtro; prepFilterZone(finp, zi); }
+  }
+}
+
+function prepAddItem(zi) {
+  const inp = document.getElementById('prep-add-' + zi);
+  const art = resolveTemplateArticle(inp.value, _prepT);
+  if (!art) { alert('Artículo no encontrado en la plantilla'); return; }
+  const items = _prep.zones[zi].items;
+  if (items.some(i => i.cod === art.codigo)) { alert('Ese artículo ya está en la zona'); return; }
+  items.push({ cod: art.codigo, activo: true });
+  inp.value = '';
+  renderPrepZonas();
+  document.querySelector(`#prep-items-${zi}`)?.closest('details')?.setAttribute('open','');
+}
+
+function prepAddAll(zi) {
+  const items = _prep.zones[zi].items;
+  const existing = new Set(items.map(i => i.cod));
+  const nuevos = _prepOrder.filter(cod => !existing.has(cod));
+  if (!nuevos.length) { alert('La zona ya tiene todos los artículos de la plantilla'); return; }
+  if (!confirm(`¿Agregar ${nuevos.length} artículos de la plantilla a "${_prep.zones[zi].nombre}"?`)) return;
+  nuevos.forEach(cod => items.push({ cod, activo: true }));
+  renderPrepZonas();
+  document.querySelector(`#prep-items-${zi}`)?.closest('details')?.setAttribute('open','');
+}
+
+async function savePreparacion(activar) {
+  const almacen = document.getElementById('prep-almacen').value;
+  const msg = document.getElementById('prep-msg');
+  if (!_prep) return;
+  for (const z of _prep.zones) {
+    if (!z.nombre.trim()) { msg.style.color = '#dc2626'; msg.textContent = '✗ Hay una zona sin nombre'; return; }
+  }
+  if (activar && !_prep.zones.some(z => z.items.some(i => i.activo !== false))) {
+    msg.style.color = '#dc2626'; msg.textContent = '✗ No se puede activar sin artículos activos'; return;
+  }
+  msg.style.color = '#6b7280'; msg.textContent = 'Guardando…';
+  const zones = _prep.zones.map(z => ({
+    id: z.id || prepZoneId(),
+    nombre: z.nombre.trim(),
+    color: z.color || '#667eea',
+    items: z.items.map((it, ii) => ({ cod: it.cod, orden: (ii + 1) * 10, activo: it.activo !== false }))
+  }));
+  try {
+    const r = await fetch(WORKER_URL + '/inv/zone-config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPasswordActual },
+      body: JSON.stringify({ action: 'inv_zone_config_save', almacen, id: _prep.id || undefined, templateHash: _prepT.templateHash || '', zones })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al guardar');
+    _prep.id = d.id;
+    _prep.templateHash = _prepT.templateHash || '';
+    if (activar) {
+      const ra = await fetch(WORKER_URL + '/inv/zone-config', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPasswordActual },
+        body: JSON.stringify({ action: 'inv_zone_config_activate', almacen, id: d.id })
+      });
+      const da = await ra.json();
+      if (!da.ok) throw new Error(da.error || 'Guardado pero no se pudo activar');
+      _prep.active = true;
+    }
+    msg.style.color = '#16a34a';
+    msg.textContent = activar ? '✓ Guardada y ACTIVA — las tomas nuevas ya la usan' : '✓ Borrador guardado';
+    renderPreparacion();
+  } catch(e) {
+    msg.style.color = '#dc2626'; msg.textContent = '✗ ' + e.message;
+  }
+}
+
+async function deactivatePreparacion() {
+  const almacen = document.getElementById('prep-almacen').value;
+  const msg = document.getElementById('prep-msg');
+  if (!confirm('¿Desactivar la preparación? El almacén volverá al comportamiento anterior (zonas fijas o catálogo completo). La config queda guardada como borrador.')) return;
+  try {
+    const r = await fetch(WORKER_URL + '/inv/zone-config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPasswordActual },
+      body: JSON.stringify({ action: 'inv_zone_config_activate', almacen, deactivate: true })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error');
+    _prep.active = false;
+    msg.style.color = '#16a34a'; msg.textContent = '✓ Preparación desactivada';
+    renderPreparacion();
+  } catch(e) {
+    msg.style.color = '#dc2626'; msg.textContent = '✗ ' + e.message;
   }
 }
 
