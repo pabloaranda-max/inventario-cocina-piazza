@@ -152,6 +152,7 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
     <button class="tab" onclick="showTab('reporte')">📊 Resumen</button>
     <button class="tab" onclick="showTab('plantillas')">📥 Plantillas</button>
     <button class="tab" onclick="showTab('preparacion')">🗂️ Preparación</button>
+    <button class="tab" id="tab-btn-admins" onclick="showTab('admins')" style="display:none">👥 Admins</button>
     <button class="tab" onclick="showTab('groq')">🤖 Asistente</button>
   </div>
 
@@ -169,13 +170,13 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
       <button class="btn-notas" onclick="toggleHistoricasSheets()" id="btn-historicas-sheets">Ver históricos</button>
     </div>
     <div class="filtros-row" id="filtros-almacen">
-      <button class="filtro-chip active" onclick="filtrarAlmacen('TODOS', this)">Todos</button>
-      <button class="filtro-chip" onclick="filtrarAlmacen('COCINA', this)">Cocina</button>
-      <button class="filtro-chip" onclick="filtrarAlmacen('ALIMENTARI', this)">Alimentari</button>
-      <button class="filtro-chip" onclick="filtrarAlmacen('SALUMERIA', this)">Salumeria</button>
-      <button class="filtro-chip" onclick="filtrarAlmacen('BARRA', this)">Barra</button>
-      <button class="filtro-chip" onclick="filtrarAlmacen('CAVA', this)">Cava</button>
-      <button class="filtro-chip" onclick="filtrarAlmacen('GENERAL', this)">General</button>
+      <button class="filtro-chip active" data-almacen="TODOS" onclick="filtrarAlmacen('TODOS', this)">Todos</button>
+      <button class="filtro-chip" data-almacen="COCINA" onclick="filtrarAlmacen('COCINA', this)">Cocina</button>
+      <button class="filtro-chip" data-almacen="ALIMENTARI" onclick="filtrarAlmacen('ALIMENTARI', this)">Alimentari</button>
+      <button class="filtro-chip" data-almacen="SALUMERIA" onclick="filtrarAlmacen('SALUMERIA', this)">Salumeria</button>
+      <button class="filtro-chip" data-almacen="BARRA" onclick="filtrarAlmacen('BARRA', this)">Barra</button>
+      <button class="filtro-chip" data-almacen="CAVA" onclick="filtrarAlmacen('CAVA', this)">Cava</button>
+      <button class="filtro-chip" data-almacen="GENERAL" onclick="filtrarAlmacen('GENERAL', this)">General</button>
     </div>
     <div id="tomas-container">
       <div class="loading-state"><div class="spinner-sm"></div>Cargando tomas...</div>
@@ -267,6 +268,34 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
         <button id="prep-btn-desactivar" onclick="deactivatePreparacion()" style="display:none;font-size:13px;padding:9px 14px;border:1px solid #fca5a5;border-radius:8px;background:#fff;cursor:pointer;color:#dc2626;font-weight:600">Desactivar preparación</button>
         <span id="prep-msg" style="font-size:13px;color:#6b7280"></span>
       </div>
+    </div>
+  </div>
+
+  <!-- TAB: ADMINS (R7, solo password maestro) -->
+  <div id="tab-admins" class="tab-content">
+    <div style="font-weight:800;color:#1e293b;margin-bottom:6px">Perfiles de admin por almacén</div>
+    <p style="font-size:13px;color:#64748b;margin-bottom:14px;line-height:1.5">
+      Un perfil entra al login con su nombre y su password, y solo puede subir plantillas,
+      editar preparaciones, exportar y borrar sesiones de sus almacenes. Solo el password
+      maestro crea o edita perfiles. La lectura de sesiones sigue siendo pública para los operarios.
+    </p>
+    <div id="admins-lista" style="margin-bottom:18px">
+      <div class="loading-state"><div class="spinner-sm"></div>Cargando perfiles...</div>
+    </div>
+    <div class="plt-status-card">
+      <div style="font-weight:700;margin-bottom:10px" id="adm-form-titulo">Nuevo perfil</div>
+      <input class="corr-input" type="text" id="adm-nombre" placeholder="Nombre (con este nombre entra al login)">
+      <input class="corr-input" type="password" id="adm-password" placeholder="Password del perfil" autocomplete="new-password">
+      <div style="font-size:13px;font-weight:600;color:#555;margin:8px 0 6px">Almacenes permitidos</div>
+      <div id="adm-almacenes" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px"></div>
+      <label style="font-size:13px;color:#475569;display:flex;align-items:center;gap:6px;margin-bottom:12px">
+        <input type="checkbox" id="adm-active" checked> Activo
+      </label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-pdf-card" onclick="guardarAdmin()">Guardar perfil</button>
+        <button class="btn-notas" onclick="nuevoAdminReset()" id="adm-cancelar" style="display:none">Cancelar edición</button>
+      </div>
+      <div id="adm-msg" style="margin-top:8px;font-size:13px"></div>
     </div>
   </div>
 
@@ -366,6 +395,8 @@ let todasLasTomas = [];
 let sesionesInventario = [];
 let filtroActual = 'TODOS';
 let adminPasswordActual = '';
+let adminEsMaster = false;
+let adminAlmacenes = '*'; // '*' (maestro) o array de claves canónicas (perfil R7)
 let mostrarHistoricasSheets = false;
 const DIAS_SHEETS_RECIENTES = 30;
 const exportandoSesiones = new Set();
@@ -374,6 +405,20 @@ let _modalTemplate = null;
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 // ── AUTH ──────────────────────────────────────────────────
+// Headers para acciones de admin: el Worker resuelve maestro vs perfil R7
+// por password + nombre (X-Admin-User).
+function adminHeaders() {
+  return { 'Content-Type': 'application/json', 'X-Admin-Password': adminPasswordActual, 'X-Admin-User': adminActual };
+}
+
+// R7: 'BARRA' es la clave legacy de Sheets — cubre cualquier BARRA_*
+function almacenPermitidoUI(almacen) {
+  if (adminEsMaster || adminAlmacenes === '*') return true;
+  if (!Array.isArray(adminAlmacenes)) return false;
+  if (almacen === 'BARRA') return adminAlmacenes.some(a => String(a).startsWith('BARRA'));
+  return adminAlmacenes.includes(almacen);
+}
+
 async function login() {
   const nombre = document.getElementById('nombre-input').value.trim();
   const pwd = document.getElementById('pwd-input').value;
@@ -382,19 +427,23 @@ async function login() {
   if (!pwd)    { errEl.textContent = 'Ingresa la contraseña'; return; }
   // El password ya no vive en este archivo (repo público): lo valida el Worker
   errEl.textContent = 'Verificando…';
+  let loginData;
   try {
     const r = await fetch(WORKER_URL + '/inv/plantilla', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'inv_admin_check', adminPassword: pwd })
+      body: JSON.stringify({ action: 'inv_admin_check', adminPassword: pwd, adminUser: nombre })
     });
-    const d = await r.json();
-    if (!d.ok) { errEl.textContent = d.error || 'Contraseña incorrecta'; return; }
+    loginData = await r.json();
+    if (!loginData.ok) { errEl.textContent = loginData.error || 'Contraseña incorrecta'; return; }
   } catch (e) {
     errEl.textContent = 'Sin conexión con el servidor'; return;
   }
   errEl.textContent = '';
   adminActual = nombre;
   adminPasswordActual = pwd;
+  adminEsMaster = !!loginData.master;
+  adminAlmacenes = loginData.master ? '*' : (loginData.almacenes || []);
+  aplicarPermisosUI();
   const key = document.getElementById('groq-key-input').value.trim();
   if (key) localStorage.setItem('groq_api_key', key);
   document.getElementById('pantalla-login').style.display = 'none';
@@ -409,6 +458,33 @@ function logout() {
   document.getElementById('pantalla-admin').style.display = 'none';
   document.getElementById('pwd-input').value = '';
   adminPasswordActual = '';
+  adminEsMaster = false;
+  adminAlmacenes = [];
+}
+
+// R7: esconde de la UI lo que el perfil no puede administrar (el Worker es
+// quien de verdad rechaza la acción; esto solo evita botones muertos)
+function aplicarPermisosUI() {
+  document.getElementById('tab-btn-admins').style.display = adminEsMaster ? '' : 'none';
+  document.querySelectorAll('#filtros-almacen .filtro-chip').forEach(chip => {
+    const a = chip.dataset.almacen;
+    chip.style.display = (a === 'TODOS' || almacenPermitidoUI(a)) ? '' : 'none';
+  });
+  if (filtroActual !== 'TODOS' && !almacenPermitidoUI(filtroActual)) {
+    filtroActual = 'TODOS';
+    document.querySelectorAll('#filtros-almacen .filtro-chip').forEach(c =>
+      c.classList.toggle('active', c.dataset.almacen === 'TODOS'));
+  }
+  for (const selId of ['plt-almacen', 'prep-almacen']) {
+    const sel = document.getElementById(selId);
+    if (!sel) continue;
+    for (const opt of sel.options) {
+      if (!opt.value) continue;
+      const permitido = almacenPermitidoUI(opt.value);
+      opt.hidden = opt.disabled = !permitido;
+      if (!permitido && sel.value === opt.value) sel.selectedIndex = 0;
+    }
+  }
 }
 
 // ── TABS ──────────────────────────────────────────────────
@@ -418,6 +494,7 @@ function showTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
   event.target.classList.add('active');
   if (tab === 'reporte') generarReporte();
+  if (tab === 'admins') cargarAdmins();
 }
 
 // ── CARGAR TOMAS ──────────────────────────────────────────
@@ -426,7 +503,9 @@ async function cargarTodasLasTomas() {
   container.innerHTML = '<div class="loading-state"><div class="spinner-sm"></div>Cargando tomas de todos los almacenes...</div>';
   
   todasLasTomas = [];
-  const promesas = Object.entries(ALMACENES).map(([nombre, url]) =>
+  const promesas = Object.entries(ALMACENES)
+    .filter(([nombre]) => almacenPermitidoUI(nombre)) // R7: no cargar almacenes ajenos
+    .map(([nombre, url]) =>
     fetch(url + '?action=listar')
       .then(r => r.json())
       .then(data => {
@@ -495,7 +574,9 @@ async function cargarSesionesInventario() {
 function renderSesionesInventario() {
   const el = document.getElementById('sesiones-container');
   if (!el) return;
-  const sesiones = sesionesInventario.filter(s => filtroIncluyeAlmacen(s.almacen));
+  const sesiones = sesionesInventario
+    .filter(s => almacenPermitidoUI(s.almacen)) // R7
+    .filter(s => filtroIncluyeAlmacen(s.almacen));
   if (!sesiones.length) {
     el.innerHTML = '<div class="empty-state" style="background:white;border-radius:10px">Sin sesiones activas recientes</div>';
     return;
@@ -912,7 +993,8 @@ async function borrarSesionInventario(almacen, fecha) {
         almacen,
         fecha,
         operario:adminActual,
-        adminPassword:adminPasswordActual
+        adminPassword:adminPasswordActual,
+        adminUser:adminActual
       })
     });
     const d = await r.json();
@@ -1036,6 +1118,7 @@ async function marcarExportacion(almacen, fecha, force) {
       fecha,
       operario:adminActual,
       adminPassword:adminPasswordActual,
+      adminUser:adminActual,
       force:!!force
     })
   });
@@ -1161,6 +1244,7 @@ function detectarDuplicados(tomas) {
 function renderTomas() {
   const container = document.getElementById('tomas-container');
   const tomas = todasLasTomas
+    .filter(t => almacenPermitidoUI(t.almacen_nombre)) // R7
     .filter(t => filtroIncluyeAlmacen(t.almacen_nombre))
     .filter(tomaSheetsReciente);
 
@@ -1701,7 +1785,7 @@ async function saveDefaults() {
   });
   try {
     const r = await fetch(WORKER_URL + '/inv/plantilla', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPasswordActual },
+      method: 'POST', headers: adminHeaders(),
       body: JSON.stringify({ action: 'inv_defaults', almacen, defaultPres })
     });
     const d = await r.json();
@@ -1729,7 +1813,7 @@ async function uploadPlantilla(file) {
 
     msg.textContent = `✓ ${Object.keys(rowMap).length} artículos · subiendo al servidor…`;
     const r = await fetch(WORKER_URL + '/inv/plantilla', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPasswordActual },
+      method: 'POST', headers: adminHeaders(),
       body: JSON.stringify({ action:'inv_plantilla', almacen, rowMap, cantidadColIdx, presMap, unitMap, raw, originalFilename: file.name || '', templateHash, templateTs: Date.now() })
     });
     const d = await r.json();
@@ -2017,7 +2101,7 @@ async function savePreparacion(activar) {
   }));
   try {
     const r = await fetch(WORKER_URL + '/inv/zone-config', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPasswordActual },
+      method: 'POST', headers: adminHeaders(),
       body: JSON.stringify({ action: 'inv_zone_config_save', almacen, id: _prep.id || undefined, templateHash: _prepT.templateHash || '', zones })
     });
     const d = await r.json();
@@ -2026,7 +2110,7 @@ async function savePreparacion(activar) {
     _prep.templateHash = _prepT.templateHash || '';
     if (activar) {
       const ra = await fetch(WORKER_URL + '/inv/zone-config', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPasswordActual },
+        method: 'POST', headers: adminHeaders(),
         body: JSON.stringify({ action: 'inv_zone_config_activate', almacen, id: d.id })
       });
       const da = await ra.json();
@@ -2047,7 +2131,7 @@ async function deactivatePreparacion() {
   if (!confirm('¿Desactivar la preparación? El almacén volverá al comportamiento anterior (zonas fijas o catálogo completo). La config queda guardada como borrador.')) return;
   try {
     const r = await fetch(WORKER_URL + '/inv/zone-config', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPasswordActual },
+      method: 'POST', headers: adminHeaders(),
       body: JSON.stringify({ action: 'inv_zone_config_activate', almacen, deactivate: true })
     });
     const d = await r.json();
@@ -2057,6 +2141,132 @@ async function deactivatePreparacion() {
     renderPreparacion();
   } catch(e) {
     msg.style.color = '#dc2626'; msg.textContent = '✗ ' + e.message;
+  }
+}
+
+// ── ADMINS (R7, solo password maestro) ────────────────────
+let _admins = [];
+let _adminEditandoId = null;
+
+function renderAdmAlmacenesChecks(seleccionados = []) {
+  const cont = document.getElementById('adm-almacenes');
+  cont.innerHTML = Object.entries(INVENTARIO_AREAS).map(([key, cfg]) => `
+    <label style="font-size:13px;color:#334155;display:flex;align-items:center;gap:5px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;cursor:pointer">
+      <input type="checkbox" class="adm-alm-check" value="${esc(key)}" ${seleccionados.includes(key) ? 'checked' : ''}> ${esc(cfg.titulo)}
+    </label>`).join('');
+}
+
+async function cargarAdmins() {
+  const el = document.getElementById('admins-lista');
+  if (!_adminEditandoId) renderAdmAlmacenesChecks();
+  el.innerHTML = '<div class="loading-state"><div class="spinner-sm"></div>Cargando perfiles...</div>';
+  try {
+    const r = await fetch(WORKER_URL + '/inv/plantilla', {
+      method: 'POST', headers: adminHeaders(),
+      body: JSON.stringify({ action: 'inv_admin_list' })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al cargar perfiles');
+    _admins = d.admins || [];
+    renderAdmins();
+  } catch(e) {
+    el.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
+  }
+}
+
+function renderAdmins() {
+  const el = document.getElementById('admins-lista');
+  if (!_admins.length) {
+    el.innerHTML = '<div class="empty-state" style="background:white;border-radius:10px">Sin perfiles. Todos entran con el password maestro.</div>';
+    return;
+  }
+  el.innerHTML = _admins.map(a => {
+    const titulos = (a.almacenes || []).map(k => INVENTARIO_AREAS[k]?.titulo || k);
+    const badge = a.active
+      ? '<span style="background:#dcfce7;color:#166534;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">Activo</span>'
+      : '<span style="background:#fee2e2;color:#991b1b;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">Inactivo</span>';
+    return `<div class="toma-card" style="border-left-color:${a.active ? '#667eea' : '#94a3b8'}">
+      <div class="toma-header">
+        <div class="toma-operario">${esc(a.nombre)} ${badge}</div>
+      </div>
+      <div class="toma-meta">${titulos.length ? esc(titulos.join(' · ')) : 'Sin almacenes asignados'}</div>
+      <div class="toma-footer" style="flex-wrap:wrap;gap:6px;">
+        <div></div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-notas" onclick="editarAdmin('${esc(a.id)}')">Editar</button>
+          <button class="btn-borrar" onclick="borrarAdmin('${esc(a.id)}','${esc(a.nombre)}')">Borrar</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function editarAdmin(id) {
+  const a = _admins.find(x => x.id === id);
+  if (!a) return;
+  _adminEditandoId = id;
+  document.getElementById('adm-form-titulo').textContent = `Editando: ${a.nombre}`;
+  document.getElementById('adm-nombre').value = a.nombre;
+  const pw = document.getElementById('adm-password');
+  pw.value = ''; pw.placeholder = 'Password (vacío = no cambiar)';
+  document.getElementById('adm-active').checked = !!a.active;
+  document.getElementById('adm-cancelar').style.display = '';
+  document.getElementById('adm-msg').textContent = '';
+  renderAdmAlmacenesChecks(a.almacenes || []);
+}
+
+function nuevoAdminReset() {
+  _adminEditandoId = null;
+  document.getElementById('adm-form-titulo').textContent = 'Nuevo perfil';
+  document.getElementById('adm-nombre').value = '';
+  const pw = document.getElementById('adm-password');
+  pw.value = ''; pw.placeholder = 'Password del perfil';
+  document.getElementById('adm-active').checked = true;
+  document.getElementById('adm-cancelar').style.display = 'none';
+  document.getElementById('adm-msg').textContent = '';
+  renderAdmAlmacenesChecks();
+}
+
+async function guardarAdmin() {
+  const msg = document.getElementById('adm-msg');
+  const nombre = document.getElementById('adm-nombre').value.trim();
+  const password = document.getElementById('adm-password').value;
+  const almacenes = [...document.querySelectorAll('.adm-alm-check:checked')].map(c => c.value);
+  const active = document.getElementById('adm-active').checked;
+  if (!nombre) { msg.style.color = '#dc2626'; msg.textContent = '✗ Falta el nombre'; return; }
+  if (!_adminEditandoId && !password) { msg.style.color = '#dc2626'; msg.textContent = '✗ Falta el password'; return; }
+  if (!almacenes.length && !confirm('El perfil no tiene almacenes asignados: podrá entrar pero no administrar nada. ¿Guardar así?')) return;
+  msg.style.color = '#6b7280'; msg.textContent = 'Guardando…';
+  try {
+    const body = { action: 'inv_admin_save', nombre, almacenes, active };
+    if (_adminEditandoId) body.id = _adminEditandoId;
+    if (password) body.password = password;
+    const r = await fetch(WORKER_URL + '/inv/plantilla', {
+      method: 'POST', headers: adminHeaders(), body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al guardar');
+    nuevoAdminReset(); // primero: también limpia adm-msg
+    msg.style.color = '#16a34a'; msg.textContent = '✓ Perfil guardado';
+    await cargarAdmins();
+  } catch(e) {
+    msg.style.color = '#dc2626'; msg.textContent = '✗ ' + e.message;
+  }
+}
+
+async function borrarAdmin(id, nombre) {
+  if (!confirm(`¿Borrar el perfil "${nombre}"? Dejará de poder entrar al admin.`)) return;
+  try {
+    const r = await fetch(WORKER_URL + '/inv/plantilla', {
+      method: 'POST', headers: adminHeaders(),
+      body: JSON.stringify({ action: 'inv_admin_delete', id })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al borrar');
+    if (_adminEditandoId === id) nuevoAdminReset();
+    await cargarAdmins();
+  } catch(e) {
+    alert('Error al borrar: ' + e.message);
   }
 }
 
