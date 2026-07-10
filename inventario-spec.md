@@ -733,8 +733,47 @@ Guardar/activar debe requerir password admin.
 | R5.1 | **Atribución por operario** — el Worker acumula `{deviceId: {operario, at}}` en `inv_sesiones.operarios_by_device` (migración 0006) a partir de las claves `zona:deviceId` de cada sync; admin muestra "quién capturó qué" (columna Operario en detalle por zona + resumen). Worker-only: los teléfonos no necesitan recargar. Limitación: un dispositivo se atribuye cuando sincroniza DESPUÉS del deploy; los nombres de syncs previos solo quedan en locks (expiran) y correcciones | HECHO 2026-07-08 (staging: 2 dispositivos simulados, re-sync no pisa; prod desplegado a media toma COCINA, atribución en curso) |
 | R6 | **Reporte de presentaciones sospechosas** — detección en admin (duplicadas, repetidas, factores sospechosos); marca y pide decisión humana, nunca autocorrige | HECHO 2026-07-08. `parsePlantilla` reporta `sospechosas[]` (factor_1, ml_g, duplicada, factor_ilegible, nombre_ambiguo) además de filtrar; admin tab Plantillas muestra "Revisión de presentaciones" calculada al vuelo desde `raw` (+ LT/KG sin presentación ni default, listas capadas a 60). Sin Worker ni migraciones. Tests parser 19/19; E2E staging 8 asserts. En prod detecta mugre real: COCINA 104×factor_1, 3×ml_g, 2×ilegible; CAVA 44×duplicada |
 | R7 | **Admins restringidos por almacén** — tabla `inv_admins` (nombre, password_hash, almacenes permitidos); solo el password maestro (`INV_ADMIN_PASSWORD`) crea/edita perfiles; el Worker valida el almacén en cada ACCIÓN de admin (exportar, borrar, plantillas, preparaciones) y admin.html filtra la vista. ⚠️ Alcance honesto: restringe acciones y UI, no lectura de datos — los GET de sesiones son públicos a propósito (operarios sin credencial); cerrar lecturas implicaría autenticar operarios (proyecto aparte) | HECHO 2026-07-08 (migración 0007; `invAdminAuth` en Worker: maestro por password, perfil por nombre+password vía `X-Admin-User`/`adminUser`; acciones nuevas `inv_admin_list/save/delete` solo maestro; `inv_export`/`inv_delete` migrados al mismo auth con validación de almacén; admin.html: tab 👥 Admins solo maestro, chips/selects/sesiones/tomas filtrados por perfil, no se fetchean Apps Scripts de almacenes ajenos. Matriz curl staging 32/32; E2E Playwright staging 11/11. Compat: admin.html viejo + Worker nuevo sigue funcionando con el maestro). **EN PROD 2026-07-09:** migración 0007 aplicada en prod (backup `~/backups/operaciones-db-backup-2026-07-09-r7.sql`), Worker desplegado, merge a main publicado en Pages; verificado en prod: `inv_admin_list` sin/con password malo → 401 "Sin permiso", GETs de operario siguen 200. Falta crear perfiles reales desde tab 👥 Admins (solo Pablo, password maestro) |
+| R8 | **Multi-centro — "Universal de Hamburguesas"** — segundo centro de consumo con ~3 almacenes (`UH_GENERAL`, `UH_COCINA`, `UH_BARRA`). Ver diseño abajo | HECHO 2026-07-10 (E2E staging: 9 asserts API — catálogo derivado, no-pisar, aislamiento CAVA — + 13 asserts navegador — filtro por centro, banner, guardia cross-centro, normalización del param, beta UH_COCINA 8 arts desde staging. Sin migraciones D1. PENDIENTE: Apps Script UH bloqueado en `clasp login` de Pablo; plantillas reales UH cuando existan en su Xetux) |
 | — | Limpieza (CSS muerto §13, mover apps viejas a `legacy/`, chat GROQ) — oportunista, al colarse en otra sesión | OPORTUNISTA |
 | — | Sheets API en vez de Apps Script (4b v1) — solo si Apps Script falla en un cierre real | FUTURO |
+
+### R8 — Multi-centro (diseño, 2026-07-10)
+
+Contexto: los 7 almacenes actuales pertenecen al centro de consumo **Piazza
+Pasticcio**. Se agrega el centro **Universal de Hamburguesas** (Xetux DISTINTO
+pero flujos idénticos: exportar plantilla xlsx / importar xlsx de carga masiva —
+la app solo ve archivos, nunca habla con Xetux, así que hoy no cambia nada del
+flujo). Decisión: misma app, mismo Worker, misma D1 — NO app ni instancia aparte.
+
+- **`centro` explícito en AREA_CONFIG** (`'PIAZZA'` los 7 existentes, `'UH'` los
+  nuevos), pensado para que la futura API Xetux se conecte POR CENTRO (secrets
+  `XETUX_*_PIAZZA` / `XETUX_*_UH` en el Worker, resolución almacén → centro →
+  credenciales). No hay columna nueva en D1: los IDs `UH_*` son únicos y todas
+  las tablas ya van por almacén.
+- **URL de entrada por centro:** `inventario.html?centro=UH` fija el centro,
+  muestra SOLO sus almacenes y un banner con el nombre del centro siempre
+  visible. Sin parámetro = PIAZZA (cero regresión para bookmarks existentes).
+  Es guardia de UI, no auth (mismo alcance honesto que R7): evita el error de
+  dedo de contar la COCINA de Piazza siendo operario de Universal.
+- **Catálogo derivado de plantilla:** `parsePlantilla` devuelve además
+  `articulos[]` (código, nombre, grupo, subgrupo, unidad — la plantilla trae
+  todo); admin los incluye en el POST `inv_plantilla` y el Worker los upserta en
+  `catalogo_articulos` SOLO si el almacén no tiene catálogo (COUNT=0). Los
+  catálogos Piazza (sync_d1.py, estacionado) no se tocan. Alta de almacén nuevo
+  queda 100% self-service: subir plantilla → catálogo + rowMap + unitMap listos.
+- **Sheets propios de Universal:** UN solo Apps Script + UN Spreadsheet para
+  todo el centro (la columna `Almacén` de MAESTRA ya distingue; menos deploys y
+  una sola autorización). Los 3 `UH_*` comparten `appsScriptUrl`; arrancan con
+  `null` si el Sheet aún no existe. Fuente: `scripts/universal/` (mismo Code.js,
+  SPREADSHEET_ID/DRIVE_FOLDER_ID propios), deploy con clasp.
+- **Permisos:** cero cambios — R7 ya restringe por lista de almacenes; un perfil
+  de Universal lleva `UH_*`.
+- **admin.html:** agregar `UH_*` a `ALMACENES` con agrupación visual por centro.
+
+Done de R8: en staging, subir plantilla a un almacén `UH_*` desde admin (catálogo
+derivado verificado), contar en `inventario-beta.html?centro=UH` sin ver almacenes
+Piazza, export xlsx correcto; E2E verde; Piazza sin regresión (home sin parámetro
+idéntico al actual).
 
 ### Pendientes fuera de slice
 

@@ -18,9 +18,14 @@ export function parsePlantilla(buf, XLSX = globalThis.XLSX) {
   const iCan = H.findIndex(h => /^cantidad$/i.test(h));
   const iUni = H.findIndex(h => /^unidad$/i.test(h));
   const iArt = H.findIndex(h => /^art[ií]culo$/i.test(h));
+  const iGrp = H.findIndex(h => /^grupo$/i.test(h));
+  const iSub = H.findIndex(h => /^subgrupo$/i.test(h));
   if (iCan < 0) throw new Error('Columna "Cantidad" no encontrada');
 
   const rowMap = {}, unitMap = {}, presRaw = {};
+  // R8: la plantilla trae código+nombre+grupo+unidad → catálogo derivable para
+  // almacenes sin catálogo D1 (el Worker solo lo usa si el almacén está vacío)
+  const articulos = [];
   // R6: todo lo filtrado se REPORTA para decisión humana — nunca se autocorrige.
   // motivo: factor_1 | ml_g | duplicada | factor_ilegible | nombre_ambiguo
   const sospechosas = [];
@@ -33,6 +38,13 @@ export function parsePlantilla(buf, XLSX = globalThis.XLSX) {
     if (!isPres) {
       const uni = iUni >= 0 ? norm(row[iUni]) : '';
       rowMap[cod] = r; unitMap[cod] = uni; presRaw[cod] = [];
+      articulos.push({
+        codigo: cod,
+        nombre: iArt >= 0 ? norm(row[iArt]) : '',
+        grupo:  iGrp >= 0 ? norm(row[iGrp]) : '',
+        subgrupo: iSub >= 0 ? norm(row[iSub]) : '',
+        unidad: uni
+      });
     } else {
       const parentCod = cod.replace(/_\d+$/, '');
       if (!presRaw[parentCod]) continue;
@@ -73,7 +85,7 @@ export function parsePlantilla(buf, XLSX = globalThis.XLSX) {
     }
     if (unique.length) presMap[cod] = unique;
   }
-  return { rowMap, cantidadColIdx: iCan, presMap, unitMap, sospechosas };
+  return { rowMap, cantidadColIdx: iCan, presMap, unitMap, sospechosas, articulos };
 }
 
 // SHA-256 truncado a 16 hex del raw base64 — versionado de plantilla (spec §5).

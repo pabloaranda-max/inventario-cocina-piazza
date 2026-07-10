@@ -301,6 +301,19 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
 const WORKER_URL = 'https://operaciones-api-staging.pablo-aranda.workers.dev'; // BETA: staging
 const APPS = 'https://script.google.com/macros/s/';
 
+// R8 — centros de consumo. Cada almacén pertenece a un centro; sin campo
+// `centro` en AREA_CONFIG se asume PIAZZA (los 7 originales no se tocan).
+// La URL de entrada fija el centro: inventario.html?centro=UH
+const CENTROS = {
+  PIAZZA: { nombre: 'Piazza Pasticcio' },
+  UH:     { nombre: 'Universal de Hamburguesas', color: '#b91c1c' }
+};
+const CENTRO = (() => {
+  const c = (new URLSearchParams(location.search).get('centro') || 'PIAZZA').toUpperCase();
+  return CENTROS[c] ? c : 'PIAZZA';
+})();
+const centroDe = key => AREA_CONFIG[key]?.centro || 'PIAZZA';
+
 const AREA_CONFIG = {
   BARRA_RESTAURANTE: {
     titulo:'Barra Restaurante', color:'#667eea',
@@ -312,8 +325,25 @@ const AREA_CONFIG = {
   CAVA:      { titulo:'Cava',      color:'#8b5cf6', appsScriptUrl:APPS+'AKfycbzQ7Pwt-rv9mPxCOzXkbI6gisss9FVtFzJyKWHGZbQOOMDHrJESa55UTNWriDUeH94B/exec', zonas:null, zonaNames:['Racks cava','Refri cava 1','Refri cava 2'], zonaColors:['#8b5cf6','#7c3aed','#6d28d9'] },
   SALUMERIA: { titulo:'Salumeria', color:'#ef4444', appsScriptUrl:APPS+'AKfycbwJ89hDt3pIyXwiQkbSaL7--Fr-DXTsFm5tTgo-rKoCc-G0fR14iJKqyjVwRCO3XC_3/exec', zonas:null, zonaNames:['Camara maduracion','Congelador horizontal','Refri','Camara fria'], zonaColors:['#ef4444','#dc2626','#b91c1c','#991b1b'] },
   GENERAL:   { titulo:'General',   color:'#6b7280', appsScriptUrl:APPS+'AKfycbyg1vJUxEGFaHs8V1co2rLxY8IA5h-Ol23-peGDg-Hdon-kI81F_r7Rx9Yey9OdNFQtVg/exec', zonas:null },
-  BARRA_AMICI:{ titulo:'Barra Amici', color:'#f97316', appsScriptUrl:null, zonas:null }
+  BARRA_AMICI:{ titulo:'Barra Amici', color:'#f97316', appsScriptUrl:null, zonas:null },
+  // Centro UH (R8) — appsScriptUrl null hasta desplegar su Apps Script/Sheet propio
+  UH_GENERAL: { centro:'UH', titulo:'General', color:'#64748b', appsScriptUrl:null, zonas:null },
+  UH_COCINA:  { centro:'UH', titulo:'Cocina',  color:'#d97706', appsScriptUrl:null, zonas:null },
+  UH_BARRA:   { centro:'UH', titulo:'Barra',   color:'#2563eb', appsScriptUrl:null, zonas:null }
 };
+
+// Guardia visual R8: fuera de PIAZZA el nombre del centro queda siempre visible
+if (CENTRO !== 'PIAZZA') {
+  document.title = 'Inventario · ' + CENTROS[CENTRO].nombre;
+  document.addEventListener('DOMContentLoaded', () => {
+    const b = document.createElement('div');
+    b.textContent = CENTROS[CENTRO].nombre;
+    b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:' +
+      (CENTROS[CENTRO].color || '#334155') +
+      ';color:#fff;text-align:center;font:600 11px system-ui;padding:3px 0;z-index:10000';
+    document.body.appendChild(b);
+  });
+}
 
 // ── Estado global ──────────────────────────────────────────────────────────
 
@@ -690,6 +720,8 @@ async function resolveZonas() {
 // ── Init ───────────────────────────────────────────────────────────────────
 
 async function selectArea(key) {
+  // R8: un almacén de otro centro nunca se abre desde esta URL
+  if (!AREA_CONFIG[key] || centroDe(key) !== CENTRO) { ALMACEN = null; renderWelcome(); return; }
   ALMACEN = key;
   CFG     = AREA_CONFIG[key];
   const savedKey = key;
@@ -728,10 +760,11 @@ function renderWelcome() {
   setColor('#667eea');
   const body = document.getElementById('welcome-body');
   const sub  = document.getElementById('welcome-sub');
-  sub.textContent = 'Inventarios';
+  sub.textContent = 'Inventarios · ' + CENTROS[CENTRO].nombre;
 
-  const sorted = Object.entries(AREA_CONFIG).sort((a, b) =>
-    a[1].titulo.localeCompare(b[1].titulo, 'es'));
+  const sorted = Object.entries(AREA_CONFIG)
+    .filter(([key]) => centroDe(key) === CENTRO)
+    .sort((a, b) => a[1].titulo.localeCompare(b[1].titulo, 'es'));
   const options = sorted.map(([key, cfg]) => {
     return `<option value="${key}">${cfg.titulo}</option>`;
   }).join('');
