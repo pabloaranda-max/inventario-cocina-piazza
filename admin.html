@@ -177,6 +177,7 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
       <button class="filtro-chip" data-almacen="BARRA" onclick="filtrarAlmacen('BARRA', this)">Barra</button>
       <button class="filtro-chip" data-almacen="CAVA" onclick="filtrarAlmacen('CAVA', this)">Cava</button>
       <button class="filtro-chip" data-almacen="GENERAL" onclick="filtrarAlmacen('GENERAL', this)">General</button>
+      <button class="filtro-chip" data-almacen="UH" onclick="filtrarAlmacen('UH', this)">Universal 🍔</button>
     </div>
     <div id="tomas-container">
       <div class="loading-state"><div class="spinner-sm"></div>Cargando tomas...</div>
@@ -200,13 +201,20 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
       <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:6px">Almacén</label>
       <select id="plt-almacen" onchange="loadPlantillaStatus()" style="padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;width:100%;max-width:340px">
         <option value="" disabled selected>— Seleccionar —</option>
-        <option value="BARRA_RESTAURANTE">Barra Restaurante</option>
-        <option value="COCINA">Cocina</option>
-        <option value="ALIMENTARI">Alimentari</option>
-        <option value="CAVA">Cava</option>
-        <option value="SALUMERIA">Salumeria</option>
-        <option value="GENERAL">General</option>
-        <option value="BARRA_AMICI">Barra Amici</option>
+        <optgroup label="Piazza Pasticcio">
+          <option value="BARRA_RESTAURANTE">Barra Restaurante</option>
+          <option value="COCINA">Cocina</option>
+          <option value="ALIMENTARI">Alimentari</option>
+          <option value="CAVA">Cava</option>
+          <option value="SALUMERIA">Salumeria</option>
+          <option value="GENERAL">General</option>
+          <option value="BARRA_AMICI">Barra Amici</option>
+        </optgroup>
+        <optgroup label="Universal de Hamburguesas">
+          <option value="UH_GENERAL">General</option>
+          <option value="UH_COCINA">Cocina</option>
+          <option value="UH_BARRA">Barra</option>
+        </optgroup>
       </select>
     </div>
     <div id="plt-status"></div>
@@ -247,13 +255,20 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
       <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:6px">Almacén</label>
       <select id="prep-almacen" onchange="loadPreparacion()" style="padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;width:100%;max-width:340px">
         <option value="" disabled selected>— Seleccionar —</option>
-        <option value="BARRA_RESTAURANTE">Barra Restaurante</option>
-        <option value="COCINA">Cocina</option>
-        <option value="ALIMENTARI">Alimentari</option>
-        <option value="CAVA">Cava</option>
-        <option value="SALUMERIA">Salumeria</option>
-        <option value="GENERAL">General</option>
-        <option value="BARRA_AMICI">Barra Amici</option>
+        <optgroup label="Piazza Pasticcio">
+          <option value="BARRA_RESTAURANTE">Barra Restaurante</option>
+          <option value="COCINA">Cocina</option>
+          <option value="ALIMENTARI">Alimentari</option>
+          <option value="CAVA">Cava</option>
+          <option value="SALUMERIA">Salumeria</option>
+          <option value="GENERAL">General</option>
+          <option value="BARRA_AMICI">Barra Amici</option>
+        </optgroup>
+        <optgroup label="Universal de Hamburguesas">
+          <option value="UH_GENERAL">General</option>
+          <option value="UH_COCINA">Cocina</option>
+          <option value="UH_BARRA">Barra</option>
+        </optgroup>
       </select>
     </div>
     <div id="prep-status"></div>
@@ -388,7 +403,12 @@ const INVENTARIO_AREAS = {
   CAVA:              { titulo:'Cava',       scriptUrl: ALMACENES.CAVA,       zonaNames:['Racks cava','Refri cava 1','Refri cava 2'] },
   SALUMERIA:         { titulo:'Salumeria',  scriptUrl: ALMACENES.SALUMERIA,  zonaNames:['Camara maduracion','Congelador horizontal','Refri','Camara fria'] },
   GENERAL:           { titulo:'General',    scriptUrl: ALMACENES.GENERAL,    zonaNames:['General'] },
-  BARRA_AMICI:       { titulo:'Barra Amici', scriptUrl: null,                zonaNames:['Barra Amici'] }
+  BARRA_AMICI:       { titulo:'Barra Amici', scriptUrl: null,                zonaNames:['Barra Amici'] },
+  // Centro UH — Universal de Hamburguesas (R8). Comparten un solo Apps Script
+  // cuando exista (agregar a ALMACENES con clave 'UH'); scriptUrl null mientras.
+  UH_GENERAL:        { centro:'UH', titulo:'General · Universal', scriptUrl: null, zonaNames:['General'] },
+  UH_COCINA:         { centro:'UH', titulo:'Cocina · Universal',  scriptUrl: null, zonaNames:['Cocina'] },
+  UH_BARRA:          { centro:'UH', titulo:'Barra · Universal',   scriptUrl: null, zonaNames:['Barra'] }
 };
 
 let todasLasTomas = [];
@@ -412,10 +432,12 @@ function adminHeaders() {
 }
 
 // R7: 'BARRA' es la clave legacy de Sheets — cubre cualquier BARRA_*
+// R8: 'UH' es la clave agregada del centro Universal — cubre cualquier UH_*
 function almacenPermitidoUI(almacen) {
   if (adminEsMaster || adminAlmacenes === '*') return true;
   if (!Array.isArray(adminAlmacenes)) return false;
   if (almacen === 'BARRA') return adminAlmacenes.some(a => String(a).startsWith('BARRA'));
+  if (almacen === 'UH')    return adminAlmacenes.some(a => String(a).startsWith('UH_'));
   return adminAlmacenes.includes(almacen);
 }
 
@@ -533,6 +555,7 @@ function filtrarAlmacen(almacen, btn) {
 function filtroIncluyeAlmacen(almacen) {
   if (filtroActual === 'TODOS') return true;
   if (filtroActual === 'BARRA') return String(almacen).startsWith('BARRA');
+  if (filtroActual === 'UH')    return String(almacen).startsWith('UH'); // R8: centro completo
   return almacen === filtroActual;
 }
 
@@ -1823,7 +1846,7 @@ async function uploadPlantilla(file) {
   msg.style.color = '#888'; msg.textContent = 'Leyendo archivo…';
   try {
     const buf = await file.arrayBuffer();
-    const { rowMap, cantidadColIdx, presMap, unitMap } = parsePlantilla(buf);
+    const { rowMap, cantidadColIdx, presMap, unitMap, articulos } = parsePlantilla(buf);
     msg.textContent = `✓ ${Object.keys(rowMap).length} artículos · calculando hash…`;
 
     const bytes = new Uint8Array(buf);
@@ -1834,12 +1857,13 @@ async function uploadPlantilla(file) {
     msg.textContent = `✓ ${Object.keys(rowMap).length} artículos · subiendo al servidor…`;
     const r = await fetch(WORKER_URL + '/inv/plantilla', {
       method: 'POST', headers: adminHeaders(),
-      body: JSON.stringify({ action:'inv_plantilla', almacen, rowMap, cantidadColIdx, presMap, unitMap, raw, originalFilename: file.name || '', templateHash, templateTs: Date.now() })
+      body: JSON.stringify({ action:'inv_plantilla', almacen, rowMap, cantidadColIdx, presMap, unitMap, articulos, raw, originalFilename: file.name || '', templateHash, templateTs: Date.now() })
     });
     const d = await r.json();
     if (d.ok) {
       msg.style.color = '#16a34a';
-      msg.textContent = `✓ Plantilla de ${almacen} guardada correctamente`;
+      msg.textContent = `✓ Plantilla de ${almacen} guardada correctamente` +
+        (d.catalogoDerivado ? ` · catálogo creado con ${d.catalogoDerivado} artículos` : '');
       document.getElementById('plt-file').value = '';
       loadPlantillaStatus();
     } else {

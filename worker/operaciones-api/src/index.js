@@ -650,7 +650,24 @@ async function handleInvPost(db, body, env = {}, request = null) {
         template_hash = excluded.template_hash,
         updated_at = excluded.updated_at
     `).bind(almacen, JSON.stringify(rowMap), cantidadColIdx, JSON.stringify(presMap || {}), JSON.stringify(unitMap || {}), raw || '', originalFilename || '', templateHash || '', new Date().toISOString()).run();
-    return json({ ok: true });
+
+    // R8: almacén sin catálogo D1 (sync_d1 solo cubre Piazza) → derivarlo de la
+    // plantilla. Solo si está vacío: catálogos existentes nunca se pisan.
+    let catalogoDerivado = 0;
+    const arts = (body.articulos || []).filter(a => a && a.codigo && a.nombre);
+    if (arts.length) {
+      const row = await db.prepare('SELECT COUNT(*) AS n FROM catalogo_articulos WHERE almacen = ?').bind(almacen).first();
+      if (!row.n) {
+        const now = new Date().toISOString();
+        const stmt = db.prepare('INSERT OR REPLACE INTO catalogo_articulos (codigo,nombre,grupo,subgrupo,unidad,almacen,updated_at) VALUES (?,?,?,?,?,?,?)');
+        for (let i = 0; i < arts.length; i += 50) {
+          await db.batch(arts.slice(i, i + 50).map(a =>
+            stmt.bind(a.codigo, a.nombre, a.grupo || '', a.subgrupo || '', a.unidad || '', almacen, now)));
+        }
+        catalogoDerivado = arts.length;
+      }
+    }
+    return json({ ok: true, catalogoDerivado });
   }
 
   if (body.action === 'inv_defaults') {
