@@ -305,7 +305,8 @@ const APPS = 'https://script.google.com/macros/s/';
 // La URL de entrada fija el centro: inventario.html?centro=UH
 const CENTROS = {
   PIAZZA: { nombre: 'Piazza Pasticcio' },
-  UH:     { nombre: 'Universal de Hamburguesas', color: '#b91c1c' }
+  // logo: ruta en branding/ cuando exista; mientras, emoji como placeholder
+  UH:     { nombre: 'Universal de Hamburguesas', color: '#b91c1c', emoji: '🍔' }
 };
 const CENTRO = (() => {
   const c = (new URLSearchParams(location.search).get('centro') || 'PIAZZA').toUpperCase();
@@ -332,13 +333,32 @@ const AREA_CONFIG = {
 };
 
 // Guardia visual R8: fuera de PIAZZA el nombre del centro queda siempre visible
+// y el hero pierde el branding de Piazza (logo + nombre pasan a ser del centro)
 if (CENTRO !== 'PIAZZA') {
   document.title = 'Inventario · ' + CENTROS[CENTRO].nombre;
   document.addEventListener('DOMContentLoaded', () => {
+    const c = CENTROS[CENTRO];
+    const img = document.querySelector('.welcome-logo-img');
+    if (img) {
+      if (c.logo) { img.src = c.logo; img.alt = c.nombre; }
+      else {
+        const em = document.createElement('div');
+        em.className = 'welcome-logo-img';
+        em.style.cssText = 'display:flex;align-items:center;justify-content:center;font-size:26px';
+        em.textContent = c.emoji || '🏪';
+        img.replaceWith(em);
+      }
+    }
+    const name = document.querySelector('.welcome-logo-name');
+    if (name) {
+      name.textContent = c.nombre;
+      // la tipografía script y el vino son marca Piazza — otro centro va neutro
+      name.style.cssText = 'font-family:system-ui,sans-serif;font-size:18px;font-weight:800;line-height:1.1;color:' + (c.color || '#334155');
+    }
     const b = document.createElement('div');
-    b.textContent = CENTROS[CENTRO].nombre;
+    b.textContent = c.nombre;
     b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:' +
-      (CENTROS[CENTRO].color || '#334155') +
+      (c.color || '#334155') +
       ';color:#fff;text-align:center;font:600 11px system-ui;padding:3px 0;z-index:10000';
     document.body.appendChild(b);
   });
