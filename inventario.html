@@ -305,8 +305,8 @@ const APPS = 'https://script.google.com/macros/s/';
 // La URL de entrada fija el centro: inventario.html?centro=UH
 const CENTROS = {
   PIAZZA: { nombre: 'Piazza Pasticcio' },
-  // logo: ruta en branding/ cuando exista; mientras, emoji como placeholder
-  UH:     { nombre: 'Universal de Hamburguesas', color: '#b91c1c', emoji: '🍔' }
+  UH:     { nombre: 'Universal de Hamburguesas', color: '#111827',
+            logo: 'branding/logo-universal.png' }
 };
 const CENTRO = (() => {
   const c = (new URLSearchParams(location.search).get('centro') || 'PIAZZA').toUpperCase();
