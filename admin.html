@@ -42,7 +42,8 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
 /* TABS */
 .tabs { display: flex; overflow-x: auto; background: white; border-bottom: 2px solid #e2e8f0; padding: 0 16px; }
 .tab { padding: 14px 16px; font-size: 14px; font-weight: bold; color: #64748b; cursor: pointer; white-space: nowrap; border-bottom: 3px solid transparent; margin-bottom: -2px; background: none; border-radius: 0; min-height: auto; }
-.tab.active { color: #667eea; border-bottom-color: #667eea; }
+.tab.active { color: #667eea; border-bottom-color: #667eea; background: #f5f6ff; }
+.tab { display: inline-flex; align-items: center; gap: 6px; }
 
 /* CONTENT */
 .tab-content { display: none; padding: 16px; }
@@ -119,10 +120,14 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
 .plt-drop:hover, .plt-drop.over { border-color:#667eea; background:#f5f3ff; }
 .plt-drop p { color:#888; font-size:14px; margin-top:8px; }
 .plt-status-card { background:white; border-radius:8px; padding:14px; border:1px solid #e2e8f0; margin-bottom:14px; }
+.ic{display:inline-block;vertical-align:-3px;flex:none}
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
+
+<!-- Iconos Lucide (ISC) — sprite inline, cero red -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true"><symbol id="i-clipboard-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></symbol><symbol id="i-chart-column" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 3v16a2 2 0 0 0 2 2h16" /> <path d="M18 17V9" /> <path d="M13 17V5" /> <path d="M8 17v-3" /></symbol><symbol id="i-file-spreadsheet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M8 13h2" /> <path d="M14 13h2" /> <path d="M8 17h2" /> <path d="M14 17h2" /></symbol><symbol id="i-chef-hat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z" /> <path d="M6 17h12" /></symbol><symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /> <path d="M16 3.128a4 4 0 0 1 0 7.744" /> <path d="M22 21v-2a4 4 0 0 0-3-3.87" /> <circle cx="9" cy="7" r="4" /></symbol><symbol id="i-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /></symbol><symbol id="i-log-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m16 17 5-5-5-5" /> <path d="M21 12H9" /> <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /></symbol><symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /> <path d="M7 11V7a5 5 0 0 1 10 0v4" /></symbol><symbol id="i-refresh-cw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></symbol><symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /> <path d="M3 3v5h5" /> <path d="M12 7v5l4 2" /></symbol><symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></symbol><symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 15V3" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /> <path d="m7 10 5 5 5-5" /></symbol><symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 3v12" /> <path d="m17 8-5-5-5 5" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></symbol><symbol id="i-printer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /> <path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6" /> <rect x="6" y="14" width="12" height="8" rx="1" /></symbol><symbol id="i-circle-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="m9 12 2 2 4-4" /></symbol><symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></symbol><symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /></symbol><symbol id="i-trash-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></symbol><symbol id="i-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /> <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" /> <path d="M7 3v4a1 1 0 0 0 1 1h7" /></symbol><symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></symbol></svg>
 
 <!-- LOGIN -->
 <div id="pantalla-login">
@@ -131,7 +136,7 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
   <input type="text" class="login-input" id="nombre-input" placeholder="Tu nombre (ej: Javier)" onkeyup="if(event.key==='Enter') login()">
   <input type="password" class="login-input" id="pwd-input" placeholder="Contraseña" onkeyup="if(event.key==='Enter') login()">
   <input type="text" class="login-input" id="groq-key-input" placeholder="API Key GROQ (opcional)" style="margin-top:0; font-size:12px;">
-  <button class="btn-login" onclick="login()">Entrar</button>
+  <button class="btn-login" onclick="login()"><svg class="ic" width="14" height="14"><use href="#i-lock"/></svg> Entrar</button>
   <div id="login-error" style="color:#dc2626;margin-top:12px;font-size:14px;"></div>
 </div>
 
@@ -143,24 +148,24 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
         <h1 id="admin-nombre-display">Admin Inventario</h1>
         <p>Piazza Pasticcio</p>
       </div>
-      <button class="btn-logout" onclick="logout()">Salir</button>
+      <button class="btn-logout" onclick="logout()"><svg class="ic" width="13" height="13"><use href="#i-log-out"/></svg> Salir</button>
     </div>
   </div>
 
   <div class="tabs">
-    <button class="tab active" onclick="showTab('tomas')">Tomas</button>
-    <button class="tab" onclick="showTab('reporte')">Resumen</button>
-    <button class="tab" onclick="showTab('plantillas')">Plantillas</button>
-    <button class="tab" onclick="showTab('preparacion')">Preparación</button>
-    <button class="tab" id="tab-btn-admins" onclick="showTab('admins')" style="display:none">Admins</button>
-    <button class="tab" onclick="showTab('groq')">Asistente</button>
+    <button class="tab active" onclick="showTab('tomas')"><svg class="ic" width="14" height="14"><use href="#i-clipboard-list"/></svg> Tomas</button>
+    <button class="tab" onclick="showTab('reporte')"><svg class="ic" width="14" height="14"><use href="#i-chart-column"/></svg> Resumen</button>
+    <button class="tab" onclick="showTab('plantillas')"><svg class="ic" width="14" height="14"><use href="#i-file-spreadsheet"/></svg> Plantillas</button>
+    <button class="tab" onclick="showTab('preparacion')"><svg class="ic" width="14" height="14"><use href="#i-chef-hat"/></svg> Preparación</button>
+    <button class="tab" id="tab-btn-admins" onclick="showTab('admins')" style="display:none"><svg class="ic" width="14" height="14"><use href="#i-users"/></svg> Admins</button>
+    <button class="tab" onclick="showTab('groq')"><svg class="ic" width="14" height="14"><use href="#i-sparkles"/></svg> Asistente</button>
   </div>
 
   <!-- TAB: TOMAS -->
   <div id="tab-tomas" class="tab-content active">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
       <div style="font-weight:800;color:#1e293b">Tomas de inventario · últimos 30 días</div>
-      <button class="btn-notas" onclick="cargarSesionesInventario()">Actualizar</button>
+      <button class="btn-notas" onclick="cargarSesionesInventario()"><svg class="ic" width="13" height="13"><use href="#i-refresh-cw"/></svg> Actualizar</button>
     </div>
     <!-- R9a: filtros de dos niveles — centro primero, almacén después -->
     <div class="filtros-row" id="filtros-centro"></div>
@@ -170,7 +175,7 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin:26px 0 10px;gap:8px;flex-wrap:wrap">
       <div style="font-weight:800;color:#64748b">Histórico en Google Sheets · Piazza (legado)</div>
-      <button class="btn-notas" onclick="cargarHistoricosSheets()" id="btn-historicos-sheets">Cargar histórico</button>
+      <button class="btn-notas" onclick="cargarHistoricosSheets()" id="btn-historicos-sheets"><svg class="ic" width="13" height="13"><use href="#i-history"/></svg> Cargar histórico</button>
     </div>
     <div id="tomas-container">
       <div class="empty-state" style="background:white;border-radius:10px">Las tomas recientes viven arriba. Este histórico consulta los Sheets de Piazza solo si lo pides.</div>
@@ -300,8 +305,8 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
         <input type="checkbox" id="adm-active" checked> Activo
       </label>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn-pdf-card" onclick="guardarAdmin()">Guardar perfil</button>
-        <button class="btn-notas" onclick="nuevoAdminReset()" id="adm-cancelar" style="display:none">Cancelar edición</button>
+        <button class="btn-pdf-card" onclick="guardarAdmin()"><svg class="ic" width="13" height="13"><use href="#i-save"/></svg> Guardar perfil</button>
+        <button class="btn-notas" onclick="nuevoAdminReset()" id="adm-cancelar" style="display:none"><svg class="ic" width="13" height="13"><use href="#i-x"/></svg> Cancelar edición</button>
       </div>
       <div id="adm-msg" style="margin-top:8px;font-size:13px"></div>
     </div>
@@ -359,6 +364,7 @@ const SCRIPT_CENTRO = {
   UH:     'https://script.google.com/macros/s/AKfycbzfvPxsYUWv1r0DvLpTAUozeZsYTlGT2vORxmIbKC9kcElo2wqoTdW9eFMao351Hxcz5Q/exec'
 };
 
+const ic = (n, s = 15) => `<svg class="ic" width="${s}" height="${s}"><use href="#i-${n}"/></svg>`;
 const WORKER_URL = 'https://operaciones-api.pablo-aranda.workers.dev';
 const INVENTARIO_AREAS = {
   BARRA_RESTAURANTE: { titulo:'Barra Restaurante', scriptUrl: SCRIPT_CENTRO.PIAZZA,
@@ -618,8 +624,8 @@ function renderSesionesInventario() {
   el.innerHTML = sesiones.map(s => {
     const cfg = INVENTARIO_AREAS[s.almacen] || { titulo:s.almacen, scriptUrl:null };
     const exp = s.exportedAt
-      ? `<span style="background:#dcfce7;color:#166534;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">Exportada</span>`
-      : `<span style="background:#fffbeb;color:#92400e;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">Pendiente</span>`;
+      ? `<span style="background:#dcfce7;color:#166534;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">${ic('circle-check',11)} Exportada</span>`
+      : `<span style="background:#fffbeb;color:#92400e;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">${ic('clock',11)} Pendiente</span>`;
     const updated = s.updatedAt ? new Date(s.updatedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short' }) : '—';
     const exportTxt = s.exportedAt ? ` · Exportada por ${esc(s.exportedBy || '—')}` : '';
     const corrTxt = s.correcciones ? ` · ${s.correcciones} corrección${s.correcciones!==1?'es':''}` : '';
@@ -638,11 +644,11 @@ function renderSesionesInventario() {
       <div class="toma-footer" style="flex-wrap:wrap;gap:6px;">
         <div class="toma-items">Capturaron: ${esc(quienes)}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="btn-notas" onclick="verDetalleSesion('${esc(s.almacen)}','${esc(s.fecha)}')">Explorar</button>
-          <button class="btn-notas" onclick="imprimirSesion('${esc(s.almacen)}','${esc(s.fecha)}')">PDF</button>
-          <button class="btn-pdf-card" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',false)">Generar XLSX y enviar</button>
-          ${s.exportedAt ? `<button class="btn-notas" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',true)">Re-exportar</button>` : ''}
-          <button class="btn-borrar" onclick="borrarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}')">Borrar sesión</button>
+          <button class="btn-notas" onclick="verDetalleSesion('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('search',13)} Explorar</button>
+          <button class="btn-notas" onclick="imprimirSesion('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('printer',13)} PDF</button>
+          <button class="btn-pdf-card" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',false)">${ic('download',13)} Generar XLSX y enviar</button>
+          ${s.exportedAt ? `<button class="btn-notas" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',true)">${ic('upload',13)} Re-exportar</button>` : ''}
+          <button class="btn-borrar" onclick="borrarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('trash-2',13)} Borrar sesión</button>
         </div>
       </div>
     </div>`;
@@ -2072,8 +2078,8 @@ function renderAdmins() {
       <div class="toma-footer" style="flex-wrap:wrap;gap:6px;">
         <div></div>
         <div style="display:flex;gap:6px;">
-          <button class="btn-notas" onclick="editarAdmin('${esc(a.id)}')">Editar</button>
-          <button class="btn-borrar" onclick="borrarAdmin('${esc(a.id)}','${esc(a.nombre)}')">Borrar</button>
+          <button class="btn-notas" onclick="editarAdmin('${esc(a.id)}')">${ic('pencil',13)} Editar</button>
+          <button class="btn-borrar" onclick="borrarAdmin('${esc(a.id)}','${esc(a.nombre)}')">${ic('trash-2',13)} Borrar</button>
         </div>
       </div>
     </div>`;
