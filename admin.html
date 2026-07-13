@@ -126,7 +126,7 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
 
 <!-- LOGIN -->
 <div id="pantalla-login">
-  <div class="login-titulo">🔐 Admin</div>
+  <div class="login-titulo">Admin</div>
   <div class="login-sub">Inventario Piazza Pasticcio</div>
   <input type="text" class="login-input" id="nombre-input" placeholder="Tu nombre (ej: Javier)" onkeyup="if(event.key==='Enter') login()">
   <input type="password" class="login-input" id="pwd-input" placeholder="Contraseña" onkeyup="if(event.key==='Enter') login()">
@@ -140,7 +140,7 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
   <div class="admin-header">
     <div class="admin-header-row">
       <div>
-        <h1 id="admin-nombre-display">⚙️ Admin Inventario</h1>
+        <h1 id="admin-nombre-display">Admin Inventario</h1>
         <p>Piazza Pasticcio</p>
       </div>
       <button class="btn-logout" onclick="logout()">Salir</button>
@@ -148,39 +148,32 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
   </div>
 
   <div class="tabs">
-    <button class="tab active" onclick="showTab('tomas')">📋 Tomas</button>
-    <button class="tab" onclick="showTab('reporte')">📊 Resumen</button>
-    <button class="tab" onclick="showTab('plantillas')">📥 Plantillas</button>
-    <button class="tab" onclick="showTab('preparacion')">🗂️ Preparación</button>
-    <button class="tab" id="tab-btn-admins" onclick="showTab('admins')" style="display:none">👥 Admins</button>
-    <button class="tab" onclick="showTab('groq')">🤖 Asistente</button>
+    <button class="tab active" onclick="showTab('tomas')">Tomas</button>
+    <button class="tab" onclick="showTab('reporte')">Resumen</button>
+    <button class="tab" onclick="showTab('plantillas')">Plantillas</button>
+    <button class="tab" onclick="showTab('preparacion')">Preparación</button>
+    <button class="tab" id="tab-btn-admins" onclick="showTab('admins')" style="display:none">Admins</button>
+    <button class="tab" onclick="showTab('groq')">Asistente</button>
   </div>
 
   <!-- TAB: TOMAS -->
   <div id="tab-tomas" class="tab-content active">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <div style="font-weight:800;color:#1e293b">Sesiones activas</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
+      <div style="font-weight:800;color:#1e293b">Tomas de inventario · últimos 30 días</div>
       <button class="btn-notas" onclick="cargarSesionesInventario()">Actualizar</button>
     </div>
-    <div id="sesiones-container" style="margin-bottom:22px">
-      <div class="loading-state"><div class="spinner-sm"></div>Cargando sesiones...</div>
+    <!-- R9a: filtros de dos niveles — centro primero, almacén después -->
+    <div class="filtros-row" id="filtros-centro"></div>
+    <div class="filtros-row" id="filtros-almacen"></div>
+    <div id="sesiones-container">
+      <div class="loading-state"><div class="spinner-sm"></div>Cargando tomas...</div>
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
-      <div style="font-weight:800;color:#1e293b" id="titulo-tomas-sheets">Tomas enviadas a Sheets · últimos 30 días</div>
-      <button class="btn-notas" onclick="toggleHistoricasSheets()" id="btn-historicas-sheets">Ver históricos</button>
-    </div>
-    <div class="filtros-row" id="filtros-almacen">
-      <button class="filtro-chip active" data-almacen="TODOS" onclick="filtrarAlmacen('TODOS', this)">Todos</button>
-      <button class="filtro-chip" data-almacen="COCINA" onclick="filtrarAlmacen('COCINA', this)">Cocina</button>
-      <button class="filtro-chip" data-almacen="ALIMENTARI" onclick="filtrarAlmacen('ALIMENTARI', this)">Alimentari</button>
-      <button class="filtro-chip" data-almacen="SALUMERIA" onclick="filtrarAlmacen('SALUMERIA', this)">Salumeria</button>
-      <button class="filtro-chip" data-almacen="BARRA" onclick="filtrarAlmacen('BARRA', this)">Barra</button>
-      <button class="filtro-chip" data-almacen="CAVA" onclick="filtrarAlmacen('CAVA', this)">Cava</button>
-      <button class="filtro-chip" data-almacen="GENERAL" onclick="filtrarAlmacen('GENERAL', this)">General</button>
-      <button class="filtro-chip" data-almacen="UH" onclick="filtrarAlmacen('UH', this)">Universal 🍔</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:26px 0 10px;gap:8px;flex-wrap:wrap">
+      <div style="font-weight:800;color:#64748b">Histórico en Google Sheets · Piazza (legado)</div>
+      <button class="btn-notas" onclick="cargarHistoricosSheets()" id="btn-historicos-sheets">Cargar histórico</button>
     </div>
     <div id="tomas-container">
-      <div class="loading-state"><div class="spinner-sm"></div>Cargando tomas...</div>
+      <div class="empty-state" style="background:white;border-radius:10px">Las tomas recientes viven arriba. Este histórico consulta los Sheets de Piazza solo si lo pides.</div>
     </div>
   </div>
 
@@ -222,7 +215,7 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
       <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:6px">Nueva plantilla (.xlsx)</label>
       <p style="font-size:13px;color:#666;margin-bottom:12px">En Xetux: Inventarios → Gestión de inventario → Exportar. Activa <strong>Incluir presentaciones</strong>.</p>
       <div class="plt-drop" id="plt-drop" onclick="document.getElementById('plt-file').click()">
-        <div style="font-size:40px">📄</div>
+        <div style="font-size:15px;font-weight:800;color:#94a3b8;letter-spacing:2px">XLSX</div>
         <p>Arrastra el .xlsx aquí o toca para seleccionar</p>
         <input type="file" id="plt-file" accept=".xlsx,.xls" style="display:none" onchange="uploadPlantilla(this.files[0])">
       </div>
@@ -278,8 +271,8 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
         <button onclick="prepAddZone()" style="font-size:13px;padding:8px 12px;border:1px dashed #94a3b8;border-radius:8px;background:#fff;cursor:pointer;color:#475569">+ Agregar zona</button>
       </div>
       <div style="border-top:1px solid #e5e7eb;padding-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <button onclick="savePreparacion(false)" style="font-size:13px;padding:9px 14px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer;color:#374151;font-weight:600">💾 Guardar borrador</button>
-        <button onclick="savePreparacion(true)" style="font-size:13px;padding:9px 16px;border:none;border-radius:8px;background:#16a34a;color:#fff;cursor:pointer;font-weight:700">✓ Guardar y activar</button>
+        <button onclick="savePreparacion(false)" style="font-size:13px;padding:9px 14px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer;color:#374151;font-weight:600">Guardar borrador</button>
+        <button onclick="savePreparacion(true)" style="font-size:13px;padding:9px 16px;border:none;border-radius:8px;background:#16a34a;color:#fff;cursor:pointer;font-weight:700">Guardar y activar</button>
         <button id="prep-btn-desactivar" onclick="deactivatePreparacion()" style="display:none;font-size:13px;padding:9px 14px;border:1px solid #fca5a5;border-radius:8px;background:#fff;cursor:pointer;color:#dc2626;font-weight:600">Desactivar preparación</button>
         <span id="prep-msg" style="font-size:13px;color:#6b7280"></span>
       </div>
@@ -324,44 +317,6 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
         <input type="text" class="chat-input" id="chat-input" placeholder="Pregunta algo..." onkeyup="if(event.key==='Enter') enviarChat()">
         <button class="btn-send" onclick="enviarChat()">➤</button>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL NOTAS Y CORRECCIONES -->
-<div id="modal-notas" class="modal-notas-overlay">
-  <div class="modal-notas-box">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <h2 style="font-size:17px;">📝 Notas y Correcciones</h2>
-      <button onclick="cerrarModalNotas()" style="background:#e2e8f0;color:#333;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:bold;">✕</button>
-    </div>
-    <div id="notas-toma-info" style="background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px;color:#475569;line-height:1.6;"></div>
-
-    <!-- Lista de ítems de la toma -->
-    <div id="notas-items-section" style="margin-bottom:16px;">
-      <div id="notas-items-loading" style="text-align:center;color:#94a3b8;padding:16px;font-size:13px;">Cargando ítems...</div>
-      <div id="notas-items-tabla" style="display:none;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <span style="font-size:13px;font-weight:bold;">Ítems de la toma</span>
-          <input type="text" id="filtro-items" placeholder="Buscar ítem..." oninput="filtrarItems()" style="border:1px solid #ddd;border-radius:6px;padding:5px 8px;font-size:12px;width:140px;">
-        </div>
-        <div id="notas-items-lista" style="max-height:220px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;"></div>
-      </div>
-    </div>
-
-    <label style="font-size:13px;font-weight:bold;display:block;margin-bottom:6px;">Nota general de la toma</label>
-    <textarea id="nota-general" rows="3" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:10px;font-size:14px;resize:vertical;box-sizing:border-box;" placeholder="Observaciones generales sobre esta toma..."></textarea>
-
-    <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px;">
-      <span style="font-size:13px;font-weight:bold;">Correcciones por ítem</span>
-      <button onclick="agregarCorreccion()" style="background:#667eea;color:white;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:bold;">+ Agregar</button>
-    </div>
-    <div id="lista-correcciones"></div>
-
-    <div id="notas-msg" style="margin-top:10px;font-size:13px;min-height:20px;"></div>
-    <div style="display:flex;gap:8px;margin-top:16px;">
-      <button onclick="guardarNotas()" style="flex:1;background:#667eea;color:white;padding:13px;border-radius:8px;font-size:15px;font-weight:bold;">💾 Guardar y Enviar</button>
-      <button onclick="imprimirTomaActiva()" style="background:#dcfce7;color:#16a34a;padding:13px 16px;border-radius:8px;font-size:15px;font-weight:bold;border:none;cursor:pointer;">🖨️ PDF</button>
     </div>
   </div>
 </div>
@@ -411,14 +366,24 @@ const INVENTARIO_AREAS = {
   UH_BARRA:          { centro:'UH', titulo:'Barra · Universal',   scriptUrl: null, zonaNames:['Barra'] }
 };
 
-let todasLasTomas = [];
+// R9a: el centro es el primer nivel de filtrado del tab Tomas.
+// chips = [claveCanónica, etiqueta]; 'BARRA' agrupa BARRA_* (clave legacy R7).
+const CENTROS = {
+  PIAZZA: { nombre: 'Piazza Pasticcio', chips: [
+    ['COCINA','Cocina'], ['ALIMENTARI','Alimentari'], ['SALUMERIA','Salumeria'],
+    ['BARRA','Barra'], ['CAVA','Cava'], ['GENERAL','General'] ] },
+  UH: { nombre: 'Universal de Hamburguesas', chips: [
+    ['UH_COCINA','Cocina'], ['UH_BARRA','Barra'], ['UH_GENERAL','General'] ] }
+};
+function centroDe(a) { return (String(a).startsWith('UH_') || a === 'UH') ? 'UH' : 'PIAZZA'; }
+
+let tomasLegacySheets = null; // null = histórico Sheets aún no consultado (R9a: solo on-demand)
 let sesionesInventario = [];
-let filtroActual = 'TODOS';
+let filtroCentro = 'TODOS';   // R9a: primer nivel — 'TODOS' | 'PIAZZA' | 'UH'
+let filtroAlmacen = 'TODOS';  // segundo nivel — clave canónica ('BARRA' agrupa BARRA_*)
 let adminPasswordActual = '';
 let adminEsMaster = false;
 let adminAlmacenes = '*'; // '*' (maestro) o array de claves canónicas (perfil R7)
-let mostrarHistoricasSheets = false;
-const DIAS_SHEETS_RECIENTES = 30;
 const exportandoSesiones = new Set();
 let _modalSesion = null;
 let _modalTemplate = null;
@@ -470,9 +435,8 @@ async function login() {
   if (key) localStorage.setItem('groq_api_key', key);
   document.getElementById('pantalla-login').style.display = 'none';
   document.getElementById('pantalla-admin').style.display = 'block';
-  document.getElementById('admin-nombre-display').textContent = `⚙️ Admin — ${adminActual}`;
+  document.getElementById('admin-nombre-display').textContent = `Admin — ${adminActual}`;
   cargarSesionesInventario();
-  cargarTodasLasTomas();
 }
 
 function logout() {
@@ -488,15 +452,8 @@ function logout() {
 // quien de verdad rechaza la acción; esto solo evita botones muertos)
 function aplicarPermisosUI() {
   document.getElementById('tab-btn-admins').style.display = adminEsMaster ? '' : 'none';
-  document.querySelectorAll('#filtros-almacen .filtro-chip').forEach(chip => {
-    const a = chip.dataset.almacen;
-    chip.style.display = (a === 'TODOS' || almacenPermitidoUI(a)) ? '' : 'none';
-  });
-  if (filtroActual !== 'TODOS' && !almacenPermitidoUI(filtroActual)) {
-    filtroActual = 'TODOS';
-    document.querySelectorAll('#filtros-almacen .filtro-chip').forEach(c =>
-      c.classList.toggle('active', c.dataset.almacen === 'TODOS'));
-  }
+  if (filtroAlmacen !== 'TODOS' && !almacenPermitidoUI(filtroAlmacen)) filtroAlmacen = 'TODOS';
+  renderFiltros();
   for (const selId of ['plt-almacen', 'prep-almacen']) {
     const sel = document.getElementById(selId);
     if (!sel) continue;
@@ -519,64 +476,96 @@ function showTab(tab) {
   if (tab === 'admins') cargarAdmins();
 }
 
-// ── CARGAR TOMAS ──────────────────────────────────────────
-async function cargarTodasLasTomas() {
-  const container = document.getElementById('tomas-container');
-  container.innerHTML = '<div class="loading-state"><div class="spinner-sm"></div>Cargando tomas de todos los almacenes...</div>';
-  
-  todasLasTomas = [];
-  const promesas = Object.entries(ALMACENES)
-    .filter(([nombre]) => almacenPermitidoUI(nombre)) // R7: no cargar almacenes ajenos
-    .map(([nombre, url]) =>
-    fetch(url + '?action=listar')
-      .then(r => r.json())
-      .then(data => {
-        if (data.ok && data.tomas) {
-          data.tomas.forEach(t => { t.almacen_nombre = nombre; t.script_url = url; });
-          todasLasTomas.push(...data.tomas);
-        }
-      })
-      .catch(() => {}) // si falla uno, continúa con los demás
-  );
-  
-  await Promise.all(promesas);
-  todasLasTomas.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-  renderTomas();
+// ── FILTROS CENTRO → ALMACÉN (R9a) ────────────────────────
+function renderFiltros() {
+  const rowC = document.getElementById('filtros-centro');
+  const rowA = document.getElementById('filtros-almacen');
+  if (!rowC || !rowA) return;
+  const centrosVisibles = Object.keys(CENTROS).filter(c =>
+    adminEsMaster || adminAlmacenes === '*' ||
+    (Array.isArray(adminAlmacenes) && adminAlmacenes.some(a => centroDe(a) === c)));
+  if (filtroCentro !== 'TODOS' && !centrosVisibles.includes(filtroCentro)) {
+    filtroCentro = 'TODOS'; filtroAlmacen = 'TODOS';
+  }
+  const chipC = (val, label) =>
+    `<button class="filtro-chip ${filtroCentro === val ? 'active' : ''}" onclick="filtrarCentro('${val}')">${label}</button>`;
+  // Un solo centro visible: no hay nada que elegir, ocultar el nivel
+  rowC.style.display = centrosVisibles.length > 1 ? '' : 'none';
+  rowC.innerHTML = chipC('TODOS', 'Todos') + centrosVisibles.map(c => chipC(c, CENTROS[c].nombre)).join('');
+  const centroChips = filtroCentro === 'TODOS'
+    ? (centrosVisibles.length === 1 ? CENTROS[centrosVisibles[0]].chips : null)
+    : CENTROS[filtroCentro].chips;
+  if (!centroChips) { rowA.style.display = 'none'; rowA.innerHTML = ''; return; }
+  const chips = centroChips.filter(([val]) => almacenPermitidoUI(val));
+  const chipA = (val, label) =>
+    `<button class="filtro-chip ${filtroAlmacen === val ? 'active' : ''}" onclick="filtrarAlmacen('${val}')">${label}</button>`;
+  rowA.style.display = '';
+  rowA.innerHTML = chipA('TODOS', 'Todos') + chips.map(([v, l]) => chipA(v, l)).join('');
 }
 
-function filtrarAlmacen(almacen, btn) {
-  filtroActual = almacen;
-  document.querySelectorAll('.filtro-chip').forEach(c => c.classList.remove('active'));
-  btn.classList.add('active');
-  renderSesionesInventario();
-  renderTomas();
+function filtrarCentro(c) {
+  filtroCentro = c; filtroAlmacen = 'TODOS';
+  renderFiltros(); renderSesionesInventario(); renderHistoricosSheets();
+}
+
+function filtrarAlmacen(a) {
+  filtroAlmacen = a;
+  renderFiltros(); renderSesionesInventario(); renderHistoricosSheets();
 }
 
 function filtroIncluyeAlmacen(almacen) {
-  if (filtroActual === 'TODOS') return true;
-  if (filtroActual === 'BARRA') return String(almacen).startsWith('BARRA');
-  if (filtroActual === 'UH')    return String(almacen).startsWith('UH'); // R8: centro completo
-  return almacen === filtroActual;
+  if (filtroCentro !== 'TODOS' && centroDe(almacen) !== filtroCentro) return false;
+  if (filtroAlmacen === 'TODOS') return true;
+  if (filtroAlmacen === 'BARRA') return String(almacen).startsWith('BARRA');
+  return almacen === filtroAlmacen;
 }
 
-function tomaSheetsReciente(toma) {
-  if (mostrarHistoricasSheets) return true;
-  const fecha = String(toma.fecha || '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return false;
-  const ts = new Date(fecha + 'T00:00:00').getTime();
-  if (!Number.isFinite(ts)) return false;
-  return ts >= Date.now() - DIAS_SHEETS_RECIENTES * 24 * 60 * 60 * 1000;
+// ── HISTÓRICO SHEETS (legado, solo lectura, on-demand) ────
+// R9a: las tomas viven en D1; los Sheets de Piazza quedan como archivo. Esta
+// consulta solo corre si el admin la pide — el tab funciona sin Apps Scripts.
+async function cargarHistoricosSheets() {
+  const container = document.getElementById('tomas-container');
+  const btn = document.getElementById('btn-historicos-sheets');
+  btn.disabled = true;
+  container.innerHTML = '<div class="loading-state"><div class="spinner-sm"></div>Consultando Sheets de Piazza...</div>';
+  tomasLegacySheets = [];
+  await Promise.all(Object.entries(ALMACENES)
+    .filter(([nombre]) => almacenPermitidoUI(nombre)) // R7
+    .map(([nombre, url]) =>
+      fetch(url + '?action=listar')
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok && data.tomas) {
+            data.tomas.forEach(t => { t.almacen_nombre = nombre; });
+            tomasLegacySheets.push(...data.tomas);
+          }
+        })
+        .catch(() => {}))); // si falla uno, continúa con los demás
+  tomasLegacySheets.sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
+  btn.disabled = false;
+  btn.textContent = 'Recargar histórico';
+  renderHistoricosSheets();
 }
 
-function toggleHistoricasSheets() {
-  mostrarHistoricasSheets = !mostrarHistoricasSheets;
-  document.getElementById('titulo-tomas-sheets').textContent = mostrarHistoricasSheets
-    ? 'Tomas enviadas a Sheets · históricos'
-    : `Tomas enviadas a Sheets · últimos ${DIAS_SHEETS_RECIENTES} días`;
-  document.getElementById('btn-historicas-sheets').textContent = mostrarHistoricasSheets
-    ? `Ver últimos ${DIAS_SHEETS_RECIENTES} días`
-    : 'Ver históricos';
-  renderTomas();
+function renderHistoricosSheets() {
+  if (tomasLegacySheets === null) return; // aún no consultado
+  const container = document.getElementById('tomas-container');
+  const tomas = tomasLegacySheets
+    .filter(t => almacenPermitidoUI(t.almacen_nombre))
+    .filter(t => filtroIncluyeAlmacen(t.almacen_nombre));
+  if (!tomas.length) {
+    container.innerHTML = '<div class="empty-state">Sin tomas en los Sheets consultados</div>';
+    return;
+  }
+  container.innerHTML = tomas.slice(0, 100).map(t => `
+    <div class="toma-card" style="border-left-color:#94a3b8">
+      <div class="toma-header">
+        <div class="toma-operario">${esc(t.operario || 'Sin nombre')}</div>
+        <div class="toma-almacen">${esc(t.almacen_nombre)}</div>
+      </div>
+      <div class="toma-meta">${esc(t.area || '—')} · ${esc(t.fecha)} · ${t.items} ítems · solo lectura (Sheets)</div>
+    </div>`).join('')
+    + (tomas.length > 100 ? `<div style="font-size:12px;color:#64748b;margin-top:6px">Mostrando 100 de ${tomas.length}.</div>` : '');
 }
 
 async function cargarSesionesInventario() {
@@ -601,7 +590,7 @@ function renderSesionesInventario() {
     .filter(s => almacenPermitidoUI(s.almacen)) // R7
     .filter(s => filtroIncluyeAlmacen(s.almacen));
   if (!sesiones.length) {
-    el.innerHTML = '<div class="empty-state" style="background:white;border-radius:10px">Sin sesiones activas recientes</div>';
+    el.innerHTML = '<div class="empty-state" style="background:white;border-radius:10px">Sin tomas en los últimos 30 días</div>';
     return;
   }
   el.innerHTML = sesiones.map(s => {
@@ -612,18 +601,23 @@ function renderSesionesInventario() {
     const updated = s.updatedAt ? new Date(s.updatedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short' }) : '—';
     const exportTxt = s.exportedAt ? ` · Exportada por ${esc(s.exportedBy || '—')}` : '';
     const corrTxt = s.correcciones ? ` · ${s.correcciones} corrección${s.correcciones!==1?'es':''}` : '';
+    const manTxt = s.manuales ? ` · ${s.manuales} no catalogado${s.manuales!==1?'s':''}` : '';
+    const comTxt = s.comentarios ? ` · ${s.comentarios} comentario${s.comentarios!==1?'s':''}` : '';
+    // R5.1: nombres reales de quienes capturaron; el operario inicial es el fallback
+    const quienes = (s.operarios && s.operarios.length) ? s.operarios.join(' · ') : (s.operario || '—');
     return `<div class="toma-card" style="border-left-color:${s.exportedAt ? '#16a34a' : '#f59e0b'}">
       <div class="toma-header">
         <div class="toma-operario">${esc(cfg.titulo)} ${exp}</div>
         <div class="toma-almacen">${esc(s.almacen)}</div>
       </div>
       <div class="toma-meta">
-        Fecha ${esc(s.fecha)} · ${s.articulosContados || s.countedItems || 0} artículos · ${s.zonasCompletadas || 0} zonas listas${corrTxt} · Actualizada ${updated}${exportTxt}
+        Fecha ${esc(s.fecha)} · ${s.articulosContados || s.countedItems || 0} artículos · ${s.zonasCompletadas || 0} zonas listas${manTxt}${comTxt}${corrTxt} · Actualizada ${updated}${exportTxt}
       </div>
       <div class="toma-footer" style="flex-wrap:wrap;gap:6px;">
-        <div class="toma-items">Operario inicial: ${esc(s.operario || '—')}</div>
+        <div class="toma-items">Capturaron: ${esc(quienes)}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button class="btn-notas" onclick="verDetalleSesion('${esc(s.almacen)}','${esc(s.fecha)}')">Explorar</button>
+          <button class="btn-notas" onclick="imprimirSesion('${esc(s.almacen)}','${esc(s.fecha)}')">PDF</button>
           <button class="btn-pdf-card" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',false)">Generar XLSX y enviar</button>
           ${s.exportedAt ? `<button class="btn-notas" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',true)">Re-exportar</button>` : ''}
           <button class="btn-borrar" onclick="borrarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}')">Borrar sesión</button>
@@ -745,9 +739,9 @@ async function verDetalleSesion(almacen, fecha) {
         <td class="mrow-uni">${esc(m.uni || m.unidad || '')}</td>
         <td style="white-space:nowrap">
           <button onclick="editarManual('${esc(almacen)}','${esc(fecha)}',${JSON.stringify(m).replace(/"/g,'&quot;')})"
-            style="background:#dbeafe;color:#1d4ed8;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:bold;margin-right:4px">✏</button>
+            style="background:#dbeafe;color:#1d4ed8;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:bold;margin-right:4px">Editar</button>
           <button onclick="borrarManual('${esc(almacen)}','${esc(fecha)}','${id}')"
-            style="background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:bold">🗑</button>
+            style="background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:bold">Borrar</button>
         </td>
       </tr>`;
     }).join('');
@@ -909,7 +903,7 @@ function actualizarNombreArticulo() {
   if (!raw) { el.textContent = '—'; return; }
   const T = _modalTemplate || {};
   const item = resolveTemplateArticle(raw, T);
-  el.textContent = item ? `${item.nombre || item.codigo} (${item.codigo})` : '⚠ Código/nombre no en plantilla';
+  el.textContent = item ? `${item.nombre || item.codigo} (${item.codigo})` : 'Código/nombre no en plantilla';
   el.style.color  = item ? '#374151' : '#dc2626';
 }
 
@@ -938,13 +932,13 @@ async function agregarArticuloCorrecion(almacen, fecha) {
     });
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || 'Error al guardar');
-    msg.innerHTML = `<span style="color:#16a34a">✅ ${cod} agregado con cantidad ${qty}.</span>`;
+    msg.innerHTML = `<span style="color:#16a34a">${cod} agregado con cantidad ${qty}.</span>`;
     codEl.value = '';
     qtyEl.value = '';
     document.getElementById('add-nombre-display').textContent = '—';
     await cargarSesionesInventario();
   } catch(e) {
-    msg.innerHTML = `<span style="color:#dc2626">❌ ${esc(e.message)}</span>`;
+    msg.innerHTML = `<span style="color:#dc2626">Error: ${esc(e.message)}</span>`;
   }
 }
 
@@ -1015,10 +1009,10 @@ async function guardarCorrecciones(almacen, fecha) {
     });
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || 'Error al guardar');
-    msg.innerHTML = `<span style="color:#16a34a">✅ ${Object.keys(corrections).length} corrección${Object.keys(corrections).length!==1?'es':''} guardada${Object.keys(corrections).length!==1?'s':''}.</span>`;
+    msg.innerHTML = `<span style="color:#16a34a">${Object.keys(corrections).length} corrección${Object.keys(corrections).length!==1?'es':''} guardada${Object.keys(corrections).length!==1?'s':''}.</span>`;
     await cargarSesionesInventario();
   } catch(e) {
-    msg.innerHTML = `<span style="color:#dc2626">❌ ${esc(e.message)}</span>`;
+    msg.innerHTML = `<span style="color:#dc2626">Error: ${esc(e.message)}</span>`;
   } finally {
     btn.disabled = false;
     btn.textContent = 'Guardar correcciones';
@@ -1258,7 +1252,6 @@ async function exportarSesionInventario(almacen, fecha, force) {
 
     await marcarExportacion(almacen, fecha, force);
     await cargarSesionesInventario();
-    await cargarTodasLasTomas();
   } catch(e) {
     alert('Error al exportar: ' + e.message);
   } finally {
@@ -1266,276 +1259,78 @@ async function exportarSesionInventario(almacen, fecha, force) {
   }
 }
 
-function detectarDuplicados(tomas) {
-  // Marca como duplicado si hay otra toma del mismo operario+area+almacen+fecha en un rango de 60 min
-  const duplicados = new Set();
-  for (let i = 0; i < tomas.length; i++) {
-    for (let j = i + 1; j < tomas.length; j++) {
-      const a = tomas[i], b = tomas[j];
-      if (a.operario === b.operario && a.area === b.area && a.almacen_nombre === b.almacen_nombre && a.fecha === b.fecha) {
-        const diffMin = Math.abs(new Date(a.timestamp) - new Date(b.timestamp)) / 60000;
-        if (diffMin <= 60) {
-          duplicados.add(a.timestamp);
-          duplicados.add(b.timestamp);
-        }
-      }
-    }
-  }
-  return duplicados;
-}
-
-function renderTomas() {
-  const container = document.getElementById('tomas-container');
-  const tomas = todasLasTomas
-    .filter(t => almacenPermitidoUI(t.almacen_nombre)) // R7
-    .filter(t => filtroIncluyeAlmacen(t.almacen_nombre))
-    .filter(tomaSheetsReciente);
-
-  if (tomas.length === 0) {
-    container.innerHTML = mostrarHistoricasSheets
-      ? '<div class="empty-state">Sin tomas registradas</div>'
-      : '<div class="empty-state">Sin tomas recientes. Usa "Ver históricos" para buscar tomas antiguas.</div>';
-    return;
-  }
-
-  const duplicados = detectarDuplicados(tomas);
-
-  container.innerHTML = tomas.map(t => {
-    const esDuplicado = duplicados.has(t.timestamp);
-    return `
-    <div class="toma-card" id="toma-${t.timestamp.replace(/[:.]/g,'-')}" style="border-left-color:${esDuplicado ? '#f59e0b' : '#667eea'}">
-      <div class="toma-header">
-        <div class="toma-operario">${t.operario || 'Sin nombre'}${esDuplicado ? ' <span style="background:#fef3c7;color:#92400e;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">⚠️ Posible duplicado</span>' : ''}</div>
-        <div class="toma-almacen">${t.almacen_nombre}</div>
-      </div>
-      <div class="toma-meta">📍 ${t.area || '—'} &nbsp;·&nbsp; 📅 ${t.fecha} &nbsp;·&nbsp; 🕐 ${new Date(t.timestamp).toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'})}</div>
-      <div class="toma-footer" style="flex-wrap:wrap;gap:6px;">
-        <div class="toma-items">📦 ${t.items} ítems</div>
-        <div style="display:flex;gap:6px;">
-          <button class="btn-notas" onclick="abrirModalNotasByTs('${t.timestamp}')">📝 Notas</button>
-          <button class="btn-pdf-card" onclick="imprimirTomaByTs('${t.timestamp}')">📄 PDF</button>
-          <button class="btn-borrar" onclick="borrarToma('${t.timestamp}','${t.area}','${t.fecha}','${t.almacen_nombre}','${t.script_url}')">Borrar Sheets</button>
-        </div>
-      </div>
-    </div>
-  `}).join('');
-}
-
-async function borrarToma(timestamp, area, fecha, almacen, scriptUrl) {
-  if (!confirm(`Borrar de Google Sheets la toma de ${area} (${almacen})?\n\nEsto elimina el renglón maestro y la hoja detalle en el Apps Script. No borra la sesión activa del Worker.`)) return;
-  
-  const id = timestamp.replace(/[:.]/g,'-');
-  const card = document.getElementById('toma-' + id);
-  if (card) card.style.opacity = '0.5';
-
-  try {
-    const url = `${scriptUrl}?action=borrar&timestamp=${encodeURIComponent(timestamp)}&area=${encodeURIComponent(area)}&fecha=${encodeURIComponent(fecha)}`;
-    await fetch(url, { mode:'no-cors', cache:'no-store' });
-    await new Promise(resolve => setTimeout(resolve, 1200));
-    await cargarTodasLasTomas();
-  } catch(e) {
-    if (card) card.style.opacity = '1';
-    alert('No se pudo enviar el borrado a Apps Script. Intenta de nuevo.');
-  }
-}
-
-// ── REPORTE ───────────────────────────────────────────────
+// ── REPORTE (R9a: desde sesiones D1) ──────────────────────
 function generarReporte() {
-  const operarios = new Set(todasLasTomas.map(t => t.operario)).size;
-  const totalItems = todasLasTomas.reduce((s, t) => s + (t.items || 0), 0);
-  const manuales = todasLasTomas.filter(t => t.tiene_manuales).length;
+  const ses = sesionesInventario.filter(s => almacenPermitidoUI(s.almacen));
+  const operarios = new Set();
+  ses.forEach(s => {
+    (s.operarios || []).forEach(o => operarios.add(o));
+    if (s.operario) operarios.add(s.operario);
+  });
 
-  document.getElementById('stat-total').textContent = todasLasTomas.length;
-  document.getElementById('stat-operarios').textContent = operarios;
-  document.getElementById('stat-items').textContent = totalItems;
-  document.getElementById('stat-manuales').textContent = manuales;
+  document.getElementById('stat-total').textContent = ses.length;
+  document.getElementById('stat-operarios').textContent = operarios.size;
+  document.getElementById('stat-items').textContent = ses.reduce((n, s) => n + (s.articulosContados || 0), 0);
+  document.getElementById('stat-manuales').textContent = ses.reduce((n, s) => n + (s.manuales || 0), 0);
 
-  // Por almacén
   const porAlmacen = {};
-  todasLasTomas.forEach(t => {
-    if (!porAlmacen[t.almacen_nombre]) porAlmacen[t.almacen_nombre] = { tomas: 0, items: 0 };
-    porAlmacen[t.almacen_nombre].tomas++;
-    porAlmacen[t.almacen_nombre].items += (t.items || 0);
+  ses.forEach(s => {
+    if (!porAlmacen[s.almacen]) porAlmacen[s.almacen] = { tomas: 0, items: 0 };
+    porAlmacen[s.almacen].tomas++;
+    porAlmacen[s.almacen].items += (s.articulosContados || 0);
   });
 
   document.getElementById('reporte-detalle').innerHTML = Object.entries(porAlmacen).map(([alm, d]) => `
     <div class="toma-card" style="border-left-color:#22c55e">
-      <div class="toma-operario">${alm}</div>
+      <div class="toma-operario">${esc((INVENTARIO_AREAS[alm] || {}).titulo || alm)}</div>
       <div class="toma-meta" style="margin-top:8px">
-        📋 ${d.tomas} tomas &nbsp;·&nbsp; 📦 ${d.items} ítems capturados
+        ${d.tomas} toma${d.tomas!==1?'s':''} · ${d.items} artículos capturados
       </div>
     </div>
   `).join('') || '<div class="empty-state">Sin datos</div>';
 }
 
-// ── NOTAS Y CORRECCIONES ──────────────────────────────────
-let tomaActiva = null;
-let correcciones = [];
-
-let itemsToma = []; // ítems cargados de la toma activa
-
-function abrirModalNotasByTs(ts) {
-  const toma = todasLasTomas.find(t => t.timestamp === ts);
-  if (!toma) return;
-  tomaActiva = toma;
-  correcciones = [];
-  itemsToma = [];
-  document.getElementById('nota-general').value = '';
-  document.getElementById('lista-correcciones').innerHTML = '';
-  document.getElementById('notas-msg').innerHTML = '';
-  document.getElementById('filtro-items').value = '';
-  document.getElementById('notas-toma-info').innerHTML =
-    `<strong>${toma.operario || 'Sin nombre'}</strong> · ${toma.almacen_nombre} · ${toma.area || '—'}<br>
-     📅 ${toma.fecha} · 📦 ${toma.items} ítems`;
-  document.getElementById('notas-items-loading').style.display = 'block';
-  document.getElementById('notas-items-tabla').style.display = 'none';
-  document.getElementById('modal-notas').style.display = 'block';
-  cargarItemsToma(toma);
-}
-
-function cargarItemsToma(toma) {
-  fetch(`${toma.script_url}?action=detalle&timestamp=${encodeURIComponent(toma.timestamp)}`)
-    .then(r => r.json())
-    .then(data => {
-      document.getElementById('notas-items-loading').style.display = 'none';
-      document.getElementById('notas-items-tabla').style.display = 'block';
-      if (data.ok && data.items) {
-        itemsToma = data.items;
-        renderItemsToma(itemsToma);
-      } else {
-        document.getElementById('notas-items-lista').innerHTML =
-          '<div style="padding:12px;color:#dc2626;font-size:13px;">Error al cargar ítems.</div>';
-      }
-    })
-    .catch(() => {
-      document.getElementById('notas-items-loading').textContent = 'No se pudo cargar la lista de ítems.';
-    });
-}
-
-function renderItemsToma(items) {
-  const lista = document.getElementById('notas-items-lista');
-  if (!items.length) {
-    lista.innerHTML = '<div style="padding:12px;color:#94a3b8;font-size:13px;">Sin ítems.</div>';
-    return;
-  }
-  lista.innerHTML = items.map((it, i) => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid #f1f5f9;background:${i%2?'#f8fafc':'#fff'};">
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:12px;font-weight:bold;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${it.nombre}</div>
-        <div style="font-size:11px;color:#64748b;">${it.codigo} · ${it.unidad} · <strong>${it.cantidad}</strong></div>
-      </div>
-      <button onclick="preCorreccionItem(${i})" style="margin-left:8px;background:#dbeafe;color:#1d4ed8;border:none;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer;flex-shrink:0;">+ Corregir</button>
-    </div>
-  `).join('');
-}
-
-function filtrarItems() {
-  const q = document.getElementById('filtro-items').value.toLowerCase();
-  const filtrados = itemsToma.filter(it =>
-    it.nombre.toLowerCase().includes(q) || it.codigo.toLowerCase().includes(q)
-  );
-  renderItemsToma(filtrados);
-}
-
-function preCorreccionItem(idx) {
-  // Buscar en itemsToma original (no filtrado)
-  const filtroVal = document.getElementById('filtro-items').value.toLowerCase();
-  const filtrados = itemsToma.filter(it =>
-    it.nombre.toLowerCase().includes(filtroVal) || it.codigo.toLowerCase().includes(filtroVal)
-  );
-  const it = filtrados[idx];
-  if (!it) return;
-  correcciones.push({
-    codigo: it.codigo,
-    nombre: it.nombre,
-    cantOriginal: String(it.cantidad),
-    cantCorregida: '',
-    nota: ''
-  });
-  renderCorrecciones();
-  // Scroll al bloque de correcciones
-  document.getElementById('lista-correcciones').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-function cerrarModalNotas() {
-  document.getElementById('modal-notas').style.display = 'none';
-  tomaActiva = null;
-}
-
-function agregarCorreccion() {
-  correcciones.push({ codigo:'', nombre:'', cantOriginal:'', cantCorregida:'', nota:'' });
-  renderCorrecciones();
-}
-
-function eliminarCorreccion(i) {
-  correcciones.splice(i, 1);
-  renderCorrecciones();
-}
-
-function renderCorrecciones() {
-  document.getElementById('lista-correcciones').innerHTML = correcciones.map((c, i) => `
-    <div class="corr-block">
-      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-        <span style="font-size:12px;font-weight:bold;color:#64748b;">Corrección ${i+1}</span>
-        <button onclick="eliminarCorreccion(${i})" style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:4px;font-size:12px;border:none;cursor:pointer;">✕</button>
-      </div>
-      <input class="corr-input" type="text" placeholder="Código ítem (ej: MP0015)" value="${c.codigo}" oninput="correcciones[${i}].codigo=this.value">
-      <input class="corr-input" type="text" placeholder="Nombre del ítem" value="${c.nombre}" oninput="correcciones[${i}].nombre=this.value">
-      <div style="display:flex;gap:6px;margin-bottom:6px;">
-        <input style="flex:1;border:1px solid #ddd;border-radius:6px;padding:7px;font-size:13px;" type="number" placeholder="Cant. original" value="${c.cantOriginal}" oninput="correcciones[${i}].cantOriginal=this.value">
-        <input style="flex:1;border:1px solid #ddd;border-radius:6px;padding:7px;font-size:13px;" type="number" placeholder="Cant. corregida" value="${c.cantCorregida}" oninput="correcciones[${i}].cantCorregida=this.value">
-      </div>
-      <textarea class="corr-input" rows="2" placeholder="Nota / motivo" oninput="correcciones[${i}].nota=this.value" style="resize:vertical;">${c.nota}</textarea>
-    </div>
-  `).join('');
-}
-
-async function guardarNotas() {
-  if (!tomaActiva) return;
-  const msg = document.getElementById('notas-msg');
-  msg.innerHTML = '<span style="color:#64748b">Enviando...</span>';
-  const payload = {
-    action: 'guardarNotas',
-    admin: adminActual,
-    fechaNota: new Date().toISOString(),
-    toma: {
-      timestamp: tomaActiva.timestamp,
-      operario: tomaActiva.operario,
-      area: tomaActiva.area,
-      fecha: tomaActiva.fecha,
-      almacen: tomaActiva.almacen_nombre
-    },
-    notaGeneral: document.getElementById('nota-general').value.trim(),
-    correcciones: correcciones
-  };
-  try {
-    await fetch(tomaActiva.script_url, {
-      method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(payload)
-    });
-    msg.innerHTML = '<span style="color:#16a34a">✓ Enviado al servidor correctamente.</span>';
-  } catch(e) {
-    msg.innerHTML = '<span style="color:#dc2626">Error de red al enviar.</span>';
-  }
-}
-
 // ── PDF ────────────────────────────────────────────────────
-function imprimirTomaByTs(ts) {
-  const toma = todasLasTomas.find(t => t.timestamp === ts);
-  if (!toma) return;
-  // Sin ítems cargados aún — cargar primero, luego generar PDF
-  document.getElementById('notas-items-loading').style.display = 'block';
-  document.getElementById('notas-items-tabla').style.display = 'none';
-  fetch(`${toma.script_url}?action=detalle&timestamp=${encodeURIComponent(toma.timestamp)}`)
-    .then(r => r.json())
-    .then(data => generarPDFAdmin(toma, data.items || [], [], ''))
-    .catch(() => generarPDFAdmin(toma, [], [], ''));
-}
-
-function imprimirTomaActiva() {
-  if (!tomaActiva) return;
-  generarPDFAdmin(tomaActiva, itemsToma, correcciones, document.getElementById('nota-general').value.trim());
+// R9a: el PDF se reconstruye desde la sesión D1 — totales con
+// calcularTotalesSesion (js/sesion-merge.js, mismo módulo que el Worker).
+async function imprimirSesion(almacen, fecha) {
+  try {
+    const [sr, tr] = await Promise.all([
+      fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(fecha)),
+      fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen))
+    ]);
+    const S = await sr.json();
+    const T = await tr.json();
+    if (!S.ok || !S.found) throw new Error('Sesión no encontrada');
+    const template = T.ok && T.found ? T : {};
+    const totales = calcularTotalesSesion(S, template);
+    const rawLookup = template.raw ? itemsFromRaw(template.raw, template) : {};
+    const items = Object.entries(totales)
+      .map(([cod, qty]) => ({
+        codigo: cod,
+        nombre: rawLookup[cod]?.nombre || cod,
+        unidad: rawLookup[cod]?.unidad || template.unitMap?.[cod] || '',
+        cantidad: parseFloat(Number(qty).toFixed(4))
+      }))
+      .sort((a, b) => String(a.nombre).localeCompare(String(b.nombre)));
+    for (const m of (S.manuales || []).filter(m => m.type !== 'comment')) {
+      items.push({ codigo: 'MANUAL', nombre: m.nombre || '—', unidad: m.uni || m.unidad || '', cantidad: m.cantidad ?? '—' });
+    }
+    // Correcciones admin → columna "Corregido"; comentarios de supervisor → nota general
+    const corrs = Object.entries(S.correctionsByZone?.['_admin'] || {})
+      .map(([cod, c]) => ({ codigo: cod, cantCorregida: c?.qty, nota: c?.nota || 'Corrección admin' }));
+    const notaGeneral = (S.manuales || []).filter(m => m.type === 'comment')
+      .map(c => `${c.cod || c.nombre || ''}: ${c.texto || ''}`.replace(/^: /, '')).join(' · ');
+    const ops = [...new Set(Object.values(S.operariosByDevice || {}).map(o => o?.operario).filter(Boolean))];
+    generarPDFAdmin({
+      almacen_nombre: almacen,
+      area: (INVENTARIO_AREAS[almacen] || {}).titulo || almacen,
+      fecha,
+      operario: (ops.length ? ops : [S.operario]).filter(Boolean).join(', ')
+    }, items, corrs, notaGeneral);
+  } catch (e) {
+    alert('No se pudo generar el PDF: ' + e.message);
+  }
 }
 
 function generarPDFAdmin(toma, items, corrs, notaGeneral) {
@@ -1589,7 +1384,7 @@ function generarPDFAdmin(toma, items, corrs, notaGeneral) {
   </style></head><body>
   <div id="cargando">Generando PDF...</div>
   <div id="contenido" style="display:none;">
-    <h1>Piazza Pasticcio — Toma de Inventario</h1>
+    <h1>${CENTROS[centroDe(toma.almacen_nombre)].nombre} — Toma de Inventario</h1>
     <div class="meta">
       <strong>Almacén:</strong> ${toma.almacen_nombre} &nbsp;|&nbsp;
       <strong>Área:</strong> ${toma.area||'—'} &nbsp;|&nbsp;
@@ -1630,11 +1425,11 @@ function generarPDFAdmin(toma, items, corrs, notaGeneral) {
 
 // ── GROQ CHAT ─────────────────────────────────────────────
 function buildContexto() {
-  const resumen = todasLasTomas.slice(0, 20).map(t =>
-    `- ${t.operario} | ${t.almacen_nombre} | Área: ${t.area} | Fecha: ${t.fecha} | ${t.items} ítems`
+  const resumen = sesionesInventario.slice(0, 20).map(s =>
+    `- ${(s.operarios || []).join('/') || s.operario || '—'} | ${s.almacen} | Fecha: ${s.fecha} | ${s.articulosContados || 0} artículos | ${s.exportedAt ? 'exportada' : 'pendiente'}`
   ).join('\n');
-  return `Eres un asistente de operaciones para Piazza Pasticcio, un restaurante italiano en CDMX. 
-Tienes acceso al resumen de las últimas tomas de inventario:
+  return `Eres un asistente de operaciones para los centros Piazza Pasticcio y Universal de Hamburguesas (CDMX).
+Tienes acceso al resumen de las últimas tomas de inventario (últimos 30 días):
 ${resumen}
 Responde en español, de forma concisa y práctica.`;
 }
@@ -1708,14 +1503,14 @@ async function loadPlantillaStatus() {
       const count = Object.keys(d.rowMap || {}).length;
       const pres  = Object.keys(d.presMap || {}).length;
       statusEl.innerHTML = `<div class="plt-status-card">
-        <div style="font-weight:700;color:#16a34a;margin-bottom:6px">✅ Plantilla configurada</div>
+        <div style="font-weight:700;color:#16a34a;margin-bottom:6px">Plantilla configurada</div>
         <div style="font-size:13px;color:#555"><strong>${count}</strong> artículos · <strong>${pres}</strong> con presentaciones</div>
         <div style="font-size:12px;color:#94a3b8;margin-top:4px">Actualizada: ${date}</div>
         <div style="font-size:11px;color:#cbd5e1;margin-top:2px">Hash: ${d.templateHash || '—'}</div>
       </div>`;
     } else {
       statusEl.innerHTML = `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px;color:#92400e;font-size:13px;margin-bottom:14px">
-        ⚠️ No hay plantilla configurada para <strong>${almacen}</strong>.
+        No hay plantilla configurada para <strong>${almacen}</strong>.
       </div>`;
     }
     uploadEl.style.display = 'block';
@@ -1763,7 +1558,7 @@ function renderRevisionPresentaciones(d) {
   }
 
   let html = `<details style="border:1px solid #fcd34d;border-radius:10px;background:#fffbeb">
-    <summary style="padding:10px 12px;cursor:pointer;font-size:13px;font-weight:700;color:#92400e">⚠️ Revisión de presentaciones: ${total} hallazgo${total !== 1 ? 's' : ''} — requieren decisión humana, nada se corrige solo</summary>
+    <summary style="padding:10px 12px;cursor:pointer;font-size:13px;font-weight:700;color:#92400e">Revisión de presentaciones: ${total} hallazgo${total !== 1 ? 's' : ''} — requieren decisión humana, nada se corrige solo</summary>
     <div style="padding:4px 12px 12px">`;
   for (const [motivo, lista] of Object.entries(grupos)) {
     const m = MOTIVOS_R6[motivo] || { titulo: motivo, accion: '', color: '#6b7280' };
@@ -1868,7 +1663,7 @@ async function uploadPlantilla(file) {
       loadPlantillaStatus();
     } else {
       msg.style.color = '#dc2626';
-      msg.textContent = '⚠️ Error: ' + (d.error || 'desconocido');
+      msg.textContent = 'Error: ' + (d.error || 'desconocido');
     }
   } catch(e) {
     msg.style.color = '#dc2626';
@@ -1902,7 +1697,7 @@ async function loadPreparacion() {
     const dp = await rp.json();
     if (!dp.ok || !dp.found) {
       statusEl.innerHTML = `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px;color:#92400e;font-size:13px">
-        ⚠️ No hay plantilla configurada para <strong>${esc(almacen)}</strong>. Sube la plantilla primero (tab Plantillas).</div>`;
+        No hay plantilla configurada para <strong>${esc(almacen)}</strong>. Sube la plantilla primero (tab Plantillas).</div>`;
       return;
     }
     _prepT = dp;
@@ -1947,10 +1742,10 @@ function renderPreparacion() {
   }
 
   const hashWarn = _prep.templateHash && _prepT.templateHash && _prep.templateHash !== _prepT.templateHash
-    ? `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px;color:#92400e;font-size:12px;margin-top:8px">⚠️ La plantilla cambió desde que se guardó esta preparación. Los artículos que ya no existen aparecen marcados en rojo; al guardar se conservan (decide tú si quitarlos).</div>`
+    ? `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px;color:#92400e;font-size:12px;margin-top:8px">La plantilla cambió desde que se guardó esta preparación. Los artículos que ya no existen aparecen marcados en rojo; al guardar se conservan (decide tú si quitarlos).</div>`
     : '';
   statusEl.innerHTML = `<div style="background:${_prep.active?'#f0fdf4':'#f8fafc'};border:1px solid ${_prep.active?'#86efac':'#e2e8f0'};border-radius:8px;padding:12px;font-size:13px;color:#334155;margin-bottom:12px">
-    ${_prep.active ? '🟢 <strong>Preparación ACTIVA</strong> — las tomas nuevas de este almacén usan estas zonas.' : '📝 <strong>Borrador</strong> — guardada pero no activa; la app sigue con el comportamiento actual.'}
+    ${_prep.active ? '<strong style="color:#16a34a">Preparación ACTIVA</strong> — las tomas nuevas de este almacén usan estas zonas.' : '<strong style="color:#64748b">Borrador</strong> — guardada pero no activa; la app sigue con el comportamiento actual.'}
     <span style="color:#94a3b8"> · ${arts} artículos en plantilla</span>
     ${hashWarn}</div>`;
   document.getElementById('prep-btn-desactivar').style.display = _prep.active ? '' : 'none';
@@ -1995,7 +1790,7 @@ function renderPrepZonas() {
       return `<div class="prep-item" data-search="${esc(normalizeTemplateSearch(nombre + ' ' + it.cod))}" style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:13px">
         <input type="checkbox" ${it.activo !== false ? 'checked' : ''} onchange="prepToggleItem(${zi},${ii},this.checked)" style="flex-shrink:0">
         <div style="flex:1;min-width:0${enPlantilla ? '' : ';color:#dc2626'}">
-          <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(nombre)}${enPlantilla ? '' : ' ⚠️'}</div>
+          <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(nombre)}${enPlantilla ? '' : ' <span style=\"color:#b45309;font-weight:700\">[fuera de plantilla]</span>'}</div>
           <div style="font-size:11px;color:#94a3b8">${esc(it.cod)}${uni ? ' · ' + esc(uni) : ''}${enPlantilla ? '' : ' · ya no está en plantilla'}</div>
         </div>
         <button onclick="prepMoveItem(${zi},${ii},-1)" style="${btnStyle}">↑</button>
@@ -2011,7 +1806,7 @@ function renderPrepZonas() {
         <span onclick="event.preventDefault();prepMoveZone(${zi},-1)" style="${btnStyle}">↑</span>
         <span onclick="event.preventDefault();prepMoveZone(${zi},1)" style="${btnStyle}">↓</span>
         <span onclick="event.preventDefault();prepDupZone(${zi})" style="${btnStyle}" title="Duplicar zona">⧉</span>
-        <span onclick="event.preventDefault();prepDelZone(${zi})" style="${btnStyle};color:#ef4444">🗑</span>
+        <span onclick="event.preventDefault();prepDelZone(${zi})" style="${btnStyle};color:#ef4444">Borrar</span>
       </summary>
       <div style="padding:8px 12px;border-top:1px solid #f1f5f9">
         <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
