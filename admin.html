@@ -340,7 +340,10 @@ function getGroqKey() {
   return localStorage.getItem('groq_api_key') || '';
 }
 
-const ALMACENES = {
+// R9b: los 6 scripts por almacén de Piazza son HISTÓRICO CONGELADO — solo
+// los lee "Cargar histórico" (?action=listar). El envío de excepciones va
+// al script único por centro (SCRIPT_CENTRO).
+const SHEETS_LEGACY_PIAZZA = {
   COCINA:     'https://script.google.com/macros/s/AKfycbyTJ-jeve3udC1mAuhcmjlUwY0oiJO2HMu55ovpUa5z48JX2j1K25BsVULrgr_tnIQ/exec',
   ALIMENTARI: 'https://script.google.com/macros/s/AKfycbxgmVa9zMMYy0eGe8zFEVnoUuZWPH1w9cgT2oxBXI307N5eMD6vLnfd88Aovo6n6spO/exec',
   SALUMERIA:  'https://script.google.com/macros/s/AKfycbwJ89hDt3pIyXwiQkbSaL7--Fr-DXTsFm5tTgo-rKoCc-G0fR14iJKqyjVwRCO3XC_3/exec',
@@ -349,21 +352,28 @@ const ALMACENES = {
   GENERAL:    'https://script.google.com/macros/s/AKfycbyg1vJUxEGFaHs8V1co2rLxY8IA5h-Ol23-peGDg-Hdon-kI81F_r7Rx9Yey9OdNFQtVg/exec'
 };
 
+// R9b: un Apps Script por centro — libro de excepciones (manuales + fotos +
+// observaciones). La toma íntegra vive en D1; el conteo oficial en Xetux.
+const SCRIPT_CENTRO = {
+  PIAZZA: 'https://script.google.com/macros/s/AKfycby7_vWJe4hDBLPrUqRPHE90YOmkufAMB-JrcBLYDkESy_vEwe9A5UCifoV9mD0EwU9S/exec',
+  UH:     null // pendiente: deploy UH con este mismo scripts/centro/Code.js
+};
+
 const WORKER_URL = 'https://operaciones-api.pablo-aranda.workers.dev';
 const INVENTARIO_AREAS = {
-  BARRA_RESTAURANTE: { titulo:'Barra Restaurante', scriptUrl: ALMACENES.BARRA,
+  BARRA_RESTAURANTE: { titulo:'Barra Restaurante', scriptUrl: SCRIPT_CENTRO.PIAZZA,
                        zonaNames:['Almacén Barra','Refri Almacén Barra','Contra Barra','Refris de Servicio'] },
-  COCINA:            { titulo:'Cocina',     scriptUrl: ALMACENES.COCINA,     zonaNames:['Cocina'] },
-  ALIMENTARI:        { titulo:'Alimentari', scriptUrl: ALMACENES.ALIMENTARI, zonaNames:['Almacén','Tienda'] },
-  CAVA:              { titulo:'Cava',       scriptUrl: ALMACENES.CAVA,       zonaNames:['Racks cava','Refri cava 1','Refri cava 2'] },
-  SALUMERIA:         { titulo:'Salumeria',  scriptUrl: ALMACENES.SALUMERIA,  zonaNames:['Camara maduracion','Congelador horizontal','Refri','Camara fria'] },
-  GENERAL:           { titulo:'General',    scriptUrl: ALMACENES.GENERAL,    zonaNames:['General'] },
-  BARRA_AMICI:       { titulo:'Barra Amici', scriptUrl: null,                zonaNames:['Barra Amici'] },
-  // Centro UH — Universal de Hamburguesas (R8). Comparten un solo Apps Script
-  // cuando exista (agregar a ALMACENES con clave 'UH'); scriptUrl null mientras.
-  UH_GENERAL:        { centro:'UH', titulo:'General · Universal', scriptUrl: null, zonaNames:['General'] },
-  UH_COCINA:         { centro:'UH', titulo:'Cocina · Universal',  scriptUrl: null, zonaNames:['Cocina'] },
-  UH_BARRA:          { centro:'UH', titulo:'Barra · Universal',   scriptUrl: null, zonaNames:['Barra'] }
+  COCINA:            { titulo:'Cocina',     scriptUrl: SCRIPT_CENTRO.PIAZZA, zonaNames:['Cocina'] },
+  ALIMENTARI:        { titulo:'Alimentari', scriptUrl: SCRIPT_CENTRO.PIAZZA, zonaNames:['Almacén','Tienda'] },
+  CAVA:              { titulo:'Cava',       scriptUrl: SCRIPT_CENTRO.PIAZZA, zonaNames:['Racks cava','Refri cava 1','Refri cava 2'] },
+  SALUMERIA:         { titulo:'Salumeria',  scriptUrl: SCRIPT_CENTRO.PIAZZA, zonaNames:['Camara maduracion','Congelador horizontal','Refri','Camara fria'] },
+  GENERAL:           { titulo:'General',    scriptUrl: SCRIPT_CENTRO.PIAZZA, zonaNames:['General'] },
+  BARRA_AMICI:       { titulo:'Barra Amici', scriptUrl: SCRIPT_CENTRO.PIAZZA, zonaNames:['Barra Amici'] },
+  // Centro UH — Universal de Hamburguesas (R8/R9b): mismo Code.js de centro,
+  // deployment propio; scriptUrl null hasta su deploy.
+  UH_GENERAL:        { centro:'UH', titulo:'General · Universal', scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['General'] },
+  UH_COCINA:         { centro:'UH', titulo:'Cocina · Universal',  scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Cocina'] },
+  UH_BARRA:          { centro:'UH', titulo:'Barra · Universal',   scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Barra'] }
 };
 
 // R9a: el centro es el primer nivel de filtrado del tab Tomas.
@@ -529,7 +539,7 @@ async function cargarHistoricosSheets() {
   btn.disabled = true;
   container.innerHTML = '<div class="loading-state"><div class="spinner-sm"></div>Consultando Sheets de Piazza...</div>';
   tomasLegacySheets = [];
-  await Promise.all(Object.entries(ALMACENES)
+  await Promise.all(Object.entries(SHEETS_LEGACY_PIAZZA)
     .filter(([nombre]) => almacenPermitidoUI(nombre)) // R7
     .map(([nombre, url]) =>
       fetch(url + '?action=listar')
@@ -1229,7 +1239,11 @@ async function exportarSesionInventario(almacen, fecha, force) {
 
     descargarXlsxInventario(almacen, fecha, T, totales);
 
-    if (cfg.scriptUrl) {
+    // R9b: a Sheets solo viajan EXCEPCIONES — manuales (con foto) y
+    // catalogados con observación. La toma íntegra ya vive en D1 y el
+    // conteo oficial va en el XLSX a Xetux. Sin excepciones, no se llama.
+    const excepciones = productos.filter(p => p.observacion);
+    if (cfg.scriptUrl && (excepciones.length || manuales.length)) {
       await fetch(cfg.scriptUrl, {
         method:'POST',
         mode:'no-cors',
@@ -1241,11 +1255,13 @@ async function exportarSesionInventario(almacen, fecha, force) {
           almacen,
           fecha,
           timestamp: new Date().toISOString(),
-          productos,
+          productos: excepciones,
           manuales
         })
       });
-      alert('Excel descargado y enviado a Sheets.');
+      alert(`Excel descargado. Excepciones a Sheets: ${excepciones.length} con observación + ${manuales.length} manuales.`);
+    } else if (cfg.scriptUrl) {
+      alert('Excel descargado. Sin excepciones — nada que enviar a Sheets.');
     } else {
       alert('Excel descargado. Sin Sheets configurado para este almacén.');
     }
