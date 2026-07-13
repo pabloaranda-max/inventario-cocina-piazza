@@ -111,9 +111,13 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
 .welcome-logo-name{font-family:'BrandScript',cursive;font-size:24px;line-height:1;color:var(--brand-wine)}
 .welcome-logo-sub{font-size:12px;font-weight:600;letter-spacing:.08em;color:var(--brand-green);margin-top:2px}
 .welcome-hero p{display:none}
+.ic{display:inline-block;vertical-align:-3px;flex:none}
 </style>
 </head>
 <body>
+
+<!-- R9b+ iconos Lucide (ISC) — sprite inline, cero red -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true"><symbol id="i-triangle-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></symbol><symbol id="i-circle-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="m15 9-6 6" /> <path d="m9 9 6 6" /></symbol><symbol id="i-circle-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="m9 12 2 2 4-4" /></symbol><symbol id="i-refresh-cw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></symbol><symbol id="i-clipboard-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></symbol><symbol id="i-message-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /></symbol><symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 3v12" /> <path d="m17 8-5-5-5 5" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></symbol><symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /> <path d="M7 11V7a5 5 0 0 1 10 0v4" /></symbol><symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /></symbol><symbol id="i-trash-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></symbol><symbol id="i-store" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5" /> <path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244" /> <path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05" /></symbol></svg>
 
 <!-- PANTALLA: selector de área -->
 <div id="screen-welcome" class="screen">
@@ -183,7 +187,7 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
   <div class="fab-bar">
     <button class="btn btn-green" style="flex:2" onclick="doneZone()">Cerrar zona ✓</button>
     <button class="btn btn-gray btn-sm" style="flex:1" onclick="openManualModal()">+ No catalogado</button>
-    <button class="btn btn-gray btn-sm" id="btn-ver-manuales" style="flex:1;display:none" onclick="openManualesLista()">📋 <span id="manuales-count-badge">0</span></button>
+    <button class="btn btn-gray btn-sm" id="btn-ver-manuales" style="flex:1;display:none" onclick="openManualesLista()"><svg class="ic" width="16" height="16"><use href="#i-clipboard-list"/></svg> <span id="manuales-count-badge">0</span></button>
   </div>
 </div>
 
@@ -196,7 +200,7 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
   <div class="content">
     <div id="validation-out"></div>
     <div class="alert alert-info" style="margin-top:16px">
-      <div class="alert-title">📤 Exportación desde Admin</div>
+      <div class="alert-title"><svg class="ic" width="15" height="15"><use href="#i-upload"/></svg> Exportación desde Admin</div>
       El Excel y el envío a Sheets se generan desde <strong>admin.html</strong> una vez que el equipo termine de contar.
     </div>
   </div>
@@ -298,6 +302,7 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
 // ── Configuración ──────────────────────────────────────────────────────────
 
 const WORKER_URL = 'https://operaciones-api.pablo-aranda.workers.dev';
+const ic = (n, s = 16) => `<svg class="ic" width="${s}" height="${s}"><use href="#i-${n}"/></svg>`;
 // R9b: esta app ya no habla con Apps Script — la toma vive en D1 y las
 // excepciones las envía admin.html al exportar (script único por centro).
 
@@ -344,7 +349,8 @@ if (CENTRO !== 'PIAZZA') {
         const em = document.createElement('div');
         em.className = 'welcome-logo-img';
         em.style.cssText = 'display:flex;align-items:center;justify-content:center;font-size:26px';
-        em.textContent = c.emoji || '🏪';
+        if (c.emoji) em.textContent = c.emoji;
+        else em.innerHTML = '<svg class="ic" width="28" height="28"><use href="#i-store"/></svg>';
         img.replaceWith(em);
       }
     }
@@ -819,7 +825,7 @@ function renderAreaWelcome() {
   let html = `<button class="btn btn-gray" style="margin-bottom:12px" onclick="ALMACEN=null;go('welcome')">← Cambiar almacén</button>`;
 
   if (!T) {
-    html += `<div class="alert alert-warn"><div class="alert-title">⚠️ Plantilla no configurada</div>Contacta al administrador para subir la plantilla de este almacén. Puedes contar, pero no podrás generar el Excel para Xetux.</div>
+    html += `<div class="alert alert-warn"><div class="alert-title">${ic('triangle-alert',15)} Plantilla no configurada</div>Contacta al administrador para subir la plantilla de este almacén. Puedes contar, pero no podrás generar el Excel para Xetux.</div>
       <div class="section-label">Zonas</div>` +
       ZONAS.map(z => `<div class="zone-card" style="border-left-color:${z.color}">
         <div class="zone-dot" style="background:${z.color}"></div>
@@ -835,14 +841,14 @@ function renderAreaWelcome() {
     const remoteCount = countedCodCount(_remoteSes);
     const remotePrompt = _remoteSes && _remoteSes.fecha === S.fecha && remoteCount > counted
       ? `<div class="alert alert-warn" style="margin-top:8px">
-          <div class="alert-title">🔄 Hay una toma con más conteos en servidor</div>
+          <div class="alert-title">${ic('refresh-cw',15)} Hay una toma con más conteos en servidor</div>
           Servidor: ${remoteCount} artículos · Este dispositivo: ${counted}
           <div style="margin-top:8px"><button class="btn btn-primary btn-sm" style="width:auto;display:inline-block" onclick="loadRemoteSesion()">Cargar toma del servidor</button></div>
         </div>`
       : '';
     const done    = new Set((S.completedZones||[]).map(k => baseZone(k))).size;
     const warnHash = T.templateHash && S.templateHash && T.templateHash !== S.templateHash
-      ? `<div class="alert alert-warn" style="margin-top:8px"><div class="alert-title">⚠️ La plantilla cambió desde que inició esta toma</div>Los factores de conversión pueden haber cambiado.</div>` : '';
+      ? `<div class="alert alert-warn" style="margin-top:8px"><div class="alert-title">${ic('triangle-alert',15)} La plantilla cambió desde que inició esta toma</div>Los factores de conversión pueden haber cambiado.</div>` : '';
     html += `<div class="card" style="border-left:4px solid ${CFG.color}">
       <div style="font-weight:700;margin-bottom:2px">Toma del ${S.fecha}</div>
       <div style="font-size:13px;color:#888">${S.operario} · ${done}/${ZONAS.length} zonas · ${counted} artículos contados</div>
@@ -858,10 +864,10 @@ function renderAreaWelcome() {
       const rc = Object.values(_remoteSes.countsByZone||{}).reduce((a,z)=>a+Object.keys(z).length,0);
       const hoy = new Date().toISOString().slice(0,10);
       const otroDia = _remoteSes.fecha !== hoy
-        ? `<div style="font-size:12px;color:#b45309;margin-bottom:8px">⚠️ Iniciada otro día y sin cerrar. Continúala para que el conteo no se fragmente en dos sesiones.</div>`
+        ? `<div style="font-size:12px;color:#b45309;margin-bottom:8px">${ic('triangle-alert',13)} Iniciada otro día y sin cerrar. Continúala para que el conteo no se fragmente en dos sesiones.</div>`
         : '';
       remoteCard = `<div class="card" style="border-left:4px solid #f59e0b;margin-bottom:16px">
-        <div style="font-weight:700;margin-bottom:2px">🔄 Toma abierta del ${esc(_remoteSes.fecha)}</div>
+        <div style="font-weight:700;margin-bottom:2px">${ic('refresh-cw',15)} Toma abierta del ${esc(_remoteSes.fecha)}</div>
         <div style="font-size:13px;color:#888;margin-bottom:8px">${esc(_remoteSes.operario)} · ${rc} artículos contados</div>
         ${otroDia}
         <div class="row">
@@ -1021,7 +1027,7 @@ function renderItemRow(item, zid, inOtherZone) {
 
   const comment = getComment(item.cod);
   const commentBtn = _supervisorActual
-    ? `<button class="comment-btn${comment?' has-comment':''}" onclick="openCommentModal('${esc(item.cod)}','${esc(displayItem.art)}')" title="${comment?'Ver comentario':'Agregar comentario'}">💬</button>`
+    ? `<button class="comment-btn${comment?' has-comment':''}" onclick="openCommentModal('${esc(item.cod)}','${esc(displayItem.art)}')" title="${comment?'Ver comentario':'Agregar comentario'}">${ic('message-circle',15)}</button>`
     : '';
   const commentText = comment ? `<div class="item-comment-text">${esc(comment.texto)}</div>` : '';
 
@@ -1241,7 +1247,7 @@ function renderOverview() {
   // Advertencia de plantilla cambiada
   const ov_warn = document.getElementById('ov-warn');
   if (T?.templateHash && S.templateHash && T.templateHash !== S.templateHash) {
-    ov_warn.innerHTML = `<div class="alert alert-warn"><div class="alert-title">⚠️ La plantilla cambió</div>Los factores de conversión pueden diferir de cuando inició esta toma.</div>`;
+    ov_warn.innerHTML = `<div class="alert alert-warn"><div class="alert-title">${ic('triangle-alert',15)} La plantilla cambió</div>Los factores de conversión pueden diferir de cuando inició esta toma.</div>`;
   } else ov_warn.innerHTML = '';
 
   let total = 0, filled = 0, allDone = true;
@@ -1324,23 +1330,23 @@ function renderValidation() {
 
   let html = '';
   if (!T || !T.raw) {
-    html += `<div class="alert alert-error"><div class="alert-title">❌ Plantilla Xetux no disponible</div>El administrador debe configurar la plantilla de este almacén.</div>`;
+    html += `<div class="alert alert-error"><div class="alert-title">${ic('circle-x',15)} Plantilla Xetux no disponible</div>El administrador debe configurar la plantilla de este almacén.</div>`;
   }
   if (notCounted.length) {
     const sample = notCounted.slice(0,5).map(cod => allItems.find(i=>i.cod===cod)?.art||cod);
-    html += `<div class="alert alert-warn"><div class="alert-title">⚠️ ${notCounted.length} artículos sin contar → quedarán en blanco</div><div>${sample.join(', ')}${notCounted.length>5?' y '+(notCounted.length-5)+' más…':''}</div></div>`;
+    html += `<div class="alert alert-warn"><div class="alert-title">${ic('triangle-alert',15)} ${notCounted.length} artículos sin contar → quedarán en blanco</div><div>${sample.join(', ')}${notCounted.length>5?' y '+(notCounted.length-5)+' más…':''}</div></div>`;
   }
   const manualesReales = (S.manuales || []).filter(m => m.type !== 'comment');
   if (manualesReales.length) {
-    html += `<div class="alert alert-info"><div class="alert-title">📝 ${manualesReales.length} ítem${manualesReales.length!==1?'s':''} no catalogado${manualesReales.length!==1?'s':''}</div>
+    html += `<div class="alert alert-info"><div class="alert-title">${ic('clipboard-list',15)} ${manualesReales.length} ítem${manualesReales.length!==1?'s':''} no catalogado${manualesReales.length!==1?'s':''}</div>
       <div>${manualesReales.map(m=>esc(m.nombre)+' — '+m.cantidad+' '+esc(m.uni)).join(', ')}</div>
       <div style="margin-top:8px"><button class="btn btn-gray btn-sm" style="width:auto;display:inline-block" onclick="compartirManuales()">Compartir lista</button></div></div>`;
   }
   const comentariosSup = (S.manuales || []).filter(m => m.type === 'comment');
   if (comentariosSup.length) {
-    html += `<div class="alert" style="background:#f3e8ff;border-color:#c4b5fd;color:#6d28d9"><div class="alert-title">💬 ${comentariosSup.length} comentario${comentariosSup.length!==1?'s':''} de supervisor</div></div>`;
+    html += `<div class="alert" style="background:#f3e8ff;border-color:#c4b5fd;color:#6d28d9"><div class="alert-title">${ic('message-circle',15)} ${comentariosSup.length} comentario${comentariosSup.length!==1?'s':''} de supervisor</div></div>`;
   }
-  html += `<div class="alert alert-ok"><div class="alert-title">✅ ${countedCods.length} artículos con cantidad</div>
+  html += `<div class="alert alert-ok"><div class="alert-title">${ic('circle-check',15)} ${countedCods.length} artículos con cantidad</div>
     <div>${withConv.length} con conversión · ${countedCods.length - withConv.length} directos</div></div>`;
 
   el.innerHTML = html;
@@ -1428,8 +1434,8 @@ function openManualesLista() {
           <div style="font-size:13px;color:#64748b">${esc(cantStr)} · ${esc(m.zona || '')}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
-          <button onclick="openManualModal('${m.id}')" style="background:#dbeafe;color:#1d4ed8;border:none;border-radius:6px;padding:6px 10px;font-size:13px;font-weight:bold;cursor:pointer">✏</button>
-          <button onclick="deleteManual('${m.id}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:6px 10px;font-size:13px;font-weight:bold;cursor:pointer">🗑</button>
+          <button onclick="openManualModal('${m.id}')" style="background:#dbeafe;color:#1d4ed8;border:none;border-radius:6px;padding:6px 10px;font-size:13px;font-weight:bold;cursor:pointer">${ic('pencil',14)}</button>
+          <button onclick="deleteManual('${m.id}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:6px 10px;font-size:13px;font-weight:bold;cursor:pointer">${ic('trash-2',14)}</button>
         </div>
       </div>`;
     }).join('');
@@ -1536,9 +1542,9 @@ function renderSupBadge() {
   const wrap = document.getElementById('sup-badge-wrap');
   if (!wrap) return;
   if (_supervisorActual) {
-    wrap.innerHTML = `<span class="sup-badge" onclick="logoutSupervisor()" title="Toca para cerrar sesión">🔐 ${esc(_supervisorActual.nombre)}</span>`;
+    wrap.innerHTML = `<span class="sup-badge" onclick="logoutSupervisor()" title="Toca para cerrar sesión">${ic('lock',12)} ${esc(_supervisorActual.nombre)}</span>`;
   } else {
-    wrap.innerHTML = `<span class="sup-badge" onclick="document.getElementById('modal-supervisor-login').classList.add('active')" title="Acceso supervisor">🔐 Supervisar</span>`;
+    wrap.innerHTML = `<span class="sup-badge" onclick="document.getElementById('modal-supervisor-login').classList.add('active')" title="Acceso supervisor">${ic('lock',12)} Supervisar</span>`;
   }
 }
 
