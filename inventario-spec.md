@@ -855,17 +855,21 @@ idéntico al actual).
   filtrar y activar las ~60 proteínas → Guardar y activar. El resto de artículos
   queda capturable vía búsqueda ("Fuera de zona · en plantilla").
 
-- **Apps Script UH (pendiente R8; DESBLOQUEADO por R9b 2026-07-13):** clasp ya
-  logueado; falta `clasp create` de un segundo proyecto con el MISMO
-  `scripts/centro/Code.js` (mover `.clasp.json` aparte — `.clasp.piazza.json`
-  guarda el de Piazza), Pablo corre `setupUH()` en el editor, deploy → URL a
-  `SCRIPT_CENTRO.UH` en admin.html. `scripts/universal/` queda obsoleto (nunca
-  se desplegó). Mientras tanto UH opera sin Sheets (`scriptUrl: null`,
-  soportado): ese periodo es el experimento empírico de si alguien extraña
-  Sheets.
-- **Merge de datos BARRA_RESTAURANTE 2026-07-05/06:** dos filas `inv_sesiones` sin
-  exportar (César 07-05, Daniel 07-06, mismo template_hash). Unir N-way por zona en la
-  fila más reciente ANTES de exportar; filas viejas se conservan como respaldo.
+- **Apps Script UH — HECHO 2026-07-13:** segundo proyecto con el MISMO
+  `scripts/centro/Code.js` (proyecto `1SYgnEk8…QKVG`; `.clasp.uh.json` /
+  `.clasp.piazza.json` guardan los scriptIds — copiar el que toque a
+  `.clasp.json` antes de push). Incidente: se corrió `setupPiazza` en el
+  proyecto UH (el dropdown del editor preselecciona la primera función) →
+  reparado con `fixUH()` de un solo uso que renombró libro/carpeta y corrigió
+  CENTRO=UH conservando IDs. Verificado: ping `centro:"UH"`, POST de prueba →
+  1 fila en MAESTRA sin pestañas extra. URL en `SCRIPT_CENTRO.UH`.
+  `scripts/universal/` queda obsoleto (nunca se desplegó).
+- ~~**Merge de datos BARRA_RESTAURANTE 2026-07-05/06**~~ OBSOLETO 2026-07-13: esas
+  filas ya no existen en D1 — la toma completa del 07-13 (Daniel, 137 arts,
+  exportada) las dejó sin efecto. NUEVO pendiente detectado: **BARRA_AMICI
+  2026-07-09 sin exportar** (César, 328 arts — parece la toma completa; la del
+  07-13 con 78 arts fue exportada). DECIDIDO por Pablo 2026-07-13: fue una toma
+  extraordinaria que NO se carga a Xetux — se queda sin exportar a propósito.
 - **Diagnóstico importación Xetux:** Pablo intenta importar un archivo generado por la
   app (con R2 desplegado) y reporta el error exacto si lo hay. Empírico, ver §9.
 - **`inventario-beta.html`:** copia de inventario.html apuntando al Worker staging,
