@@ -477,7 +477,8 @@ async function handleInvGet(db, url) {
     try {
       rows = await db.prepare(
         `SELECT almacen, operario, fecha, updated_at, exported_at, exported_by,
-                counts_by_zone, corrections_by_zone, completed_zones, manuales
+                counts_by_zone, corrections_by_zone, completed_zones, manuales,
+                operarios_by_device
          FROM inv_sesiones ${where}
          ORDER BY fecha DESC, updated_at DESC
          LIMIT 200`
@@ -500,6 +501,13 @@ async function handleInvGet(db, url) {
       const correctionsByZone = JSON.parse(row.corrections_by_zone || '{}');
       const correctedCods = new Set();
       for (const zc of Object.values(correctionsByZone)) for (const cod of Object.keys(zc || {})) correctedCods.add(cod);
+      // R9a: el tab Tomas del admin lista desde D1 — conteos de manuales y
+      // nombres de operarios (R5.1) evitan otro roundtrip por sesión.
+      const manualesArr = JSON.parse(row.manuales || '[]');
+      const opsByDev = JSON.parse(row.operarios_by_device || '{}');
+      const operarios = [...new Set(
+        Object.values(opsByDev).map(o => o && o.operario).filter(Boolean)
+      )];
       return {
         almacen:          row.almacen,
         operario:         row.operario,
@@ -509,7 +517,10 @@ async function handleInvGet(db, url) {
         exportedBy:       row.exported_by || '',
         articulosContados: cods.size,
         zonasCompletadas: uniqueZones.size,
-        correcciones:     correctedCods.size
+        correcciones:     correctedCods.size,
+        manuales:         manualesArr.filter(m => m && m.type !== 'comment').length,
+        comentarios:      manualesArr.filter(m => m && m.type === 'comment').length,
+        operarios
       };
     });
     return json({ ok: true, sesiones });
