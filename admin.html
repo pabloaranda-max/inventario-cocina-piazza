@@ -371,9 +371,9 @@ const INVENTARIO_AREAS = {
   BARRA_AMICI:       { titulo:'Barra Amici', scriptUrl: SCRIPT_CENTRO.PIAZZA, zonaNames:['Barra Amici'] },
   // Centro UH — Universal de Hamburguesas (R8/R9b): mismo Code.js de centro,
   // deployment propio; scriptUrl null hasta su deploy.
-  UH_GENERAL:        { centro:'UH', titulo:'General · Universal', scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['General'] },
-  UH_COCINA:         { centro:'UH', titulo:'Cocina · Universal',  scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Cocina'] },
-  UH_BARRA:          { centro:'UH', titulo:'Barra · Universal',   scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Barra'] }
+  UH_GENERAL:        { centro:'UH', titulo:'General', scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['General'] },
+  UH_COCINA:         { centro:'UH', titulo:'Cocina',  scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Cocina'] },
+  UH_BARRA:          { centro:'UH', titulo:'Barra',   scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Barra'] }
 };
 
 // R9a: el centro es el primer nivel de filtrado del tab Tomas.
@@ -386,6 +386,18 @@ const CENTROS = {
     ['UH_COCINA','Cocina'], ['UH_BARRA','Barra'], ['UH_GENERAL','General'] ] }
 };
 function centroDe(a) { return (String(a).startsWith('UH_') || a === 'UH') ? 'UH' : 'PIAZZA'; }
+
+// Etiqueta inequívoca de almacén: SIEMPRE lleva el centro, ambos centros por
+// igual (antes solo UH lo traía hardcodeado en el título y Piazza quedaba
+// implícito — confuso al asignar permisos o mirar tomas con filtro "Todos").
+// Acepta claves completas (BARRA_RESTAURANTE) y canónicas R7 ('BARRA').
+const CENTRO_CORTO = { PIAZZA: 'Piazza', UH: 'Universal' };
+function tituloAlmacen(key) {
+  const c = centroDe(key);
+  const chip = (CENTROS[c].chips.find(([k]) => k === key) || [])[1];
+  const t = INVENTARIO_AREAS[key]?.titulo || chip || key;
+  return `${t} · ${CENTRO_CORTO[c]}`;
+}
 
 let tomasLegacySheets = null; // null = histórico Sheets aún no consultado (R9a: solo on-demand)
 let sesionesInventario = [];
@@ -617,7 +629,7 @@ function renderSesionesInventario() {
     const quienes = (s.operarios && s.operarios.length) ? s.operarios.join(' · ') : (s.operario || '—');
     return `<div class="toma-card" style="border-left-color:${s.exportedAt ? '#16a34a' : '#f59e0b'}">
       <div class="toma-header">
-        <div class="toma-operario">${esc(cfg.titulo)} ${exp}</div>
+        <div class="toma-operario">${esc(tituloAlmacen(s.almacen))} ${exp}</div>
         <div class="toma-almacen">${esc(s.almacen)}</div>
       </div>
       <div class="toma-meta">
@@ -1030,7 +1042,7 @@ async function guardarCorrecciones(almacen, fecha) {
 }
 
 async function borrarSesionInventario(almacen, fecha) {
-  if (!confirm(`Borrar la sesión activa ${almacen} del ${fecha}?\nEsto borra la sesión del Worker/Admin. No borra registros ya enviados a Google Sheets.`)) return;
+  if (!confirm(`Borrar la sesión activa de ${tituloAlmacen(almacen)} del ${fecha}?\nEsto borra la sesión del Worker/Admin. No borra registros ya enviados a Google Sheets.`)) return;
   try {
     const r = await fetch(WORKER_URL + '/inv/sesion', {
       method:'POST',
@@ -1181,7 +1193,7 @@ async function exportarSesionInventario(almacen, fecha, force) {
     alert('Esta sesión ya se está exportando en esta ventana.');
     return;
   }
-  if (!force && !confirm(`Exportar sesión ${almacen} del ${fecha} desde admin?\nEsto marcará la sesión como exportada.`)) return;
+  if (!force && !confirm(`Exportar sesión de ${tituloAlmacen(almacen)} del ${fecha} desde admin?\nEsto marcará la sesión como exportada.`)) return;
   exportandoSesiones.add(exportKey);
   try {
     const [sr, tr] = await Promise.all([
@@ -1298,7 +1310,7 @@ function generarReporte() {
 
   document.getElementById('reporte-detalle').innerHTML = Object.entries(porAlmacen).map(([alm, d]) => `
     <div class="toma-card" style="border-left-color:#22c55e">
-      <div class="toma-operario">${esc((INVENTARIO_AREAS[alm] || {}).titulo || alm)}</div>
+      <div class="toma-operario">${esc(tituloAlmacen(alm))}</div>
       <div class="toma-meta" style="margin-top:8px">
         ${d.tomas} toma${d.tomas!==1?'s':''} · ${d.items} artículos capturados
       </div>
@@ -1340,7 +1352,7 @@ async function imprimirSesion(almacen, fecha) {
     const ops = [...new Set(Object.values(S.operariosByDevice || {}).map(o => o?.operario).filter(Boolean))];
     generarPDFAdmin({
       almacen_nombre: almacen,
-      area: (INVENTARIO_AREAS[almacen] || {}).titulo || almacen,
+      area: tituloAlmacen(almacen),
       fecha,
       operario: (ops.length ? ops : [S.operario]).filter(Boolean).join(', ')
     }, items, corrs, notaGeneral);
@@ -1673,7 +1685,7 @@ async function uploadPlantilla(file) {
     const d = await r.json();
     if (d.ok) {
       msg.style.color = '#16a34a';
-      msg.textContent = `✓ Plantilla de ${almacen} guardada correctamente` +
+      msg.textContent = `✓ Plantilla de ${tituloAlmacen(almacen)} guardada correctamente` +
         (d.catalogoDerivado ? ` · catálogo creado con ${d.catalogoDerivado} artículos` : '');
       document.getElementById('plt-file').value = '';
       loadPlantillaStatus();
@@ -2005,10 +2017,22 @@ let _adminEditandoId = null;
 
 function renderAdmAlmacenesChecks(seleccionados = []) {
   const cont = document.getElementById('adm-almacenes');
-  cont.innerHTML = Object.entries(INVENTARIO_AREAS).map(([key, cfg]) => `
-    <label style="font-size:13px;color:#334155;display:flex;align-items:center;gap:5px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;cursor:pointer">
-      <input type="checkbox" class="adm-alm-check" value="${esc(key)}" ${seleccionados.includes(key) ? 'checked' : ''}> ${esc(cfg.titulo)}
-    </label>`).join('');
+  // Agrupados por centro para que "Cocina" de Piazza jamás se confunda con
+  // "Cocina" de Universal al asignar permisos
+  const porCentro = {};
+  Object.entries(INVENTARIO_AREAS).forEach(([key, cfg]) => {
+    (porCentro[centroDe(key)] ??= []).push([key, cfg]);
+  });
+  cont.innerHTML = Object.entries(porCentro).map(([c, items]) => `
+    <div style="width:100%">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#64748b;margin:4px 0 6px">${esc(CENTROS[c].nombre)}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        ${items.map(([key, cfg]) => `
+          <label style="font-size:13px;color:#334155;display:flex;align-items:center;gap:5px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;cursor:pointer">
+            <input type="checkbox" class="adm-alm-check" value="${esc(key)}" ${seleccionados.includes(key) ? 'checked' : ''}> ${esc(cfg.titulo)}
+          </label>`).join('')}
+      </div>
+    </div>`).join('');
 }
 
 async function cargarAdmins() {
@@ -2036,7 +2060,7 @@ function renderAdmins() {
     return;
   }
   el.innerHTML = _admins.map(a => {
-    const titulos = (a.almacenes || []).map(k => INVENTARIO_AREAS[k]?.titulo || k);
+    const titulos = (a.almacenes || []).map(tituloAlmacen);
     const badge = a.active
       ? '<span style="background:#dcfce7;color:#166534;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">Activo</span>'
       : '<span style="background:#fee2e2;color:#991b1b;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">Inactivo</span>';
