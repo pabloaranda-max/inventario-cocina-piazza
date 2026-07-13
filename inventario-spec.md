@@ -734,6 +734,8 @@ Guardar/activar debe requerir password admin.
 | R6 | **Reporte de presentaciones sospechosas** — detección en admin (duplicadas, repetidas, factores sospechosos); marca y pide decisión humana, nunca autocorrige | HECHO 2026-07-08. `parsePlantilla` reporta `sospechosas[]` (factor_1, ml_g, duplicada, factor_ilegible, nombre_ambiguo) además de filtrar; admin tab Plantillas muestra "Revisión de presentaciones" calculada al vuelo desde `raw` (+ LT/KG sin presentación ni default, listas capadas a 60). Sin Worker ni migraciones. Tests parser 19/19; E2E staging 8 asserts. En prod detecta mugre real: COCINA 104×factor_1, 3×ml_g, 2×ilegible; CAVA 44×duplicada |
 | R7 | **Admins restringidos por almacén** — tabla `inv_admins` (nombre, password_hash, almacenes permitidos); solo el password maestro (`INV_ADMIN_PASSWORD`) crea/edita perfiles; el Worker valida el almacén en cada ACCIÓN de admin (exportar, borrar, plantillas, preparaciones) y admin.html filtra la vista. ⚠️ Alcance honesto: restringe acciones y UI, no lectura de datos — los GET de sesiones son públicos a propósito (operarios sin credencial); cerrar lecturas implicaría autenticar operarios (proyecto aparte) | HECHO 2026-07-08 (migración 0007; `invAdminAuth` en Worker: maestro por password, perfil por nombre+password vía `X-Admin-User`/`adminUser`; acciones nuevas `inv_admin_list/save/delete` solo maestro; `inv_export`/`inv_delete` migrados al mismo auth con validación de almacén; admin.html: tab 👥 Admins solo maestro, chips/selects/sesiones/tomas filtrados por perfil, no se fetchean Apps Scripts de almacenes ajenos. Matriz curl staging 32/32; E2E Playwright staging 11/11. Compat: admin.html viejo + Worker nuevo sigue funcionando con el maestro). **EN PROD 2026-07-09:** migración 0007 aplicada en prod (backup `~/backups/operaciones-db-backup-2026-07-09-r7.sql`), Worker desplegado, merge a main publicado en Pages; verificado en prod: `inv_admin_list` sin/con password malo → 401 "Sin permiso", GETs de operario siguen 200. Falta crear perfiles reales desde tab 👥 Admins (solo Pablo, password maestro) |
 | R8 | **Multi-centro — "Universal de Hamburguesas"** — segundo centro de consumo con ~3 almacenes (`UH_GENERAL`, `UH_COCINA`, `UH_BARRA`). Ver diseño abajo | HECHO 2026-07-10 (E2E staging: 9 asserts API — catálogo derivado, no-pisar, aislamiento CAVA — + 13 asserts navegador — filtro por centro, banner, guardia cross-centro, normalización del param, beta UH_COCINA 8 arts desde staging. Sin migraciones D1. PENDIENTE: Apps Script UH bloqueado en `clasp login` de Pablo; plantillas reales UH cuando existan en su Xetux). **EN PROD 2026-07-10:** Worker desplegado (smoke test GETs OK), merge a main publicado en Pages. URL operarios UH: `inventario.html?centro=UH` |
+| R9a | **Tomas desde D1 + UI centro→almacén + limpieza visual** — el tab Tomas de admin.html deja de consultar Apps Scripts y lee `GET /inv/sesiones` del Worker; filtros de dos niveles (centro → almacén); limpieza de emojis. Ver diseño abajo | PENDIENTE |
+| R9b | **Sheets de excepciones, un script por centro** — `scripts/centro/Code.js` único (deploy Pasticcio + UH); a Sheets solo viajan manuales + fotos + artículos con observación; sin pestañas de detalle. Requiere R9a. Ver diseño abajo | PENDIENTE |
 | — | Limpieza (CSS muerto §13, mover apps viejas a `legacy/`, chat GROQ) — oportunista, al colarse en otra sesión | OPORTUNISTA |
 | — | Sheets API en vez de Apps Script (4b v1) — solo si Apps Script falla en un cierre real | FUTURO |
 
@@ -775,13 +777,89 @@ derivado verificado), contar en `inventario-beta.html?centro=UH` sin ver almacen
 Piazza, export xlsx correcto; E2E verde; Piazza sin regresión (home sin parámetro
 idéntico al actual).
 
-### Pendientes fuera de slice
+### R9 — Archivo v2: tomas desde D1 + Sheets de excepciones (diseño, 2026-07-12)
+
+**Contexto y decisiones (sesión 2026-07-12):**
+
+- D1 prod medido 2026-07-12: **0.94 MB totales** (4 sesiones, 7 plantillas, 2,605
+  artículos). Free tier Cloudflare: 500 MB/base, 5 GB/cuenta, 5M lecturas/día,
+  100K escrituras/día → **capacidad NO es argumento para conservar Sheets**;
+  proyección ~12 MB/año en el peor caso.
+- Reparto de registros sin traslape: **Xetux** = registro oficial de catalogados
+  (vía export/import validado); **D1** = registro operativo completo (quién,
+  cuándo, por zona, correcciones); **Sheets** = SOLO libro de excepciones legible
+  para humanos sin admin: **manuales + fotos + artículos con observación** —
+  nada de eso llega a Xetux (la carga masiva solo lleva Cantidad), por lo que
+  esta parte de Sheets es la única irreemplazable.
+- Las pestañas de detalle por envío (`AREA_YYYYMMDD_HHMM`) son duplicado 100% de
+  MAESTRA (solo aportan la miniatura) y crecen sin tope → se eliminan; la
+  miniatura cabe en MAESTRA porque las filas de excepción son pocas.
+- **Un Apps Script + un Spreadsheet POR CENTRO** (Pasticcio migra de sus 6
+  scripts por almacén; Universal nace ya así). Sheets/scripts viejos de Piazza
+  quedan CONGELADOS como histórico — no se borran ni se migran datos.
+- Emojis en admin: se ven poco profesionales (feedback de Pablo). Decorativos
+  fuera; estados → badges de color; SVG inline solo si es imprescindible.
+- Futuro (decisión abierta, NO slice): la "ventana humana" podría terminar
+  siendo una página de solo-lectura en Pages sobre los GETs públicos del Worker;
+  Sheets de excepciones cubre ese rol mientras tanto a costo $0.
+
+**R9a — Tomas desde D1 + UI centro→almacén + limpieza visual (admin.html):**
+
+- `cargarTodasLasTomas()` deja el fan-out a Apps Scripts; lee `GET /inv/sesiones`
+  (público por diseño R7). Verificar que la respuesta cubre el listado (fecha,
+  operario/s, almacén, nº ítems, exported, timestamp); si falta campo o rango de
+  fechas, extender el GET (Worker, sin migración D1).
+- Detalle de toma y PDF: reconstruir desde la sesión D1 (countsByZone +
+  zoneSnapshot), totales con `js/sesion-merge.js` (mismo módulo que el Worker —
+  cierra de paso el pendiente vivo de R5).
+- Filtros de dos niveles: selector de centro (Todos / Piazza / Universal) +
+  chips de almacén filtradas por el centro elegido. Muere el chip especial `UH`
+  con startsWith.
+- Borrar toma = `inv_delete` (R7, ya existe). El borrado vía Apps Script deja de
+  ofrecerse (Sheets pasa a histórico congelado).
+- Limpieza visual: tabs sin emoji (texto tipografiado); ✅/❌/⚠️ → badges de
+  color ya estilados; "📄 PDF" → "PDF"; 📦 contadores → texto; chip Universal
+  sin 🍔 (monocromo #111827, coherente con branding R8). inventario.html solo
+  oportunista.
+- **Alcance honesto:** el listado D1 solo cubre tomas desde que existe
+  `inv_sesiones`; tomas anteriores viven en los Sheets congelados (dejar link
+  "ver históricos" al Spreadsheet, no fetch).
+- **Done R9a:** tab Tomas funciona SIN ningún Apps Script configurado (UH lista
+  sus tomas sin script); mismas tomas visibles que antes para Piazza reciente;
+  matriz de filtros centro→almacén verificada; PDF de una toma real idéntico en
+  contenido al actual; cero emojis decorativos en admin.
+
+**R9b — Sheets de excepciones, un script por centro (requiere R9a):**
+
+- Nuevo `scripts/centro/Code.js` ÚNICO para ambos centros (2 deployments;
+  Script Properties: SPREADSHEET_ID, DRIVE_FOLDER_ID, CENTRO). Sustituye a
+  `scripts/universal/` y a los 6 de Piazza.
+- `procesarInventario` v2: recibe SOLO excepciones; escribe MAESTRA (con
+  miniatura inline) + NOTAS; NO crea pestañas de detalle; se eliminan
+  `listarTomas`/`detalleToma`/`borrarToma` (admin ya no los usa tras R9a) →
+  script mínimo.
+- `inventario.html`: al enviar, filtra el payload → manuales completos +
+  productos con `observacion !== ''`. Catalogados sin observación NO viajan
+  (ya están en Xetux vía export y en D1 vía sync). Si una toma no tiene
+  excepciones, no se llama al Apps Script.
+- `procesarNotas` se conserva (NOTAS es parte del libro de excepciones); el
+  update de filas MAESTRA solo aplica si la fila existe.
+- AREA_CONFIG (inventario.html) y ALMACENES (admin.html): los 7 almacenes
+  Piazza apuntan a la URL única del centro; los `UH_*` a la suya.
+- **Done R9b:** toma de prueba en beta/staging escribe SOLO excepciones en
+  MAESTRA, sin pestaña nueva, foto sube a Drive; toma íntegra visible en admin
+  vía D1; export Xetux intacto; Piazza y UH con el mismo Code.js.
 
 - **Preparación real de COCINA (post-R5):** subir plantilla COCINA desde admin →
   tab Preparación → "Crear: 1 zona con todo activo" → Desactivar visibles →
   filtrar y activar las ~60 proteínas → Guardar y activar. El resto de artículos
   queda capturable vía búsqueda ("Fuera de zona · en plantilla").
 
+- **Apps Script UH (pendiente R8, re-secuenciado 2026-07-12):** ejecutar el
+  `clasp login` + `setup()` + deploy DESPUÉS de R9b, ya con el
+  `scripts/centro/Code.js` de excepciones — evita desplegar y autorizar dos
+  veces. Mientras tanto UH opera sin Sheets (`appsScriptUrl: null`, soportado):
+  ese periodo es el experimento empírico de si alguien extraña Sheets.
 - **Merge de datos BARRA_RESTAURANTE 2026-07-05/06:** dos filas `inv_sesiones` sin
   exportar (César 07-05, Daniel 07-06, mismo template_hash). Unir N-way por zona en la
   fila más reciente ANTES de exportar; filas viejas se conservan como respaldo.
