@@ -4,10 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Inventario · Piazza Pasticcio</title>
-<link rel="icon" type="image/png" href="branding/icon-192.png" id="favicon">
-<link rel="apple-touch-icon" href="branding/icon-180.png" id="touch-icon">
-<link rel="manifest" href="manifest.webmanifest" id="manifest-link">
-<meta name="theme-color" content="#667eea">
+<script>
+// Chrome captura el <link rel=manifest> al parsear la página; cambiarle el
+// href con JS después NO cambia la identidad de la app que se instala (por
+// eso instalar ?centro=UH daba la app de Piazza). El link correcto tiene que
+// emitirse aquí mismo, antes de que exista cualquier <link>.
+(function(){
+  var uh = (new URLSearchParams(location.search).get('centro') || '').toUpperCase() === 'UH';
+  var pre = uh ? 'branding/icon-uh-' : 'branding/icon-';
+  document.write(
+    '<link rel="icon" type="image/png" href="' + pre + '192.png" id="favicon">' +
+    '<link rel="apple-touch-icon" href="' + pre + '180.png" id="touch-icon">' +
+    '<link rel="manifest" href="' + (uh ? 'manifest-uh' : 'manifest') + '.webmanifest" id="manifest-link">' +
+    '<meta name="theme-color" content="' + (uh ? '#111827' : '#667eea') + '">'
+  );
+})();
+</script>
 <style>
 @font-face{font-family:'Brand';font-weight:400;src:url(branding/fonts/FreightNeo%20W03%20Book.ttf)format('truetype')}
 @font-face{font-family:'BrandScript';font-weight:900;src:url(branding/fonts/TT%20Nooks%20Script%20Black.otf)format('opentype')}
@@ -343,11 +355,7 @@ const AREA_CONFIG = {
 // Guardia visual R8: fuera de PIAZZA el nombre del centro queda siempre visible
 // y el hero pierde el branding de Piazza (logo + nombre pasan a ser del centro)
 if (CENTRO !== 'PIAZZA') {
-  if (CENTRO === 'UH') {
-    document.getElementById('favicon').href = 'branding/icon-uh-192.png';
-    document.getElementById('touch-icon').href = 'branding/icon-uh-180.png';
-    document.getElementById('manifest-link').href = 'manifest-uh.webmanifest';
-  }
+  // favicon/manifest de UH ya se emiten en el <head> al parsear (identidad PWA)
   document.title = 'Inventario · ' + CENTROS[CENTRO].nombre;
   document.addEventListener('DOMContentLoaded', () => {
     const c = CENTROS[CENTRO];
