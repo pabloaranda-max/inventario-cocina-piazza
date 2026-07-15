@@ -650,7 +650,8 @@ function renderSesionesInventario() {
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button class="btn-notas" onclick="verDetalleSesion('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('search',13)} Explorar</button>
           <button class="btn-notas" onclick="imprimirSesion('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('printer',13)} PDF</button>
-          <button class="btn-pdf-card" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',false)">${ic('download',13)} Generar XLSX y enviar</button>
+          ${!s.exportedAt ? `<button class="btn-pdf-card" onclick="cerrarConPlantillaFresca('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('file-spreadsheet',13)} Cerrar con plantilla fresca</button>` : ''}
+          <button class="btn-notas" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',false)">${ic('download',13)} Generar XLSX y enviar</button>
           ${s.exportedAt ? `<button class="btn-notas" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',true)">${ic('upload',13)} Re-exportar</button>` : ''}
           <button class="btn-borrar" onclick="borrarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('trash-2',13)} Borrar sesión</button>
         </div>
@@ -1256,7 +1257,64 @@ async function marcarExportacion(almacen, fecha, force) {
   return d;
 }
 
-async function exportarSesionInventario(almacen, fecha, force) {
+// Cierre semanal con plantilla fresca: en Xetux el nombre válido para importar
+// la carga masiva nace al crear la toma de inventario, así que subir plantilla
+// y exportar la sesión ocurren siempre juntos. Este flujo colapsa ambos pasos:
+// valida lo contado contra el xlsx recién exportado de Xetux, lo sube como
+// plantilla del almacén y dispara el export normal sin re-preguntar el hash.
+function cerrarConPlantillaFresca(almacen, fecha) {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = '.xlsx,.xls';
+  inp.onchange = () => { if (inp.files[0]) subirPlantillaYExportar(almacen, fecha, inp.files[0]); };
+  inp.click();
+}
+
+async function subirPlantillaYExportar(almacen, fecha, file) {
+  try {
+    const buf = await file.arrayBuffer();
+    const { rowMap, cantidadColIdx, presMap, unitMap, articulos } = parsePlantilla(buf);
+
+    const sr = await fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(fecha));
+    const S = await sr.json();
+    if (!S.ok || !S.found) throw new Error('Sesión no encontrada');
+    const contados = new Set();
+    for (const zc of Object.values(S.countsByZone || {}))
+      for (const cod of Object.keys(zc || {})) contados.add(cod);
+    for (const [cod, corr] of Object.entries(S.correctionsByZone?.['_admin'] || {}))
+      if (corr?.qty != null) contados.add(cod);
+    const fuera = [...contados].filter(cod => rowMap[cod] === undefined);
+    if (fuera.length) {
+      alert(
+        `No se subió nada: ${fuera.length} artículo(s) contado(s) no están en "${file.name}":\n` +
+        fuera.join(', ') +
+        `\n\n¿Seguro que es la plantilla de ${tituloAlmacen(almacen)}?`
+      );
+      return;
+    }
+    if (!confirm(
+      `"${file.name}"\n${Object.keys(rowMap).length} artículos; cubre los ${contados.size} contados en la toma del ${fecha}.\n\n` +
+      `¿Subirla como plantilla de ${tituloAlmacen(almacen)} y exportar la sesión?`
+    )) return;
+
+    const bytes = new Uint8Array(buf);
+    let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
+    const raw = btoa(bin);
+    const templateHash = await hashRaw(raw);
+    const r = await fetch(WORKER_URL + '/inv/plantilla', {
+      method: 'POST', headers: adminHeaders(),
+      body: JSON.stringify({ action:'inv_plantilla', almacen, rowMap, cantidadColIdx, presMap, unitMap, articulos, raw, originalFilename: file.name || '', templateHash, templateTs: Date.now() })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'No se pudo subir la plantilla');
+
+    await exportarSesionInventario(almacen, fecha, true, { hashVerificado: true });
+  } catch (e) {
+    alert('Error al cerrar con plantilla fresca: ' + e.message);
+  }
+}
+
+async function exportarSesionInventario(almacen, fecha, force, opts) {
   const cfg = INVENTARIO_AREAS[almacen] || {};
   const exportKey = `${almacen}:${fecha}`;
   if (exportandoSesiones.has(exportKey)) {
@@ -1292,7 +1350,7 @@ async function exportarSesionInventario(almacen, fecha, force) {
           '\n\nNo se exportó nada; sube una plantilla Xetux que los incluya.'
         );
       }
-      if (!confirm(
+      if (!opts?.hashVerificado && !confirm(
         'La plantilla cambió desde que se capturó esta sesión.\n\n' +
         `Verificado: los ${contados.size} artículos contados existen todos en la plantilla actual. ` +
         'Los factores de conversión por defecto serán los de la plantilla nueva.\n\n' +
