@@ -1,4 +1,5 @@
 {
+  "id": "inventario-uh",
   "name": "Inventario Universal de Hamburguesas",
   "short_name": "Inventario UH",
   "start_url": "inventario.html?centro=UH",
