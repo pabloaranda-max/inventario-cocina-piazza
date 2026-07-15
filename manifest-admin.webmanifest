@@ -1,4 +1,5 @@
 {
+  "id": "admin-inventario-piazza",
   "name": "Admin Inventario Piazza",
   "short_name": "Admin Inv",
   "start_url": "admin.html",
