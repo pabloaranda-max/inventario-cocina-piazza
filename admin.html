@@ -1152,6 +1152,63 @@ async function catalogoLookup(almacen, T) {
   return lookup;
 }
 
+const _crcTable = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(data) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < data.length; i++) c = _crcTable[(c ^ data[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+// ZIP mínimo sin compresión (método store). Existe porque el xlsx de carga
+// masiva debe conservar el nombre exacto del export de Xetux, y ese nombre no
+// dice de qué almacén es: el zip lo envuelve en una carpeta ALMACEN/.
+function buildZip(entries) {
+  const enc = new TextEncoder();
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  const u16 = v => [v & 0xFF, (v >> 8) & 0xFF];
+  const u32 = v => [v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF];
+  const chunks = [], central = [];
+  let offset = 0;
+  for (const { name, data } of entries) {
+    const nameB = enc.encode(name);
+    const crc = crc32(data);
+    const head = new Uint8Array([
+      0x50,0x4B,0x03,0x04, ...u16(20), ...u16(0), ...u16(0), ...u16(dosTime), ...u16(dosDate),
+      ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nameB.length), ...u16(0)
+    ]);
+    central.push({ nameB, crc, size: data.length, offset });
+    chunks.push(head, nameB, data);
+    offset += head.length + nameB.length + data.length;
+  }
+  const cdStart = offset;
+  let cdSize = 0;
+  for (const c of central) {
+    const rec = new Uint8Array([
+      0x50,0x4B,0x01,0x02, ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(dosTime), ...u16(dosDate),
+      ...u32(c.crc), ...u32(c.size), ...u32(c.size), ...u16(c.nameB.length), ...u16(0), ...u16(0),
+      ...u16(0), ...u16(0), ...u32(0), ...u32(c.offset)
+    ]);
+    chunks.push(rec, c.nameB);
+    cdSize += rec.length + c.nameB.length;
+  }
+  chunks.push(new Uint8Array([
+    0x50,0x4B,0x05,0x06, ...u16(0), ...u16(0), ...u16(central.length), ...u16(central.length),
+    ...u32(cdSize), ...u32(cdStart), ...u16(0)
+  ]));
+  return new Blob(chunks, { type: 'application/zip' });
+}
+
 function descargarXlsxInventario(almacen, fecha, T, totales) {
   const wb = XLSX.read(b64ToArrayBuffer(T.raw), { type:'array', cellStyles:true });
   const ws = wb.Sheets[wb.SheetNames[0]];
@@ -1162,13 +1219,16 @@ function descargarXlsxInventario(almacen, fecha, T, totales) {
     ws[addr] = { t:'n', v: parseFloat(qty.toFixed(4)) };
   }
   const out = XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles:true });
-  const blob = new Blob([out], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  // Xetux puede rechazar la importación si el archivo no conserva el nombre con que
+  // exportó la plantilla; usar el original y caer al legacy solo si no existe (pre-v4.7).
+  // El navegador no deja elegir carpeta de descarga, así que el xlsx viaja dentro
+  // de un zip que al extraerse crea ALMACEN/ para identificar de cuál almacén es.
+  const fname = T.originalFilename || `Inventario_${almacen}_${fecha}.xlsx`;
+  const blob = buildZip([{ name: `${almacen}/${fname}`, data: new Uint8Array(out) }]);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  // Xetux puede rechazar la importación si el archivo no conserva el nombre con que
-  // exportó la plantilla; usar el original y caer al legacy solo si no existe (pre-v4.7)
-  a.download = T.originalFilename || `Inventario_${almacen}_${fecha}.xlsx`;
+  a.download = `Inventario_${almacen}_${fecha}.zip`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -1211,7 +1271,29 @@ async function exportarSesionInventario(almacen, fecha, force) {
     if (!S.ok || !S.found) throw new Error('Sesión no encontrada');
     if (!T.ok || !T.found || !T.raw) throw new Error('Plantilla Xetux no disponible');
     if (S.templateHash && T.templateHash && S.templateHash !== T.templateHash) {
-      throw new Error('La plantilla actual no coincide con la usada al capturar esta sesión. No se exportó nada; revisa la plantilla antes de cerrar.');
+      // Plantilla re-subida a mitad de toma (Xetux solo acepta el nombre de su
+      // último export, así que re-subirla es rutina). Exportar sigue siendo
+      // válido si todos los códigos con conteo existen en la plantilla vigente;
+      // un código ausente perdería su cantidad en silencio — solo eso bloquea.
+      const contados = new Set();
+      for (const zc of Object.values(S.countsByZone || {}))
+        for (const cod of Object.keys(zc || {})) contados.add(cod);
+      for (const [cod, corr] of Object.entries(S.correctionsByZone?.['_admin'] || {}))
+        if (corr?.qty != null) contados.add(cod);
+      const fuera = [...contados].filter(cod => T.rowMap?.[cod] === undefined);
+      if (fuera.length) {
+        throw new Error(
+          `La plantilla cambió desde que se capturó esta sesión y ${fuera.length} artículo(s) contado(s) ya no están en ella:\n` +
+          fuera.join(', ') +
+          '\n\nNo se exportó nada; sube una plantilla Xetux que los incluya.'
+        );
+      }
+      if (!confirm(
+        'La plantilla cambió desde que se capturó esta sesión.\n\n' +
+        `Verificado: los ${contados.size} artículos contados existen todos en la plantilla actual. ` +
+        'Los factores de conversión por defecto serán los de la plantilla nueva.\n\n' +
+        '¿Exportar con la plantilla actual?'
+      )) return;
     }
     if (S.exportedAt && !force) {
       const msg = S.exportedBy ? `Ya fue exportada por ${S.exportedBy}.` : 'Ya fue exportada.';
