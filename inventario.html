@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Inventario · Piazza Pasticcio</title>
+<link rel="icon" type="image/png" href="branding/icon-192.png" id="favicon">
+<link rel="apple-touch-icon" href="branding/icon-180.png" id="touch-icon">
+<link rel="manifest" href="manifest.webmanifest" id="manifest-link">
+<meta name="theme-color" content="#667eea">
 <style>
 @font-face{font-family:'Brand';font-weight:400;src:url(branding/fonts/FreightNeo%20W03%20Book.ttf)format('truetype')}
 @font-face{font-family:'BrandScript';font-weight:900;src:url(branding/fonts/TT%20Nooks%20Script%20Black.otf)format('opentype')}
@@ -339,6 +343,11 @@ const AREA_CONFIG = {
 // Guardia visual R8: fuera de PIAZZA el nombre del centro queda siempre visible
 // y el hero pierde el branding de Piazza (logo + nombre pasan a ser del centro)
 if (CENTRO !== 'PIAZZA') {
+  if (CENTRO === 'UH') {
+    document.getElementById('favicon').href = 'branding/icon-uh-192.png';
+    document.getElementById('touch-icon').href = 'branding/icon-uh-180.png';
+    document.getElementById('manifest-link').href = 'manifest-uh.webmanifest';
+  }
   document.title = 'Inventario · ' + CENTROS[CENTRO].nombre;
   document.addEventListener('DOMContentLoaded', () => {
     const c = CENTROS[CENTRO];
