@@ -6,13 +6,15 @@
 # el mismo y la primera app instalada capturaba a la otra. La copia es
 # byte-idéntica: inventario.html detecta el centro por pathname.
 #
-# Correr después de cada deploy que toque inventario.html, manifest-uh o branding/.
+# Lo corre solo el Action .github/workflows/sync-uh.yml en cada push a main
+# (UH_REMOTE apunta al remote ssh con el deploy key); también sirve a mano.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+REMOTE="${UH_REMOTE:-https://github.com/pabloaranda-max/inventario-uh.git}"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
-git clone --depth 1 https://github.com/pabloaranda-max/inventario-uh.git "$TMP"
+git clone --depth 1 "$REMOTE" "$TMP"
 
 rm -rf "$TMP"/inventario.html "$TMP"/manifest-uh.webmanifest "$TMP"/branding "$TMP"/index.html "$TMP"/README.md
 cp inventario.html manifest-uh.webmanifest "$TMP"/
@@ -31,7 +33,8 @@ git add -A
 if git diff --cached --quiet; then
   echo "Espejo UH ya está al día."
 else
-  git commit -m "sync: espejo desde inventario-cocina-piazza $(date -u +%Y-%m-%dT%H:%MZ)"
+  git -c user.name="sync-uh" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+    commit -m "sync: espejo desde inventario-cocina-piazza $(date -u +%Y-%m-%dT%H:%MZ)"
   git push origin HEAD
   echo "Espejo UH actualizado."
 fi
