@@ -10,7 +10,8 @@
 // eso instalar ?centro=UH daba la app de Piazza). El link correcto tiene que
 // emitirse aquí mismo, antes de que exista cualquier <link>.
 (function(){
-  var uh = (new URLSearchParams(location.search).get('centro') || '').toUpperCase() === 'UH';
+  var uh = location.pathname.indexOf('/inventario-uh/') !== -1 ||
+           (new URLSearchParams(location.search).get('centro') || '').toUpperCase() === 'UH';
   var pre = uh ? 'branding/icon-uh-' : 'branding/icon-';
   document.write(
     '<link rel="icon" type="image/png" href="' + pre + '192.png" id="favicon">' +
@@ -331,6 +332,9 @@ const CENTROS = {
             logo: 'branding/logo-universal.png' }
 };
 const CENTRO = (() => {
+  // El repo espejo inventario-uh sirve una copia byte-idéntica de esta página:
+  // ahí el centro se decide por la ruta, sin depender de ?centro=
+  if (location.pathname.indexOf('/inventario-uh/') !== -1) return 'UH';
   const c = (new URLSearchParams(location.search).get('centro') || 'PIAZZA').toUpperCase();
   return CENTROS[c] ? c : 'PIAZZA';
 })();
