@@ -1,6 +1,8 @@
-# inventario.html — Especificación técnica v4.7
+# inventario.html — Especificación técnica v4.8
 
-> Última actualización: 2026-07-08. Estado: **EN PRODUCCIÓN** (CAVA probado; BARRA_RESTAURANTE con dos tomas reales completadas).
+> Última actualización: 2026-07-15. Estado: **EN PRODUCCIÓN** (CAVA probado; BARRA_RESTAURANTE con dos tomas reales completadas).
+> v4.8: export con guard verificado + zip por almacén, botón "Cerrar con plantilla
+> fresca", apps instalables PWA (§16, UH en repo espejo), icono propio del admin.
 >
 > **Este documento es el ÚNICO contrato vivo del proyecto.** `plan-slices.md` (v1.0) y
 > `FABLE_HANDOFF.md` quedan [SUPERADOS] — sus decisiones vigentes están incorporadas
@@ -229,7 +231,16 @@ async function hashRaw(raw) {
 }
 ```
 
-Si `T.templateHash !== S.templateHash` → advertencia visible. No bloquear exportación.
+Si `T.templateHash !== S.templateHash`:
+
+- **inventario.html:** advertencia visible. No bloquear la captura.
+- **admin.html al exportar (v4.8):** verificar que TODOS los códigos con conteo
+  (countsByZone + correcciones `_admin`) existan en `T.rowMap`. Si todos existen →
+  confirm y continuar (los factores default se resuelven con la plantilla vigente).
+  Si falta alguno → bloquear listándolos: un código ausente perdería su cantidad en
+  silencio al escribir el xlsx. Motivo: re-subir plantilla a mitad de toma es RUTINA
+  (Xetux solo acepta importaciones con el nombre de su último export, ver §9), así
+  que el mismatch de hash no puede ser un bloqueo duro.
 
 ---
 
@@ -481,7 +492,23 @@ El xlsx se regenera desde `T.raw` (base64): se parsea, se sobreescriben las celd
 **Nombre del archivo (v4.7):** el archivo descargado usa `T.originalFilename` (el nombre
 exacto con que Xetux exportó la plantilla); solo si está vacío cae al nombre legacy
 `Inventario_{almacen}_{fecha}.xlsx`. Motivo: Xetux puede bloquear la importación por
-nombre de archivo antes de validar contenido.
+nombre de archivo antes de validar contenido. **Además, el nombre válido nace al CREAR
+la toma de inventario en Xetux** (consecutivo XTINVxxxxxx): exportar plantilla e importar
+la carga masiva van siempre pegados a esa toma.
+
+**Descarga en zip (v4.8):** el navegador no permite elegir carpeta de descarga y el
+nombre Xetux no identifica el almacén, así que el xlsx baja dentro de
+`Inventario_{almacen}_{fecha}.zip` que al extraerse crea `ALMACEN/xlsx-nombre-intacto`
+(`buildZip` en admin.html, ZIP método store sin compresión, CRC32 propio). El operador
+descomprime antes de importar a Xetux.
+
+**Botón "Cerrar con plantilla fresca" (v4.8, tab Tomas, solo sesiones pendientes):**
+colapsa el ciclo semanal en un paso — se elige el xlsx recién exportado de Xetux y el
+admin: (1) valida que todo lo contado exista en él ANTES de subir nada (si falta un
+código, aborta listándolo), (2) lo sube como plantilla del almacén (action
+inv_plantilla), (3) dispara el export normal con `opts.hashVerificado` (el guard de §5
+no re-pregunta). Flujo semanal completo: crear toma en Xetux → exportar plantilla →
+botón → descomprimir zip → importar en Xetux.
 
 **Diagnóstico de importación — método empírico, no especulativo:** si Xetux rechaza un
 archivo generado por la app, la única fuente de verdad es el error real de Xetux en un
@@ -887,3 +914,44 @@ idéntico al actual).
   `validation_report.json`.
 - Nunca committear secrets; viven en `wrangler secret`.
 - Cada slice termina actualizando ESTE documento.
+
+---
+
+## 16. Apps instalables (PWA) — IMPLEMENTADO (2026-07-15)
+
+**Regla dura de Chrome Android: UNA app instalada por scope.** La primera app
+instalada captura toda URL dentro de su scope; "instalar" otra en el mismo scope solo
+crea un acceso que abre dentro de la existente. Ni `id` distintos en el manifest ni
+cambiar `<link rel=manifest>` con JS lo resuelven (Chrome captura el manifest al
+parsear la página — probado y fallado 3 veces antes de llegar a esta arquitectura).
+
+### Arquitectura (scopes disjuntos)
+
+| App | URL de instalación | Manifest (id) | Scope |
+|---|---|---|---|
+| Inventario Piazza | `…/inventario-cocina-piazza/inventario.html` | `manifest.webmanifest` (`inventario-piazza`) | `inventario.html` |
+| Inventario UH | `…/inventario-uh/inventario.html` | `manifest-uh.webmanifest` (`inventario-uh`) | `/inventario-uh/` |
+| Admin | `…/inventario-cocina-piazza/admin.html` | `manifest-admin.webmanifest` (`admin-inventario-piazza`) | `admin.html` |
+
+- `scope` acotado a un archivo es válido: el matching es por prefijo de string del path.
+- El `<head>` de inventario.html emite manifest/iconos con `document.write` al parseo,
+  según pathname (`/inventario-uh/` → UH) o `?centro=UH`.
+- Iconos: `branding/icon-*` (Piazza), `icon-uh-*` (UH), `icon-admin-*` (admin, sliders
+  slate — el admin es multi-centro y no lleva emblema de Piazza). 180/192/512 cada uno.
+
+### Repo espejo `pabloaranda-max/inventario-uh`
+
+Copia **byte-idéntica** de `inventario.html` + `manifest-uh.webmanifest` + `branding/`
+(+ `index.html` redirect y `.nojekyll`). Sincronización AUTOMÁTICA:
+`.github/workflows/sync-uh.yml` corre `tools/sync-uh.sh` en cada push a main que toque
+esos archivos, autenticando con deploy key (secret `UH_DEPLOY_KEY`, escritura solo al
+espejo). El script también corre a mano como fallback.
+
+### Reglas operativas
+
+- Apps ya instaladas congelan icono/nombre/scope al instalar; cambios de manifest
+  llegan por el ciclo de actualización de WebAPK o reinstalando.
+- La URL vieja `…?centro=UH` sigue sirviendo en navegador; para INSTALAR UH se usa el
+  espejo (en la URL vieja chocaría con el scope de Piazza).
+- El caché HTTP de GitHub Pages es de 10 min — probar instalaciones después de ese
+  lapso o borrando datos del sitio.
