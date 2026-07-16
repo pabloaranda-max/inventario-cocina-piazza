@@ -1,0 +1,31 @@
+# Empuja el espejo inventario-uh (Pages /inventario-uh/, app PWA de UH) en
+# cada push a main que toque la app. El espejo existe porque Chrome Android
+# permite una sola app instalada por scope — ver tools/sync-uh.sh.
+name: sync-espejo-uh
+on:
+  push:
+    branches: [main]
+    paths:
+      - inventario.html
+      - manifest-uh.webmanifest
+      - 'branding/**'
+      - tools/sync-uh.sh
+      - .github/workflows/sync-uh.yml
+  workflow_dispatch:
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar deploy key del espejo
+        env:
+          DEPLOY_KEY: ${{ secrets.UH_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+      - name: Sincronizar espejo
+        env:
+          UH_REMOTE: git@github.com:pabloaranda-max/inventario-uh.git
+        run: bash tools/sync-uh.sh
