@@ -3,6 +3,7 @@
   "name": "Admin Inventario Piazza",
   "short_name": "Admin Inv",
   "start_url": "admin.html",
+  "scope": "admin.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#1e293b",
