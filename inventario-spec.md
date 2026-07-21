@@ -517,12 +517,32 @@ nombre de archivo antes de validar contenido. **Además, el nombre válido nace 
 la toma de inventario en Xetux** (consecutivo XTINVxxxxxx): exportar plantilla e importar
 la carga masiva van siempre pegados a esa toma.
 
-**Descarga: .xlsx directo (v4.10 — revierte el zip de v4.8).** El archivo baja tal cual,
-con el nombre de Xetux, y el almacén se identifica en el aviso de descarga
-(`Descargado: <archivo> (es el inventario de <almacén> del <fecha>)`). El zip de v4.8
-(`buildZip`, carpeta `ALMACEN/`) está ELIMINADO: **Xetux no reconoce el zip**, obligaba a
-descomprimir a mano en cada carga y no aportaba nada a cambio. No reintroducir empaquetado
-sobre el archivo que va a Xetux — lo que Xetux valida es el nombre del .xlsx.
+**Descarga: .xlsx directo (v4.10 — revierte el zip de v4.8).** El zip de v4.8 (`buildZip`,
+carpeta `ALMACEN/`) está ELIMINADO: **Xetux no reconoce el zip**, obligaba a descomprimir a
+mano en cada carga y no aportaba nada. No reintroducir empaquetado sobre el archivo que va
+a Xetux — lo que Xetux valida es el nombre del .xlsx.
+
+**Modal "Inventario listo" (v4.10).** El export ya no baja el archivo solo: `construirXlsx
+Inventario()` devuelve `{bytes, fname}` y el modal `#modal-archivo` muestra almacén, fecha y
+el **nombre exacto con botón de copiar** (para pegarlo en el diálogo de importación de
+Xetux, donde los `XTINVxxxxxx` son indistinguibles entre sí). Guardar es un clic propio:
+
+- Con `showSaveFilePicker` (Chrome de escritorio) el archivo **se sobrescribe** y Chrome
+  recuerda la carpeta por almacén vía la opción `id: 'inv_<almacen>'`. Esto es lo que
+  elimina el ritual de borrar-antes-de-bajar: una descarga normal NO sobrescribe, Chrome
+  crea `… (1).xlsx` y **Xetux rechaza ese nombre**.
+- Sin soporte, o si el picker falla por cualquier motivo que no sea `AbortError`, cae a
+  `<a download>` y avisa de la trampa del `(1)`.
+- Si el usuario renombra en el diálogo, se compara `handle.name` con `fname` y se avisa.
+
+**Por qué guardar va en un clic aparte y no automático:** `showSaveFilePicker` exige gesto
+de usuario reciente (~5 s) y el export tarda más que eso (fetches de sesión/plantilla +
+`XLSX.write` con estilos + los confirm del guard). Llamarlo dentro del flujo daría
+`SecurityError` y caería siempre al `<a download>` — justo lo que hay que evitar.
+
+**Botón "Nombre del archivo"** en cada toma ya exportada (`verArchivoDeToma`): pide la
+plantilla vigente y abre el mismo modal en modo solo-nombre, para identificar cuál de los
+archivos acumulados en la carpeta corresponde a esa toma.
 
 **Botón "Cerrar con plantilla fresca" (v4.8, tab Tomas, solo sesiones pendientes):**
 colapsa el ciclo semanal en un paso — se elige el xlsx recién exportado de Xetux y el
