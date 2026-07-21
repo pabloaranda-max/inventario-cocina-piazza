@@ -1157,63 +1157,6 @@ async function catalogoLookup(almacen, T) {
   return lookup;
 }
 
-const _crcTable = (() => {
-  const t = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
-    t[n] = c >>> 0;
-  }
-  return t;
-})();
-
-function crc32(data) {
-  let c = 0xFFFFFFFF;
-  for (let i = 0; i < data.length; i++) c = _crcTable[(c ^ data[i]) & 0xFF] ^ (c >>> 8);
-  return (c ^ 0xFFFFFFFF) >>> 0;
-}
-
-// ZIP mínimo sin compresión (método store). Existe porque el xlsx de carga
-// masiva debe conservar el nombre exacto del export de Xetux, y ese nombre no
-// dice de qué almacén es: el zip lo envuelve en una carpeta ALMACEN/.
-function buildZip(entries) {
-  const enc = new TextEncoder();
-  const now = new Date();
-  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
-  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
-  const u16 = v => [v & 0xFF, (v >> 8) & 0xFF];
-  const u32 = v => [v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF];
-  const chunks = [], central = [];
-  let offset = 0;
-  for (const { name, data } of entries) {
-    const nameB = enc.encode(name);
-    const crc = crc32(data);
-    const head = new Uint8Array([
-      0x50,0x4B,0x03,0x04, ...u16(20), ...u16(0), ...u16(0), ...u16(dosTime), ...u16(dosDate),
-      ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nameB.length), ...u16(0)
-    ]);
-    central.push({ nameB, crc, size: data.length, offset });
-    chunks.push(head, nameB, data);
-    offset += head.length + nameB.length + data.length;
-  }
-  const cdStart = offset;
-  let cdSize = 0;
-  for (const c of central) {
-    const rec = new Uint8Array([
-      0x50,0x4B,0x01,0x02, ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(dosTime), ...u16(dosDate),
-      ...u32(c.crc), ...u32(c.size), ...u32(c.size), ...u16(c.nameB.length), ...u16(0), ...u16(0),
-      ...u16(0), ...u16(0), ...u32(0), ...u32(c.offset)
-    ]);
-    chunks.push(rec, c.nameB);
-    cdSize += rec.length + c.nameB.length;
-  }
-  chunks.push(new Uint8Array([
-    0x50,0x4B,0x05,0x06, ...u16(0), ...u16(0), ...u16(central.length), ...u16(central.length),
-    ...u32(cdSize), ...u32(cdStart), ...u16(0)
-  ]));
-  return new Blob(chunks, { type: 'application/zip' });
-}
-
 function descargarXlsxInventario(almacen, fecha, T, totales) {
   const wb = XLSX.read(b64ToArrayBuffer(T.raw), { type:'array', cellStyles:true });
   const ws = wb.Sheets[wb.SheetNames[0]];
@@ -1226,16 +1169,18 @@ function descargarXlsxInventario(almacen, fecha, T, totales) {
   const out = XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles:true });
   // Xetux puede rechazar la importación si el archivo no conserva el nombre con que
   // exportó la plantilla; usar el original y caer al legacy solo si no existe (pre-v4.7).
-  // El navegador no deja elegir carpeta de descarga, así que el xlsx viaja dentro
-  // de un zip que al extraerse crea ALMACEN/ para identificar de cuál almacén es.
+  // Se descarga el .xlsx tal cual: el zip de v4.8 (carpeta ALMACEN/ para identificar
+  // el almacén) no sirve — Xetux no lo reconoce y obliga a descomprimir a mano.
+  // El almacén se identifica en el aviso de descarga, no en el archivo.
   const fname = T.originalFilename || `Inventario_${almacen}_${fecha}.xlsx`;
-  const blob = buildZip([{ name: `${almacen}/${fname}`, data: new Uint8Array(out) }]);
+  const blob = new Blob([out], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `Inventario_${almacen}_${fecha}.zip`;
+  a.download = fname;
   a.click();
   URL.revokeObjectURL(url);
+  return fname;
 }
 
 async function marcarExportacion(almacen, fecha, force) {
@@ -1373,6 +1318,19 @@ async function exportarSesionInventario(almacen, fecha, force, opts) {
     const corrections = correctionsByCod(S);
     const rawLookup = itemsFromRaw(T.raw, T);
     const catLookup = await catalogoLookup(almacen, T);
+    // Los comentarios de la toma son excepciones: al XLSX de Xetux solo viajan
+    // cantidades, así que la observación va a Sheets junto con las correcciones.
+    const comentariosByCod = {};
+    for (const m of (S.manuales || [])) {
+      if (m.type === 'comment' && m.cod)
+        (comentariosByCod[m.cod] = comentariosByCod[m.cod] || []).push(m.zona ? `${m.texto} (${m.zona})` : m.texto);
+    }
+    const observacionDe = cod => {
+      const notas = [];
+      if (corrections[cod]) notas.push(`Editado despues de cerrar zona: ${corrections[cod].map(c => `${zonaNombre(almacen, c.zid)} por ${c.operario || '—'}`).join('; ')}`);
+      for (const t of (comentariosByCod[cod] || [])) notas.push(`Comentario: ${t}`);
+      return notas.join(' · ');
+    };
     const productos = Object.entries(totales)
       .filter(([cod]) => T.rowMap?.[cod] !== undefined)
       .map(([cod, qty]) => {
@@ -1387,11 +1345,21 @@ async function exportarSesionInventario(almacen, fecha, force, opts) {
           uni: item.unidad,
           catalogado: true,
           corregido: !!corrections[cod],
-          observacion: corrections[cod]
-            ? `Editado despues de cerrar zona: ${corrections[cod].map(c => `${zonaNombre(almacen, c.zid)} por ${c.operario || '—'}`).join('; ')}`
-            : ''
+          observacion: observacionDe(cod)
         };
       });
+    // Comentarios sobre artículos que no entran al XLSX (sin conteo, o contados
+    // pero ya fuera de la plantilla actual): fila de excepción para no perderlos.
+    for (const cod of Object.keys(comentariosByCod)) {
+      if (totales[cod] !== undefined && T.rowMap?.[cod] !== undefined) continue;
+      const item = catLookup[cod] || rawLookup[cod] || { codigo:cod, nombre:cod, unidad:T.unitMap?.[cod] || '' };
+      productos.push({
+        codigo: cod, nombre: item.nombre, unidad: item.unidad,
+        cantidad: totales[cod] !== undefined ? parseFloat(totales[cod].toFixed(4)) : '',
+        cod, art: item.nombre, uni: item.unidad,
+        catalogado: true, corregido: false, observacion: observacionDe(cod)
+      });
+    }
     const manuales = (S.manuales || []).filter(m => m.type !== 'comment').map(m => ({
       ...m,
       unidad: m.unidad || m.uni || '',
@@ -1399,7 +1367,9 @@ async function exportarSesionInventario(almacen, fecha, force, opts) {
       foto_base64: m.foto_base64 || m.foto || null
     }));
 
-    descargarXlsxInventario(almacen, fecha, T, totales);
+    const archivo = descargarXlsxInventario(almacen, fecha, T, totales);
+    // El nombre lo impone Xetux y no dice de qué almacén es: se nombra aquí.
+    const avisoArchivo = `Descargado: ${archivo}\n(es el inventario de ${tituloAlmacen(almacen)} del ${fecha} — impórtalo tal cual, sin renombrar)`;
 
     // R9b: a Sheets solo viajan EXCEPCIONES — manuales (con foto) y
     // catalogados con observación. La toma íntegra ya vive en D1 y el
@@ -1421,11 +1391,11 @@ async function exportarSesionInventario(almacen, fecha, force, opts) {
           manuales
         })
       });
-      alert(`Excel descargado. Excepciones a Sheets: ${excepciones.length} con observación + ${manuales.length} manuales.`);
+      alert(`${avisoArchivo}\n\nExcepciones a Sheets: ${excepciones.length} con observación + ${manuales.length} manuales.`);
     } else if (cfg.scriptUrl) {
-      alert('Excel descargado. Sin excepciones — nada que enviar a Sheets.');
+      alert(`${avisoArchivo}\n\nSin excepciones — nada que enviar a Sheets.`);
     } else {
-      alert('Excel descargado. Sin Sheets configurado para este almacén.');
+      alert(`${avisoArchivo}\n\nSin Sheets configurado para este almacén.`);
     }
 
     await marcarExportacion(almacen, fecha, force);
@@ -1696,6 +1666,7 @@ async function loadPlantillaStatus() {
       renderDefaultsEditor(d.defaultPres || {});
       renderRevisionPresentaciones(d);
     } else {
+      renderDefaultsEditor(null);
       document.getElementById('plt-revision').innerHTML = '';
     }
   } catch(e) {
@@ -1759,10 +1730,15 @@ function renderRevisionPresentaciones(d) {
   cont.innerHTML = html;
 }
 
+// defaultPres null/undefined = el almacén no tiene plantilla: se oculta el editor.
+// Si quedara visible con las filas del almacén anterior, "Guardar" las escribiría
+// en el almacén equivocado.
 function renderDefaultsEditor(defaultPres) {
   const sec = document.getElementById('plt-defaults-section');
   const tbody = document.getElementById('plt-defs-body');
   tbody.innerHTML = '';
+  document.getElementById('plt-defs-msg').textContent = '';
+  if (!defaultPres) { sec.style.display = 'none'; return; }
   for (const [uni, pres] of Object.entries(defaultPres)) {
     for (const p of (pres || [])) _addDefaultRow(uni, p.nombre, p.factor);
   }
@@ -1773,32 +1749,53 @@ function _addDefaultRow(uni, nombre, factor) {
   const tbody = document.getElementById('plt-defs-body');
   const tr = document.createElement('tr');
   const cellStyle = 'padding:3px 4px';
-  const inp = (val, ph, w, type='text') =>
-    `<input type="${type}" value="${String(val??'')}" placeholder="${ph}" style="width:${w};font-size:12px;border:1px solid #d1d5db;border-radius:4px;padding:3px 6px${type==='number'?';text-align:right':''}">`;
+  // El factor es texto con inputmode decimal, no type=number: con teclado en
+  // español "0,75" deja un input number en value="" y la fila se perdía en
+  // silencio. Aquí la coma se normaliza al guardar.
+  const inp = (val, ph, w, extra='') =>
+    `<input type="text" value="${String(val??'')}" placeholder="${ph}" ${extra} style="width:${w};font-size:12px;border:1px solid #d1d5db;border-radius:4px;padding:3px 6px">`;
   tr.innerHTML = `
     <td style="${cellStyle}">${inp(uni,'LT','55px')}</td>
     <td style="${cellStyle}">${inp(nombre,'BOTELLA','130px')}</td>
-    <td style="${cellStyle};text-align:right">${inp(factor,'0.75','65px','number')}</td>
+    <td style="${cellStyle};text-align:right">${inp(factor,'0.75','65px','inputmode="decimal"')}</td>
     <td style="${cellStyle}"><button onclick="this.closest('tr').remove()" style="border:none;background:none;color:#ef4444;cursor:pointer;font-size:16px;line-height:1">×</button></td>`;
   tbody.appendChild(tr);
 }
 
 function addDefaultRow() { _addDefaultRow('', '', ''); }
 
+// Guardar es todo-o-nada y se verifica contra el servidor: antes una fila mal
+// escrita se descartaba callada y se guardaba {} mostrando "✓ Guardado", así que
+// los defaults parecían puestos y el export seguía enviando el conteo sin convertir.
 async function saveDefaults() {
   const almacen = document.getElementById('plt-almacen').value;
   const msg = document.getElementById('plt-defs-msg');
-  msg.style.color = '#6b7280'; msg.textContent = 'Guardando…';
   const defaultPres = {};
-  document.querySelectorAll('#plt-defs-body tr').forEach(tr => {
+  const malas = [];
+  [...document.querySelectorAll('#plt-defs-body tr')].forEach((tr, i) => {
     const [iUni, iNom, iFac] = tr.querySelectorAll('input');
     const uni = iUni.value.trim().toUpperCase();
     const nom = iNom.value.trim();
-    const fac = parseFloat(iFac.value);
-    if (!uni || !nom || isNaN(fac) || fac <= 0) return;
+    const facTxt = iFac.value.trim().replace(',', '.');
+    const fac = parseFloat(facTxt);
+    tr.style.background = '';
+    if (!uni && !nom && !facTxt) return;             // fila vacía: se ignora
+    if (!uni || !nom || !(fac > 0)) {
+      malas.push(i + 1);
+      tr.style.background = '#fee2e2';
+      return;
+    }
     if (!defaultPres[uni]) defaultPres[uni] = [];
     defaultPres[uni].push({ nombre: nom, factor: fac });
   });
+  if (malas.length) {
+    msg.style.color = '#dc2626';
+    msg.textContent = `✗ No se guardó nada: revisa la fila ${malas.join(', ')} (unidad, nombre y factor > 0).`;
+    return;
+  }
+  if (!Object.keys(defaultPres).length &&
+      !confirm(`Sin filas: esto BORRA las presentaciones por defecto de ${tituloAlmacen(almacen)}. ¿Continuar?`)) return;
+  msg.style.color = '#6b7280'; msg.textContent = 'Guardando…';
   try {
     const r = await fetch(WORKER_URL + '/inv/plantilla', {
       method: 'POST', headers: adminHeaders(),
@@ -1806,7 +1803,19 @@ async function saveDefaults() {
     });
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || 'Error');
-    msg.style.color = '#16a34a'; msg.textContent = '✓ Guardado';
+    // Releer del servidor: lo que se ve tiene que ser lo que quedó guardado.
+    const vr = await fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen));
+    const v = await vr.json();
+    const guardado = (v.ok && v.found) ? (v.defaultPres || {}) : null;
+    if (!guardado || JSON.stringify(guardado) !== JSON.stringify(defaultPres)) {
+      msg.style.color = '#dc2626';
+      msg.textContent = '✗ El servidor no confirmó el guardado. Vuelve a intentar.';
+      return;
+    }
+    const n = Object.values(guardado).reduce((a, p) => a + p.length, 0);
+    msg.style.color = '#16a34a';
+    msg.textContent = `✓ Guardado y verificado en el servidor (${n} regla${n !== 1 ? 's' : ''}).`;
+    renderRevisionPresentaciones({ ...v });
   } catch(e) {
     msg.style.color = '#dc2626'; msg.textContent = '✗ ' + e.message;
   }

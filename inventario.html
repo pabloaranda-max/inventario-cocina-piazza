@@ -1338,7 +1338,10 @@ function renderValidation() {
   const totales = {}; // cod → qty_base
   for (const [zid, zc] of Object.entries(S.countsByZone||{})) {
     for (const [cod, qty] of Object.entries(zc)) {
-      const f = (S.presChoiceByZone?.[zid]?.[cod]) ?? (T?.presMap?.[cod]?.[0]?.factor ?? 1);
+      // getPresOptions, no presMap: incluye los defaults por unidad, que es lo que
+      // aplica el export (factorDefault en js/sesion-merge.js). Con presMap a secas
+      // la pantalla de validación mostraba el conteo sin convertir.
+      const f = (S.presChoiceByZone?.[zid]?.[cod]) ?? (getPresOptions(cod)[0]?.factor ?? 1);
       totales[cod] = (totales[cod] || 0) + qty * f;
     }
   }
@@ -1347,7 +1350,7 @@ function renderValidation() {
   const allItems = ZONAS.flatMap(z => z.items);
   const allCods  = [...new Set(allItems.map(i => i.cod))];
   const notCounted = allCods.filter(cod => totales[cod] === undefined);
-  const withConv   = countedCods.filter(cod => (T?.presMap?.[cod]?.length||0) > 0);
+  const withConv   = countedCods.filter(cod => getPresOptions(cod).length > 0);
 
   let html = '';
   if (!T || !T.raw) {

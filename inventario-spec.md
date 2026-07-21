@@ -1,6 +1,10 @@
-# inventario.html — Especificación técnica v4.8
+# inventario.html — Especificación técnica v4.10
 
-> Última actualización: 2026-07-15. Estado: **EN PRODUCCIÓN** (CAVA probado; BARRA_RESTAURANTE con dos tomas reales completadas).
+> Última actualización: 2026-07-21. Estado: **EN PRODUCCIÓN** (CAVA probado; BARRA_RESTAURANTE con dos tomas reales completadas).
+> v4.10: el export baja el .xlsx directo (zip eliminado — Xetux no lo reconoce) y las
+> presentaciones por defecto se guardan todo-o-nada con verificación contra el servidor.
+> v4.9: scraper ELIMINADO del proyecto (`cargar_xetux.py` apartado en `operaciones/`),
+> plan de costeo por restaurante R10a–c (§15).
 > v4.8: export con guard verificado + zip por almacén, botón "Cerrar con plantilla
 > fresca", apps instalables PWA (§16, UH en repo espejo), icono propio del admin.
 >
@@ -48,7 +52,8 @@ Pablo completó el primer inventario real de BARRA_RESTAURANTE. Funcionó pero c
 - `defaultPres`: presentaciones por defecto por unidad (para artículos sin `_NNNN` en Xetux)
 - Catálogo filtrado por rowMap: solo aparecen artículos en la plantilla activa
 - Catálogos en D1: BARRA(423), COCINA(1106), ALIMENTARI(424), CAVA(214), GENERAL(385), SALUMERIA(74)
-- sync_d1.py: sincroniza catálogos Xetux → D1 permanentemente (POST /sync/catalogo con X-Sync-Token)
+- ~~sync_d1.py: sincroniza catálogos Xetux → D1~~ ELIMINADO 2026-07-16 junto con el
+  scraper; desde R8 el catálogo se deriva de la plantilla al subirla desde admin (§15 R8)
 
 **CAVA probado:**
 - Plantilla: 146 artículos, 131 con presentaciones de Xetux
@@ -103,7 +108,7 @@ Pablo completó el primer inventario real de BARRA_RESTAURANTE. Funcionó pero c
        GET  /inv/sesiones[?almacen=X]                  ← listado para admin (v4.5)
        POST /inv/sesion  (inv_sesion | inv_lock)
        POST /inv/sesion  (action: inv_export)          ← marca sesión como exportada (v4.5)
-       POST /sync/catalogo  ← sync_d1.py con X-Sync-Token
+       POST /sync/catalogo  ← [MUERTO 2026-07-16] era sync_d1.py; el catálogo se deriva de la plantilla (R8)
 
   └─ [admin.html] → gestiona plantillas, muestra sesiones, genera Excel, envía Sheets
   └─ Google Apps Script (por almacén) → Sheets
@@ -218,6 +223,22 @@ function getPresOptions(cod) {
 Se guarda con `action: inv_defaults` — **sobrevive re-uploads de plantilla** (columna separada en D1).
 
 Admin configura defaults desde admin.html → sección "Presentaciones por defecto" en tab Plantillas.
+
+**El factor default lo aplica el export, no solo la pantalla.** `factorDefault()` en
+`js/sesion-merge.js` (Worker + admin) resuelve presMap → defaultPres → 1, y es la única
+implementación válida. La pantalla de validación de inventario.html usa `getPresOptions`
+por la misma razón: si una superficie mira solo `presMap`, muestra o exporta el conteo
+**sin convertir** y el error es silencioso (v4.10 corrigió eso en la validación).
+
+**Guardar defaults es todo-o-nada y verificado (v4.10).** Hasta v4.9 una fila incompleta o
+con factor ilegible se descartaba callada y se guardaba `{}` mostrando "✓ Guardado": los
+defaults parecían configurados y el export seguía mandando botellas como litros — con
+`default_pres = '{}'` en los 8 almacenes de producción al 2026-07-21. Ahora: fila inválida
+→ no se guarda nada y se marca la fila; el factor acepta coma decimal (`type=text` +
+`inputmode=decimal`, un `type=number` deja `value=""` al teclear `0,75`); guardar vacío
+pide confirmación porque BORRA; y tras el POST se relee del servidor y se compara, así que
+"✓ Guardado" significa guardado. El editor se oculta si el almacén no tiene plantilla
+(antes conservaba las filas del almacén anterior).
 
 ### Versionado
 
@@ -496,11 +517,12 @@ nombre de archivo antes de validar contenido. **Además, el nombre válido nace 
 la toma de inventario en Xetux** (consecutivo XTINVxxxxxx): exportar plantilla e importar
 la carga masiva van siempre pegados a esa toma.
 
-**Descarga en zip (v4.8):** el navegador no permite elegir carpeta de descarga y el
-nombre Xetux no identifica el almacén, así que el xlsx baja dentro de
-`Inventario_{almacen}_{fecha}.zip` que al extraerse crea `ALMACEN/xlsx-nombre-intacto`
-(`buildZip` en admin.html, ZIP método store sin compresión, CRC32 propio). El operador
-descomprime antes de importar a Xetux.
+**Descarga: .xlsx directo (v4.10 — revierte el zip de v4.8).** El archivo baja tal cual,
+con el nombre de Xetux, y el almacén se identifica en el aviso de descarga
+(`Descargado: <archivo> (es el inventario de <almacén> del <fecha>)`). El zip de v4.8
+(`buildZip`, carpeta `ALMACEN/`) está ELIMINADO: **Xetux no reconoce el zip**, obligaba a
+descomprimir a mano en cada carga y no aportaba nada a cambio. No reintroducir empaquetado
+sobre el archivo que va a Xetux — lo que Xetux valida es el nombre del .xlsx.
 
 **Botón "Cerrar con plantilla fresca" (v4.8, tab Tomas, solo sesiones pendientes):**
 colapsa el ciclo semanal en un paso — se elige el xlsx recién exportado de Xetux y el
@@ -508,7 +530,7 @@ admin: (1) valida que todo lo contado exista en él ANTES de subir nada (si falt
 código, aborta listándolo), (2) lo sube como plantilla del almacén (action
 inv_plantilla), (3) dispara el export normal con `opts.hashVerificado` (el guard de §5
 no re-pregunta). Flujo semanal completo: crear toma en Xetux → exportar plantilla →
-botón → descomprimir zip → importar en Xetux.
+botón → importar el .xlsx descargado en Xetux.
 
 **Diagnóstico de importación — método empírico, no especulativo:** si Xetux rechaza un
 archivo generado por la app, la única fuente de verdad es el error real de Xetux en un
@@ -595,7 +617,7 @@ No se añade testing por ceremonia — se pone alarma donde ya hubo falla real.
 
 Nota sobre unitMap: `parsePlantilla` captura la unidad tal como aparece en la plantilla Xetux. El override real ocurre en `resolveZonas()`: si el catálogo D1 dice `B.750` pero `unitMap[cod]` dice `LT`, el ítem muestra `LT`. Eso es un test de integración posterior, no del parser.
 
-**Fase 2 — Alertas Slack en sync_d1.py:**
+**Fase 2 — ~~Alertas Slack en sync_d1.py~~ [OBSOLETO 2026-07-16: scraper y sync_d1.py eliminados del proyecto]:**
 - Postear a Slack si `articulos_sync == 0` para cualquier almacén
 - Postear si la cuenta baja >80% vs la corrida anterior (baseline guardado en archivo local)
 - Postear si hay error de login/scrape en Xetux
@@ -763,6 +785,9 @@ Guardar/activar debe requerir password admin.
 | R8 | **Multi-centro — "Universal de Hamburguesas"** — segundo centro de consumo con ~3 almacenes (`UH_GENERAL`, `UH_COCINA`, `UH_BARRA`). Ver diseño abajo | HECHO 2026-07-10 (E2E staging: 9 asserts API — catálogo derivado, no-pisar, aislamiento CAVA — + 13 asserts navegador — filtro por centro, banner, guardia cross-centro, normalización del param, beta UH_COCINA 8 arts desde staging. Sin migraciones D1. PENDIENTE: Apps Script UH bloqueado en `clasp login` de Pablo; plantillas reales UH cuando existan en su Xetux). **EN PROD 2026-07-10:** Worker desplegado (smoke test GETs OK), merge a main publicado en Pages. URL operarios UH: `inventario.html?centro=UH` |
 | R9a | **Tomas desde D1 + UI centro→almacén + limpieza visual** — el tab Tomas de admin.html deja de consultar Apps Scripts y lee `GET /inv/sesiones` del Worker; filtros de dos niveles (centro → almacén); limpieza de emojis. Ver diseño abajo | HECHO 2026-07-12 (E2E staging 27 asserts Playwright: lista D1 con operarios R5.1/manuales/comentarios, matriz centro→almacén, detalle, PDF por centro desde `calcularTotalesSesion`, CERO requests a script.google.com; histórico Sheets on-demand solo lectura; modal notas Sheets eliminado — el detalle D1 ya cubría notas/correcciones. Worker: GET extendido con manuales/comentarios/operarios, sin migración. **EN PROD 2026-07-12:** Worker desplegado (smoke: 3 sesiones prod con campos nuevos), merge a main en Pages) |
 | R9b | **Sheets de excepciones, un script por centro** — `scripts/centro/Code.js` único (deploy Pasticcio + UH); a Sheets solo viajan manuales + fotos + artículos con observación; sin pestañas de detalle. Requiere R9a. Ver diseño abajo | HECHO — **EN PROD 2026-07-13**. Script Piazza desplegado (proyecto `1hFie_…AaRs`, deployment `AKfycby7…wU9S`, libro `Inventario Excepciones · Piazza Pasticcio` = `1Xz7O10p…HFAg`); prueba real: 2 filas de excepciones en MAESTRA (observación resaltada + manual con foto en Drive y miniatura inline), cero pestañas de detalle. Cambios vs diseño: el filtro de payload vive en admin.html (`exportarSesionInventario`) porque inventario.html ya no enviaba a Sheets desde R9a — su config `appsScriptUrl` era código muerto y se eliminó; los 6 scripts viejos quedan como `SHEETS_LEGACY_PIAZZA` SOLO para "Cargar histórico"; BARRA_AMICI ahora sí envía excepciones (antes no tenía Sheets). El script re-filtra defensivamente por si llama un cliente viejo. **UH pendiente:** `clasp create` segundo proyecto con el mismo Code.js + `setupUH()` + deploy → URL a `SCRIPT_CENTRO.UH` |
+| R10a | **Piloto de costeo manual (compuerta go/no-go)** — un mes: 4 XLS exportados a mano de Xetux + tomas D1 → costo real por almacén/centro, auditoría de costos $0, cobertura ABC del conteo. Cero código permanente. Ver diseño abajo | PENDIENTE (arranca cuando Pablo baje los 4 XLS del mes piloto) |
+| R10b | **Tab Costos en admin — carga manual de archivos** — SOLO con el go de R10a. Arrastrar los 4 XLS al tab (patrón subida de plantillas), tablas D1 con `centro`, `GET /costos/resumen`, reporte semanal/mensual de dos capas. Ver diseño abajo | CONDICIONADO al go de R10a |
+| R10c | **Brecha real (mermas + desperdicio)** — costo real (R10b) − costo teórico (recetas/consumo Xetux). Cierra el rediseño de reportes pendiente desde 2026-03-27 | FUTURO (tras R10b estable) |
 | — | Limpieza (CSS muerto §13, mover apps viejas a `legacy/`, chat GROQ) — oportunista, al colarse en otra sesión | OPORTUNISTA |
 | — | Sheets API en vez de Apps Script (4b v1) — solo si Apps Script falla en un cierre real | FUTURO |
 
@@ -788,7 +813,7 @@ flujo). Decisión: misma app, mismo Worker, misma D1 — NO app ni instancia apa
   `articulos[]` (código, nombre, grupo, subgrupo, unidad — la plantilla trae
   todo); admin los incluye en el POST `inv_plantilla` y el Worker los upserta en
   `catalogo_articulos` SOLO si el almacén no tiene catálogo (COUNT=0). Los
-  catálogos Piazza (sync_d1.py, estacionado) no se tocan. Alta de almacén nuevo
+  catálogos Piazza (sembrados por sync_d1.py, hoy eliminado) no se tocan. Alta de almacén nuevo
   queda 100% self-service: subir plantilla → catálogo + rowMap + unitMap listos.
 - **Sheets propios de Universal:** UN solo Apps Script + UN Spreadsheet para
   todo el centro (la columna `Almacén` de MAESTRA ya distingue; menos deploys y
@@ -902,6 +927,76 @@ idéntico al actual).
 - **`inventario-beta.html`:** copia de inventario.html apuntando al Worker staging,
   servida por el mismo GitHub Pages → staging real de frontend probable desde teléfono.
   Crearla al inicio de R1 (primer slice que toca inventario.html).
+
+### R10 — Costeo por restaurante (diseño, 2026-07-16)
+
+**Contexto.** El scraper se ELIMINÓ del proyecto el 2026-07-16 (fallaba a diario, con
+fallas silenciosas —descargas con fechas incorrectas—, IDs PrimeFaces frágiles; el
+costeo es semanal/mensual y no justifica scraping). `cargar_xetux.py` (sistema
+Operaciones, no costeo) quedó apartado en `operaciones/` con README, pendiente de
+confirmar si Operaciones sigue vivo. El costeo se rediseña sobre datos que ya existen
+(las tomas en D1) + exports manuales de Xetux. Camino futuro preferido: leer la **DB
+del servidor físico de Xetux** (está en el restaurante, bajo control de Pablo; la API
+del vendor se pidió desde marzo y no llega). Ese diagnóstico es independiente de estos
+slices — si se logra, la captura manual colapsa a queries directas.
+
+**Hechos confirmados por Pablo (2026-07-16) que fijan el diseño:**
+
+1. NO existen movimientos de producto entre Piazza y UH → las transferencias internas
+   se anulan a nivel centro; solo importan para el desglose por almacén.
+2. Al aplicar una toma parcial, **Xetux pone en CERO los artículos no contados** → los
+   inventarios cerrados de Xetux NO sirven como frontera de valor (explica BARRA
+   feb-2026 con 5 artículos / $1,972). La frontera canónica son las tomas de la app en
+   D1 (`inv_sesiones` exportadas, totales vía `sesion-merge`). El stock teórico de
+   Xetux ("inventario actual") tampoco es confiable en cantidades para los no contados
+   — se usa SOLO como catálogo de costos.
+3. Cadencia: semanal (entre tomas) + mensual.
+
+**Ecuación de dos capas (por almacén, entre tomas consecutivas):**
+
+```
+Capa contada  (artículos presentes en AMBAS tomas frontera):
+              costo = toma_inicial + compras + transf_netas − toma_final
+Capa Δ=0      (todo lo demás): costo = compras + transf_netas del periodo
+Costo almacén = capa contada + capa Δ=0
+Costo centro  = Σ almacenes (las transferencias internas se anulan solas)
+```
+
+Reglas: artículo contado en solo UNA de las dos tomas frontera → cae a capa Δ=0 ese
+periodo (por eso las preparaciones §14 deben ser estables semana a semana). Semana sin
+toma de un almacén → su periodo se extiende hasta la siguiente toma y el reporte
+semanal lo marca "sin corte". GENERAL/SALUMERIA sin semáforo de % costo (sus "ventas"
+son transferencias enviadas — decisión 2026-03-25). Valuación: costo promedio vs
+último costo se decide con datos del piloto (correr ambos y comparar); cadena de
+fallback de costo: costo promedio → último costo → último costo de compra → flag "sin
+costo".
+
+**Insumos (4 XLS por centro, export manual de Xetux en la sesión semanal que Pablo ya
+hace — ~10 min):** compras detalle, transferencias, inventario actual (solo costos),
+ventas consolidado.
+
+**R10a — Piloto manual (compuerta).** Un mes de datos, cero código permanente: cruzar
+los 4 XLS con las tomas D1 y producir (1) costo real por almacén y por centro, (2)
+auditoría de artículos con movimiento/stock y costo $0 (lista concreta para corregir
+en Xetux), (3) cobertura ABC: % del valor del consumo que cae en capa contada, por
+almacén. **Go/no-go:** go si los números le resultan creíbles a Pablo y la cobertura
+contada de los almacenes grandes es razonable (o ampliable vía preparaciones §14);
+no-go = primero corregir costos $0 en Xetux / ampliar listas de conteo, sin construir
+nada. UH arranca como compras puras (todo capa Δ=0) hasta tener plantillas y tomas
+reales.
+
+**R10b — Tab Costos en admin (solo con go).** Carga manual: arrastrar los 4 XLS al tab
+→ parseo en navegador (SheetJS ya presente; mismo patrón que la subida de plantillas)
+con **validación antes de aceptar** (fechas dentro del rango declarado, totales > 0,
+almacenes esperados presentes) → POST al Worker → tablas D1 nuevas con columna
+`centro` (`costos_articulos`, `mov_compras`, `mov_transferencias`, `mov_ventas`) →
+`GET /costos/resumen` calcula la ecuación → UI: ventas, compras, costo real en dos
+capas, % vs ventas, **cobertura del conteo** (indicador de confianza del reporte) y
+desglose por almacén. Cero Python, cero cron, cero Playwright.
+
+**R10c — Brecha real (fase 2).** `brecha = costo real − costo teórico`
+(recetas/consumo de Xetux) = mermas + desperdicio. Cierra el rediseño de reportes
+pendiente desde 2026-03-27 — ahora con la ecuación correcta debajo.
 
 ### Reglas transversales (heredadas de plan v1, vigentes)
 
