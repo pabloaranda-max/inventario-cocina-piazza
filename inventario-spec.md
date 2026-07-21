@@ -207,6 +207,23 @@ uni: (T?.unitMap?.[a.codigo]) || a.unidad
 
 Razón: Xetux puede tener unidades incorrectas en el catálogo (ej: CAVA vinos con "B.750" en lugar de "LT"). La plantilla tiene la unidad correcta siempre.
 
+### Unidades: cada centro escribe las suyas
+
+El Xetux de Piazza usa `LT` y `PZA`; el de Universal de Hamburguesas usa `L` y `PZ`
+(`KG` coincide). Nunca comparar contra literales: usar `UNIDAD_PESO_VOLUMEN` /
+`UNIDAD_PIEZA` (definidas en admin.html e inventario.html). Con `=== 'LT'` los avisos
+de "se mide directo, sin presentación" ignoraban en silencio TODO lo que UH tiene en
+litros — justo donde muerde el error de contar piezas y registrar litros.
+
+**Excepción deliberada:** la regla `ml_g` del parser (factor >10 en LT/KG = mL/g mal
+capturado, DESCARTA la presentación) **no** se amplió a `L`. UH tiene `BIDON 20 L` y
+`BARRIL 29 LT` legítimos que el filtro borraría. Ampliar una regla que solo avisa es
+gratis; ampliar una que descarta datos no. Consecuencia asumida: para volúmenes de UH
+esa red no existe; para sus `KG` sí.
+
+**defaultPres se indexa por la unidad literal**: una regla para `LT` no aplica a `L`.
+Las de UH van con la clave `L`.
+
 ### defaultPres — presentaciones por defecto
 
 ```js

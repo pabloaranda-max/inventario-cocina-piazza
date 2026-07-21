@@ -1025,8 +1025,9 @@ function renderItemRow(item, zid, inOtherZone) {
   const unitLabel = opts.length === 1 ? `bots × ${opts[0].factor} ${displayItem.uni}`
                   : opts.length > 1   ? `${displayItem.uni} · selecciona presentación`
                   : displayItem.uni;
-  const unitWarn  = (displayItem.uni === 'LT' || displayItem.uni === 'KG') && opts.length === 0 ? ' warn' : '';
-  const inputStep = opts.length > 0 && displayItem.uni !== 'PZA' ? '0.5' : '0.01';
+  // Unidades por centro: Piazza LT/PZA, UH L/PZ (ver inventario.html)
+  const unitWarn  = /^(KG|K|G|GR|GRS|LT|LTS|L|ML)$/i.test(displayItem.uni || '') && opts.length === 0 ? ' warn' : '';
+  const inputStep = opts.length > 0 && !/^(PZA|PZAS|PZ|PIEZA|PIEZAS|UND|U)$/i.test(displayItem.uni || '') ? '0.5' : '0.01';
 
   const comment = getComment(item.cod);
   const commentBtn = _supervisorActual

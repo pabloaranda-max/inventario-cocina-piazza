@@ -1813,6 +1813,15 @@ async function loadPlantillaStatus() {
 // ── R6: revisión de presentaciones sospechosas ─────────────
 // Se calcula al vuelo desde el raw de la plantilla (parser puro). Solo informa
 // y pide decisión humana — la corrección real se hace en Xetux o con defaultPres.
+//
+// Cada Xetux escribe las unidades a su manera: Piazza usa LT/PZA y Universal de
+// Hamburguesas usa L/PZ. Con /^(LT|KG)$/ el aviso ignoraba en silencio todos los
+// artículos en L de UH, que es justo donde muerde el error de contar piezas y
+// registrar litros. Es una regla de AVISO: ampliarla no descarta ningún dato.
+// (La regla ml_g del parser NO se amplía a "L" a propósito: UH tiene BIDON 20 L
+// y BARRIL 29 LT legítimos que el filtro >10 borraría.)
+const UNIDAD_PESO_VOLUMEN = /^(KG|K|G|GR|GRS|LT|LTS|L|ML)$/i;
+
 const MOTIVOS_R6 = {
   ml_g:            { titulo: 'Factor >10 en LT/KG — probable mL/g mal capturado en Xetux', accion: 'DESCARTADA al parsear. Corregir el factor en Xetux y re-subir la plantilla.', color: '#dc2626' },
   factor_1:        { titulo: 'Factor 1.0 — no convierte nada', accion: 'DESCARTADA al parsear. Si el artículo sí necesita presentación, corregir en Xetux.', color: '#d97706' },
@@ -1833,7 +1842,7 @@ function renderRevisionPresentaciones(d) {
   const grupos = {};
   for (const s of (P.sospechosas || [])) (grupos[s.motivo] = grupos[s.motivo] || []).push(s);
   const sinPres = Object.keys(P.rowMap).filter(cod =>
-    /^(LT|KG)$/i.test(P.unitMap[cod] || '') && !P.presMap[cod] &&
+    UNIDAD_PESO_VOLUMEN.test(P.unitMap[cod] || '') && !P.presMap[cod] &&
     !((d.defaultPres || {})[P.unitMap[cod]]?.length));
 
   const total = (P.sospechosas || []).length + sinPres.length;

@@ -984,6 +984,13 @@ function getQtyForZone(zid, cod) {
   return (S.countsByZone?.[zid])?.[cod];
 }
 
+// Cada Xetux escribe las unidades a su manera: Piazza usa LT/PZA y Universal de
+// Hamburguesas usa L/PZ. Comparar contra 'LT'/'PZA' a secas dejaba a UH sin el
+// aviso naranja de "se mide directo, sin presentación" y con el paso de captura
+// equivocado.
+const UNIDAD_PESO_VOLUMEN = /^(KG|K|G|GR|GRS|LT|LTS|L|ML)$/i;
+const UNIDAD_PIEZA        = /^(PZA|PZAS|PZ|PIEZA|PIEZAS|UND|U)$/i;
+
 function getPresOptions(cod) {
   const explicit = T?.presMap?.[cod];
   if (explicit?.length) return explicit;
@@ -1047,8 +1054,8 @@ function renderItemRow(item, zid, inOtherZone) {
   const unitLabel = opts.length === 1 ? `bots × ${opts[0].factor} ${displayItem.uni}`
                   : opts.length > 1   ? `${displayItem.uni} · selecciona presentación`
                   : displayItem.uni;
-  const unitWarn  = (displayItem.uni === 'LT' || displayItem.uni === 'KG') && opts.length === 0 ? ' warn' : '';
-  const inputStep = opts.length > 0 && displayItem.uni !== 'PZA' ? '0.5' : '0.01';
+  const unitWarn  = UNIDAD_PESO_VOLUMEN.test(displayItem.uni || '') && opts.length === 0 ? ' warn' : '';
+  const inputStep = opts.length > 0 && !UNIDAD_PIEZA.test(displayItem.uni || '') ? '0.5' : '0.01';
 
   const comment = getComment(item.cod);
   const commentBtn = _supervisorActual
