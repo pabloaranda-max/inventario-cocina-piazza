@@ -351,9 +351,13 @@ const AREA_CONFIG = {
   SALUMERIA: { titulo:'Salumeria', color:'#ef4444', zonas:null, zonaNames:['Camara maduracion','Congelador horizontal','Refri','Camara fria'], zonaColors:['#ef4444','#dc2626','#b91c1c','#991b1b'] },
   GENERAL:   { titulo:'General',   color:'#6b7280', zonas:null },
   BARRA_AMICI:{ titulo:'Barra Amici', color:'#f97316', zonas:null },
-  UH_GENERAL: { centro:'UH', titulo:'General', color:'#64748b', zonas:null },
-  UH_COCINA:  { centro:'UH', titulo:'Cocina',  color:'#d97706', zonas:null },
-  UH_BARRA:   { centro:'UH', titulo:'Barra',   color:'#2563eb', zonas:null }
+  // UH confirmó sus 4 almacenes 2026-07-21: merch, cocina, barra, suministros.
+  // UH_GENERAL era un provisional de R8 y ya no existe (nunca tuvo plantilla,
+  // catálogo ni tomas en D1, así que se retiró sin migración).
+  UH_MERCH:       { centro:'UH', titulo:'Merch',       color:'#db2777', zonas:null },
+  UH_COCINA:      { centro:'UH', titulo:'Cocina',      color:'#d97706', zonas:null },
+  UH_BARRA:       { centro:'UH', titulo:'Barra',       color:'#2563eb', zonas:null },
+  UH_SUMINISTROS: { centro:'UH', titulo:'Suministros', color:'#64748b', zonas:null }
 };
 
 // Guardia visual R8: fuera de PIAZZA el nombre del centro queda siempre visible

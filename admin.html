@@ -213,9 +213,10 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
           <option value="BARRA_AMICI">Barra Amici</option>
         </optgroup>
         <optgroup label="Universal de Hamburguesas">
-          <option value="UH_GENERAL">General</option>
+          <option value="UH_MERCH">Merch</option>
           <option value="UH_COCINA">Cocina</option>
           <option value="UH_BARRA">Barra</option>
+          <option value="UH_SUMINISTROS">Suministros</option>
         </optgroup>
       </select>
     </div>
@@ -267,9 +268,10 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
           <option value="BARRA_AMICI">Barra Amici</option>
         </optgroup>
         <optgroup label="Universal de Hamburguesas">
-          <option value="UH_GENERAL">General</option>
+          <option value="UH_MERCH">Merch</option>
           <option value="UH_COCINA">Cocina</option>
           <option value="UH_BARRA">Barra</option>
+          <option value="UH_SUMINISTROS">Suministros</option>
         </optgroup>
       </select>
     </div>
@@ -406,9 +408,13 @@ const INVENTARIO_AREAS = {
   BARRA_AMICI:       { titulo:'Barra Amici', scriptUrl: SCRIPT_CENTRO.PIAZZA, zonaNames:['Barra Amici'] },
   // Centro UH — Universal de Hamburguesas (R8/R9b): mismo Code.js de centro,
   // deployment propio; scriptUrl null hasta su deploy.
-  UH_GENERAL:        { centro:'UH', titulo:'General', scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['General'] },
-  UH_COCINA:         { centro:'UH', titulo:'Cocina',  scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Cocina'] },
-  UH_BARRA:          { centro:'UH', titulo:'Barra',   scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Barra'] }
+  // UH confirmó sus 4 almacenes 2026-07-21: merch, cocina, barra, suministros.
+  // UH_GENERAL era un provisional de R8 y ya no existe (nunca tuvo plantilla,
+  // catálogo ni tomas en D1, así que se retiró sin migración).
+  UH_MERCH:          { centro:'UH', titulo:'Merch',       scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Merch'] },
+  UH_COCINA:         { centro:'UH', titulo:'Cocina',      scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Cocina'] },
+  UH_BARRA:          { centro:'UH', titulo:'Barra',       scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Barra'] },
+  UH_SUMINISTROS:    { centro:'UH', titulo:'Suministros', scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Suministros'] }
 };
 
 // R9a: el centro es el primer nivel de filtrado del tab Tomas.
@@ -418,7 +424,8 @@ const CENTROS = {
     ['COCINA','Cocina'], ['ALIMENTARI','Alimentari'], ['SALUMERIA','Salumeria'],
     ['BARRA','Barra'], ['CAVA','Cava'], ['GENERAL','General'] ] },
   UH: { nombre: 'Universal de Hamburguesas', chips: [
-    ['UH_COCINA','Cocina'], ['UH_BARRA','Barra'], ['UH_GENERAL','General'] ] }
+    ['UH_MERCH','Merch'], ['UH_COCINA','Cocina'],
+    ['UH_BARRA','Barra'], ['UH_SUMINISTROS','Suministros'] ] }
 };
 function centroDe(a) { return (String(a).startsWith('UH_') || a === 'UH') ? 'UH' : 'PIAZZA'; }
 
