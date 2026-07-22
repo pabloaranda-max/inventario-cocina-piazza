@@ -3,6 +3,8 @@
 > Última actualización: 2026-07-21. Estado: **EN PRODUCCIÓN** (CAVA probado; BARRA_RESTAURANTE con dos tomas reales completadas).
 > v4.10: el export baja el .xlsx directo (zip eliminado — Xetux no lo reconoce) y las
 > presentaciones por defecto se guardan todo-o-nada con verificación contra el servidor.
+> UH cerró sus 4 almacenes y subió sus plantillas; **la puesta en marcha quedó
+> congelada hasta estar en sitio → §15 "R8.1 — Puesta en marcha de UH"**.
 > v4.9: scraper ELIMINADO del proyecto (`cargar_xetux.py` apartado en `operaciones/`),
 > plan de costeo por restaurante R10a–c (§15).
 > v4.8: export con guard verificado + zip por almacén, botón "Cerrar con plantilla
@@ -819,6 +821,7 @@ Guardar/activar debe requerir password admin.
 | R5.1 | **Atribución por operario** — el Worker acumula `{deviceId: {operario, at}}` en `inv_sesiones.operarios_by_device` (migración 0006) a partir de las claves `zona:deviceId` de cada sync; admin muestra "quién capturó qué" (columna Operario en detalle por zona + resumen). Worker-only: los teléfonos no necesitan recargar. Limitación: un dispositivo se atribuye cuando sincroniza DESPUÉS del deploy; los nombres de syncs previos solo quedan en locks (expiran) y correcciones | HECHO 2026-07-08 (staging: 2 dispositivos simulados, re-sync no pisa; prod desplegado a media toma COCINA, atribución en curso) |
 | R6 | **Reporte de presentaciones sospechosas** — detección en admin (duplicadas, repetidas, factores sospechosos); marca y pide decisión humana, nunca autocorrige | HECHO 2026-07-08. `parsePlantilla` reporta `sospechosas[]` (factor_1, ml_g, duplicada, factor_ilegible, nombre_ambiguo) además de filtrar; admin tab Plantillas muestra "Revisión de presentaciones" calculada al vuelo desde `raw` (+ LT/KG sin presentación ni default, listas capadas a 60). Sin Worker ni migraciones. Tests parser 19/19; E2E staging 8 asserts. En prod detecta mugre real: COCINA 104×factor_1, 3×ml_g, 2×ilegible; CAVA 44×duplicada |
 | R7 | **Admins restringidos por almacén** — tabla `inv_admins` (nombre, password_hash, almacenes permitidos); solo el password maestro (`INV_ADMIN_PASSWORD`) crea/edita perfiles; el Worker valida el almacén en cada ACCIÓN de admin (exportar, borrar, plantillas, preparaciones) y admin.html filtra la vista. ⚠️ Alcance honesto: restringe acciones y UI, no lectura de datos — los GET de sesiones son públicos a propósito (operarios sin credencial); cerrar lecturas implicaría autenticar operarios (proyecto aparte) | HECHO 2026-07-08 (migración 0007; `invAdminAuth` en Worker: maestro por password, perfil por nombre+password vía `X-Admin-User`/`adminUser`; acciones nuevas `inv_admin_list/save/delete` solo maestro; `inv_export`/`inv_delete` migrados al mismo auth con validación de almacén; admin.html: tab 👥 Admins solo maestro, chips/selects/sesiones/tomas filtrados por perfil, no se fetchean Apps Scripts de almacenes ajenos. Matriz curl staging 32/32; E2E Playwright staging 11/11. Compat: admin.html viejo + Worker nuevo sigue funcionando con el maestro). **EN PROD 2026-07-09:** migración 0007 aplicada en prod (backup `~/backups/operaciones-db-backup-2026-07-09-r7.sql`), Worker desplegado, merge a main publicado en Pages; verificado en prod: `inv_admin_list` sin/con password malo → 401 "Sin permiso", GETs de operario siguen 200. Falta crear perfiles reales desde tab 👥 Admins (solo Pablo, password maestro) |
+| R8.1 | **Puesta en marcha de UH en sitio** — defaults de presentación, zonas, Sheet del centro y perfil de admin. **Ver §15 "R8.1 — Puesta en marcha de UH"** | PENDIENTE — congelado a propósito 2026-07-21 hasta estar en el sitio de Universal. La infraestructura ya está lista (4 almacenes, 4 plantillas en D1, catálogos derivados); lo que falta requiere ver los almacenes físicos |
 | R8 | **Multi-centro — "Universal de Hamburguesas"** — segundo centro de consumo. Almacenes CONFIRMADOS por UH 2026-07-21: `UH_MERCH`, `UH_COCINA`, `UH_BARRA`, `UH_SUMINISTROS` (el `UH_GENERAL` de R8 era provisional y se retiró sin migración — nunca tuvo plantilla, catálogo ni tomas en D1). Ver diseño abajo | HECHO 2026-07-10 (E2E staging: 9 asserts API — catálogo derivado, no-pisar, aislamiento CAVA — + 13 asserts navegador — filtro por centro, banner, guardia cross-centro, normalización del param, beta UH_COCINA 8 arts desde staging. Sin migraciones D1. PENDIENTE: Apps Script UH bloqueado en `clasp login` de Pablo; plantillas reales UH cuando existan en su Xetux). **EN PROD 2026-07-10:** Worker desplegado (smoke test GETs OK), merge a main publicado en Pages. URL operarios UH: `inventario.html?centro=UH` |
 | R9a | **Tomas desde D1 + UI centro→almacén + limpieza visual** — el tab Tomas de admin.html deja de consultar Apps Scripts y lee `GET /inv/sesiones` del Worker; filtros de dos niveles (centro → almacén); limpieza de emojis. Ver diseño abajo | HECHO 2026-07-12 (E2E staging 27 asserts Playwright: lista D1 con operarios R5.1/manuales/comentarios, matriz centro→almacén, detalle, PDF por centro desde `calcularTotalesSesion`, CERO requests a script.google.com; histórico Sheets on-demand solo lectura; modal notas Sheets eliminado — el detalle D1 ya cubría notas/correcciones. Worker: GET extendido con manuales/comentarios/operarios, sin migración. **EN PROD 2026-07-12:** Worker desplegado (smoke: 3 sesiones prod con campos nuevos), merge a main en Pages) |
 | R9b | **Sheets de excepciones, un script por centro** — `scripts/centro/Code.js` único (deploy Pasticcio + UH); a Sheets solo viajan manuales + fotos + artículos con observación; sin pestañas de detalle. Requiere R9a. Ver diseño abajo | HECHO — **EN PROD 2026-07-13**. Script Piazza desplegado (proyecto `1hFie_…AaRs`, deployment `AKfycby7…wU9S`, libro `Inventario Excepciones · Piazza Pasticcio` = `1Xz7O10p…HFAg`); prueba real: 2 filas de excepciones en MAESTRA (observación resaltada + manual con foto en Drive y miniatura inline), cero pestañas de detalle. Cambios vs diseño: el filtro de payload vive en admin.html (`exportarSesionInventario`) porque inventario.html ya no enviaba a Sheets desde R9a — su config `appsScriptUrl` era código muerto y se eliminó; los 6 scripts viejos quedan como `SHEETS_LEGACY_PIAZZA` SOLO para "Cargar histórico"; BARRA_AMICI ahora sí envía excepciones (antes no tenía Sheets). El script re-filtra defensivamente por si llama un cliente viejo. **UH pendiente:** `clasp create` segundo proyecto con el mismo Code.js + `setupUH()` + deploy → URL a `SCRIPT_CENTRO.UH` |
@@ -865,6 +868,64 @@ Done de R8: en staging, subir plantilla a un almacén `UH_*` desde admin (catál
 derivado verificado), contar en `inventario-beta.html?centro=UH` sin ver almacenes
 Piazza, export xlsx correcto; E2E verde; Piazza sin regresión (home sin parámetro
 idéntico al actual).
+
+### R8.1 — Puesta en marcha de UH: PENDIENTE HASTA ESTAR EN SITIO
+
+> **Congelado a propósito el 2026-07-21.** Lo que falta no se puede decidir desde
+> la computadora: hay que ver los almacenes de Universal, cómo están acomodados y
+> en qué presentación llega cada cosa. Retomar ESTA sección al llegar al sitio.
+
+**Lo que YA está listo y no hay que volver a hacer:**
+
+- Los 4 almacenes existen en las apps: `UH_MERCH`, `UH_COCINA`, `UH_BARRA`,
+  `UH_SUMINISTROS`.
+- Las 4 plantillas están en D1 con su nombre de Xetux, y los catálogos se
+  derivaron solos: Merch 8 artículos, Cocina 122, Barra 51, Suministros 12.
+- El parser leyó las 35 presentaciones de Xetux **sin descartar ninguna**.
+- Los operarios entran por `inventario.html?centro=UH`.
+
+**Paso 1 — Presentaciones por defecto (tab Plantillas, por almacén).**
+Merch y Suministros son 100% PZ: no requieren nada. En Cocina y Barra hay 115
+artículos en KG/L sin presentación, pero la mayoría es correcta así:
+
+- **Las `SUB *` son subrecetas** producidas en casa (26 en Cocina, 5 en Barra).
+  Se pesan o miden en su recipiente: NO llevan presentación de proveedor.
+- **Lo que se pesa a granel** (verduras, carnes, especias, sal, azúcar) tampoco.
+- **El riesgo real es lo que llega en empaque cerrado y alguien va a contar por
+  bulto.** Candidatos a revisar en sitio:
+  - *Cocina:* MAYONESA HEINZ POUCH · MAYONESA KRAFT · MAYONESA MCORMICK ·
+    MOSTAZA FRENCHS SPICY BROWN · CHILE JALAPEÑO EN LATA · JALAPEÑO ENCURTIDO ·
+    PEPINILLOS REBANADOS · PANKO BIMBO · SALSA BUFFALO · SALSA SWEET CHILLI MAE
+    PLOY · MIEL DE ABEJA · LECHE DESCREMADA EN POLVO · QUESO CHEDDAR KIRKLAND ·
+    QUESO PEPPERJACK WOOLSHURT · SUERO DE LECHE · VINAGRE DE VINO BLANCO ·
+    LECHE ENTERA (L) · VINAGRE DE VINO TINTO COLAVITA (L)
+  - *Barra:* BASE PARA HELADO CAPRI · CREMA DE AVELLANA · CREMA DE PISTACHE ·
+    GALLETA MOLIDA LOTUS · TOPPING BISCOFF · DEXTROSA · LECHE DESCREMADA EN
+    POLVO · MIEL DE ABEJA · ESENCIA DE VAINILLA (L) · LECHE ENTERA (L)
+
+  La lista viva y completa la da el panel "Revisión de presentaciones" del tab
+  Plantillas. Dos avisos: `defaultPres` se indexa por la unidad literal, así que
+  **las reglas de UH van con clave `L`, no `LT`**; y un default por unidad aplica
+  a TODO lo que no tenga presentación propia en esa unidad — si solo algunos
+  artículos la necesitan, la corrección va en Xetux, no en el default.
+
+**Paso 2 — Preparación de conteo (tab Preparación, por almacén).** Sin zonas,
+Cocina se cuenta como una lista de 122 artículos. Definir las zonas en sitio
+según cómo esté acomodado físicamente el almacén, con el orden en que se camina.
+
+**Paso 3 — Sheet de excepciones del centro.** `SCRIPT_CENTRO.UH` ya está
+desplegado; falta ejecutar `setupUH()` una vez para crear Spreadsheet y carpeta
+de fotos. Sin esto las excepciones (manuales con foto, observaciones) no tienen
+a dónde llegar — el conteo oficial no se ve afectado, va por el XLSX.
+
+**Paso 4 — Perfil de admin de UH (R7).** Crear un perfil restringido a `UH_*`
+desde el tab Admins (solo con el password maestro) para que quien opere Universal
+no vea ni toque los almacenes de Piazza.
+
+**Trampa conocida (ya resuelta, no re-introducir):** el Xetux de UH escribe `L` y
+`PZ` donde el de Piazza escribe `LT` y `PZA`. Ver §5 "Unidades: cada centro
+escribe las suyas" — incluida la razón por la que la regla `ml_g` NO se amplió a
+`L` (`BIDON 20 L` y `BARRIL 29 LT` son legítimos).
 
 ### R9 — Archivo v2: tomas desde D1 + Sheets de excepciones (diseño, 2026-07-12)
 
