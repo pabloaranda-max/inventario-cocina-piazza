@@ -682,7 +682,7 @@ function renderSesionesInventario() {
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button class="btn-notas" onclick="verDetalleSesion('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('search',13)} Explorar</button>
           <button class="btn-notas" onclick="imprimirSesion('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('printer',13)} PDF</button>
-          ${!s.exportedAt ? `<button class="btn-pdf-card" onclick="cerrarConPlantillaFresca('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('file-spreadsheet',13)} Cerrar con plantilla fresca</button>` : ''}
+          <button class="btn-pdf-card" onclick="cerrarConPlantillaFresca('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('file-spreadsheet',13)} ${s.exportedAt ? 'Rehacer con plantilla fresca' : 'Cerrar con plantilla fresca'}</button>
           <button class="btn-notas" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',false)">${ic('download',13)} Generar XLSX y enviar</button>
           ${s.exportedAt ? `<button class="btn-notas" onclick="verArchivoDeToma('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('file-spreadsheet',13)} Nombre del archivo</button>` : ''}
           ${s.exportedAt ? `<button class="btn-notas" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',true)">${ic('upload',13)} Re-exportar</button>` : ''}
@@ -1327,9 +1327,14 @@ async function marcarExportacion(almacen, fecha, force) {
   return d;
 }
 
-// Cierre semanal con plantilla fresca: en Xetux el nombre válido para importar
-// la carga masiva nace al crear la toma de inventario, así que subir plantilla
-// y exportar la sesión ocurren siempre juntos. Este flujo colapsa ambos pasos:
+// Cierre semanal con plantilla fresca: en Xetux el archivo válido para importar
+// la carga masiva nace al crear la toma de inventario — lleva su consecutivo
+// XTINVxxxxxx, y si no coincide con la toma abierta Xetux responde "El código
+// del archivo no concuerda con el inventario actual". Por eso subir plantilla y
+// exportar la sesión ocurren siempre juntos, y por eso el botón sigue disponible
+// DESPUÉS de exportar: si la toma de Xetux se rehizo, hay que repetir el par con
+// el export nuevo (exportar con force ya funcionaba; solo estaba oculto).
+// Este flujo colapsa ambos pasos:
 // valida lo contado contra el xlsx recién exportado de Xetux, lo sube como
 // plantilla del almacén y dispara el export normal sin re-preguntar el hash.
 function cerrarConPlantillaFresca(almacen, fecha) {
