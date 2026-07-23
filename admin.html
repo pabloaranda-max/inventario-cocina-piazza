@@ -710,12 +710,17 @@ function detalleTotalesPorZona(S, T) {
   const filas = [];
   const totales = {};
   for (const [zid, zc] of Object.entries(S.countsByZone || {})) {
-    for (const [cod, qty] of Object.entries(zc || {})) {
+    for (const [cod, val] of Object.entries(zc || {})) {
       const f = (S.presChoiceByZone?.[zid]?.[cod]) ?? factorDefault(T, cod);
-      const baseQty = qty * f;
+      const baseQty = cantidadBase(val, f);
+      // R11: valor desglosado → mostrar las líneas ("2× BOTELLA 0.75 + 0.3 abierto")
+      const lineas = lineasDesglose(val);
+      const qty = lineas
+        ? lineas.map(l => Number(l.f) === 1 ? `${l.q} abierto` : `${l.q}× ${l.n || l.f}`).join(' + ')
+        : val;
       const correction = S.correctionsByZone?.[zid]?.[cod] || null;
       totales[cod] = (totales[cod] || 0) + baseQty;
-      filas.push({ zid, cod, qty, factor:f, baseQty, correction });
+      filas.push({ zid, cod, qty, factor: lineas ? null : f, baseQty, correction });
     }
   }
   return { filas, totales };
@@ -2481,11 +2486,13 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 <script type="module">
 import { parsePlantilla, hashRaw } from './js/plantilla-parser.js';
-import { factorDefault, calcularTotalesSesion } from './js/sesion-merge.js';
+import { factorDefault, calcularTotalesSesion, cantidadBase, lineasDesglose } from './js/sesion-merge.js';
 window.parsePlantilla = parsePlantilla;
 window.hashRaw = hashRaw;
 window.factorDefault = factorDefault;
 window.calcularTotalesSesion = calcularTotalesSesion;
+window.cantidadBase = cantidadBase;
+window.lineasDesglose = lineasDesglose;
 </script>
 </body>
 </html>
