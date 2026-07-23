@@ -838,6 +838,7 @@ Guardar/activar debe requerir password admin.
 | R11a | **Conteo desglosado — módulo puro** — `calcularTotalesSesion` y helpers de `js/sesion-merge.js` aceptan valor número (legacy) o array de líneas; tests node con fixtures mixtos. Ver diseño abajo | HECHO 2026-07-23 (`lineasDesglose`/`cantidadBase` en sesion-merge.js; `node tests/test-merge.mjs` 21 asserts con fixtures mixtos: legacy, array, mezcla en la misma sesión, corrección admin sobre array) |
 | R11b | **Conteo desglosado — captura** — UI de desglose en inventario.html (líneas por presentación + "Abierto" en unidad base), pantalla de validación y badge. Probar en beta/staging | HECHO 2026-07-23 en rama `feat/slice-r11-desglose` — smoke local `tests/smoke-r11b.py` (Playwright + Worker stubeado, 17 asserts) y **Done verificado en beta+staging REALES** (`tests/e2e-beta-r11b.py`, 12 asserts): beta publicada en Pages (main `287e4f5`), Worker staging redesplegado con el sesion-merge de R11a, artículo con 2 presentaciones + abierto = 3.3 LT, zona cerrada, validación correcta, y en D1 staging el desglose viaja como array de 3 líneas con el número legacy intacto al lado (sesión de prueba borrada después). **EN PROD 2026-07-23** (merge a main `efe80af` a petición de Pablo, Worker prod redesplegado `ae09b004`, Pages + espejo UH verificados; había una toma UH_COCINA pendiente del mismo Pablo al desplegar — refrescar dispositivos antes de usar desglose en ella) |
 | R11c | **Conteo desglosado — admin** — detalle por zona muestra líneas; verificación de export con dry-run. Piloto: una toma real en CAVA antes de darlo por cerrado | EN CURSO — detalle por zona con líneas EN PROD 2026-07-23 (`117b7c5`: `detalleTotalesPorZona` polimórfico, "2× BOTELLA 0.75 + 0.3 abierto"; sin esto mostraba NaN). **Faltan: dry-run de export de una sesión mixta contra cálculo a mano + piloto = una toma real de CAVA exportada sin sorpresas** |
+| R12 | **Guard de versión de app (anti-skew de caché)** — `APP_VERSION` en los frontends viaja en cada POST `/inv/*`; el Worker rechaza escrituras de versiones < `MIN_APP_VERSION` (426) y publica `minAppVersion` en los GET de arranque; la app bloquea al entrar y muestra banner si el sync es rechazado; imports de módulos con `?v=` para que HTML y módulo no se desfasen. Ver diseño abajo | PENDIENTE |
 | — | Limpieza (CSS muerto §13, mover apps viejas a `legacy/`, chat GROQ) — oportunista, al colarse en otra sesión | OPORTUNISTA |
 | — | Sheets API en vez de Apps Script (4b v1) — solo si Apps Script falla en un cierre real | FUTURO |
 
@@ -1161,6 +1162,49 @@ artículo con 2 presentaciones + abierto, cerrar zona, validación y totales cor
 camino simple intacto (número en D1). R11c: detalle por zona en admin muestra líneas;
 export dry-run de una sesión mixta cuadra contra cálculo a mano; piloto = una toma
 real de CAVA exportada sin sorpresas.
+
+### R12 — Guard de versión de app (diseño, 2026-07-23)
+
+**Problema.** GitHub Pages cachea ~10 min y los teléfonos/pestañas retienen más: tras
+un deploy que cambia el formato de datos (R11: arrays de desglose), un cliente viejo
+convive con datos nuevos. Incidente real 2026-07-23: admin con `sesion-merge.js` viejo
+en caché exportó `#NUM!` (array × factor = NaN) 11 min después del deploy R11. Un
+operario viejo no puede pisar rebanadas ajenas (merge por `zona:deviceId`), pero sí
+ver NaN y producir exports rotos — y cada slice futuro agranda el riesgo.
+
+**Modelo (decidido con Pablo 2026-07-23).** Versión entera monotónica, se bumpea SOLO
+cuando cambia el formato de datos (v1 = desglose R11):
+
+- Frontends: `const APP_VERSION = 1` (inventario.html y admin.html); viaja como
+  `appVersion` en cada POST `/inv/*`.
+- Worker: `MIN_APP_VERSION` en `wrangler.toml [vars]` (por entorno). POST con
+  `appVersion < min` → **426** `{appUpdateRequired, minAppVersion}` — cliente sin
+  campo cuenta como 0. GET de arranque (`/inv/plantilla`, `/inv/sesiones`) incluyen
+  `minAppVersion` para el chequeo amable.
+- inventario.html: `selectArea` bloquea con pantalla "Actualizar ahora" si
+  `minAppVersion > APP_VERSION` (antes de contar); si un sync devuelve 426 a media
+  zona, banner fijo persistente — **lo capturado no se pierde**: vive en localStorage
+  y se re-sincroniza tras actualizar. Botón = reload con `?v=Date.now()` (atraviesa
+  la caché de Pages; conserva `?centro=`).
+- admin.html: el login (`inv_admin_check`) ya es la puerta — un admin viejo recibe el
+  426 con instrucción de Ctrl+F5; además chequeo de `minAppVersion` al cargar Tomas.
+  Imports de módulos con sufijo `?v=1` (bump junto con APP_VERSION): HTML y
+  `sesion-merge.js`/`plantilla-parser.js` se actualizan atómicamente — el skew
+  intra-página fue exactamente el incidente.
+- ⚠️ Alcance honesto: el xlsx del export se genera client-side ANTES de marcar
+  exported — el guard de arranque/login es la defensa del admin; el 426 en
+  `inv_export` es cinturón que corta el flujo y avisa.
+
+**Playbook de deploy cuando un release cambia formato de datos:** (1) push frontends
+a main y esperar a que Pages sirva la versión nueva (verificar con curl), (2) recién
+entonces deploy del Worker con el `MIN_APP_VERSION` bumpeado — al instante ningún
+cliente viejo puede escribir; la ventana de skew queda en cero. Orden inverso =
+lockout de toda la flota vieja mientras Pages propaga.
+
+**Done.** Staging: POST sin `appVersion` → 426, con versión → 200; Playwright: pantalla
+de bloqueo al entrar con `minAppVersion` alto, banner tras sync 426, flujo normal
+intacto. Prod: rollout con el playbook, verificado con curl que un POST estilo-viejo
+rebota y los GET publican `minAppVersion`.
 
 ### Reglas transversales (heredadas de plan v1, vigentes)
 

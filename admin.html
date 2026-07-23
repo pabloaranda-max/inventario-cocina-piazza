@@ -397,6 +397,9 @@ const SCRIPT_CENTRO = {
 
 const ic = (n, s = 15) => `<svg class="ic" width="${s}" height="${s}"><use href="#i-${n}"/></svg>`;
 const WORKER_URL = 'https://operaciones-api.pablo-aranda.workers.dev';
+// R12 — versión de datos (bump junto con inventario.html y el ?v= de los
+// imports de módulos al final del archivo). v1 = desglose R11. Spec §15 R12.
+const APP_VERSION = 1;
 const INVENTARIO_AREAS = {
   BARRA_RESTAURANTE: { titulo:'Barra Restaurante', scriptUrl: SCRIPT_CENTRO.PIAZZA,
                        zonaNames:['Almacén Barra','Refri Almacén Barra','Contra Barra','Refris de Servicio'] },
@@ -482,7 +485,7 @@ async function login() {
   try {
     const r = await fetch(WORKER_URL + '/inv/plantilla', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'inv_admin_check', adminPassword: pwd, adminUser: nombre })
+      body: JSON.stringify({ action: 'inv_admin_check', appVersion: APP_VERSION, adminPassword: pwd, adminUser: nombre })
     });
     loginData = await r.json();
     if (!loginData.ok) { errEl.textContent = loginData.error || 'Contraseña incorrecta'; return; }
@@ -632,6 +635,22 @@ function renderHistoricosSheets() {
     + (tomas.length > 100 ? `<div style="font-size:12px;color:#64748b;margin-top:6px">Mostrando 100 de ${tomas.length}.</div>` : '');
 }
 
+// R12 — este admin quedó atrás del formato de datos: avisar y recargar sin caché
+function mostrarBannerUpdate() {
+  if (document.getElementById('update-banner')) return;
+  const b = document.createElement('div');
+  b.id = 'update-banner';
+  b.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#b45309;color:#fff;z-index:10001;font:600 12px system-ui;padding:8px 12px;text-align:center';
+  b.innerHTML = 'Admin desactualizado: hay una versión nueva con otro formato de datos — exportar así puede salir mal. <button onclick="forzarActualizacion()" style="margin-left:8px;border:none;border-radius:6px;padding:4px 10px;font-weight:700;cursor:pointer">Actualizar</button>';
+  document.body.appendChild(b);
+}
+
+function forzarActualizacion() {
+  const u = new URL(location.href);
+  u.searchParams.set('v', Date.now()); // atraviesa la caché de Pages
+  location.replace(u.toString());
+}
+
 async function cargarSesionesInventario() {
   const el = document.getElementById('sesiones-container');
   if (!el) return;
@@ -640,6 +659,8 @@ async function cargarSesionesInventario() {
     const r = await fetch(WORKER_URL + '/inv/sesiones?dias=30');
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || 'Error al cargar sesiones');
+    // R12: pestaña vieja abierta días → banner antes de que un export salga mal
+    if ((Number(d.minAppVersion) || 0) > APP_VERSION) mostrarBannerUpdate();
     sesionesInventario = d.sesiones || [];
     renderSesionesInventario();
   } catch(e) {
@@ -998,7 +1019,7 @@ async function agregarArticuloCorrecion(almacen, fecha) {
     const r = await fetch(WORKER_URL + '/inv/sesion', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'inv_sesion', almacen, fecha, operario: adminActual,
+      body: JSON.stringify({ action: 'inv_sesion', appVersion: APP_VERSION, almacen, fecha, operario: adminActual,
         correctionsByZone: { '_admin': { [cod]: { qty, operario: adminActual, ts: new Date().toISOString() } } } })
     });
     const d = await r.json();
@@ -1018,7 +1039,7 @@ async function borrarManual(almacen, fecha, manId) {
   try {
     const r = await fetch(WORKER_URL + '/inv/sesion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'inv_sesion', almacen, fecha, operario: adminActual,
+      body: JSON.stringify({ action: 'inv_sesion', appVersion: APP_VERSION, almacen, fecha, operario: adminActual,
         removeManuales: [manId] })
     });
     const d = await r.json();
@@ -1041,7 +1062,7 @@ async function editarManual(almacen, fecha, m) {
     const updated = { ...m, nombre, cantidad, uni, unidad: uni };
     const r = await fetch(WORKER_URL + '/inv/sesion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'inv_sesion', almacen, fecha, operario: adminActual,
+      body: JSON.stringify({ action: 'inv_sesion', appVersion: APP_VERSION, almacen, fecha, operario: adminActual,
         manuales: [updated] })
     });
     const d = await r.json();
@@ -1075,7 +1096,7 @@ async function guardarCorrecciones(almacen, fecha) {
     const r = await fetch(WORKER_URL + '/inv/sesion', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'inv_sesion', almacen, fecha, operario: adminActual,
+      body: JSON.stringify({ action: 'inv_sesion', appVersion: APP_VERSION, almacen, fecha, operario: adminActual,
         correctionsByZone: { '_admin': corrections } })
     });
     const d = await r.json();
@@ -1097,7 +1118,7 @@ async function borrarSesionInventario(almacen, fecha) {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify({
-        action:'inv_delete',
+        action:'inv_delete', appVersion: APP_VERSION,
         almacen,
         fecha,
         operario:adminActual,
@@ -1318,7 +1339,7 @@ async function marcarExportacion(almacen, fecha, force) {
     method:'POST',
     headers:{ 'Content-Type':'application/json' },
     body: JSON.stringify({
-      action:'inv_export',
+      action:'inv_export', appVersion: APP_VERSION,
       almacen,
       fecha,
       operario:adminActual,
@@ -1383,7 +1404,7 @@ async function subirPlantillaYExportar(almacen, fecha, file) {
     const templateHash = await hashRaw(raw);
     const r = await fetch(WORKER_URL + '/inv/plantilla', {
       method: 'POST', headers: adminHeaders(),
-      body: JSON.stringify({ action:'inv_plantilla', almacen, rowMap, cantidadColIdx, presMap, unitMap, articulos, raw, originalFilename: file.name || '', templateHash, templateTs: Date.now() })
+      body: JSON.stringify({ action:'inv_plantilla', appVersion: APP_VERSION, almacen, rowMap, cantidadColIdx, presMap, unitMap, articulos, raw, originalFilename: file.name || '', templateHash, templateTs: Date.now() })
     });
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || 'No se pudo subir la plantilla');
@@ -1962,7 +1983,7 @@ async function saveDefaults() {
   try {
     const r = await fetch(WORKER_URL + '/inv/plantilla', {
       method: 'POST', headers: adminHeaders(),
-      body: JSON.stringify({ action: 'inv_defaults', almacen, defaultPres })
+      body: JSON.stringify({ action: 'inv_defaults', appVersion: APP_VERSION, almacen, defaultPres })
     });
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || 'Error');
@@ -2002,7 +2023,7 @@ async function uploadPlantilla(file) {
     msg.textContent = `✓ ${Object.keys(rowMap).length} artículos · subiendo al servidor…`;
     const r = await fetch(WORKER_URL + '/inv/plantilla', {
       method: 'POST', headers: adminHeaders(),
-      body: JSON.stringify({ action:'inv_plantilla', almacen, rowMap, cantidadColIdx, presMap, unitMap, articulos, raw, originalFilename: file.name || '', templateHash, templateTs: Date.now() })
+      body: JSON.stringify({ action:'inv_plantilla', appVersion: APP_VERSION, almacen, rowMap, cantidadColIdx, presMap, unitMap, articulos, raw, originalFilename: file.name || '', templateHash, templateTs: Date.now() })
     });
     const d = await r.json();
     if (d.ok) {
@@ -2291,7 +2312,7 @@ async function savePreparacion(activar) {
   try {
     const r = await fetch(WORKER_URL + '/inv/zone-config', {
       method: 'POST', headers: adminHeaders(),
-      body: JSON.stringify({ action: 'inv_zone_config_save', almacen, id: _prep.id || undefined, templateHash: _prepT.templateHash || '', zones })
+      body: JSON.stringify({ action: 'inv_zone_config_save', appVersion: APP_VERSION, almacen, id: _prep.id || undefined, templateHash: _prepT.templateHash || '', zones })
     });
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || 'Error al guardar');
@@ -2300,7 +2321,7 @@ async function savePreparacion(activar) {
     if (activar) {
       const ra = await fetch(WORKER_URL + '/inv/zone-config', {
         method: 'POST', headers: adminHeaders(),
-        body: JSON.stringify({ action: 'inv_zone_config_activate', almacen, id: d.id })
+        body: JSON.stringify({ action: 'inv_zone_config_activate', appVersion: APP_VERSION, almacen, id: d.id })
       });
       const da = await ra.json();
       if (!da.ok) throw new Error(da.error || 'Guardado pero no se pudo activar');
@@ -2321,7 +2342,7 @@ async function deactivatePreparacion() {
   try {
     const r = await fetch(WORKER_URL + '/inv/zone-config', {
       method: 'POST', headers: adminHeaders(),
-      body: JSON.stringify({ action: 'inv_zone_config_activate', almacen, deactivate: true })
+      body: JSON.stringify({ action: 'inv_zone_config_activate', appVersion: APP_VERSION, almacen, deactivate: true })
     });
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || 'Error');
@@ -2364,7 +2385,7 @@ async function cargarAdmins() {
   try {
     const r = await fetch(WORKER_URL + '/inv/plantilla', {
       method: 'POST', headers: adminHeaders(),
-      body: JSON.stringify({ action: 'inv_admin_list' })
+      body: JSON.stringify({ action: 'inv_admin_list', appVersion: APP_VERSION })
     });
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || 'Error al cargar perfiles');
@@ -2439,7 +2460,7 @@ async function guardarAdmin() {
   if (!almacenes.length && !confirm('El perfil no tiene almacenes asignados: podrá entrar pero no administrar nada. ¿Guardar así?')) return;
   msg.style.color = '#6b7280'; msg.textContent = 'Guardando…';
   try {
-    const body = { action: 'inv_admin_save', nombre, almacenes, active };
+    const body = { action: 'inv_admin_save', appVersion: APP_VERSION, nombre, almacenes, active };
     if (_adminEditandoId) body.id = _adminEditandoId;
     if (password) body.password = password;
     const r = await fetch(WORKER_URL + '/inv/plantilla', {
@@ -2460,7 +2481,7 @@ async function borrarAdmin(id, nombre) {
   try {
     const r = await fetch(WORKER_URL + '/inv/plantilla', {
       method: 'POST', headers: adminHeaders(),
-      body: JSON.stringify({ action: 'inv_admin_delete', id })
+      body: JSON.stringify({ action: 'inv_admin_delete', appVersion: APP_VERSION, id })
     });
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || 'Error al borrar');
@@ -2485,8 +2506,11 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 <script type="module">
-import { parsePlantilla, hashRaw } from './js/plantilla-parser.js';
-import { factorDefault, calcularTotalesSesion, cantidadBase, lineasDesglose } from './js/sesion-merge.js';
+// R12: el ?v= amarra el módulo a esta versión del HTML — sin él, un admin.html
+// fresco puede correr con un módulo viejo de caché (o al revés), que fue
+// exactamente el incidente #NUM! de 2026-07-23. Bump junto con APP_VERSION.
+import { parsePlantilla, hashRaw } from './js/plantilla-parser.js?v=1';
+import { factorDefault, calcularTotalesSesion, cantidadBase, lineasDesglose } from './js/sesion-merge.js?v=1';
 window.parsePlantilla = parsePlantilla;
 window.hashRaw = hashRaw;
 window.factorDefault = factorDefault;

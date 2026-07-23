@@ -371,7 +371,14 @@ async function postSlack(canal, texto, env) {
 
 // ── Inventario sync (sin auth) ─────────────────────────────────────────────
 
-async function handleInvGet(db, url) {
+// R12 — guard de versión: un cliente con HTML/JS viejo en caché no debe escribir
+// datos cuyo formato no entiende (p.ej. arrays de desglose R11 → NaN → #NUM! en
+// el export, incidente 2026-07-23). MIN_APP_VERSION vive en wrangler.toml [vars]
+// por entorno; bumpearlo SOLO después de que Pages sirva el frontend nuevo
+// (playbook en spec §15 R12). Cliente sin campo cuenta como versión 0.
+function minAppVersion(env) { return Number(env?.MIN_APP_VERSION) || 0; }
+
+async function handleInvGet(db, url, env = {}) {
   const path = url.pathname;
 
   if (path === '/inv/plantilla') {
@@ -380,9 +387,10 @@ async function handleInvGet(db, url) {
     const row = await db.prepare(
       'SELECT row_map, cantidad_col_idx, pres_map, unit_map, default_pres, raw, original_filename, template_hash, updated_at FROM inv_plantillas WHERE almacen = ?'
     ).bind(almacen).first();
-    if (!row) return json({ ok: true, found: false });
+    if (!row) return json({ ok: true, found: false, minAppVersion: minAppVersion(env) });
     return json({
       ok: true, found: true,
+      minAppVersion: minAppVersion(env),
       rowMap: JSON.parse(row.row_map),
       cantidadColIdx: row.cantidad_col_idx,
       presMap: row.pres_map ? JSON.parse(row.pres_map) : {},
@@ -523,7 +531,7 @@ async function handleInvGet(db, url) {
         operarios
       };
     });
-    return json({ ok: true, sesiones });
+    return json({ ok: true, sesiones, minAppVersion: minAppVersion(env) });
   }
 
   return json({ error: 'Ruta no encontrada' }, 404);
@@ -561,6 +569,16 @@ function almacenPermitido(auth, almacen) {
 async function handleInvPost(db, body, env = {}, request = null) {
   const pwd = request?.headers?.get('X-Admin-Password') || body.adminPassword || '';
   const adminUser = request?.headers?.get('X-Admin-User') || body.adminUser || '';
+
+  // R12: escritura de app vieja → 426. Los datos del operario no se pierden:
+  // viven en localStorage y se re-sincronizan cuando actualice.
+  const appVersion = Number(body.appVersion) || 0;
+  if (appVersion < minAppVersion(env)) {
+    return json({
+      ok: false, appUpdateRequired: true, minAppVersion: minAppVersion(env),
+      error: 'App desactualizada: cierra y vuelve a abrir la app (o Ctrl+F5 en el navegador) para actualizar. Lo capturado no se pierde.'
+    }, 426);
+  }
 
   // Login de admin.html: valida el password sin exponerlo en el código del repo público.
   // R7: también acepta perfiles de inv_admins y devuelve sus almacenes permitidos.
@@ -982,7 +1000,7 @@ export default {
 
     if (url.pathname.startsWith('/inv/')) {
       try {
-        if (request.method === 'GET')  return await handleInvGet(env.DB, url);
+        if (request.method === 'GET')  return await handleInvGet(env.DB, url, env);
         if (request.method === 'POST') return await handleInvPost(env.DB, await request.json(), env, request);
         return new Response('Method not allowed', { status: 405, headers: CORS });
       } catch (err) {

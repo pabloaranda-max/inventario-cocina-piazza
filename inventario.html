@@ -328,6 +328,12 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
 // ── Configuración ──────────────────────────────────────────────────────────
 
 const WORKER_URL = 'https://operaciones-api.pablo-aranda.workers.dev';
+// R12 — versión de datos de la app: bump SOLO cuando cambie el formato de lo
+// que se escribe en D1 (v1 = desglose por presentación R11). El Worker rechaza
+// escrituras con versión menor a su MIN_APP_VERSION (426) para que una app con
+// caché vieja no conviva con datos que no entiende. Spec §15 R12.
+const APP_VERSION = 1;
+let _minAppVersion = 0; // lo publica el Worker en los GET de arranque
 const ic = (n, s = 16) => `<svg class="ic" width="${s}" height="${s}"><use href="#i-${n}"/></svg>`;
 // R9b: esta app ya no habla con Apps Script — la toma vive en D1 y las
 // excepciones las envía admin.html al exportar (script único por centro).
@@ -493,6 +499,7 @@ async function fetchPlantillaWorker() {
     const r = await fetch(WORKER_URL + '/inv/plantilla?almacen=' + ALMACEN);
     if (!r.ok) return false;
     const d = await r.json();
+    _minAppVersion = Number(d.minAppVersion) || 0;
     if (!d.ok || !d.found) return false;
     T = { rowMap: d.rowMap, cantidadColIdx: d.cantidadColIdx, presMap: d.presMap || {}, unitMap: d.unitMap || {}, defaultPres: d.defaultPres || {}, templateHash: d.templateHash || '', templateTs: Date.now(), raw: d.raw || null };
     return true;
@@ -551,6 +558,7 @@ function syncSesionWorker() {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
       action:'inv_sesion',
+      appVersion:APP_VERSION,
       almacen:ALMACEN,
       operario:S.operario,
       fecha:S.fecha,
@@ -565,7 +573,11 @@ function syncSesionWorker() {
       zoneSnapshot: sendSnapshot ? S.zoneSnapshot : undefined
     })
   })
-  .then(() => {
+  .then(r => {
+    // R12: el Worker rechaza escrituras de app vieja — avisar sin perder nada
+    // (todo sigue en localStorage y se re-sincroniza tras actualizar)
+    if (r.status === 426) { mostrarBannerUpdate(); return; }
+    if (!r.ok) return;
     let dirty = false;
     if (removeCompletedZones.length && S) {
       S.pendingCompletedZoneRemovals = (S.pendingCompletedZoneRemovals || []).filter(z => !removeCompletedZones.includes(z));
@@ -583,7 +595,7 @@ async function lockZone(zoneIdx, release) {
   try {
     const r = await fetch(WORKER_URL + '/inv/sesion', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ action:'inv_lock', almacen:ALMACEN, fecha:S.fecha, zone_idx:zoneIdx, device_id:getDeviceId(), operario:S.operario, release:!!release })
+      body: JSON.stringify({ action:'inv_lock', appVersion:APP_VERSION, almacen:ALMACEN, fecha:S.fecha, zone_idx:zoneIdx, device_id:getDeviceId(), operario:S.operario, release:!!release })
     });
     return await r.json();
   } catch(e) { console.warn('lockZone:', e); return { ok:true }; }
@@ -791,6 +803,8 @@ async function selectArea(key) {
   S = lsGet('s');
   const [ok, zcfg] = await Promise.all([fetchPlantillaWorker(), fetchZoneConfigWorker()]);
   if (ALMACEN !== savedKey) return;
+  // R12: app vieja → bloquear ANTES de contar (el Worker rechazaría el sync)
+  if (_minAppVersion > APP_VERSION) { renderUpdateRequired(); return; }
   if (!ok) T = null;
   ZCFG = zcfg;
 
@@ -810,6 +824,35 @@ async function selectArea(key) {
   if (ALMACEN !== savedKey) return;
 
   renderAreaWelcome();
+}
+
+// R12 — actualización forzada: ?v=timestamp atraviesa la caché de Pages (una
+// recarga normal puede servir la misma copia vieja). Conserva ?centro= y demás.
+function forzarActualizacion() {
+  const u = new URL(location.href);
+  u.searchParams.set('v', Date.now());
+  location.replace(u.toString());
+}
+
+function renderUpdateRequired() {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-welcome').classList.add('active');
+  document.getElementById('welcome-sub').textContent = 'Actualización necesaria';
+  document.getElementById('welcome-body').innerHTML = `
+    <div style="padding:24px 16px 16px">
+      <div class="alert alert-warn"><div class="alert-title">${ic('refresh-cw',15)} Hay una versión nueva de la app</div>
+      Para no mezclar datos entre versiones hay que actualizar antes de contar. Los conteos ya guardados no se pierden.</div>
+      <button class="btn btn-primary" onclick="forzarActualizacion()">Actualizar ahora</button>
+    </div>`;
+}
+
+function mostrarBannerUpdate() {
+  if (document.getElementById('update-banner')) return;
+  const b = document.createElement('div');
+  b.id = 'update-banner';
+  b.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#b45309;color:#fff;z-index:10001;font:600 12px system-ui;padding:8px 12px;text-align:center';
+  b.innerHTML = 'App desactualizada: el servidor no recibe estos conteos hasta actualizar. Lo capturado queda guardado en este teléfono. <button onclick="forzarActualizacion()" style="margin-left:8px;border:none;border-radius:6px;padding:4px 10px;font-weight:700;cursor:pointer">Actualizar</button>';
+  document.body.appendChild(b);
 }
 
 // ── Pantalla: selector de área ─────────────────────────────────────────────
@@ -1740,7 +1783,7 @@ async function loginSupervisor() {
   try {
     const r = await fetch(WORKER_URL + '/inv/sesion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'inv_supervisor_login', nombre, pin })
+      body: JSON.stringify({ action: 'inv_supervisor_login', appVersion: APP_VERSION, nombre, pin })
     });
     const d = await r.json();
     if (!d.ok) { errEl.textContent = d.error || 'PIN incorrecto'; errEl.style.display = ''; return; }
