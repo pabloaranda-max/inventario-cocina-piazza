@@ -88,6 +88,15 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
 .qty-label{font-size:11px;color:#aaa;white-space:nowrap}
 .lt-badge{font-size:11px;font-weight:700;color:var(--color,#667eea);background:#ede9fe;padding:2px 6px;border-radius:6px;white-space:nowrap;min-width:54px;text-align:right}
 .pres-sel{font-size:12px;border:1px solid #ddd;border-radius:6px;padding:3px 6px;background:white;color:#333;max-width:110px}
+/* R11 — desglose por presentación */
+.item-row.desglosado{flex-wrap:wrap}
+.desg-btn{border:1px solid #ddd;background:white;border-radius:8px;padding:8px 7px;display:flex;align-items:center;color:var(--color,#667eea);flex-shrink:0}
+.desglose-block{flex-basis:100%;background:#fafaff;border:1px solid var(--brand-border,#eee);border-radius:8px;padding:6px 10px;margin-top:8px}
+.desg-linea{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0}
+.desg-label{font-size:12px;color:#555;flex:1;min-width:0}
+.desg-input{width:64px;padding:8px 6px}
+.desg-total{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:6px 0 2px;margin-top:2px;border-top:1px dashed #ddd;font-size:12px;color:#666}
+.desg-cerrar{background:none;border:none;color:#999;font-size:11px;text-decoration:underline;padding:4px;margin-right:auto}
 .search-bar{background:rgba(255,253,248,.9);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:10px 16px;border-bottom:1px solid var(--brand-border);display:flex;gap:8px;position:sticky;top:53px;z-index:40}
 .search-bar input{flex:1;padding:10px 14px;border:1.5px solid #ddd;border-radius:10px;font-size:16px;font-family:inherit}
 .search-bar input:focus{outline:none;border-color:var(--color,#667eea)}
@@ -134,7 +143,7 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
 <body>
 
 <!-- R9b+ iconos Lucide (ISC) — sprite inline, cero red -->
-<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true"><symbol id="i-triangle-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></symbol><symbol id="i-circle-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="m15 9-6 6" /> <path d="m9 9 6 6" /></symbol><symbol id="i-circle-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="m9 12 2 2 4-4" /></symbol><symbol id="i-refresh-cw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></symbol><symbol id="i-clipboard-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></symbol><symbol id="i-message-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /></symbol><symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 3v12" /> <path d="m17 8-5-5-5 5" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></symbol><symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /> <path d="M7 11V7a5 5 0 0 1 10 0v4" /></symbol><symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /></symbol><symbol id="i-trash-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></symbol><symbol id="i-store" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5" /> <path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244" /> <path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05" /></symbol></svg>
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true"><symbol id="i-triangle-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></symbol><symbol id="i-circle-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="m15 9-6 6" /> <path d="m9 9 6 6" /></symbol><symbol id="i-circle-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="m9 12 2 2 4-4" /></symbol><symbol id="i-refresh-cw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></symbol><symbol id="i-clipboard-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></symbol><symbol id="i-message-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /></symbol><symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 3v12" /> <path d="m17 8-5-5-5 5" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></symbol><symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /> <path d="M7 11V7a5 5 0 0 1 10 0v4" /></symbol><symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /></symbol><symbol id="i-trash-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></symbol><symbol id="i-list-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M11 12H3" /> <path d="M16 6H3" /> <path d="M16 18H3" /> <path d="M18 9v6" /> <path d="M21 12h-6" /></symbol><symbol id="i-store" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5" /> <path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244" /> <path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05" /></symbol></svg>
 
 <!-- PANTALLA: selector de área -->
 <div id="screen-welcome" class="screen">
@@ -1002,6 +1011,26 @@ function getPresChoice(zid, cod) {
   return (S.presChoiceByZone?.[zid])?.[cod] ?? null;
 }
 
+// R11 — desglose por presentación. countsByZone[zid][cod] es polimórfico:
+// número (legacy, factor vía presChoice/default) o array [{n,f,q}] con el
+// factor DENTRO de cada línea; f:1 = abierto/suelto en unidad base (spec §6).
+// Espejo de lineasDesglose/cantidadBase de js/sesion-merge.js — esta página es
+// autocontenida (el espejo UH no copia js/): mantener ambos en sincronía.
+const _desgloseOpen = new Set(); // "zid|cod" con desglose abierto pero aún sin captura
+
+function esDesglose(val) { return Array.isArray(val); }
+
+function cantidadBaseInv(val, factorLegacy) {
+  if (Array.isArray(val)) return val.reduce((s, l) => s + (Number(l?.q) || 0) * (Number(l?.f) || 0), 0);
+  return (Number(val) || 0) * factorLegacy;
+}
+
+// Líneas que ofrece el desglose: las presentaciones del artículo + siempre la
+// de abierto/suelto (f:1, unidad base directa).
+function lineasDePlantilla(cod) {
+  return [...getPresOptions(cod).map(o => ({ n: o.nombre || '', f: o.factor })), { n: '', f: 1 }];
+}
+
 function itemSearchText(item) {
   const templateItem = _templateItemsByCod[item.cod] || null;
   const pres = getPresOptions(item.cod)
@@ -1032,7 +1061,8 @@ function renderItemRow(item, zid, inOtherZone) {
     ? { ...item, art: templateItem.art || item.art, uni: templateItem.uni || item.uni, grp: templateItem.grp || item.grp }
     : item;
   const raw    = getQtyForZone(zid, item.cod);
-  const flt    = raw !== undefined ? parseFloat(raw) : NaN;
+  const desglosado = esDesglose(raw) || _desgloseOpen.has(zid + '|' + item.cod);
+  const flt    = typeof raw === 'number' ? raw : NaN;
   const opts   = getPresOptions(item.cod);
   const chosen = getPresChoice(zid, item.cod) ?? (opts[0]?.factor ?? null);
   const filled = raw !== undefined ? 'filled' : '';
@@ -1040,19 +1070,20 @@ function renderItemRow(item, zid, inOtherZone) {
   const dataZ  = `data-zid="${zid}"`;
 
   let presHtml = '';
-  if (opts.length === 1) {
+  if (!desglosado && opts.length === 1) {
     const f = opts[0].factor;
     const ltStr = !isNaN(flt) ? fmtNum(flt * f) : '—';
     presHtml = `<span class="lt-badge" id="ltb_${zid}_${esc(item.cod)}">${ltStr} ${item.uni}</span>`;
-  } else if (opts.length > 1) {
+  } else if (!desglosado && opts.length > 1) {
     const selOpts = opts.map(o => `<option value="${o.factor}" ${o.factor==chosen?'selected':''}>${o.nombre} (${o.factor})</option>`).join('');
     const ltStr = chosen && !isNaN(flt) ? fmtNum(flt * chosen) : (raw!==undefined?fmtNum(flt):'—');
     presHtml = `<select class="pres-sel" ${dataZ} data-cod="${esc(item.cod)}" onchange="onPresChange(this)">${selOpts}</select>
       <span class="lt-badge" id="ltb_${zid}_${esc(item.cod)}">${ltStr} ${item.uni}</span>`;
   }
 
-  const unitLabel = opts.length === 1 ? `bots × ${opts[0].factor} ${displayItem.uni}`
-                  : opts.length > 1   ? `${displayItem.uni} · selecciona presentación`
+  const unitLabel = desglosado          ? `${displayItem.uni} · desglosado`
+                  : opts.length === 1   ? `bots × ${opts[0].factor} ${displayItem.uni}`
+                  : opts.length > 1     ? `${displayItem.uni} · selecciona presentación`
                   : displayItem.uni;
   const unitWarn  = UNIDAD_PESO_VOLUMEN.test(displayItem.uni || '') && opts.length === 0 ? ' warn' : '';
   const inputStep = opts.length > 0 && !UNIDAD_PIEZA.test(displayItem.uni || '') ? '0.5' : '0.01';
@@ -1063,7 +1094,44 @@ function renderItemRow(item, zid, inOtherZone) {
     : '';
   const commentText = comment ? `<div class="item-comment-text">${esc(comment.texto)}</div>` : '';
 
-  return `<div class="item-row${inOtherZone?' other-zone':''}${corrected?' corrected':''}" data-search="${esc(itemSearchText(item))}">
+  let qtyHtml, desgloseHtml = '';
+  if (desglosado) {
+    const cur   = esDesglose(raw) ? raw : [];
+    const total = cantidadBaseInv(cur, 0);
+    // Líneas ofrecidas + las capturadas que ya no calzan con la plantilla
+    // (p.ej. re-subida a mitad de toma) — nunca ocultar cantidad capturada.
+    const ofrecidas = lineasDePlantilla(item.cod);
+    const huerfanas = cur.filter(c => !ofrecidas.some(l => Number(l.f) === Number(c.f) && (l.n || '') === (c.n || '')));
+    const lineaHtml = l => {
+      const q = cur.find(c => Number(c.f) === Number(l.f) && (c.n || '') === (l.n || ''))?.q;
+      const label = Number(l.f) === 1 ? `Abierto / suelto (${displayItem.uni} directo)` : `${l.n} (${l.f} ${displayItem.uni})`;
+      return `<div class="desg-linea"><span class="desg-label">${esc(label)}</span>
+        <input type="number" class="qty-input desg-input${q !== undefined ? ' filled' : ''}" inputmode="decimal"
+          step="${Number(l.f) === 1 ? '0.01' : '0.5'}" min="0" placeholder="0" value="${q !== undefined ? q : ''}"
+          ${dataZ} data-cod="${esc(item.cod)}" data-f="${l.f}" data-n="${esc(l.n || '')}"
+          oninput="onDesgloseQty(this)" onfocus="this.select()"></div>`;
+    };
+    qtyHtml = `<span class="lt-badge" id="ltb_${zid}_${esc(item.cod)}">${fmtNum(total)} ${displayItem.uni}</span>`;
+    desgloseHtml = `<div class="desglose-block">
+      ${[...ofrecidas, ...huerfanas].map(lineaHtml).join('')}
+      <div class="desg-total">
+        <button class="desg-cerrar" ${dataZ} data-cod="${esc(item.cod)}" onclick="quitarDesglose(this)">Quitar desglose</button>
+        = <b id="dtot_${zid}_${esc(item.cod)}">${fmtNum(total)}</b>&nbsp;${displayItem.uni}
+      </div>
+    </div>`;
+  } else {
+    const desgBtn = opts.length > 0
+      ? `<button class="desg-btn" ${dataZ} data-cod="${esc(item.cod)}" onclick="toggleDesglose(this)" title="Desglosar por presentación">${ic('list-plus',18)}</button>`
+      : '';
+    qtyHtml = `${presHtml}
+      <input type="number" class="qty-input ${filled}" inputmode="decimal"
+        step="${inputStep}" min="0" placeholder="0"
+        value="${raw!==undefined?raw:''}"
+        ${dataZ} data-cod="${esc(item.cod)}"
+        oninput="onQty(this)" onfocus="this.select()">${desgBtn}`;
+  }
+
+  return `<div class="item-row${inOtherZone?' other-zone':''}${corrected?' corrected':''}${desglosado?' desglosado':''}" data-search="${esc(itemSearchText(item))}">
     <div class="item-text">
       <div style="display:flex;align-items:flex-start;gap:4px">
         <div class="item-name" style="flex:1">${esc(displayItem.art)}</div>
@@ -1074,13 +1142,9 @@ function renderItemRow(item, zid, inOtherZone) {
       ${commentText}
     </div>
     <div class="qty-wrap">
-      ${presHtml}
-      <input type="number" class="qty-input ${filled}" inputmode="decimal"
-        step="${inputStep}" min="0" placeholder="0"
-        value="${raw!==undefined?raw:''}"
-        ${dataZ} data-cod="${esc(item.cod)}"
-        oninput="onQty(this)" onfocus="this.select()">
+      ${qtyHtml}
     </div>
+    ${desgloseHtml}
   </div>`;
 }
 
@@ -1140,6 +1204,88 @@ function onPresChange(sel) {
   if (badge && qty !== undefined) badge.textContent = fmtNum(qty * f) + ' ' + (ZONAS[CZ]?.items.find(i=>i.cod===cod)?.uni||'LT');
   lsSet('s', S);
   scheduleSyncSesion();
+}
+
+// R11b — handlers del desglose ------------------------------------------------
+
+function findItemByCod(cod) {
+  for (const z of ZONAS) { const it = z.items.find(i => i.cod === cod); if (it) return it; }
+  return _templateItemsByCod[cod] || { cod, art: cod, uni: T?.unitMap?.[cod] || '', grp: '' };
+}
+
+// Reemplaza la fila en el DOM re-usando renderItemRow (conserva búsqueda activa)
+function rerenderRow(el, zid, cod) {
+  const row = el.closest('.item-row');
+  if (!row) return;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = renderItemRow(findItemByCod(cod), zid, row.classList.contains('other-zone'));
+  const neu = tmp.firstElementChild;
+  if (row.classList.contains('search-match')) neu.classList.add('search-match');
+  if (row.classList.contains('hidden')) neu.classList.add('hidden');
+  row.replaceWith(neu);
+}
+
+function toggleDesglose(btn) {
+  const zid = btn.dataset.zid, cod = btn.dataset.cod;
+  const raw = getQtyForZone(zid, cod);
+  if (typeof raw === 'number') {
+    // sembrar el número previo en la línea de la presentación elegida (spec R11b)
+    const f = getPresChoice(zid, cod) ?? (getPresOptions(cod)[0]?.factor ?? 1);
+    const linea = lineasDePlantilla(cod).find(l => Number(l.f) === Number(f)) || { n: '', f: 1 };
+    S.countsByZone[zid][cod] = [{ n: linea.n, f: linea.f, q: raw }];
+    markCorrection(zid, cod, 'cantidad');
+    lsSet('s', S);
+    scheduleSyncSesion();
+  }
+  _desgloseOpen.add(zid + '|' + cod);
+  rerenderRow(btn, zid, cod);
+}
+
+function quitarDesglose(btn) {
+  const zid = btn.dataset.zid, cod = btn.dataset.cod;
+  const raw = getQtyForZone(zid, cod);
+  const tieneCaptura = esDesglose(raw) && raw.some(l => Number(l.q) > 0);
+  if (tieneCaptura && !confirm('¿Quitar el desglose?\n\nSe borra lo capturado en las líneas de este artículo.')) return;
+  if (esDesglose(raw)) {
+    delete S.countsByZone[zid][cod];
+    markCorrection(zid, cod, 'borrado');
+    lsSet('s', S);
+    scheduleSyncSesion();
+    updateProgress();
+  }
+  _desgloseOpen.delete(zid + '|' + cod);
+  rerenderRow(btn, zid, cod);
+}
+
+function onDesgloseQty(inp) {
+  const zid = inp.dataset.zid, cod = inp.dataset.cod;
+  const lineas = [];
+  inp.closest('.desglose-block').querySelectorAll('.desg-input').forEach(i => {
+    const v = i.value.trim();
+    const q = parseFloat(v);
+    const ok = v !== '' && !isNaN(q) && q >= 0;
+    i.classList.toggle('filled', ok);
+    if (ok) lineas.push({ n: i.dataset.n || '', f: parseFloat(i.dataset.f), q });
+  });
+  if (!S.countsByZone) S.countsByZone = {};
+  if (!S.countsByZone[zid]) S.countsByZone[zid] = {};
+  if (lineas.length) {
+    S.countsByZone[zid][cod] = lineas;
+    markCorrection(zid, cod, 'cantidad');
+  } else {
+    delete S.countsByZone[zid][cod];   // array vacío → se borra la clave (spec §6)
+    markCorrection(zid, cod, 'borrado');
+  }
+  const total = cantidadBaseInv(lineas, 0);
+  const item  = findItemByCod(cod);
+  const uni   = _templateItemsByCod[cod]?.uni || item.uni || '';
+  const dtot  = document.getElementById('dtot_' + zid + '_' + cod);
+  if (dtot) dtot.textContent = fmtNum(total);
+  const badge = document.getElementById('ltb_' + zid + '_' + cod);
+  if (badge) badge.textContent = fmtNum(total) + ' ' + uni;
+  lsSet('s', S);
+  scheduleSyncSesion();
+  updateProgress();
 }
 
 function updateProgress() {
@@ -1289,7 +1435,7 @@ function renderOverview() {
     const zbz = {};
     for (const [key, counts] of Object.entries(S.countsByZone || {})) {
       if (baseZone(key) === i) {
-        for (const [cod, qty] of Object.entries(counts)) zbz[cod] = (zbz[cod]||0) + qty;
+        for (const [cod, qty] of Object.entries(counts)) zbz[cod] = (zbz[cod]||0) + cantidadBaseInv(qty, 1);
       }
     }
 	    const zoneFilled = zone.items.filter(it => zbz[it.cod] !== undefined).length;
@@ -1353,7 +1499,7 @@ function renderValidation() {
       // aplica el export (factorDefault en js/sesion-merge.js). Con presMap a secas
       // la pantalla de validación mostraba el conteo sin convertir.
       const f = (S.presChoiceByZone?.[zid]?.[cod]) ?? (getPresOptions(cod)[0]?.factor ?? 1);
-      totales[cod] = (totales[cod] || 0) + qty * f;
+      totales[cod] = (totales[cod] || 0) + cantidadBaseInv(qty, f);
     }
   }
   const countedCods = Object.keys(totales);
@@ -1381,8 +1527,9 @@ function renderValidation() {
   if (comentariosSup.length) {
     html += `<div class="alert" style="background:#f3e8ff;border-color:#c4b5fd;color:#6d28d9"><div class="alert-title">${ic('message-circle',15)} ${comentariosSup.length} comentario${comentariosSup.length!==1?'s':''} de supervisor</div></div>`;
   }
+  const desglosados = Object.values(S.countsByZone || {}).reduce((s, zc) => s + Object.values(zc || {}).filter(esDesglose).length, 0);
   html += `<div class="alert alert-ok"><div class="alert-title">${ic('circle-check',15)} ${countedCods.length} artículos con cantidad</div>
-    <div>${withConv.length} con conversión · ${countedCods.length - withConv.length} directos</div></div>`;
+    <div>${withConv.length} con conversión · ${countedCods.length - withConv.length} directos${desglosados ? ' · ' + desglosados + ' con desglose' : ''}</div></div>`;
 
   el.innerHTML = html;
 }
