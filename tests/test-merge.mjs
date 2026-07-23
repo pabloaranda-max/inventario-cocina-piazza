@@ -1,6 +1,7 @@
 // tests/test-merge.mjs — correr con: node tests/test-merge.mjs
 import { mergeZoneMap, mergeCorrections, mergeManuales, mergeCompletedZones,
-         factorDefault, calcularTotalesSesion } from '../js/sesion-merge.js';
+         factorDefault, calcularTotalesSesion,
+         lineasDesglose, cantidadBase } from '../js/sesion-merge.js';
 import assert from 'node:assert/strict';
 
 // clave colaborativa "zona:device" reemplaza completo (borrar se propaga)
@@ -52,4 +53,28 @@ assert.equal(tot.MP1, 2 * 0.75 + 4 * 1);   // devA factor default, devB factor e
 assert.equal(tot.MP2, 10 * 0.7);            // defaultPres por unidad
 assert.equal(tot.MP9, 7);                   // corrección admin
 
-console.log('✅ sesion-merge: 12 asserts OK');
+// R11 — desglose por líneas (spec §6/§15): valor polimórfico número | array
+assert.equal(lineasDesglose(2.5), null);                       // legacy → null
+assert.deepEqual(lineasDesglose([{ n:'B', f:0.75, q:2 }]), [{ n:'B', f:0.75, q:2 }]);
+assert.equal(cantidadBase(2, 0.75), 1.5);                      // legacy aplica factor caller
+// desglose: Σ q×f con factor embebido; línea f:1 = abierto en unidad base
+assert.equal(cantidadBase([{ n:'BOTELLA', f:0.75, q:2 }, { n:'MAGNUM', f:1.5, q:1 },
+                           { n:'', f:1, q:0.3 }], 999), 3.3);  // factorLegacy NO aplica
+assert.equal(cantidadBase([], 0.75), 0);                       // array vacío = 0 (la UI lo borra)
+assert.equal(cantidadBase([{ n:'B', f:0.75 }], 1), 0);         // línea sin q no truena
+
+// sesión mixta: mismo cod como número en un dispositivo y array en otro;
+// presChoice aplica SOLO al número; corrección admin sobreescribe arrays también
+const Smix = {
+  countsByZone: {
+    '0:devA': { MP1: [{ n:'BOTELLA', f:0.75, q:2 }, { n:'', f:1, q:0.5 }] },
+    '0:devB': { MP1: 4, MP2: [{ n:'CAJA', f:12, q:2 }, { n:'', f:1, q:5 }] }
+  },
+  presChoiceByZone: { '0:devA': { MP1: 999 }, '0:devB': { MP1: 1 } },
+  correctionsByZone: { _admin: { MP2: { qty: 30 } } }
+};
+const totMix = calcularTotalesSesion(Smix, T);
+assert.equal(totMix.MP1, (2 * 0.75 + 0.5) + 4 * 1);  // 2 + 4 — el 999 se ignoró
+assert.equal(totMix.MP2, 30);                         // corrección admin pisa el 29 del array
+
+console.log('✅ sesion-merge: 21 asserts OK');

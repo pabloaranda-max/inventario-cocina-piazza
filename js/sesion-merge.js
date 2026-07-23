@@ -52,14 +52,30 @@ export function factorDefault(T, cod) {
   return defaults?.[0]?.factor ?? 1;
 }
 
+// R11: el valor de countsByZone[zid][cod] es polimórfico — número (legacy) o
+// array de líneas de desglose [{n: nombre, f: factor, q: cantidad}] (spec §6).
+// Devuelve las líneas si es desglose, null si es legacy.
+export function lineasDesglose(val) {
+  return Array.isArray(val) ? val : null;
+}
+
+// Cantidad en unidad base de UN valor de conteo (R11): con desglose el factor
+// viaja dentro de cada línea (presChoice se ignora); con número aplica el
+// factor legacy (elegido o default) que pasa el caller.
+export function cantidadBase(val, factorLegacy) {
+  const lineas = lineasDesglose(val);
+  if (lineas) return lineas.reduce((s, l) => s + (Number(l?.q) || 0) * (Number(l?.f) || 0), 0);
+  return (Number(val) || 0) * factorLegacy;
+}
+
 // Totales de una sesión: suma sobre zonas/dispositivos con el factor elegido
 // (presChoiceByZone) o el default; correcciones admin sobreescriben (spec §9).
 export function calcularTotalesSesion(S, T) {
   const totales = {};
   for (const [zid, zc] of Object.entries(S?.countsByZone || {})) {
-    for (const [cod, qty] of Object.entries(zc || {})) {
+    for (const [cod, val] of Object.entries(zc || {})) {
       const f = (S?.presChoiceByZone?.[zid]?.[cod]) ?? factorDefault(T, cod);
-      totales[cod] = (totales[cod] || 0) + qty * f;
+      totales[cod] = (totales[cod] || 0) + cantidadBase(val, f);
     }
   }
   const adminCorr = S?.correctionsByZone?.['_admin'] || {};
