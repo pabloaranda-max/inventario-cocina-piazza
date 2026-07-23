@@ -1,8 +1,10 @@
-# inventario.html — Especificación técnica v4.10
+# inventario.html — Especificación técnica v4.11
 
 > Última actualización: 2026-07-23. Estado: **EN PRODUCCIÓN** (CAVA probado; BARRA_RESTAURANTE con dos tomas reales completadas).
-> 2026-07-23: nuevo plan R11a–c "Conteo desglosado por presentación" (§15) — varias
-> presentaciones y paquetes/botellas abiertos del mismo artículo en la misma zona.
+> v4.11 (2026-07-23): **R11 conteo desglosado EN PROD** (R11a módulo + R11b captura +
+> detalle admin con líneas; solo falta el piloto CAVA de R11c) y **R12 guard de
+> versión de app EN PROD** (426 a escrituras de apps con caché vieja — nació del
+> incidente #NUM! del mismo día; contrato en §7, playbook de deploy en §15 R12).
 > v4.10: el export baja el .xlsx directo (zip eliminado — Xetux no lo reconoce) y las
 > presentaciones por defecto se guardan todo-o-nada con verificación contra el servidor.
 > UH cerró sus 4 almacenes y subió sus plantillas; **la puesta en marcha quedó
@@ -333,6 +335,13 @@ S = {
 ---
 
 ## 7. Worker — contratos de API
+
+**Transversal R12 (v4.11):** todo POST `/inv/*` debe incluir `appVersion` (entero;
+hoy `1`). Si `appVersion < MIN_APP_VERSION` (wrangler.toml `[vars]`, por entorno)
+el Worker responde **426** `{ok:false, appUpdateRequired:true, minAppVersion,
+error}` sin ejecutar la acción — cliente sin campo cuenta como 0. Los GET de
+arranque (`/inv/plantilla`, `/inv/sesiones`) incluyen `minAppVersion` en la
+respuesta para el chequeo amable del cliente. Diseño y playbook: §15 R12.
 
 ### GET /inv/plantilla?almacen=X
 
