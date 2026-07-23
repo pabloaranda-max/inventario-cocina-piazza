@@ -1,6 +1,8 @@
 # inventario.html — Especificación técnica v4.10
 
-> Última actualización: 2026-07-21. Estado: **EN PRODUCCIÓN** (CAVA probado; BARRA_RESTAURANTE con dos tomas reales completadas).
+> Última actualización: 2026-07-23. Estado: **EN PRODUCCIÓN** (CAVA probado; BARRA_RESTAURANTE con dos tomas reales completadas).
+> 2026-07-23: nuevo plan R11a–c "Conteo desglosado por presentación" (§15) — varias
+> presentaciones y paquetes/botellas abiertos del mismo artículo en la misma zona.
 > v4.10: el export baja el .xlsx directo (zip eliminado — Xetux no lo reconoce) y las
 > presentaciones por defecto se guardan todo-o-nada con verificación contra el servidor.
 > UH cerró sus 4 almacenes y subió sus plantillas; **la puesta en marcha quedó
@@ -297,7 +299,12 @@ S = {
     // baseZone(key) = parseInt(key)  ← parseInt se detiene en ':' → extrae zoneIdx
     '0:dev_xyz': { 'MP0001': 3.5, 'XMAT001': 2 },
     '0:dev_abc': { 'MP0001': 1.0 },   // mismo cod, otro dispositivo = se suma al exportar
-    '2:dev_xyz': { 'MP0001': 1 }
+    '2:dev_xyz': { 'MP0001': 1 },
+    // R11: valor polimórfico — número (legacy) o array de líneas de desglose
+    // [{n: nombre, f: factor, q: cantidad}]. f:1 = abierto/suelto en unidad base.
+    // Con array el factor viaja DENTRO de cada línea → presChoiceByZone se ignora
+    // para ese cod. total = Σ q×f. Array vacío no se guarda (se borra la clave).
+    '3:dev_xyz': { 'MP0553': [ {n:'BOTELLA', f:0.75, q:2}, {n:'', f:1, q:0.3} ] }
   },
   presChoiceByZone: {
     '0:dev_xyz': { 'XMAT2409000106': 2.9 },
@@ -828,6 +835,9 @@ Guardar/activar debe requerir password admin.
 | R10a | **Piloto de costeo manual (compuerta go/no-go)** — un mes: 4 XLS exportados a mano de Xetux + tomas D1 → costo real por almacén/centro, auditoría de costos $0, cobertura ABC del conteo. Cero código permanente. Ver diseño abajo | PENDIENTE (arranca cuando Pablo baje los 4 XLS del mes piloto) |
 | R10b | **Tab Costos en admin — carga manual de archivos** — SOLO con el go de R10a. Arrastrar los 4 XLS al tab (patrón subida de plantillas), tablas D1 con `centro`, `GET /costos/resumen`, reporte semanal/mensual de dos capas. Ver diseño abajo | CONDICIONADO al go de R10a |
 | R10c | **Brecha real (mermas + desperdicio)** — costo real (R10b) − costo teórico (recetas/consumo Xetux). Cierra el rediseño de reportes pendiente desde 2026-03-27 | FUTURO (tras R10b estable) |
+| R11a | **Conteo desglosado — módulo puro** — `calcularTotalesSesion` y helpers de `js/sesion-merge.js` aceptan valor número (legacy) o array de líneas; tests node con fixtures mixtos. Ver diseño abajo | PENDIENTE |
+| R11b | **Conteo desglosado — captura** — UI de desglose en inventario.html (líneas por presentación + "Abierto" en unidad base), pantalla de validación y badge. Probar en beta/staging | PENDIENTE (tras R11a) |
+| R11c | **Conteo desglosado — admin** — detalle por zona muestra líneas; verificación de export con dry-run. Piloto: una toma real en CAVA antes de darlo por cerrado | PENDIENTE (tras R11b) |
 | — | Limpieza (CSS muerto §13, mover apps viejas a `legacy/`, chat GROQ) — oportunista, al colarse en otra sesión | OPORTUNISTA |
 | — | Sheets API en vez de Apps Script (4b v1) — solo si Apps Script falla en un cierre real | FUTURO |
 
@@ -1095,6 +1105,62 @@ desglose por almacén. Cero Python, cero cron, cero Playwright.
 **R10c — Brecha real (fase 2).** `brecha = costo real − costo teórico`
 (recetas/consumo de Xetux) = mermas + desperdicio. Cierra el rediseño de reportes
 pendiente desde 2026-03-27 — ahora con la ecuación correcta debajo.
+
+### R11 — Conteo desglosado por presentación (diseño, 2026-07-23)
+
+**Problema.** El modelo permite UN número y UN factor por artículo por zona/dispositivo.
+Si en la misma zona hay 2 botellas de 0.75 + 1 magnum de 1.5 del mismo vino, o botellas
+cerradas + una abierta a la mitad, el operario hace matemática mental o captura
+decimales de botella — error silencioso de conversión, la clase de bug que v4.10 cazó.
+
+**Modelo (decidido con Pablo 2026-07-23).** El valor de `countsByZone[zid][cod]` se
+vuelve polimórfico (ver §6):
+
+```js
+countsByZone['0:dev_x']['MP0553'] = 2.5                      // legacy — sigue válido
+countsByZone['0:dev_x']['MP0553'] = [                        // desglose (opt-in por artículo)
+  { n:'BOTELLA', f:0.75, q:2 },   // 2 botellas de 0.75
+  { n:'MAGNUM',  f:1.5,  q:1 },   // 1 magnum
+  { n:'',        f:1,    q:0.3 }  // abierto/suelto: unidad base directa
+]
+```
+
+- total = `Σ q×f`; con array el factor viaja en la línea → `presChoiceByZone` se
+  ignora para ese cod (queda solo para números legacy).
+- La línea `f:1` ("Abierto/suelto") captura **unidad base directa** (0.3 LT, no 0.4
+  botellas) — el punto es eliminar la matemática mental. Para PZA con caja (R3) es
+  "piezas sueltas".
+- El camino simple NO cambia: un input → se guarda número, como siempre. El array
+  solo nace cuando el operario abre el desglose. Array vacío → se borra la clave.
+- NO estructura paralela (dos fuentes de verdad = bug de v4.10 repetido). NO factor
+  libre en v1 (las presentaciones vienen de plantilla/defaults; el caso raro va por
+  manual u observación). NO flag por almacén: el desglose solo aparece en artículos
+  con `getPresOptions(cod).length > 0`, se auto-limita solo.
+
+**UI (R11b).** En filas con presentaciones, botón "desglosar" expande la fila en
+líneas: una por presentación de `getPresOptions(cod)` + siempre "Abierto (unidad
+base)". Si ya había número capturado, se siembra en la línea de la presentación
+elegida. El badge muestra la suma convertida.
+
+**Impacto.**
+
+- `js/sesion-merge.js` — único lugar de cálculo (Worker + admin + inventario):
+  helper nuevo + `calcularTotalesSesion` polimórfico → XLSX, PDF y Sheets correctos solos.
+- Worker: CERO cambios de storage/migración — `mergeZoneMap` reemplaza la slice del
+  dispositivo y trata valores como JSON opaco; `articulosContados` cuenta claves.
+  Redeploy solo para recoger el módulo compartido.
+- admin.html: `detalleTotalesPorZona` muestra líneas ("2× BOTELLA 0.75 + 0.3 LT
+  abierto = 1.8 LT") — mejora de auditoría gratis.
+- ⚠️ Compat: app vieja que abra sesión con arrays de OTRO dispositivo ve NaN en la
+  pantalla de validación (su propia captura no se afecta — cada dispositivo lee su
+  slice). Ventana corta (Pages 10 min + ciclo PWA); desplegar fuera de toma activa.
+
+**Done.** R11a: tests node verdes con fixtures mixtos (legacy, array, mezcla en la
+misma sesión, corrección admin sobre array). R11b: en beta/staging, desglosar un
+artículo con 2 presentaciones + abierto, cerrar zona, validación y totales correctos;
+camino simple intacto (número en D1). R11c: detalle por zona en admin muestra líneas;
+export dry-run de una sesión mixta cuadra contra cálculo a mano; piloto = una toma
+real de CAVA exportada sin sorpresas.
 
 ### Reglas transversales (heredadas de plan v1, vigentes)
 
