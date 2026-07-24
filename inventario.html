@@ -543,6 +543,15 @@ async function fetchSesionAbiertaWorker(dias = 7) {
   } catch(e) { console.warn('sesiones fetch:', e); return null; }
 }
 
+// Un POST fallido (red caída, 5xx, conflicto de escritura) se descartaba en
+// silencio, y tras cerrar zona el cliente ya no reenvía countsByZone → esa cola de
+// conteo quedaba varada en el teléfono sin que nadie se enterara. Ahora el payload
+// se reintenta con backoff; si aun así no entra, el operario ve un banner en vez de
+// creer que quedó guardado. `_syncUltimo` evita que un reintento viejo pise el
+// estado nuevo: si ya salió otra sync para la misma zona, la vieja se abandona.
+let _syncSeq = 0;
+const _syncUltimo = {};   // zoneKey -> seq de la sync más reciente emitida
+
 function syncSesionWorker() {
   if (!S) return;
   // Solo enviamos la zona activa de este dispositivo. Clave "zoneIdx:deviceId" garantiza
@@ -550,44 +559,86 @@ function syncSesionWorker() {
   const myKey = CZ !== null ? myZoneKey(CZ) : null;
   const cbz   = myKey ? { [myKey]: S.countsByZone?.[myKey]  || {} } : {};
   const pcbz  = myKey ? { [myKey]: S.presChoiceByZone?.[myKey] || {} } : {};
+  enviarPayloadSesion(cbz, pcbz);
+}
+
+// Reenvía TODAS las rebanadas de este dispositivo, no solo la zona activa. Repara
+// lo que haya quedado varado (zona ya cerrada, corte de red, sync perdida).
+function resincronizarTodo() {
+  if (!S) return;
+  const dev = getDeviceId();
+  const mias = k => String(k).split(':')[1] === dev;
+  const cbz = {}, pcbz = {};
+  for (const k of Object.keys(S.countsByZone || {}))      if (mias(k)) cbz[k]  = S.countsByZone[k]  || {};
+  for (const k of Object.keys(S.presChoiceByZone || {}))  if (mias(k)) pcbz[k] = S.presChoiceByZone[k] || {};
+  enviarPayloadSesion(cbz, pcbz);
+}
+
+function enviarPayloadSesion(cbz, pcbz) {
   const removeCompletedZones = S.pendingCompletedZoneRemovals || [];
   // El snapshot pesa (todas las zonas con artículos): se envía solo hasta que el
   // Worker lo tenga (first-write-wins allá; snapshotSynced acá).
   const sendSnapshot = !!(S.zoneSnapshot?.length && !S.snapshotSynced);
+  const body = {
+    action:'inv_sesion',
+    appVersion:APP_VERSION,
+    almacen:ALMACEN,
+    operario:S.operario,
+    fecha:S.fecha,
+    templateHash:S.templateHash||'',
+    countsByZone:cbz,
+    presChoiceByZone:pcbz,
+    correctionsByZone:S.correctionsByZone||{},
+    completedZones:S.completedZones||[],
+    removeCompletedZones,
+    manuales:S.manuales||[],
+    zoneConfigId:S.zoneConfigId||'',
+    zoneSnapshot: sendSnapshot ? S.zoneSnapshot : undefined
+  };
+  const seq  = ++_syncSeq;
+  const keys = Object.keys(cbz);
+  keys.forEach(k => { _syncUltimo[k] = seq; });
+  enviarSesion(body, { seq, keys, intento:0, removeCompletedZones, sendSnapshot });
+}
+
+// Un payload deja de estar vigente cuando ya salió una sync más nueva para la misma
+// zona (esa lleva el estado actual, superset del que falló). Un payload sin conteos
+// —zona ya cerrada— nunca queda obsoleto: se reintenta hasta que entre.
+function syncVigente(ctx) { return ctx.keys.every(k => _syncUltimo[k] === ctx.seq); }
+
+function enviarSesion(body, ctx) {
+  if (!syncVigente(ctx)) return;
   fetch(WORKER_URL + '/inv/sesion', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      action:'inv_sesion',
-      appVersion:APP_VERSION,
-      almacen:ALMACEN,
-      operario:S.operario,
-      fecha:S.fecha,
-      templateHash:S.templateHash||'',
-      countsByZone:cbz,
-      presChoiceByZone:pcbz,
-      correctionsByZone:S.correctionsByZone||{},
-      completedZones:S.completedZones||[],
-      removeCompletedZones,
-      manuales:S.manuales||[],
-      zoneConfigId:S.zoneConfigId||'',
-      zoneSnapshot: sendSnapshot ? S.zoneSnapshot : undefined
-    })
+    body: JSON.stringify(body)
   })
   .then(r => {
     // R12: el Worker rechaza escrituras de app vieja — avisar sin perder nada
     // (todo sigue en localStorage y se re-sincroniza tras actualizar)
     if (r.status === 426) { mostrarBannerUpdate(); return; }
-    if (!r.ok) return;
+    if (!r.ok) { reintentarSesion(body, ctx); return; }
+    ocultarBannerSync();
     let dirty = false;
-    if (removeCompletedZones.length && S) {
-      S.pendingCompletedZoneRemovals = (S.pendingCompletedZoneRemovals || []).filter(z => !removeCompletedZones.includes(z));
+    if (ctx.removeCompletedZones.length && S) {
+      S.pendingCompletedZoneRemovals = (S.pendingCompletedZoneRemovals || []).filter(z => !ctx.removeCompletedZones.includes(z));
       dirty = true;
     }
-    if (sendSnapshot && S) { S.snapshotSynced = true; dirty = true; }
+    if (ctx.sendSnapshot && S) { S.snapshotSynced = true; dirty = true; }
     if (dirty && S) lsSet('s', S);
   })
-  .catch(e => console.warn('sesion sync:', e));
+  .catch(e => { console.warn('sesion sync:', e); reintentarSesion(body, ctx); });
 }
+
+function reintentarSesion(body, ctx) {
+  if (!syncVigente(ctx)) return;
+  if (ctx.intento >= 5) { mostrarBannerSync(); return; }
+  const espera = 1000 * Math.pow(2, ctx.intento) + Math.floor(Math.random() * 500);
+  setTimeout(() => enviarSesion(body, { ...ctx, intento: ctx.intento + 1 }), espera);
+}
+
+// Al recuperar conexión, reenviar todo lo de este dispositivo (incluye zonas ya
+// cerradas, que el sync normal ya no manda).
+window.addEventListener('online', () => { if (S) resincronizarTodo(); });
 
 function scheduleSyncSesion() { clearTimeout(_syncTimer); _syncTimer = setTimeout(syncSesionWorker, 3000); }
 
@@ -854,6 +905,18 @@ function mostrarBannerUpdate() {
   b.innerHTML = 'App desactualizada: el servidor no recibe estos conteos hasta actualizar. Lo capturado queda guardado en este teléfono. <button onclick="forzarActualizacion()" style="margin-left:8px;border:none;border-radius:6px;padding:4px 10px;font-weight:700;cursor:pointer">Actualizar</button>';
   document.body.appendChild(b);
 }
+
+// Sync agotada tras varios reintentos: el operario tiene que saberlo — lo capturado
+// vive en este teléfono y no está en el servidor. Se quita solo al primer sync OK.
+function mostrarBannerSync() {
+  if (document.getElementById('sync-banner')) return;
+  const b = document.createElement('div');
+  b.id = 'sync-banner';
+  b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#b91c1c;color:#fff;z-index:10001;font:600 12px system-ui;padding:8px 12px;text-align:center';
+  b.innerHTML = 'Sin conexión con el servidor: lo contado está guardado en este teléfono pero NO se ha enviado. No borres la app; se reintenta solo al volver la señal. <button onclick="resincronizarTodo()" style="margin-left:8px;border:none;border-radius:6px;padding:4px 10px;font-weight:700;cursor:pointer">Reintentar</button>';
+  document.body.appendChild(b);
+}
+function ocultarBannerSync() { document.getElementById('sync-banner')?.remove(); }
 
 // ── Pantalla: selector de área ─────────────────────────────────────────────
 

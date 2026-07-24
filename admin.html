@@ -1393,8 +1393,12 @@ async function subirPlantillaYExportar(almacen, fecha, file) {
       );
       return;
     }
+    // Este camino exporta con force: es la única confirmación que verá el admin,
+    // así que aquí va también la cobertura (lo no contado entra a Xetux como CERO).
+    const enCero = Object.keys(rowMap).length - contados.size;
     if (!confirm(
       `"${file.name}"\n${Object.keys(rowMap).length} artículos; cubre los ${contados.size} contados en la toma del ${fecha}.\n\n` +
+      `Los otros ${enCero} van SIN cantidad — Xetux los aplica como CERO.\n\n` +
       `¿Subirla como plantilla de ${tituloAlmacen(almacen)} y exportar la sesión?`
     )) return;
 
@@ -1422,7 +1426,9 @@ async function exportarSesionInventario(almacen, fecha, force, opts) {
     alert('Esta sesión ya se está exportando en esta ventana.');
     return;
   }
-  if (!force && !confirm(`Exportar sesión de ${tituloAlmacen(almacen)} del ${fecha} desde admin?\nEsto marcará la sesión como exportada.`)) return;
+  // La confirmación se pide más abajo, ya con la sesión y la plantilla en mano:
+  // así puede decir cuántos artículos se escriben y cuántos van vacíos (= CERO en
+  // Xetux al aplicar), que es lo que de verdad hay que revisar antes de exportar.
   exportandoSesiones.add(exportKey);
   try {
     const [sr, tr] = await Promise.all([
@@ -1471,6 +1477,22 @@ async function exportarSesionInventario(almacen, fecha, force, opts) {
     )) return;
 
     const totales = calcularTotalesSesion(S, T);
+
+    // Xetux aplica como CERO todo artículo que llegue sin cantidad, así que una toma
+    // a medias borra existencias en silencio. El dato que hay que ver antes de
+    // exportar es la cobertura, no el número suelto de artículos contados.
+    const enPlantilla = Object.keys(T.rowMap || {}).length;
+    const seEscriben = Object.keys(totales).filter(cod => T.rowMap?.[cod] !== undefined).length;
+    const enCero = enPlantilla - seEscriben;
+    const zonasAbiertas = (S.zoneSnapshot?.length || 0) - new Set((S.completedZones || []).map(z => parseInt(z))).size;
+    if (!force && !confirm(
+      `Exportar la toma de ${tituloAlmacen(almacen)} del ${fecha}?\n\n` +
+      `Se escriben ${seEscriben} de los ${enPlantilla} artículos de la plantilla.\n` +
+      `Los otros ${enCero} van SIN cantidad — Xetux los aplica como CERO.\n` +
+      (zonasAbiertas > 0 ? `\n⚠️ Quedan ${zonasAbiertas} zona(s) sin cerrar: puede que alguien siga contando.\n` : '') +
+      `\nEsto marcará la sesión como exportada.`
+    )) return;
+
     const corrections = correctionsByCod(S);
     const rawLookup = itemsFromRaw(T.raw, T);
     const catLookup = await catalogoLookup(almacen, T);
