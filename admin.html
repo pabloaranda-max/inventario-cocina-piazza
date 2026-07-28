@@ -1131,7 +1131,14 @@ async function borrarSesionInventario(almacen, fecha) {
     await cargarSesionesInventario();
     alert('Sesión borrada del Admin/Worker. Los registros enviados a Sheets no se tocaron.');
   } catch(e) {
-    alert('Error al borrar: ' + e.message);
+    // La tarjeta pudo quedar obsoleta entre que se pintó y el clic: otro admin
+    // borró la sesión, o un teléfono que seguía sincronizando la recreó con otra
+    // fecha. Sin refrescar acá, la tarjeta fantasma se queda en pantalla y cada
+    // reintento repite el mismo error (incidente 2026-07-27).
+    try { await cargarSesionesInventario(); } catch(_) {}
+    alert(/no encontrada/i.test(e.message)
+      ? 'Esa toma ya no existe en el servidor. La lista quedó actualizada.'
+      : 'Error al borrar: ' + e.message);
   }
 }
 
@@ -2005,6 +2012,22 @@ async function saveDefaults() {
   }
 }
 
+// Cuenta filas con cantidad capturada en la columna que detectó el parser. Una
+// plantilla recién exportada de Xetux trae esa columna vacía; un export de la
+// app trae los conteos.
+function filasConCantidad(buf, idx) {
+  try {
+    const wb = XLSX.read(buf, { type:'array' });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:'' });
+    let n = 0;
+    for (const r of rows) {
+      const v = r[idx];
+      if (v !== '' && v != null && !isNaN(parseFloat(v))) n++;
+    }
+    return n;
+  } catch(_) { return 0; }
+}
+
 async function uploadPlantilla(file) {
   const almacen = document.getElementById('plt-almacen').value;
   if (!almacen || !file) return;
@@ -2013,6 +2036,55 @@ async function uploadPlantilla(file) {
   try {
     const buf = await file.arrayBuffer();
     const { rowMap, cantidadColIdx, presMap, unitMap, articulos } = parsePlantilla(buf);
+
+    // Guarda 1 — no aceptar un EXPORT como plantilla (incidente 2026-07-27).
+    // El export de la app y la plantilla de Xetux comparten patrón de nombre y
+    // viven en carpetas vecinas, así que el diálogo de archivos los confunde.
+    // Dos señales independientes los separan: Xetux escribe el xlsx con Apache
+    // POI y la columna Cantidad vacía; el export lo escribe SheetJS ya con los
+    // conteos. Cualquiera de las dos alcanza para frenar.
+    let props = {};
+    try { props = XLSX.read(buf, { type:'array', bookProps:true }).Props || {}; } catch(_) {}
+    const generadoPorLaApp = /sheetjs/i.test(props.Application || '');
+    const conCantidad = filasConCantidad(buf, cantidadColIdx);
+    if (generadoPorLaApp || conCantidad) {
+      msg.style.color = '#dc2626';
+      msg.textContent = '✗ Eso es un export, no una plantilla. No se subió nada.';
+      alert(
+        `"${file.name}" no es una plantilla de Xetux:\n` +
+        (generadoPorLaApp ? '· lo generó esta app (SheetJS), no Xetux\n' : '') +
+        (conCantidad ? `· trae ${conCantidad} fila(s) con cantidad capturada; una plantilla viene vacía\n` : '') +
+        '\nLas plantillas se bajan de Xetux (normalmente quedan en Descargas). ' +
+        'Los archivos que están en las carpetas de exports son el inventario ya contado.'
+      );
+      document.getElementById('plt-file').value = '';
+      return;
+    }
+
+    // Guarda 2 — no pisar un almacén con la plantilla de otro. Si lo entrante
+    // casi no comparte códigos con lo que ese almacén ya tiene, casi siempre es
+    // el archivo equivocado. Se avisa y decide la persona; nunca se autocorrige
+    // (mismo criterio que R6).
+    let previos = [];
+    try {
+      const pr = await fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen));
+      const pd = await pr.json();
+      if (pd.found && pd.rowMap) previos = Object.keys(pd.rowMap);
+    } catch(_) {}
+    if (previos.length) {
+      const comunes = previos.filter(c => rowMap[c] !== undefined).length;
+      if (comunes / previos.length < 0.2 && !confirm(
+        `"${file.name}" trae ${Object.keys(rowMap).length} artículos, pero solo ${comunes} de los ` +
+        `${previos.length} que ${tituloAlmacen(almacen)} ya tiene.\n\n` +
+        `¿Seguro que es la plantilla de ${tituloAlmacen(almacen)}? Subirla reemplaza la actual.`
+      )) {
+        msg.textContent = 'Cancelado, no se subió nada.';
+        document.getElementById('plt-file').value = '';
+        return;
+      }
+    }
+
+    msg.style.color = '#888';
     msg.textContent = `✓ ${Object.keys(rowMap).length} artículos · calculando hash…`;
 
     const bytes = new Uint8Array(buf);
