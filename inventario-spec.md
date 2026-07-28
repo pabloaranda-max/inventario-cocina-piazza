@@ -17,6 +17,12 @@
 > **Este documento es el ÚNICO contrato vivo del proyecto.** `plan-slices.md` (v1.0) y
 > `FABLE_HANDOFF.md` quedan [SUPERADOS] — sus decisiones vigentes están incorporadas
 > aquí (§15). No crear documentos de planeación paralelos; actualizar este.
+>
+> **Historia de fallas: [`inventario-incidentes.md`](inventario-incidentes.md).** No es
+> un plan paralelo ni contradice lo anterior: este spec es **normativo** (cómo debe
+> comportarse el sistema, se corrige), la bitácora es **histórica** (qué pasó,
+> *append-only*, no se reescribe al arreglar el bug). Al cerrar un incidente, la regla
+> queda ahí y el contrato acá.
 
 ---
 
