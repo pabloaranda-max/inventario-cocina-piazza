@@ -45,6 +45,102 @@ patrón se repite, tres entradas honestas apuntan mejor que una teoría inventad
 
 ---
 
+## 2026-07-27 — El export de CAVA se subió como plantilla de SALUMERÍA
+
+- **Impacto:** SALUMERÍA quedó con la lista de artículos de CAVA (vinos) como plantilla
+  vigente durante ~27 minutos, con una toma real en curso encima. Los 13 artículos
+  contados por el operario aparecían "fuera de plantilla" y con el código en lugar del
+  nombre. **Sin pérdida de conteos** — plantilla y sesión son tablas distintas. Exportar
+  en ese estado le habría mandado ceros a Xetux para todo lo contado.
+- **Detección:** Pablo, al intentar cerrar la toma con plantilla fresca; el guard de esa
+  ruta avisó "13 artículos contados no están en la plantilla". La subida directa, en
+  cambio, no había dicho nada en cuatro intentos.
+- **Causa raíz:** **confirmada.** El diálogo de archivos de Windows abría en la carpeta
+  de exports de CAVA, donde el único xlsx es el inventario ya contado que la propia app
+  generó. Ese archivo y una plantilla de Xetux comparten el patrón de nombre
+  (`Inventario XTINVxxxxxx <fecha>.xlsx`) porque Xetux valida el nombre al importar, así
+  que en el diálogo son indistinguibles: solo cambia el consecutivo (279 contra 280).
+  La pestaña Plantillas aceptaba cualquier xlsx para cualquier almacén sin una sola
+  comprobación.
+- **Evidencia:** el `raw` guardado en D1 pesaba 125,143 bytes y coincidía exactamente con
+  `…\INVENTARIOS PP\PASTICIO\CAVA\Inventario XTINV000279….xlsx`; sus metadatos decían
+  `Application: SheetJS` (Xetux escribe `Apache POI`) y traía 80 filas con cantidad ya
+  capturada. El acceso directo de "Recientes" de Windows a ese archivo estaba fechado en
+  el segundo exacto de cada escritura a D1 (21:45:00 y 21:56:41), y del archivo correcto
+  no existía ningún acceso. Las cuatro subidas dejaron el **mismo hash**, o sea los
+  mismos bytes cada vez. El archivo correcto, pasado por el parser real del proyecto,
+  daba 80 artículos y contenía los 13 códigos contados.
+- **Resolución:** la plantilla correcta se escribió directamente en D1 el mismo día
+  (`XTINV000280`, hash `7c1fdefdb481723a`, 80 artículos, verificado). El arreglo de
+  código va en el mismo commit que este incidente: la subida rechaza archivos con
+  `Application: SheetJS` o con la columna Cantidad llena, y avisa cuando los códigos
+  entrantes casi no coinciden con los que el almacén ya tiene.
+- **Lección:** **cuando dos rutas hacen lo mismo, la guarda tiene que estar en las dos.**
+  "Cerrar con plantilla fresca" sí comparaba lo contado contra el archivo y frenó; la
+  pestaña Plantillas no comparaba nada y dejó pisar el almacén cuatro veces seguidas. El
+  usuario hizo lo mismo en ambas y solo una lo protegió.
+
+---
+
+## 2026-07-27 — "Sesión no encontrada" al borrar una toma que ya no existía
+
+- **Impacto:** menor y sin pérdida de datos. Al borrar una toma vacía de SALUMERÍA
+  fechada el 7 de julio, el admin devolvía `Error al borrar: Sesión no encontrada` y
+  seguía mostrando la tarjeta, así que cada reintento repetía el error.
+- **Detección:** reporte de Pablo al usar el admin.
+- **Causa raíz:** **el Worker decía la verdad** — esa fila ya no existía en D1. La tarjeta
+  estaba obsoleta y el admin **no refrescaba la lista al fallar** (`cargarSesionesInventario()`
+  solo se llamaba en el camino de éxito), de modo que la tarjeta fantasma se quedaba fija.
+  Por qué desapareció la fila del 07-07 quedó **sin confirmar**; lo más probable es que un
+  primer borrado sí funcionó y el teléfono, al no encontrar sesión en el servidor, recreó
+  la toma con la fecha de hoy.
+- **Evidencia:** en D1 no había fila `SALUMERIA / 2026-07-07`; sí una `SALUMERIA / 2026-07-27`
+  con 13 códigos en 3 zonas cerradas y sincronizaciones posteriores a la captura de
+  pantalla. Las otras cinco tarjetas coincidían con D1 al minuto, así que la lista no
+  estaba obsoleta en general.
+- **Resolución:** el admin ahora refresca la lista también en el error y distingue "esa
+  toma ya no existe" de una falla real (mismo commit que el incidente anterior).
+- **Lección:** dos, y la segunda sigue abierta:
+  1. **Una acción que falla debe dejar la pantalla en el estado real del servidor**, o el
+     usuario reintenta contra un fantasma indefinidamente.
+  2. **Borrar no es durable mientras un teléfono siga vivo:** el sync es un
+     `INSERT … ON CONFLICT` sin lápida, así que cualquier dispositivo que aún tenga la
+     sesión en su localStorage la recrea en el siguiente envío, incluso bajo otra fecha.
+     Va como pendiente al spec §15 (R17); empeora con R14 desplegado, que ahora sí
+     reintenta.
+
+---
+
+## 2026-07-26 — La toma de CAVA no registró un solo conteo
+
+- **Impacto:** la toma de CAVA del 26 quedó con **cero artículos** en el servidor. Si se
+  hubiera exportado así, Xetux habría aplicado CERO a todo el almacén. Lo capturado por
+  el operario, si existió, nunca salió de su teléfono.
+- **Detección:** al revisar el tab Tomas antes de iniciar la toma del día siguiente; la
+  tarjeta decía "0 artículos · 0 zonas listas".
+- **Causa raíz:** **NO CONFIRMADA.** Lo único que llegó al servidor fue el candado de la
+  zona 0 del dispositivo `ms2fjz2o7q9flgsxuqd` (Omar) a las 17:34:06, que es también el
+  último `updated_at`. Después no llegó nada. Candidatos, en orden:
+  1. **R14 — el cliente descartaba en silencio los POST fallidos** (`if (!r.ok) return;`),
+     sin banner ni aviso: el operario pudo capturar toda la zona viendo la app normal
+     mientras nada subía.
+  2. La zona se tomó y no se capturó nada (se hizo en papel o se abandonó).
+- **Evidencia:** `counts_by_zone = {}`, `completed_zones = []`, cero manuales, cero
+  correcciones y `operarios_by_device = {}`; pero `zone_snapshot` y `template_hash` sí
+  estaban congelados, o sea que la sesión se abrió correctamente. **No es R13**: la
+  carrera deja rastro de conteos pisados, y acá nunca hubo conteos.
+- **Resolución:** ninguna sobre esa toma — no hay nada que recuperar del lado del
+  servidor. R14 y R15 salieron a producción el 2026-07-28 (ver §15), que es lo que
+  convierte este modo de falla en visible: el cliente ahora reintenta, avisa con banner
+  si se agota, y la confirmación de export dice cuántos artículos van y cuántos entran
+  como CERO.
+- **Lección:** **un sync que falla en silencio produce exactamente este incidente y no
+  deja forma de distinguirlo de "no se contó nada".** Un año de tomas pudo tener casos
+  así sin que nadie lo notara; sin banner en el cliente ni cobertura al exportar, no hay
+  manera de saberlo retroactivamente.
+
+---
+
 ## 2026-07-26 — La app no cargaba ("URLs muertos")
 
 - **Impacto:** `inventario.html` inaccesible para Pablo durante unos minutos. Se
