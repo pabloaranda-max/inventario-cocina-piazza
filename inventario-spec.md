@@ -1,6 +1,13 @@
-# inventario.html — Especificación técnica v4.11
+# inventario.html — Especificación técnica v4.12
 
-> Última actualización: 2026-07-23. Estado: **EN PRODUCCIÓN** (CAVA probado; BARRA_RESTAURANTE con dos tomas reales completadas).
+> Última actualización: 2026-07-24. Estado: **EN PRODUCCIÓN** (CAVA probado; BARRA_RESTAURANTE con dos tomas reales completadas).
+> v4.12 (2026-07-24): auditoría previa a operar en más de dos restaurantes (dos
+> revisiones independientes, Claude y Codex, con hallazgos coincidentes). **Se
+> reprodujo una condición de carrera que pierde conteos de forma definitiva** →
+> §15 R13, BLOQUEANTE para multi-restaurante. Además R14 (sync del cliente a prueba
+> de fallos) y R15 (cobertura visible antes de exportar: lo no contado entra a Xetux
+> como CERO). **Producción NO se tocó**: los tres arreglos están escritos y
+> verificados en staging, esperando ventana con calma. Ver §15.
 > v4.11 (2026-07-23): **R11 conteo desglosado EN PROD** (R11a módulo + R11b captura +
 > detalle admin con líneas; solo falta el piloto CAVA de R11c) y **R12 guard de
 > versión de app EN PROD** (426 a escrituras de apps con caché vieja — nació del
@@ -336,7 +343,14 @@ S = {
 
 **Sync parcial:** cada dispositivo solo manda su zona activa (`CZ`). Si `CZ = null`, `countsByZone = {}` — el Worker interpreta `{}` como "sin cambios en conteos", no como "borrar todo".
 
-**Conteo colaborativo:** dos o más usuarios pueden contar la misma zona simultáneamente. La clave `"zoneIdx:deviceId"` garantiza que el Worker nunca mezcle conteos de dispositivos distintos. Para claves con ':', el Worker reemplaza la slice completa (permite borrar cantidades); para claves legacy sin ':', sigue haciendo merge superficial. Al exportar el Excel/Sheets, el cliente baja la sesión más reciente del Worker y suma todos los deviceId para cada zoneIdx antes de procesar.
+**Conteo colaborativo:** dos o más usuarios pueden contar la misma zona simultáneamente. La clave `"zoneIdx:deviceId"` garantiza que el Worker nunca mezcle conteos de dispositivos distintos.
+
+> ⚠️ **La clave protege el merge, no la escritura de la fila.** Hasta que se despliegue
+> **§15 R13**, dos dispositivos que sincronizan en la misma ventana de milisegundos se
+> pisan a nivel de fila y el perdedor pierde lo capturado desde su último sync — de
+> forma DEFINITIVA si era su última sync (p. ej. al cerrar zona). Ambos POST devuelven
+> `200`. Reproducido 2026-07-24: 5/6 rondas con pérdida en el escenario "dos operarios
+> cierran zona a la vez". Para claves con ':', el Worker reemplaza la slice completa (permite borrar cantidades); para claves legacy sin ':', sigue haciendo merge superficial. Al exportar el Excel/Sheets, el cliente baja la sesión más reciente del Worker y suma todos los deviceId para cada zoneIdx antes de procesar.
 
 ---
 
@@ -854,7 +868,13 @@ Guardar/activar debe requerir password admin.
 | R11b | **Conteo desglosado — captura** — UI de desglose en inventario.html (líneas por presentación + "Abierto" en unidad base), pantalla de validación y badge. Probar en beta/staging | HECHO 2026-07-23 en rama `feat/slice-r11-desglose` — smoke local `tests/smoke-r11b.py` (Playwright + Worker stubeado, 17 asserts) y **Done verificado en beta+staging REALES** (`tests/e2e-beta-r11b.py`, 12 asserts): beta publicada en Pages (main `287e4f5`), Worker staging redesplegado con el sesion-merge de R11a, artículo con 2 presentaciones + abierto = 3.3 LT, zona cerrada, validación correcta, y en D1 staging el desglose viaja como array de 3 líneas con el número legacy intacto al lado (sesión de prueba borrada después). **EN PROD 2026-07-23** (merge a main `efe80af` a petición de Pablo, Worker prod redesplegado `ae09b004`, Pages + espejo UH verificados; había una toma UH_COCINA pendiente del mismo Pablo al desplegar — refrescar dispositivos antes de usar desglose en ella) |
 | R11c | **Conteo desglosado — admin** — detalle por zona muestra líneas; verificación de export con dry-run. Piloto: una toma real en CAVA antes de darlo por cerrado | EN CURSO — detalle por zona con líneas EN PROD 2026-07-23 (`117b7c5`: `detalleTotalesPorZona` polimórfico, "2× BOTELLA 0.75 + 0.3 abierto"; sin esto mostraba NaN). **Faltan: dry-run de export de una sesión mixta contra cálculo a mano + piloto = una toma real de CAVA exportada sin sorpresas** |
 | R12 | **Guard de versión de app (anti-skew de caché)** — `APP_VERSION` en los frontends viaja en cada POST `/inv/*`; el Worker rechaza escrituras de versiones < `MIN_APP_VERSION` (426) y publica `minAppVersion` en los GET de arranque; la app bloquea al entrar y muestra banner si el sync es rechazado; imports de módulos con `?v=` para que HTML y módulo no se desfasen. Ver diseño abajo | HECHO — **EN PROD 2026-07-23** (main `70acc94`, Worker prod `6a64c4d6` con MIN=1 desplegado DESPUÉS de verificar Pages — playbook cumplido; espejo UH incluido). Staging: POST sin versión → 426, versionado → 200, GETs publican minAppVersion. Smokes: `tests/smoke-r12.py` 8 asserts (bloqueo al entrar, banner tras 426 sin perder captura local, flujo normal) + regresión R11b 17/17. Prod verificado con 6 probes estables (426 + minAppVersion:1). ⚠️ Lección: probar el rechazo en prod SOLO con action inexistente (`probe_r12`) — un POST real durante la propagación del Worker puede caer en una instancia vieja y escribir (pasó; fila basura borrada por SQL) |
-| — | Limpieza (CSS muerto §13, mover apps viejas a `legacy/`, chat GROQ) — oportunista, al colarse en otra sesión | OPORTUNISTA |
+| R13 | **Escritura atómica de sesiones (carrera lost-update)** — el read-modify-write de `inv_sesion` no es atómico: dos dispositivos que sincronizan en la misma ventana de milisegundos se pisan y la pérdida es DEFINITIVA. Ver diseño abajo | **PENDIENTE — BLOQUEANTE para multi-restaurante.** Falla reproducida 2026-07-24; arreglo escrito y verificado en staging, sin desplegar a prod (rama `fix/inv-concurrencia-sync`) |
+| R14 | **Sync del cliente a prueba de fallos** — hoy cualquier POST fallido se descarta en silencio (`if (!r.ok) return;` + `.catch(console.warn)`); tras cerrar zona el cliente ya no reenvía conteos, así que lo capturado queda varado en el teléfono sin aviso. Ver diseño abajo | PENDIENTE — arreglo escrito y verificado (`tests/smoke-sync-retry.py`, 15 asserts), sin desplegar |
+| R15 | **Cobertura visible antes de exportar** — Xetux aplica como CERO todo artículo que llegue sin cantidad; nada lo advertía. Ver diseño abajo | PENDIENTE — arreglo escrito y verificado, sin desplegar |
+| — | **GENERAL sin plantilla en D1** — la app cae a "Iniciar conteo sin plantilla" y la toma no es exportable. Subir su plantilla Xetux o retirarlo de `AREA_CONFIG` | PENDIENTE (bloqueante solo si se opera GENERAL) |
+| — | **Preparación de COCINA desfasada** — la preparación activa expone 58 de los 736 artículos de la plantilla y está congelada contra `templateHash` `5785b457e877`, mientras la plantilla vigente es `4aba07cd59e2`. Revisar si sigue siendo la intención | PENDIENTE (detectado 2026-07-24) |
+| — | **`defaultPres` vacío en 11 de 12 almacenes** — solo CAVA tiene `LT → botella .75`. Los demás cuentan todo en unidad base; correcto por diseño, pero conviene confirmarlo almacén por almacén antes de escalar | PENDIENTE |
+| — | Limpieza (CSS muerto §13, mover apps viejas a `legacy/`, chat GROQ) — oportunista, al colarse en otra sesión. Añadir: borrar la plantilla huérfana `BARRA` de D1 (360 arts, del 2026-06-23, sin `unitMap` ni `originalFilename`; `BARRA` no existe en `AREA_CONFIG`, así que no es alcanzable desde la app) | OPORTUNISTA |
 | — | Sheets API en vez de Apps Script (4b v1) — solo si Apps Script falla en un cierre real | FUTURO |
 
 ### R8 — Multi-centro (diseño, 2026-07-10)
@@ -1220,6 +1240,137 @@ lockout de toda la flota vieja mientras Pages propaga.
 de bloqueo al entrar con `minAppVersion` alto, banner tras sync 426, flujo normal
 intacto. Prod: rollout con el playbook, verificado con curl que un POST estilo-viejo
 rebota y los GET publican `minAppVersion`.
+
+### R13 — Escritura atómica de sesiones (diseño, 2026-07-24) — BLOQUEANTE
+
+**Problema.** `inv_sesion` hace `SELECT` → merge en JS → `INSERT … ON CONFLICT DO
+UPDATE` **sin transacción**. Dos dispositivos que sincronizan en la misma ventana de
+milisegundos leen ambos el estado previo y el segundo escribe el blob completo SIN la
+rebanada del primero. La clave `zona:deviceId` (§6) protege contra el merge, pero no
+contra esto: la carrera ocurre una capa más abajo, en la fila entera.
+
+Normalmente se auto-repara —cada dispositivo reenvía su rebanada completa en el
+siguiente sync— **salvo cuando la sync perdida es la última**. Y `cerrarZona()`
+(inventario.html) hace un `syncSesionWorker()` inmediato que es justo esa: después de
+cerrar zona, `CZ = null` y los syncs siguientes mandan `countsByZone: {}` (= "sin
+cambios"). Lo capturado queda varado en localStorage y **nadie se entera**.
+
+**Evidencia (staging, 2026-07-24).** Reproducido de forma independiente por dos
+revisiones:
+
+| Prueba | Resultado ANTES |
+|---|---|
+| 8 dispositivos sincronizando a la vez | sobrevivió **1 de 8** |
+| 2 dispositivos, 6 rondas | **6/6 rondas con pérdida** |
+| 3 / 4 / 6 dispositivos, 6 rondas c/u | 12 / 16 / 27 rebanadas perdidas |
+| **Dos operarios cierran zona a la vez** (el caso operativo real) | **5/6 rondas perdieron la cola del conteo, definitivo** |
+| POST simultáneos (medición de Codex) | 8/8 intentos perdieron una slice; **ambos POST devuelven 200** |
+
+Nota: los dos POST responden `200`. No hay ninguna señal de error, ni en el cliente ni
+en el Worker.
+
+**Arreglo (escrito y verificado en staging, sin desplegar).** Control optimista (CAS)
+sobre `updated_at`, que ya existe — **sin migración, sin cambio de esquema, sin cambio
+de contrato de API**:
+
+- el `SELECT` incluye `updated_at` y ese valor viaja como token;
+- la sentencia termina en `WHERE inv_sesiones.updated_at IS ?`; si el token no coincide,
+  `meta.changes = 0` → se relee y se reintenta sobre el estado fresco (12 intentos,
+  backoff con jitter creciente);
+- fila inexistente → token centinela `'@@fila-nueva@@'` (ningún `updated_at` real puede
+  valer eso), así que una inserción concurrente también se detecta y reintenta;
+- `updated_at` nuevo se fuerza a diferir del token (dos escrituras en el mismo
+  milisegundo dejarían el token indistinguible);
+- agotados los reintentos → `409` (el cliente conserva todo en localStorage; ver R14).
+
+**Verificado.** Con el arreglo en staging: cierre de zona simultáneo **0/6 pérdidas**
+(era 5/6); 2, 3, 4 y 6 dispositivos concurrentes **0 pérdidas**; estrés de 12
+dispositivos × 5 syncs **60/60 en 200, cero 409**. SQLite local confirma la semántica
+exacta de la cláusula (12 asserts) **incluido que `zone_snapshot` sigue siendo
+first-write-wins — R5 intacto**. Regresión: `test-merge.mjs` 21, `smoke-r11b.py` 17,
+`smoke-r12.py` 8, todas verdes.
+
+**Playbook de deploy.** Es server-only y compatible hacia atrás: un cliente viejo no se
+entera y no necesita recargar. No requiere el orden Pages→Worker de R12. Basta
+`npx wrangler deploy` sobre `operaciones-api`, **fuera de una toma activa**. Reversión:
+`git checkout worker/operaciones-api/src/index.js && npx wrangler deploy`. Staging ya
+corre el arreglo desde 2026-07-24 — si prod y staging divergen, es por esto.
+
+### R14 — Sync del cliente a prueba de fallos (diseño, 2026-07-24)
+
+**Problema.** `syncSesionWorker()` descarta en silencio cualquier fallo: `if (!r.ok)
+return;` y `.catch(e => console.warn(...))`. No hay reintento, ni verificación de que
+el servidor recibió, ni aviso al operario. Un corte de wifi —o el 409 de R13— pierde
+lo capturado desde el último sync que sí entró. Con zona ya cerrada, para siempre.
+
+**Arreglo (escrito y verificado, sin desplegar).**
+
+- reintento con backoff exponencial (5 intentos) del payload que falló;
+- contador de secuencia por zona (`_syncUltimo`): si ya salió una sync más nueva para
+  la misma zona, el reintento viejo se abandona — **nunca revierte a un estado
+  anterior**. Un payload sin conteos (zona cerrada) no caduca: se reintenta hasta entrar;
+- agotados los reintentos → banner rojo fijo: "lo contado está guardado en este
+  teléfono pero NO se ha enviado", con botón Reintentar. Se quita solo al primer sync OK;
+- `window.addEventListener('online')` → `resincronizarTodo()`, que reenvía **todas** las
+  rebanadas de este dispositivo, incluidas las de zonas ya cerradas (el sync normal ya
+  no las manda). Repara también lo que hubiera quedado varado por R13.
+
+**Verificado.** `tests/smoke-sync-retry.py`, 15 asserts: fallo transitorio → se
+recupera solo sin banner; fallo sostenido → banner + captura íntegra en localStorage +
+el botón Reintentar funciona; tras cerrar zona el sync normal manda `{}` **(confirmado)**
+y el evento `online` sí reenvía la zona cerrada; un reintento viejo no pisa el estado
+nuevo; camino feliz sin reintentos de más.
+
+**Limitación honesta que queda abierta.** El admin sigue sin poder saber si un teléfono
+tiene capturas sin sincronizar: solo ve lo que llegó a D1. Detectarlo desde el servidor
+es imposible sin presencia del dispositivo. Mitigación operativa mientras tanto:
+**antes de exportar, confirmar con cada operario que su app no muestra el banner rojo.**
+
+### R15 — Cobertura visible antes de exportar (diseño, 2026-07-24)
+
+**Problema.** El XLSX se genera sobre el original de Xetux escribiendo solo las celdas
+de cantidad; los artículos no contados quedan **vacíos, y Xetux los aplica como CERO**.
+Una toma a medias borra existencias en silencio. Nada lo advertía: el admin solo
+mostraba "N artículos · M zonas listas", sin denominador.
+
+Cobertura real de las tomas exportadas (medida 2026-07-24):
+
+| Toma | Contados / plantilla | Irían a Xetux como CERO |
+|---|---|---|
+| UH_COCINA 2026-07-23 | 13 / 122 | 109 |
+| BARRA_AMICI 2026-07-22 | 103 / 358 | 255 |
+| BARRA_RESTAURANTE 2026-07-22 | 152 / 377 | 225 |
+
+Puede ser correcto —una barra no tiene todo su catálogo físicamente— pero hoy nadie lo
+ve antes de pulsar exportar.
+
+**Arreglo (escrito y verificado, sin desplegar).** Enriquecer las confirmaciones que
+**ya existen**, sin añadir fricción nueva: la de `exportarSesionInventario` se mueve a
+después de bajar sesión y plantilla (ahí ya se puede calcular) y dice "Se escriben N de
+los M artículos de la plantilla · los otros K van SIN cantidad — Xetux los aplica como
+CERO", más aviso si quedan zonas sin cerrar. La de `subirPlantillaYExportar` (camino
+"plantilla fresca", que exporta con `force`) recibe la misma línea de cobertura.
+
+**Verificado** ejecutando la ruta real de exportación con la plantilla real de CAVA.
+
+### Auditoría del export a Xetux (2026-07-24) — sin hallazgos
+
+Validado end-to-end con la plantilla real de CAVA y una sesión con casos borde
+(desglose R11, cero explícito, 1/3, dos dispositivos sobre el mismo artículo, código
+fuera de plantilla): mismas hojas, 8 columnas, 334 filas y encabezados idénticos al
+original; cantidades como **número**, redondeadas a 4 decimales; cada cantidad en la
+fila de su código; el código fuera de plantilla no se cuela; nombre = `originalFilename`
+de Xetux sin sufijos. 24 asserts.
+
+Dos observaciones que NO son defectos y conviene no volver a investigar:
+
+- **`'' → celda vacía`**: Xetux entrega la columna Cantidad con cadenas vacías y
+  SheetJS las normaliza a celdas vacías al reescribir. Pasa en todas las filas, desde
+  siempre, y Xetux ha aceptado todos los exports reales.
+- **catálogo > plantilla** (CAVA 215/145, COCINA 1106/736, ALIMENTARI 402/294): NO es
+  una ruta de descarte silencioso. La lista de conteo se construye desde la plantilla
+  (∩ preparación activa), no desde el catálogo — verificado en prod: CAVA muestra 435
+  filas = 145 códigos × 3 zonas, con **0 códigos fuera de plantilla**.
 
 ### Reglas transversales (heredadas de plan v1, vigentes)
 

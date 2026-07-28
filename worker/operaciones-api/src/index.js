@@ -761,100 +761,136 @@ async function handleInvPost(db, body, env = {}, request = null) {
             zoneConfigId, zoneSnapshot } = body; // counts legacy para barra.html
     if (!almacen || !operario || !fecha) return json({ error: 'Datos incompletos' }, 400);
 
-    let existing;
-    try {
-      existing = await db.prepare(
-        `SELECT counts, counts_by_zone, pres_choice_by_zone, corrections_by_zone, completed_zones, manuales, operarios_by_device
-         FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
-      ).bind(almacen, fecha).first();
-    } catch (err) {
-      existing = await db.prepare(
-        `SELECT counts, counts_by_zone, pres_choice_by_zone, completed_zones, manuales
-         FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
-      ).bind(almacen, fecha).first();
+    // El read-modify-write de abajo NO es atómico en D1: dos dispositivos que
+    // sincronizan en la misma ventana de milisegundos leían ambos el estado previo
+    // y el segundo escribía el blob completo SIN la rebanada del primero. Como tras
+    // cerrar zona el cliente ya no reenvía countsByZone (manda {} = "sin cambios"),
+    // la pérdida era definitiva: zona cerrada a la que le falta la cola del conteo.
+    // Reproducido 2026-07-24 en staging: 2 dispositivos cerrando zona a la vez →
+    // 5/6 rondas con pérdida. Se resuelve con control optimista (CAS) sobre
+    // updated_at: la escritura perdedora afecta 0 filas y se reintenta sobre el
+    // estado fresco. Sin migración — updated_at ya existe.
+    const CAS_INTENTOS = 12;
+    let guardado = false;
+    for (let intento = 0; intento < CAS_INTENTOS && !guardado; intento++) {
+      let existing;
+      try {
+        existing = await db.prepare(
+          `SELECT counts, counts_by_zone, pres_choice_by_zone, corrections_by_zone, completed_zones, manuales, operarios_by_device, updated_at
+           FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
+        ).bind(almacen, fecha).first();
+      } catch (err) {
+        existing = await db.prepare(
+          `SELECT counts, counts_by_zone, pres_choice_by_zone, completed_zones, manuales, updated_at
+           FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
+        ).bind(almacen, fecha).first();
+      }
+
+      // Reglas de merge compartidas con admin.html — ver js/sesion-merge.js
+      const mergedCBZ = mergeZoneMap(JSON.parse(existing?.counts_by_zone || '{}'), countsByZone);
+      const mergedPCBZ = mergeZoneMap(JSON.parse(existing?.pres_choice_by_zone || '{}'), presChoiceByZone);
+      const mergedCorrections = mergeCorrections(JSON.parse(existing?.corrections_by_zone || '{}'), correctionsByZone);
+      const mergedManuales = mergeManuales(JSON.parse(existing?.manuales || '[]'), manuales, removeManuales);
+      const mergedZones = mergeCompletedZones(JSON.parse(existing?.completed_zones || '[]'), completedZones, removeCompletedZones);
+
+      // Legacy counts merge (para barra.html)
+      const existingCounts = JSON.parse(existing?.counts || '{}');
+      const mergedCounts = counts ? { ...existingCounts, ...counts } : existingCounts;
+
+      // Atribución (R5.1): las claves "zona:deviceId" de ESTE POST pertenecen al
+      // dispositivo que envía, y `operario` es quien lo opera → acumular el mapeo.
+      // (No usar completedZones: trae claves de otros dispositivos tras un merge.)
+      const mergedOps = JSON.parse(existing?.operarios_by_device || '{}');
+      const senderDevices = new Set();
+      for (const key of [...Object.keys(countsByZone || {}), ...Object.keys(presChoiceByZone || {})]) {
+        const dev = String(key).split(':')[1];
+        if (dev) senderDevices.add(dev);
+      }
+      for (const dev of senderDevices) {
+        mergedOps[dev] = { operario, at: new Date().toISOString() };
+      }
+
+      // Token CAS: el updated_at que leímos. Si la fila no existía, un valor que
+      // ningún updated_at real puede tener → si otro dispositivo la creó mientras
+      // tanto, el ON CONFLICT no aplica y reintentamos leyendo su estado.
+      const casToken = existing ? (existing.updated_at ?? null) : '@@fila-nueva@@';
+      // updated_at es el token de la próxima escritura: garantizar que cambie
+      // (dos escrituras en el mismo milisegundo dejarían el token indistinguible).
+      let nuevoTs = new Date().toISOString();
+      if (nuevoTs === casToken) nuevoTs = new Date(Date.now() + 1).toISOString();
+
+      const commonBinds = [
+        almacen, operario, fecha,
+        JSON.stringify(mergedCounts),
+        JSON.stringify(mergedCBZ),
+        JSON.stringify(mergedPCBZ),
+        JSON.stringify(mergedCorrections),
+        JSON.stringify(mergedZones),
+        JSON.stringify(mergedManuales),
+        templateHash || '',
+      ];
+      let res;
+      try {
+        // zone_snapshot/zone_config_id: first-write-wins — el snapshot lo congela el
+        // dispositivo que INICIA la toma; los demás dispositivos nunca lo pisan.
+        res = await db.prepare(`
+          INSERT INTO inv_sesiones
+            (almacen, operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
+             corrections_by_zone, completed_zones, locked_zones, manuales, template_hash,
+             zone_config_id, zone_snapshot, operarios_by_device, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(almacen, fecha) DO UPDATE SET
+            operario           = excluded.operario,
+            counts             = excluded.counts,
+            counts_by_zone     = excluded.counts_by_zone,
+            pres_choice_by_zone = excluded.pres_choice_by_zone,
+            corrections_by_zone = excluded.corrections_by_zone,
+            completed_zones    = excluded.completed_zones,
+            manuales           = excluded.manuales,
+            template_hash      = excluded.template_hash,
+            zone_config_id     = CASE WHEN zone_config_id = '' THEN excluded.zone_config_id ELSE zone_config_id END,
+            zone_snapshot      = CASE WHEN zone_snapshot  = '' THEN excluded.zone_snapshot  ELSE zone_snapshot  END,
+            operarios_by_device = excluded.operarios_by_device,
+            updated_at         = excluded.updated_at
+          WHERE inv_sesiones.updated_at IS ?
+        `).bind(
+          ...commonBinds,
+          zoneConfigId || '',
+          zoneSnapshot ? JSON.stringify(zoneSnapshot) : '',
+          JSON.stringify(mergedOps),
+          nuevoTs,
+          casToken
+        ).run();
+      } catch (err) {
+        // Fallback pre-migración 0005
+        res = await db.prepare(`
+          INSERT INTO inv_sesiones
+            (almacen, operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
+             corrections_by_zone, completed_zones, locked_zones, manuales, template_hash, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?)
+          ON CONFLICT(almacen, fecha) DO UPDATE SET
+            operario           = excluded.operario,
+            counts             = excluded.counts,
+            counts_by_zone     = excluded.counts_by_zone,
+            pres_choice_by_zone = excluded.pres_choice_by_zone,
+            corrections_by_zone = excluded.corrections_by_zone,
+            completed_zones    = excluded.completed_zones,
+            manuales           = excluded.manuales,
+            template_hash      = excluded.template_hash,
+            updated_at         = excluded.updated_at
+          WHERE inv_sesiones.updated_at IS ?
+        `).bind(...commonBinds, nuevoTs, casToken).run();
+      }
+      if ((res?.meta?.changes ?? 0) > 0) { guardado = true; break; }
+      // Perdimos el CAS: otro dispositivo escribió entre nuestra lectura y nuestra
+      // escritura. Backoff con jitter creciente (evita que N dispositivos vuelvan
+      // a chocar en fase) y reintento sobre el estado fresco.
+      await new Promise(r => setTimeout(r, 20 + Math.floor(Math.random() * 40 * (intento + 1))));
     }
-
-    // Reglas de merge compartidas con admin.html — ver js/sesion-merge.js
-    const mergedCBZ = mergeZoneMap(JSON.parse(existing?.counts_by_zone || '{}'), countsByZone);
-    const mergedPCBZ = mergeZoneMap(JSON.parse(existing?.pres_choice_by_zone || '{}'), presChoiceByZone);
-    const mergedCorrections = mergeCorrections(JSON.parse(existing?.corrections_by_zone || '{}'), correctionsByZone);
-    const mergedManuales = mergeManuales(JSON.parse(existing?.manuales || '[]'), manuales, removeManuales);
-    const mergedZones = mergeCompletedZones(JSON.parse(existing?.completed_zones || '[]'), completedZones, removeCompletedZones);
-
-    // Legacy counts merge (para barra.html)
-    const existingCounts = JSON.parse(existing?.counts || '{}');
-    const mergedCounts = counts ? { ...existingCounts, ...counts } : existingCounts;
-
-    // Atribución (R5.1): las claves "zona:deviceId" de ESTE POST pertenecen al
-    // dispositivo que envía, y `operario` es quien lo opera → acumular el mapeo.
-    // (No usar completedZones: trae claves de otros dispositivos tras un merge.)
-    const mergedOps = JSON.parse(existing?.operarios_by_device || '{}');
-    const senderDevices = new Set();
-    for (const key of [...Object.keys(countsByZone || {}), ...Object.keys(presChoiceByZone || {})]) {
-      const dev = String(key).split(':')[1];
-      if (dev) senderDevices.add(dev);
-    }
-    for (const dev of senderDevices) {
-      mergedOps[dev] = { operario, at: new Date().toISOString() };
-    }
-
-    const commonBinds = [
-      almacen, operario, fecha,
-      JSON.stringify(mergedCounts),
-      JSON.stringify(mergedCBZ),
-      JSON.stringify(mergedPCBZ),
-      JSON.stringify(mergedCorrections),
-      JSON.stringify(mergedZones),
-      JSON.stringify(mergedManuales),
-      templateHash || '',
-    ];
-    try {
-      // zone_snapshot/zone_config_id: first-write-wins — el snapshot lo congela el
-      // dispositivo que INICIA la toma; los demás dispositivos nunca lo pisan.
-      await db.prepare(`
-        INSERT INTO inv_sesiones
-          (almacen, operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
-           corrections_by_zone, completed_zones, locked_zones, manuales, template_hash,
-           zone_config_id, zone_snapshot, operarios_by_device, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(almacen, fecha) DO UPDATE SET
-          operario           = excluded.operario,
-          counts             = excluded.counts,
-          counts_by_zone     = excluded.counts_by_zone,
-          pres_choice_by_zone = excluded.pres_choice_by_zone,
-          corrections_by_zone = excluded.corrections_by_zone,
-          completed_zones    = excluded.completed_zones,
-          manuales           = excluded.manuales,
-          template_hash      = excluded.template_hash,
-          zone_config_id     = CASE WHEN zone_config_id = '' THEN excluded.zone_config_id ELSE zone_config_id END,
-          zone_snapshot      = CASE WHEN zone_snapshot  = '' THEN excluded.zone_snapshot  ELSE zone_snapshot  END,
-          operarios_by_device = excluded.operarios_by_device,
-          updated_at         = excluded.updated_at
-      `).bind(
-        ...commonBinds,
-        zoneConfigId || '',
-        zoneSnapshot ? JSON.stringify(zoneSnapshot) : '',
-        JSON.stringify(mergedOps),
-        new Date().toISOString()
-      ).run();
-    } catch (err) {
-      // Fallback pre-migración 0005
-      await db.prepare(`
-        INSERT INTO inv_sesiones
-          (almacen, operario, fecha, counts, counts_by_zone, pres_choice_by_zone,
-           corrections_by_zone, completed_zones, locked_zones, manuales, template_hash, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?)
-        ON CONFLICT(almacen, fecha) DO UPDATE SET
-          operario           = excluded.operario,
-          counts             = excluded.counts,
-          counts_by_zone     = excluded.counts_by_zone,
-          pres_choice_by_zone = excluded.pres_choice_by_zone,
-          corrections_by_zone = excluded.corrections_by_zone,
-          completed_zones    = excluded.completed_zones,
-          manuales           = excluded.manuales,
-          template_hash      = excluded.template_hash,
-          updated_at         = excluded.updated_at
-      `).bind(...commonBinds, new Date().toISOString()).run();
+    if (!guardado) {
+      // Nunca visto en pruebas (6 intentos con backoff). El cliente conserva todo
+      // en localStorage y reintenta: devolver error es correcto, no perder datos.
+      return json({ ok: false, error: 'Conflicto de sincronización, reintenta' }, 409);
     }
     return json({ ok: true });
   }
