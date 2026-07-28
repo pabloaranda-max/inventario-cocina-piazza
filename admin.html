@@ -2121,11 +2121,13 @@ async function uploadPlantilla(file) {
     });
     const d = await r.json();
     if (d.ok) {
+      document.getElementById('plt-file').value = '';
+      // loadPlantillaStatus limpia plt-msg al arrancar: el mensaje de éxito
+      // tiene que ir DESPUÉS del refresh o el admin nunca llega a verlo.
+      await loadPlantillaStatus();
       msg.style.color = '#16a34a';
       msg.textContent = `✓ Plantilla de ${tituloAlmacen(almacen)} guardada correctamente` +
         (d.catalogoDerivado ? ` · catálogo creado con ${d.catalogoDerivado} artículos` : '');
-      document.getElementById('plt-file').value = '';
-      loadPlantillaStatus();
     } else {
       msg.style.color = '#dc2626';
       msg.textContent = 'Error: ' + (d.error || 'desconocido');
