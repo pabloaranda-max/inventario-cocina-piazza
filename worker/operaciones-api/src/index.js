@@ -888,7 +888,7 @@ async function handleInvPost(db, body, env = {}, request = null) {
       await new Promise(r => setTimeout(r, 20 + Math.floor(Math.random() * 40 * (intento + 1))));
     }
     if (!guardado) {
-      // Nunca visto en pruebas (6 intentos con backoff). El cliente conserva todo
+      // Nunca visto en pruebas (12 intentos con backoff). El cliente conserva todo
       // en localStorage y reintenta: devolver error es correcto, no perder datos.
       return json({ ok: false, error: 'Conflicto de sincronización, reintenta' }, 409);
     }
