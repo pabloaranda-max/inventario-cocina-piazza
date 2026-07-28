@@ -1383,6 +1383,19 @@ async function subirPlantillaYExportar(almacen, fecha, file) {
     const buf = await file.arrayBuffer();
     const { rowMap, cantidadColIdx, presMap, unitMap, articulos } = parsePlantilla(buf);
 
+    // Guarda R16 también en esta ruta: la validación de contados NO protege
+    // contra un export del MISMO almacén (sus códigos coinciden todos), que se
+    // subiría como plantilla — el incidente 2026-07-27 por la otra puerta.
+    const senales = senalesDeExport(buf, cantidadColIdx);
+    if (senales) {
+      alert(
+        `"${file.name}" no es una plantilla de Xetux:\n` + senales +
+        '\nAquí va la plantilla que Xetux exporta al crear la toma ' +
+        '(Inventarios → Gestión de inventario → Exportar), no el inventario ya contado.'
+      );
+      return;
+    }
+
     const sr = await fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(fecha));
     const S = await sr.json();
     if (!S.ok || !S.found) throw new Error('Sesión no encontrada');
@@ -1492,12 +1505,16 @@ async function exportarSesionInventario(almacen, fecha, force, opts) {
     const seEscriben = Object.keys(totales).filter(cod => T.rowMap?.[cod] !== undefined).length;
     const enCero = enPlantilla - seEscriben;
     const zonasAbiertas = (S.zoneSnapshot?.length || 0) - new Set((S.completedZones || []).map(z => parseInt(z))).size;
-    if (!force && !confirm(
-      `Exportar la toma de ${tituloAlmacen(almacen)} del ${fecha}?\n\n` +
+    // Solo "Cerrar con plantilla fresca" (hashVerificado) confirmó ya con su
+    // propia línea de cobertura. Los demás caminos la ven aquí — incluido
+    // re-exportar (force), que aplicaría los mismos CEROs que la primera vez.
+    if (!opts?.hashVerificado && !confirm(
+      `${force ? 'Re-exportar' : 'Exportar'} la toma de ${tituloAlmacen(almacen)} del ${fecha}?\n\n` +
       `Se escriben ${seEscriben} de los ${enPlantilla} artículos de la plantilla.\n` +
       `Los otros ${enCero} van SIN cantidad — Xetux los aplica como CERO.\n` +
       (zonasAbiertas > 0 ? `\n⚠️ Quedan ${zonasAbiertas} zona(s) sin cerrar: puede que alguien siga contando.\n` : '') +
-      `\nEsto marcará la sesión como exportada.`
+      (force ? `\nEsta toma ya se había exportado; el archivo se genera de nuevo.`
+             : `\nEsto marcará la sesión como exportada.`)
     )) return;
 
     const corrections = correctionsByCod(S);
@@ -2050,6 +2067,22 @@ function filasConCantidad(buf, idx) {
   } catch(_) { return 0; }
 }
 
+// R16: distingue un export de la app de una plantilla de Xetux, por las dos
+// señales independientes del incidente 2026-07-27 (Xetux escribe con Apache POI
+// y la columna Cantidad vacía; el export lo escribe SheetJS ya con conteos).
+// Devuelve el texto de las señales si el archivo es un export, o null si parece
+// plantilla. La usan LAS DOS rutas de subida — lección del incidente: cuando dos
+// rutas hacen lo mismo, la guarda va en las dos.
+function senalesDeExport(buf, cantidadColIdx) {
+  let props = {};
+  try { props = XLSX.read(buf, { type:'array', bookProps:true }).Props || {}; } catch(_) {}
+  const generadoPorLaApp = /sheetjs/i.test(props.Application || '');
+  const conCantidad = filasConCantidad(buf, cantidadColIdx);
+  if (!generadoPorLaApp && !conCantidad) return null;
+  return (generadoPorLaApp ? '· lo generó esta app (SheetJS), no Xetux\n' : '') +
+         (conCantidad ? `· trae ${conCantidad} fila(s) con cantidad capturada; una plantilla viene vacía\n` : '');
+}
+
 async function uploadPlantilla(file) {
   const almacen = document.getElementById('plt-almacen').value;
   if (!almacen || !file) return;
@@ -2062,20 +2095,12 @@ async function uploadPlantilla(file) {
     // Guarda 1 — no aceptar un EXPORT como plantilla (incidente 2026-07-27).
     // El export de la app y la plantilla de Xetux comparten patrón de nombre y
     // viven en carpetas vecinas, así que el diálogo de archivos los confunde.
-    // Dos señales independientes los separan: Xetux escribe el xlsx con Apache
-    // POI y la columna Cantidad vacía; el export lo escribe SheetJS ya con los
-    // conteos. Cualquiera de las dos alcanza para frenar.
-    let props = {};
-    try { props = XLSX.read(buf, { type:'array', bookProps:true }).Props || {}; } catch(_) {}
-    const generadoPorLaApp = /sheetjs/i.test(props.Application || '');
-    const conCantidad = filasConCantidad(buf, cantidadColIdx);
-    if (generadoPorLaApp || conCantidad) {
+    const senales = senalesDeExport(buf, cantidadColIdx);
+    if (senales) {
       msg.style.color = '#dc2626';
       msg.textContent = '✗ Eso es un export, no una plantilla. No se subió nada.';
       alert(
-        `"${file.name}" no es una plantilla de Xetux:\n` +
-        (generadoPorLaApp ? '· lo generó esta app (SheetJS), no Xetux\n' : '') +
-        (conCantidad ? `· trae ${conCantidad} fila(s) con cantidad capturada; una plantilla viene vacía\n` : '') +
+        `"${file.name}" no es una plantilla de Xetux:\n` + senales +
         '\nLas plantillas se bajan de Xetux (normalmente quedan en Descargas). ' +
         'Los archivos que están en las carpetas de exports son el inventario ya contado.'
       );
