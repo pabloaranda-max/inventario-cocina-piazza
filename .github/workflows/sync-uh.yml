@@ -9,6 +9,7 @@ on:
       - inventario.html
       - manifest-uh.webmanifest
       - 'branding/**'
+      - 'vendor/**'
       - tools/sync-uh.sh
       - .github/workflows/sync-uh.yml
   workflow_dispatch:

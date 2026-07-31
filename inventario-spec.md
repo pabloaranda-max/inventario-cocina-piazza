@@ -1,6 +1,22 @@
-# inventario.html — Especificación técnica v4.15
+# inventario.html — Especificación técnica v4.17
 
-> Última actualización: 2026-07-28. Estado: **EN PRODUCCIÓN** (CAVA probado; BARRA_RESTAURANTE con dos tomas reales completadas).
+> Última actualización: 2026-07-31. Estado: **v4.17 EN PRODUCCIÓN**.
+> v4.17 (2026-07-30): cada cierre de zona confirmado por el Worker emite un acuse
+> individual e inmutable (`inventory-zone-receipt/v1`). El dispositivo contador
+> descarga automáticamente un PDF con folio, hora servidor CDMX, operador, dispositivo,
+> capturas originales, cantidades base, no catalogados y SHA-256; la tarjeta conserva
+> descarga manual. Reabrir/corregir/cerrar emite otro folio sin borrar el anterior.
+> Admin lista los acuses y cada uno se verifica recalculando la huella en
+> `GET /inv/receipt?id=…`. Migración D1 `0008_add_inv_receipts.sql` aplicada en
+> producción después del respaldo `operaciones-db-backup-2026-07-31-r23.sql`.
+> v4.16 (2026-07-30): la fecha operativa se calcula siempre en
+> `America/Mexico_City` — ya no salta al día siguiente después de las 18:00 en CDMX.
+> Los timestamps técnicos siguen en UTC. Cerrar una zona ahora deja un estado
+> persistente e inequívoco: tarjeta verde, badge **CERRADA**, confirmación que explica
+> el efecto y texto explícito para reabrir/modificar. El buscador deja de presentar
+> artículos como pertenecientes a "otras zonas": consulta toda la plantilla y captura
+> el resultado en la zona actual. Se documentan como futuros, no implementados: carga
+> revisada de plantillas en lote (R22).
 > v4.15 (2026-07-28): la cobertura R15 también sale al **re-exportar** (`force`) — cerró
 > el CANDIDATO de v4.14 por decisión de Pablo. Solo "Cerrar con plantilla fresca" queda
 > exenta (confirma con su propia línea). Verificado en navegador:
@@ -748,8 +764,9 @@ Nota sobre unitMap: `parsePlantilla` captura la unidad tal como aparece en la pl
 > - El snapshot se persiste en `inv_sesiones.zone_snapshot` (migración 0005,
 >   first-write-wins): un segundo dispositivo que continúa la toma hereda las
 >   MISMAS zonas aunque el admin edite la preparación a media toma (E2E verificado).
-> - Los artículos inactivos/no asignados aparecen al buscar bajo
->   "Fuera de zona · en plantilla" y se pueden capturar (mecanismo previo, reusado).
+> - Los artículos fuera de la lista principal aparecen al buscar bajo
+>   "Más artículos de la plantilla · disponibles en esta zona" y se capturan en la
+>   zona actual. La preparación es una vista operativa, no un límite del catálogo.
 > - ⚠️ Edge conocido: "Nueva toma" el MISMO día sobre el mismo almacén reusa la fila
 >   D1 (PK almacen+fecha) y conserva el snapshot original por first-write-wins. Para
 >   un reset real ese día: borrar la sesión desde admin y luego iniciar la nueva.
@@ -760,7 +777,10 @@ Objetivo: eliminar zonas hardcodeadas y permitir que admin prepare cada toma sin
 
 ### Principio
 
-La plantilla Xetux es la fuente total de artículos. La preparación de conteo define cómo se presentan esos artículos por almacén:
+La plantilla Xetux es la fuente total de artículos. Una zona representa el lugar
+físico donde se encontró una existencia; no la propiedad exclusiva del artículo.
+Por defecto, la plantilla completa está disponible en cada zona. La preparación de
+conteo define qué se muestra primero por almacén:
 
 - zonas editables desde `admin.html`
 - artículos activos/inactivos por zona
@@ -768,6 +788,13 @@ La plantilla Xetux es la fuente total de artículos. La preparación de conteo d
 - un artículo puede existir en una o varias zonas
 - búsqueda global sobre toda la plantilla
 - sesiones existentes nunca cambian cuando se edita una preparación futura
+- ningún artículo de la plantilla queda prohibido por estar inactivo o no asignado
+
+La preparación reducida de **COCINA (58 artículos)** es correcta por ahora
+(confirmado por Pablo 2026-07-30): esos 58 forman la vista principal y el resto de la
+plantilla sigue disponible mediante búsqueda. Las restricciones duras por zona,
+si algún almacén las necesita en el futuro, serán un modo explícito distinto; nunca
+el efecto accidental de una preparación.
 
 ### Experiencia recomendada
 
@@ -776,8 +803,10 @@ No usar bloqueo duro para artículos inactivos. En operación real genera más n
 Comportamiento deseado:
 
 - Artículo activo en zona: aparece normalmente.
-- Artículo en plantilla pero no activo en la zona: aparece al buscar bajo `En plantilla · no asignado a esta zona`.
-- El operario puede capturarlo, pero queda marcado como fuera de zona.
+- Artículo en plantilla pero no activo en la zona: aparece al buscar bajo
+  `Más artículos de la plantilla · disponibles en esta zona`.
+- El operario puede capturarlo en la zona actual, pero queda marcado como fuera de
+  la preparación habitual.
 - Admin puede revisar esos casos después y decidir si el artículo debe activarse en esa zona para futuras tomas.
 
 ### Modelo propuesto D1
@@ -895,17 +924,104 @@ Guardar/activar debe requerir password admin.
 | R15 | **Cobertura visible antes de exportar** — Xetux aplica como CERO todo artículo que llegue sin cantidad; nada lo advertía. Ver diseño abajo | HECHO — **EN PROD 2026-07-28** (Pages, main `1b61d51`). Las confirmaciones que ya existían ahora dicen la cobertura ("se escriben N de M; los otros K van como CERO") y avisan de zonas sin cerrar |
 | R16 | **Guardas de subida de plantilla** — la pestaña Plantillas aceptaba cualquier xlsx para cualquier almacén. Ahora rechaza los exports que genera la propia app (metadato `Application: SheetJS`, o columna Cantidad con valores; Xetux escribe `Apache POI` y la deja vacía) y avisa cuando los códigos entrantes casi no coinciden con los que el almacén ya tiene. Ver incidente 2026-07-27 | HECHO — **EN PROD 2026-07-28** (main `469e7a7`). Los predicados se validaron en node contra los archivos reales del incidente: las plantillas de SALUMERÍA y CAVA pasan, el export de CAVA se bloquea, y el cruce de códigos da 100% contra el almacén correcto y 0% contra el equivocado. **La ruta de UI quedó verificada en navegador 2026-07-28** (`tests/smoke-r16-ui.py`, 18 asserts, Chromium headless con Worker stubeado — la premisa "no hay headless en el repo" era falsa: los smoke de Playwright corren en local): el alert sale con las dos señales, el input queda limpio en cada rechazo (reelegir el mismo archivo vuelve a disparar la guarda), el confirm de almacén cruzado se puede cancelar y también aceptar, y el borrado refresca la lista distinguiendo "ya no existe" de una falla real. De pilón el navegador destapó que el mensaje verde "guardada correctamente" se borraba en el mismo instante en que se pintaba (`loadPlantillaStatus` limpia `plt-msg` al arrancar) — corregido: el mensaje va después del refresh. **2026-07-28, segunda vuelta:** la detección de exports se extrajo a `senalesDeExport()` y ahora también frena en "Cerrar con plantilla fresca", donde la validación de contados NO protegía contra un export del MISMO almacén (sus códigos coinciden todos) — la lección del incidente aplicada a las dos rutas, verificado en `tests/smoke-plantilla-fresca.py` |
 | R17 | **Borrado de sesión durable** — el sync es un `INSERT … ON CONFLICT` sin lápida: cualquier teléfono que aún tenga la sesión la recrea en el siguiente envío, incluso bajo otra fecha, así que borrar desde el admin es una carrera que el admin pierde. Diseño a decidir: lápida en D1 con expiración, o rechazar el borrado si hubo sync reciente y ofrecer cerrar la toma en su lugar | PENDIENTE. La mitad barata ya salió con R16 (`469e7a7`): al fallar, el admin refresca la lista y distingue "esa toma ya no existe" de una falla real. **Empeora con R14 desplegado**, que ahora sí reintenta |
-| R18 | **Resiliencia de carga (tres dominios en el camino crítico)** — `github.io` + `cdn.sheetjs.com` + `workers.dev`, y `admin.html` suma `cdnjs.cloudflare.com`; cualquiera de los dos primeros caído deja la app muerta. Sin caché local: no hay `sw.js` ni registro de `serviceWorker`, así que las PWA dependen de red en cada apertura. Orden acordado: **(a)** vendorizar `xlsx` y `html2pdf` con versión fija (`xlsx-latest` es etiqueta móvil: SheetJS puede cambiar la librería del export sin un commit nuestro), **(b)** decidir hosting (Pages contra Workers Static Assets) ANTES del service worker, porque el SW se registra por origen, **(c)** service worker network-first para el HTML con caída a caché | PENDIENTE — nació del incidente 2026-07-26 (la app no cargaba, causa NO confirmada). Pendiente barato aparte: ping periódico a Pages y al Worker, que hoy no existe — ningún incidente transitorio va a tener causa confirmada mientras la única señal sea que alguien esté mirando |
+| R18 | **Resiliencia de carga (tres dominios en el camino crítico)** — `github.io` + `cdn.sheetjs.com` + `workers.dev`, y `admin.html` suma `cdnjs.cloudflare.com`; cualquiera de los dos primeros caído deja la app muerta. Sin caché local: no hay `sw.js` ni registro de `serviceWorker`, así que las PWA dependen de red en cada apertura. Orden acordado: **(a)** vendorizar `xlsx` y `html2pdf` con versión fija (`xlsx-latest` es etiqueta móvil: SheetJS puede cambiar la librería del export sin un commit nuestro), **(b)** decidir hosting (Pages contra Workers Static Assets) ANTES del service worker, porque el SW se registra por origen, **(c)** service worker network-first para el HTML con caída a caché | PENDIENTE PARCIAL — R23 ya vendoriza `html2pdf` 0.10.1 para el acuse del operario (carga diferida, hash documentado); el PDF del admin aún usa CDN y `xlsx` sigue en `xlsx-latest`. Nació del incidente 2026-07-26 (la app no cargaba, causa NO confirmada). Pendiente barato aparte: ping periódico a Pages y al Worker |
 | R19 | **Fusionar o mover tomas desde el admin** — la sesión se identifica por `almacen + fecha`, así que una toma continuada al día siguiente, o un teléfono que sincronizó bajo la fecha equivocada, quedan en filas separadas y no se suman. Fusionar es unir mapas con clave `zona:dispositivo`, unir zonas cerradas y concatenar manuales; la variante barata que cubre el caso frecuente es "mover esta toma al día X". Nota: la continuidad de R1 no ofrece continuar tomas con cero conteos (`inventario.html`, filtro `articulosContados > 0`), que es justo el caso en que se nota | CANDIDATO — pedido por Pablo 2026-07-27 al ver que su toma de CAVA no se sumaba a la del día anterior |
 | R20 | **Entrar al admin con huella — plan en dos niveles.** **Nivel 1 (barato, primero):** los campos de login de `admin.html` no están en un `<form>` ni tienen `autocomplete`, así que el gestor de contraseñas de Chrome no ofrece guardar/rellenar de forma confiable. Envolverlos en `<form>` con `autocomplete="username"` / `"current-password"` (cuidando que el campo de la key de Groq no confunda al autofill); del lado de Pablo, activar en Chrome Android "usar el bloqueo de pantalla para rellenar". La huella gatea el autollenado: cero cambio de lógica, el login queda idéntico y el riesgo es casi nulo. **Nivel 2 (solo si el 1 no basta): passkeys (WebAuthn)** — huella real sin contraseña: dos endpoints en el Worker (reto + verificación de firma), tabla D1 de credenciales registradas, flujo de registro/login en cliente y la contraseña como fallback para no romper nada. Slice mediano (tamaño R12): staging primero, smoke propio, ventana con calma — es ruta de auth | CANDIDATO — pedido por Pablo 2026-07-28. Empezar por el nivel 1 y medir si el fastidio desaparece antes de tocar la ruta de auth |
+| R21 | **Fecha operativa CDMX + cierre inequívoco de zona + catálogo disponible por zona** — toda fecha de negocio usa `America/Mexico_City`; los timestamps técnicos siguen ISO/UTC. Una zona cerrada queda verde con badge textual **CERRADA**, confirmación explícita y una acción clara para reabrir/modificar. El buscador consulta toda la plantilla, reúne los resultados no preparados en una sola sección "disponibles en esta zona" y siempre escribe en la zona que se está contando | HECHO — **EN PROD 2026-07-31**. `tests/smoke-date-zone.py` (18) cubre el borde 21:30 CDMX / día siguiente UTC, catálogo completo en la zona actual, cierre persistente y reapertura |
+| R22 | **Carga revisada de plantillas en lote** — seleccionar varios xlsx o una carpeta, inferir almacén por huella de códigos y revisar el mapeo completo antes de una sola escritura. Ver diseño abajo | FUTURO — diferido por Pablo 2026-07-30: la comodidad no justifica introducir riesgo de asignación antes del inventario |
+| R23 | **Acuse PDF individual y auditable** — al cerrar una zona, el Worker conserva un payload inmutable por dispositivo, emite folio + SHA-256 y solo entonces el teléfono genera/descarga el PDF. Reabrir y cerrar de nuevo crea otro acuse; los anteriores permanecen. Admin los lista y el endpoint por folio recalcula la huella para verificarlos | HECHO — **EN PROD 2026-07-31**. Respaldo D1 → migración 0008 → Worker prod `6ed03819` → Pages/espejo UH. Prueba remota staging limpia, sin tomas artificiales residuales. `tests/test-receipt.mjs` (11), `tests/smoke-worker-receipt.py` (18, incluida alteración detectada) y `tests/smoke-receipt.py` (26, PDF real inspeccionado, multipágina, reintento tras corrección e historial admin) |
 | — | **GENERAL sin plantilla en D1** — la app cae a "Iniciar conteo sin plantilla" y la toma no es exportable. Subir su plantilla Xetux o retirarlo de `AREA_CONFIG` | PENDIENTE (bloqueante solo si se opera GENERAL) |
-| — | **Preparación de COCINA desfasada** — la preparación activa expone 58 de los 736 artículos de la plantilla y está congelada contra `templateHash` `5785b457e877`, mientras la plantilla vigente es `4aba07cd59e2`. Revisar si sigue siendo la intención | PENDIENTE (detectado 2026-07-24) |
+| — | **Preparación reducida de COCINA** — la preparación activa expone 58 artículos y su `templateHash` es anterior a la plantilla vigente; los 58 códigos siguen existiendo y el resto permanece disponible mediante búsqueda | ACEPTADO 2026-07-30 — Pablo confirma que los 58 son correctos por ahora. Al subir plantilla fresca, refrescar la preparación sin convertirla en bloqueo duro |
 | — | **`defaultPres` vacío en 9 de los 11 almacenes con plantilla** — verificado en D1 el 2026-07-28: solo CAVA (`LT → botella .75`) y UH_COCINA lo tienen configurado. Vacíos: ALIMENTARI, BARRA, BARRA_AMICI, BARRA_RESTAURANTE, COCINA, SALUMERIA, UH_BARRA, UH_MERCH, UH_SUMINISTROS. Los demás cuentan todo en unidad base; correcto por diseño, pero conviene confirmarlo almacén por almacén antes de escalar. Ojo: subir una plantilla nueva NO pisa `default_pres` (el upsert no toca esa columna), así que un `{}` es que nunca se configuró, no que se haya borrado | PENDIENTE |
 | — | **Toma de CAVA del 2026-07-26 con cero conteos, sin exportar** — sigue en D1. Exportarla le aplicaría CERO a todo CAVA en Xetux; con R15 desplegado la confirmación ahora lo advierte, pero la fila sigue ahí y hay que decidir: borrarla, o dejarla como evidencia del incidente. Ver bitácora 2026-07-26 | PENDIENTE — decisión de Pablo |
 | — | **"Re-exportar" no mostraba la cobertura R15** — todo camino con `force=true` saltaba la confirmación: el botón Re-exportar y también "Generar XLSX" sobre una sesión ya exportada (que pone `force=true` tras su propio confirm). Re-exportar una toma a medias aplicaría los mismos CEROs que la primera vez sin avisar | HECHO — pedido por Pablo 2026-07-28. La confirmación de cobertura ahora se salta SOLO con `opts.hashVerificado` ("Cerrar con plantilla fresca", que confirma con su propia línea); en re-export el texto aclara "ya se había exportado". Verificado en navegador: `tests/smoke-r15-reexport.py`, 10 asserts (cobertura y aviso de zonas en ambos caminos force; cancelar no escribe nada) |
 | — | **"Cerrar con plantilla fresca": Pablo reporta que nunca le funcionó** (2026-07-28; el mensaje exacto no se recuerda). El único uso documentado es el del incidente 07-27, donde el guard de contados frenó con el archivo equivocado — protegió, pero con mensaje críptico. El camino completo pasa en Chromium (`tests/smoke-plantilla-fresca.py`: picker → validación → confirm → subida → export → modal, celdas del xlsx incluidas), así que la falla estaría en los datos reales, el navegador usado o el lado Xetux | ABIERTO — a la próxima falla real, capturar el mensaje exacto (foto de pantalla) y anotarla en la bitácora con su molde |
 | — | Limpieza (CSS muerto §13, mover apps viejas a `legacy/`, chat GROQ) — oportunista, al colarse en otra sesión. Añadir: borrar la plantilla huérfana `BARRA` de D1 (360 arts, del 2026-06-23, sin `unitMap` ni `originalFilename`; `BARRA` no existe en `AREA_CONFIG`, así que no es alcanzable desde la app) y la sesión de prueba `BARRA_RESTAURANTE / TEST-2026-06-26 / Test-A`, invisible en el admin porque el `GLOB` de fechas de `/inv/sesiones` la filtra, pero viva en prod | OPORTUNISTA |
 | — | Sheets API en vez de Apps Script (4b v1) — solo si Apps Script falla en un cierre real | FUTURO |
+
+### R22 — Carga revisada de plantillas en lote (futuro)
+
+**Decisión 2026-07-30:** no construir antes del inventario. Los nombres que genera
+Xetux (`Inventario XTINV… fecha.xlsx`) no identifican el almacén y no deben
+renombrarse, porque ese nombre se reutiliza al devolver el archivo a Xetux. Una
+asignación silenciosa por nombre sería insegura.
+
+Cuando se retome, el flujo debe ser:
+
+1. Elegir varios `.xlsx` o una carpeta. La lectura y validación ocurre primero en
+   memoria; todavía no se escribe nada.
+2. Aplicar a cada archivo las guardas R16: rechazar exports de la app y archivos con
+   cantidades capturadas.
+3. Comparar sus códigos contra la plantilla vigente de cada almacén del centro. La
+   inferencia solo propone un almacén cuando hay un ganador único y con margen claro;
+   un caso ambiguo queda **SIN ASIGNAR**, nunca se resuelve por orden o por nombre.
+4. Mostrar una revisión obligatoria, una fila por archivo:
+   `archivo → almacén propuesto → códigos nuevos/comunes/faltantes → confianza`.
+   Bloquear almacenes duplicados y exigir selección manual para cualquier fila
+   ambigua.
+5. Pedir una confirmación final que enumere todos los reemplazos. El Worker debe
+   aceptar el lote en una transacción **todo o nada** y devolver el resultado de cada
+   archivo. Se conservan los nombres originales.
+
+Done futuro: fixtures de los 7 almacenes Piazza y los 4 UH; asignación correcta
+independiente del nombre y del orden de selección; archivo cruzado/ambiguo/export
+bloqueado; cancelar deja D1 byte-idéntica; una falla intermedia no deja un lote
+parcial.
+
+### R23 — Acuse PDF individual y auditable (en producción)
+
+El reporte combinado del admin no protege por sí solo al operario: suma varios
+dispositivos y puede recibir correcciones posteriores. La evidencia correcta es el
+estado individual que el servidor recibió de cada dispositivo al cerrar cada zona.
+
+**Flujo:**
+
+1. `doneZone()` marca la zona cerrada y solicita acuse con un `receiptEventId`
+   persistido. La petición incluye únicamente la rebanada `zona:deviceId` del
+   contador; congela también los factores por defecto para que el resultado no cambie
+   si después se edita la plantilla.
+2. El Worker guarda/mezcla la sesión con el CAS de R13. Solo después de confirmar esa
+   escritura construye el payload `inventory-zone-receipt/v1` desde el estado
+   aceptado, no desde una copia optimista de la UI.
+3. El payload conserva almacén, fecha, zona, operador declarado, dispositivo,
+   `templateHash`, cantidades originales, presentación/factor, cantidad base y no
+   catalogados del mismo dispositivo/zona (incluido si tenían foto).
+4. `js/inventory-receipt.js` serializa canónicamente el payload, calcula SHA-256 y
+   deriva un folio `ACU-<fecha>-<96 bits del hash>`. Migración 0008 lo inserta en
+   `inv_receipts` con hora del servidor. `INSERT OR IGNORE` + el evento estable hacen
+   idempotentes los reintentos.
+5. Al recibir el folio, el teléfono intenta descargar automáticamente
+   `Acuse_<almacén>_<fecha>_Zona-N_<folio>.pdf`. Mientras renderiza muestra
+   "Conteo confirmado por el servidor". La tarjeta verde conserva **Descargar PDF**;
+   si el navegador bloquea el intento automático, nunca se pierde la vía manual.
+6. Reabrir y corregir no altera el acuse anterior. El siguiente cierre usa otro
+   evento/folio. El detalle de admin lista todo el historial con operador, dispositivo,
+   hora y hash; `GET /inv/receipt?id=<folio>` confirma la copia guardada.
+
+`GET /inv/sesion` solo incorpora metadata de los acuses (folio, hash, atribución y
+conteos de renglones), porque esa ruta se consulta cada 8 segundos. El payload completo
+se devuelve al emitirlo o por `GET /inv/receipt`; así el polling no retransmite cientos
+de artículos.
+
+El PDF declara su alcance: acredita recepción exacta, no aprobación final ni
+correcciones de administración. La identidad humana sigue siendo **nombre declarado**
+(la app de operarios no tiene login); la evidencia fuerte actual es dispositivo +
+hora servidor + contenido inmutable. Si una auditoría futura exige identidad
+criptográfica de la persona, el siguiente nivel es PIN/passkey o firma, no modificar
+el PDF.
+
+`html2pdf` 0.10.1 queda local en `vendor/`, con licencia y SHA documentados, y se
+carga solo al generar el acuse. El espejo UH copia `vendor/` automáticamente.
+
+**Verificación local:**
+
+- `tests/test-receipt.mjs`: 11 asserts de canonicalización, factores, atribución,
+  idempotencia y cambio de huella.
+- `tests/smoke-worker-receipt.py`: 17 asserts contra Worker + D1 temporales reales;
+  persiste, verifica, reintenta y conserva acuse original/corregido.
+- `tests/smoke-receipt.py`: 24 asserts en Chromium; descarga automática, PDF A4 real
+  (>150 KB), contenido visual inspeccionado, recuperación por folio, descarga manual,
+  dos folios tras corrección y paginación de 180 artículos.
 
 ### R8 — Multi-centro (diseño, 2026-07-10)
 
@@ -1079,7 +1195,8 @@ escribe las suyas" — incluida la razón por la que la regla `ml_g` NO se ampli
 - **Preparación real de COCINA (post-R5):** subir plantilla COCINA desde admin →
   tab Preparación → "Crear: 1 zona con todo activo" → Desactivar visibles →
   filtrar y activar las ~60 proteínas → Guardar y activar. El resto de artículos
-  queda capturable vía búsqueda ("Fuera de zona · en plantilla").
+  queda capturable vía búsqueda ("Más artículos de la plantilla · disponibles en
+  esta zona").
 
 - **Apps Script UH — HECHO 2026-07-13:** segundo proyecto con el MISMO
   `scripts/centro/Code.js` (proyecto `1SYgnEk8…QKVG`; `.clasp.uh.json` /

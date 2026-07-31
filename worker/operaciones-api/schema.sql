@@ -138,6 +138,24 @@ CREATE TABLE IF NOT EXISTS inv_sesiones (
   PRIMARY KEY (almacen, fecha)
 );
 
+-- ── Inventario: acuses inmutables por cierre de zona (migración 0008) ────
+CREATE TABLE IF NOT EXISTS inv_receipts (
+  id            TEXT PRIMARY KEY,
+  almacen       TEXT NOT NULL,
+  fecha         TEXT NOT NULL,
+  device_id     TEXT NOT NULL,
+  operario      TEXT NOT NULL,
+  zone_key      TEXT NOT NULL,
+  zone_name     TEXT NOT NULL DEFAULT '',
+  payload_json  TEXT NOT NULL,                  -- inventory-zone-receipt/v1
+  payload_hash  TEXT NOT NULL,
+  received_at   TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_inv_receipts_hash
+  ON inv_receipts (payload_hash);
+CREATE INDEX IF NOT EXISTS idx_inv_receipts_session_device
+  ON inv_receipts (almacen, fecha, device_id, received_at);
+
 -- ── Inventario: preparación editable de conteo (migración 0004, R5) ───────
 CREATE TABLE IF NOT EXISTS inv_zone_configs (
   id            TEXT PRIMARY KEY,

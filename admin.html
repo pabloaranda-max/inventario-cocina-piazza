@@ -400,6 +400,7 @@ const WORKER_URL = 'https://operaciones-api.pablo-aranda.workers.dev';
 // R12 — versión de datos (bump junto con inventario.html y el ?v= de los
 // imports de módulos al final del archivo). v1 = desglose R11. Spec §15 R12.
 const APP_VERSION = 1;
+const OPERATING_TIME_ZONE = 'America/Mexico_City';
 const INVENTARIO_AREAS = {
   BARRA_RESTAURANTE: { titulo:'Barra Restaurante', scriptUrl: SCRIPT_CENTRO.PIAZZA,
                        zonaNames:['Almacén Barra','Refri Almacén Barra','Contra Barra','Refris de Servicio'] },
@@ -683,7 +684,7 @@ function renderSesionesInventario() {
     const exp = s.exportedAt
       ? `<span style="background:#dcfce7;color:#166534;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">${ic('circle-check',11)} Exportada</span>`
       : `<span style="background:#fffbeb;color:#92400e;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">${ic('clock',11)} Pendiente</span>`;
-    const updated = s.updatedAt ? new Date(s.updatedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short' }) : '—';
+    const updated = s.updatedAt ? new Date(s.updatedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short', timeZone:OPERATING_TIME_ZONE }) : '—';
     const exportTxt = s.exportedAt ? ` · Exportada por ${esc(s.exportedBy || '—')}` : '';
     const corrTxt = s.correcciones ? ` · ${s.correcciones} corrección${s.correcciones!==1?'es':''}` : '';
     const manTxt = s.manuales ? ` · ${s.manuales} no catalogado${s.manuales!==1?'s':''}` : '';
@@ -786,8 +787,8 @@ async function verDetalleSesion(almacen, fecha) {
     const zones = new Set(Object.keys(S.countsByZone || {}).map(k => baseZone(k)));
     const completed = new Set((S.completedZones || []).map(k => baseZone(k)));
     const manuales = S.manuales || [];
-    const updated = S.updatedAt ? new Date(S.updatedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short' }) : '—';
-    const exported = S.exportedAt ? new Date(S.exportedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short' }) : 'No';
+    const updated = S.updatedAt ? new Date(S.updatedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short', timeZone:OPERATING_TIME_ZONE }) : '—';
+    const exported = S.exportedAt ? new Date(S.exportedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short', timeZone:OPERATING_TIME_ZONE }) : 'No';
     // R5.1: quién capturó qué — el deviceId de la clave "zona:deviceId" se traduce
     // a nombre con operariosByDevice (acumulado por el Worker en cada sync)
     const operarioDeZid = zid => {
@@ -804,6 +805,34 @@ async function verDetalleSesion(almacen, fecha) {
     const opsResumen = Object.entries(opsPorDev)
       .map(([dev, n]) => `${esc(S.operariosByDevice?.[dev]?.operario || 'disp. …' + dev.slice(-5))} (${n})`)
       .join(' · ');
+    const receipts = S.receipts || [];
+    const receiptsHtml = receipts.length ? `
+      <div style="font-weight:800;margin:16px 0 6px;color:#166534">Acuses confirmados por el servidor (${receipts.length})</div>
+      <div style="display:grid;gap:7px;margin-bottom:14px">
+        ${receipts.slice().reverse().map(receipt => {
+          const received = receipt.receivedAt
+            ? new Date(receipt.receivedAt).toLocaleString('es-MX', {
+                dateStyle:'short', timeStyle:'medium', timeZone:OPERATING_TIME_ZONE
+              })
+            : '—';
+          const verifyUrl = WORKER_URL + '/inv/receipt?id=' + encodeURIComponent(receipt.id || '');
+          return `<div style="border:1px solid #86efac;background:#f0fdf4;border-radius:8px;padding:9px 10px;font-size:12px">
+            <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+              <strong style="color:#166534">${esc(receipt.id || '—')}</strong>
+              <a href="${esc(verifyUrl)}" target="_blank" rel="noopener"
+                style="color:#166534;font-weight:700">Verificar en servidor ↗</a>
+            </div>
+            ${esc(receipt.zoneName || 'Zona')} · ${esc(receipt.operario || '—')} ·
+            ${esc(received)} · ${receipt.itemCount ?? (receipt.items || []).length} catalogados ·
+            ${receipt.manualItemCount ?? (receipt.manualItems || []).length} no catalogados<br>
+            <span style="color:#64748b">Dispositivo: ${esc(receipt.deviceId || '—')} · SHA-256 del contenido:
+            <code style="font-size:10px;word-break:break-all">${esc(receipt.hash || '—')}</code></span>
+          </div>`;
+        }).join('')}
+      </div>` : `
+      <div style="border:1px solid #fde68a;background:#fffbeb;color:#92400e;border-radius:8px;padding:9px 10px;font-size:12px;margin:12px 0">
+        Esta toma todavía no tiene acuses individuales emitidos por el servidor.
+      </div>`;
     const rows = filas
       .sort((a,b) => String(a.zid).localeCompare(String(b.zid)) || String(a.cod).localeCompare(String(b.cod)))
       .slice(0, 350)
@@ -900,12 +929,14 @@ async function verDetalleSesion(almacen, fecha) {
         <div class="detalle-stat"><div class="detalle-stat-num">${zones.size}</div><div class="detalle-stat-label">Zonas capturadas</div></div>
         <div class="detalle-stat"><div class="detalle-stat-num">${completed.size}</div><div class="detalle-stat-label">Zonas cerradas</div></div>
         <div class="detalle-stat"><div class="detalle-stat-num">${Object.keys(adminCorr).length}</div><div class="detalle-stat-label">Correcciones admin</div></div>
+        <div class="detalle-stat"><div class="detalle-stat-num">${receipts.length}</div><div class="detalle-stat-label">Acuses auditables</div></div>
       </div>
       <div style="background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:12px">
         <strong>${esc(almacen)}</strong> · ${esc(fecha)} · Operario sesión: ${esc(S.operario || '—')}<br>
         ${opsResumen ? `Capturaron: ${opsResumen} artículos<br>` : ''}
         Actualizada: ${updated} · Exportada: ${esc(exported)}${S.exportedBy ? ` por ${esc(S.exportedBy)}` : ''}
       </div>
+      ${receiptsHtml}
       <input id="detalle-search" type="text" placeholder="Buscar código o artículo…"
         oninput="filtrarDetalleSesion(this.value)"
         style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:4px">
@@ -1695,7 +1726,7 @@ async function imprimirSesion(almacen, fecha) {
 }
 
 function generarPDFAdmin(toma, items, corrs, notaGeneral) {
-  const fecha_imp = new Date().toLocaleString('es-MX');
+  const fecha_imp = new Date().toLocaleString('es-MX', { timeZone: OPERATING_TIME_ZONE });
 
   // Mapa de correcciones por código para resaltar en la tabla
   const corrMap = {};
@@ -1860,7 +1891,7 @@ async function loadPlantillaStatus() {
     const r = await fetch(WORKER_URL + '/inv/plantilla?almacen=' + almacen);
     const d = await r.json();
     if (d.ok && d.found) {
-      const date  = d.updatedAt ? new Date(d.updatedAt).toLocaleString('es-MX') : '—';
+      const date  = d.updatedAt ? new Date(d.updatedAt).toLocaleString('es-MX', { timeZone: OPERATING_TIME_ZONE }) : '—';
       const count = Object.keys(d.rowMap || {}).length;
       const pres  = Object.keys(d.presMap || {}).length;
       // El nombre del archivo es lo que Xetux valida al importar: si el que está

@@ -1,10 +1,169 @@
 import { mergeZoneMap, mergeCorrections, mergeManuales, mergeCompletedZones } from '../../../js/sesion-merge.js';
+import {
+  buildReceiptPayload,
+  identifyReceipt,
+  normalizeReceiptItems,
+  normalizeReceiptManuals,
+} from '../../../js/inventory-receipt.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, X-Session-Token, X-Sync-Token, X-Admin-Password, X-Admin-User',
 };
+
+const OPERATING_TIME_ZONE = 'America/Mexico_City';
+
+function fechaOperativaCDMX(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: OPERATING_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const byType = Object.fromEntries(parts.map(p => [p.type, p.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
+}
+
+function receiptFromRow(row) {
+  if (!row) return null;
+  let payload = {};
+  try { payload = JSON.parse(row.payload_json || '{}'); } catch (_) {}
+  return {
+    ...payload,
+    id: row.id,
+    hash: row.payload_hash,
+    receivedAt: row.received_at,
+  };
+}
+
+function receiptSummaryFromRow(row) {
+  const receipt = receiptFromRow(row);
+  if (!receipt) return null;
+  return {
+    id: receipt.id,
+    hash: receipt.hash,
+    receivedAt: receipt.receivedAt,
+    schema: receipt.schema,
+    eventId: receipt.eventId,
+    almacen: receipt.almacen,
+    fecha: receipt.fecha,
+    operario: receipt.operario,
+    deviceId: receipt.deviceId,
+    zoneKey: receipt.zoneKey,
+    zoneIndex: receipt.zoneIndex,
+    zoneName: receipt.zoneName,
+    templateHash: receipt.templateHash,
+    itemCount: (receipt.items || []).length,
+    manualItemCount: (receipt.manualItems || []).length,
+  };
+}
+
+async function verifyReceiptRow(row) {
+  if (!row) return { receipt: null, verified: false };
+  let payload;
+  try {
+    payload = JSON.parse(row.payload_json || '');
+  } catch (_) {
+    return { receipt: receiptFromRow(row), verified: false };
+  }
+  const identity = await identifyReceipt(payload);
+  return {
+    receipt: receiptFromRow(row),
+    verified: identity.id === row.id && identity.hash === row.payload_hash,
+  };
+}
+
+async function createInventoryReceipt(db, {
+  almacen,
+  fecha,
+  operario,
+  eventId,
+  zoneKey,
+  zoneNameHint,
+  countsByZone,
+  presChoiceByZone,
+  manuales,
+  zoneSnapshot,
+  templateHash,
+  receivedAt,
+}) {
+  const splitAt = String(zoneKey).indexOf(':');
+  const zoneIndex = parseInt(String(zoneKey), 10);
+  const deviceId = splitAt >= 0 ? String(zoneKey).slice(splitAt + 1) : '';
+  if (!deviceId || !Number.isInteger(zoneIndex) || zoneIndex < 0) {
+    throw new Error('No se pudo identificar dispositivo o zona para el acuse');
+  }
+
+  let templateRow = null;
+  try {
+    templateRow = await db.prepare(
+      'SELECT pres_map, unit_map, default_pres, template_hash FROM inv_plantillas WHERE almacen = ?'
+    ).bind(almacen).first();
+  } catch (_) {}
+  const template = {
+    presMap: JSON.parse(templateRow?.pres_map || '{}'),
+    unitMap: JSON.parse(templateRow?.unit_map || '{}'),
+    defaultPres: JSON.parse(templateRow?.default_pres || '{}'),
+  };
+
+  const catalogRows = await db.prepare(
+    'SELECT codigo, nombre, unidad FROM catalogo_articulos WHERE almacen = ?'
+  ).bind(almacen).all();
+  const catalog = {};
+  for (const item of (catalogRows.results || [])) {
+    catalog[item.codigo] = { nombre: item.nombre, unidad: item.unidad };
+  }
+
+  const snapshot = Array.isArray(zoneSnapshot) ? zoneSnapshot : [];
+  const zoneName = String(snapshot[zoneIndex]?.nombre || zoneNameHint || `Zona ${zoneIndex + 1}`);
+  const counts = countsByZone?.[zoneKey] || {};
+  const presChoices = presChoiceByZone?.[zoneKey] || {};
+  const items = normalizeReceiptItems({ counts, presChoices, catalog, template });
+  const manualItems = normalizeReceiptManuals(manuales, deviceId, zoneName);
+  const payload = buildReceiptPayload({
+    eventId,
+    almacen,
+    fecha,
+    operario,
+    deviceId,
+    zoneKey,
+    zoneIndex,
+    zoneName,
+    templateHash: templateHash || templateRow?.template_hash || '',
+    items,
+    manualItems,
+  });
+  const identity = await identifyReceipt(payload);
+
+  await db.prepare(`
+    INSERT OR IGNORE INTO inv_receipts
+      (id, almacen, fecha, device_id, operario, zone_key, zone_name,
+       payload_json, payload_hash, received_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    identity.id,
+    almacen,
+    fecha,
+    deviceId,
+    operario,
+    zoneKey,
+    zoneName,
+    JSON.stringify(payload),
+    identity.hash,
+    receivedAt,
+  ).run();
+
+  const row = await db.prepare(
+    `SELECT id, payload_json, payload_hash, received_at
+     FROM inv_receipts WHERE id = ?`
+  ).bind(identity.id).first();
+  const stored = await verifyReceiptRow(row);
+  if (!stored.verified) {
+    throw new Error('Conflicto al verificar la huella del acuse');
+  }
+  return stored.receipt;
+}
 
 // Revisores que participan en aprobaciones
 const REVISORES = ['pablo', 'javier', 'matteo'];
@@ -403,6 +562,18 @@ async function handleInvGet(db, url, env = {}) {
     });
   }
 
+  if (path === '/inv/receipt') {
+    const id = url.searchParams.get('id');
+    if (!id) return json({ error: 'Falta id de acuse' }, 400);
+    const row = await db.prepare(
+      `SELECT id, payload_json, payload_hash, received_at
+       FROM inv_receipts WHERE id = ?`
+    ).bind(id).first();
+    if (!row) return json({ ok: true, found: false });
+    const result = await verifyReceiptRow(row);
+    return json({ ok: true, found: true, ...result });
+  }
+
   if (path === '/inv/sesion') {
     const almacen = url.searchParams.get('almacen');
     const fecha   = url.searchParams.get('fecha');
@@ -423,6 +594,21 @@ async function handleInvGet(db, url, env = {}) {
       ).bind(almacen, fecha).first();
     }
     if (!row) return json({ ok: true, found: false });
+    let receipts = [];
+    try {
+      const rr = await db.prepare(
+        `SELECT id, payload_json, payload_hash, received_at
+         FROM inv_receipts
+         WHERE almacen = ? AND fecha = ?
+         ORDER BY received_at ASC`
+      ).bind(almacen, fecha).all();
+      // El polling del operario consulta esta ruta cada 8 s. Enviar aquí solo
+      // metadata evita repetir cientos de artículos; el PDF completo se obtiene
+      // por folio en /inv/receipt cuando haga falta.
+      receipts = (rr.results || []).map(receiptSummaryFromRow);
+    } catch (_) {
+      // Compatibilidad durante el despliegue: antes de migración 0008 no hay acuses.
+    }
     return json({
       ok: true, found: true,
       operario:         row.operario,
@@ -440,6 +626,7 @@ async function handleInvGet(db, url, env = {}) {
       zoneConfigId:     row.zone_config_id || '',
       zoneSnapshot:     row.zone_snapshot ? JSON.parse(row.zone_snapshot) : null,
       operariosByDevice: JSON.parse(row.operarios_by_device || '{}'),
+      receipts,
       updatedAt:        row.updated_at
     });
   }
@@ -475,7 +662,7 @@ async function handleInvGet(db, url, env = {}) {
   if (path === '/inv/sesiones') {
     const almacen = url.searchParams.get('almacen');
     const dias = Math.max(1, Math.min(90, parseInt(url.searchParams.get('dias') || '14', 10) || 14));
-    const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const desde = fechaOperativaCDMX(new Date(Date.now() - dias * 24 * 60 * 60 * 1000));
     const validDate = "fecha GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'";
     const where = almacen
       ? `WHERE almacen = ? AND ${validDate} AND fecha >= ?`
@@ -758,8 +945,24 @@ async function handleInvPost(db, body, env = {}, request = null) {
   if (body.action === 'inv_sesion') {
     const { almacen, operario, fecha, countsByZone, presChoiceByZone, correctionsByZone,
             completedZones, removeCompletedZones, manuales, removeManuales, templateHash, counts,
-            zoneConfigId, zoneSnapshot } = body; // counts legacy para barra.html
+            zoneConfigId, zoneSnapshot, requestReceipt, receiptZoneKey,
+            receiptZoneName, receiptEventId } = body; // counts legacy para barra.html
     if (!almacen || !operario || !fecha) return json({ error: 'Datos incompletos' }, 400);
+    const wantsReceipt = requestReceipt === true;
+    if (wantsReceipt) {
+      if (!receiptZoneKey || !receiptEventId) {
+        return json({ error: 'Falta zona o evento para emitir el acuse' }, 400);
+      }
+      if (!Object.prototype.hasOwnProperty.call(countsByZone || {}, receiptZoneKey)) {
+        return json({ error: 'El acuse debe incluir la captura exacta de su zona' }, 400);
+      }
+      if (!(completedZones || []).includes(receiptZoneKey)) {
+        return json({ error: 'Solo se emite acuse para una zona cerrada' }, 400);
+      }
+      if (String(receiptEventId).length > 120 || String(receiptZoneKey).length > 180) {
+        return json({ error: 'Identificador de acuse inválido' }, 400);
+      }
+    }
 
     // El read-modify-write de abajo NO es atómico en D1: dos dispositivos que
     // sincronizan en la misma ventana de milisegundos leían ambos el estado previo
@@ -772,11 +975,14 @@ async function handleInvPost(db, body, env = {}, request = null) {
     // estado fresco. Sin migración — updated_at ya existe.
     const CAS_INTENTOS = 12;
     let guardado = false;
+    let acceptedReceiptState = null;
     for (let intento = 0; intento < CAS_INTENTOS && !guardado; intento++) {
       let existing;
       try {
         existing = await db.prepare(
-          `SELECT counts, counts_by_zone, pres_choice_by_zone, corrections_by_zone, completed_zones, manuales, operarios_by_device, updated_at
+          `SELECT counts, counts_by_zone, pres_choice_by_zone, corrections_by_zone,
+                  completed_zones, manuales, operarios_by_device, template_hash,
+                  zone_snapshot, updated_at
            FROM inv_sesiones WHERE almacen = ? AND fecha = ?`
         ).bind(almacen, fecha).first();
       } catch (err) {
@@ -881,7 +1087,20 @@ async function handleInvPost(db, body, env = {}, request = null) {
           WHERE inv_sesiones.updated_at IS ?
         `).bind(...commonBinds, nuevoTs, casToken).run();
       }
-      if ((res?.meta?.changes ?? 0) > 0) { guardado = true; break; }
+      if ((res?.meta?.changes ?? 0) > 0) {
+        guardado = true;
+        acceptedReceiptState = {
+          countsByZone: mergedCBZ,
+          presChoiceByZone: mergedPCBZ,
+          manuales: mergedManuales,
+          zoneSnapshot: existing?.zone_snapshot
+            ? JSON.parse(existing.zone_snapshot)
+            : (Array.isArray(zoneSnapshot) ? zoneSnapshot : []),
+          templateHash: templateHash || existing?.template_hash || '',
+          receivedAt: nuevoTs,
+        };
+        break;
+      }
       // Perdimos el CAS: otro dispositivo escribió entre nuestra lectura y nuestra
       // escritura. Backoff con jitter creciente (evita que N dispositivos vuelvan
       // a chocar en fase) y reintento sobre el estado fresco.
@@ -892,7 +1111,19 @@ async function handleInvPost(db, body, env = {}, request = null) {
       // en localStorage y reintenta: devolver error es correcto, no perder datos.
       return json({ ok: false, error: 'Conflicto de sincronización, reintenta' }, 409);
     }
-    return json({ ok: true });
+    let receipt = null;
+    if (wantsReceipt) {
+      receipt = await createInventoryReceipt(db, {
+        almacen,
+        fecha,
+        operario,
+        eventId: receiptEventId,
+        zoneKey: receiptZoneKey,
+        zoneNameHint: receiptZoneName,
+        ...acceptedReceiptState,
+      });
+    }
+    return json({ ok: true, receipt });
   }
 
   if (body.action === 'inv_lock') {

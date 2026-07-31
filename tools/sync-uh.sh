@@ -16,9 +16,10 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 git clone --depth 1 "$REMOTE" "$TMP"
 
-rm -rf "$TMP"/inventario.html "$TMP"/manifest-uh.webmanifest "$TMP"/branding "$TMP"/index.html "$TMP"/README.md
+rm -rf "$TMP"/inventario.html "$TMP"/manifest-uh.webmanifest "$TMP"/branding "$TMP"/vendor "$TMP"/index.html "$TMP"/README.md
 cp inventario.html manifest-uh.webmanifest "$TMP"/
 cp -r branding "$TMP"/branding
+cp -r vendor "$TMP"/vendor
 touch "$TMP"/.nojekyll
 # La raíz /inventario-uh/ redirige a la app para que la URL corta funcione
 cat > "$TMP"/index.html <<'HTML'

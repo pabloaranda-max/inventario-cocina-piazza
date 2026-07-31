@@ -60,15 +60,20 @@ input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
 .progress-fill{height:100%;background:#22c55e;border-radius:4px;transition:width .3s}
 .zone-card{background:var(--brand-paper);background:color-mix(in srgb,var(--brand-paper) 94%,white);border:1px solid var(--brand-border);border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px rgba(47,62,30,.05);cursor:pointer;border-left:4px solid var(--brand-border)}
 .zone-card:active{opacity:.8}
-.zone-card.done{border-left-color:#22c55e}
+.zone-card.done{border-color:#22c55e;border-left-color:#16a34a;background:#f0fdf4;box-shadow:0 4px 14px rgba(22,163,74,.12)}
+.zone-card.done .zone-name{color:#166534}
 .zone-card.partial{border-left-color:#f59e0b}
 .zone-card.corrected{border-left-color:#facc15;background:#fffbeb}
+.zone-card.done.corrected{border-color:#22c55e;border-left-color:#16a34a;background:#f0fdf4}
 .zone-card.locked{border-left-color:#94a3b8;cursor:not-allowed;opacity:.6}
 .zone-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .zone-info{flex:1;min-width:0}
 .zone-name{font-weight:700;font-size:15px}
 .zone-meta{font-size:12px;color:#888;margin-top:2px}
-.zone-status{font-size:20px}
+.zone-status{font-size:20px;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.zone-status-closed{display:inline-flex;align-items:center;gap:4px;background:#166534;color:#fff;border-radius:999px;padding:5px 8px;font-size:10px;font-weight:800;letter-spacing:.04em;white-space:nowrap}
+.zone-receipt-btn{border:1px solid #15803d;background:#fff;color:#166534;border-radius:7px;padding:5px 7px;font-size:10px;font-weight:800;white-space:nowrap}
+.zone-receipt-pending{color:#166534;font-size:10px;font-weight:700;white-space:nowrap}
 .subgrupo-hdr{font-size:11px;font-weight:700;color:var(--brand-muted);text-transform:uppercase;letter-spacing:1px;padding:10px 16px 4px;background:rgba(47,62,30,.04)}
 .subgrupo-hdr.hidden{display:none}
 .item-row{background:var(--brand-paper);padding:11px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--brand-border)}
@@ -206,12 +211,12 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
     <span id="count-pct" style="font-size:13px;white-space:nowrap;opacity:.85"></span>
   </div>
   <div class="search-bar">
-    <input type="text" id="count-search" placeholder="Buscar artículo…" oninput="filterCount(this.value)">
+    <input type="text" id="count-search" placeholder="Buscar en toda la plantilla…" oninput="filterCount(this.value)">
     <button onclick="clearSearch()">✕</button>
   </div>
   <div id="count-list" style="padding-bottom:90px"></div>
   <div class="fab-bar">
-    <button class="btn btn-green" style="flex:2" onclick="doneZone()">Cerrar zona ✓</button>
+    <button class="btn btn-green" style="flex:2" onclick="doneZone()">✓ Cerrar esta zona</button>
     <button class="btn btn-gray btn-sm" style="flex:1" onclick="openManualModal()">+ No catalogado</button>
     <button class="btn btn-gray btn-sm" id="btn-ver-manuales" style="flex:1;display:none" onclick="openManualesLista()"><svg class="ic" width="16" height="16"><use href="#i-clipboard-list"/></svg> <span id="manuales-count-badge">0</span></button>
   </div>
@@ -333,6 +338,22 @@ const WORKER_URL = 'https://operaciones-api.pablo-aranda.workers.dev';
 // escrituras con versión menor a su MIN_APP_VERSION (426) para que una app con
 // caché vieja no conviva con datos que no entiende. Spec §15 R12.
 const APP_VERSION = 1;
+const OPERATING_TIME_ZONE = 'America/Mexico_City';
+
+// La fecha que identifica una toma es la fecha operativa de CDMX, no la UTC del
+// dispositivo. Con toISOString(), después de las 18:00 en CDMX la app proponía
+// el día siguiente y podía fragmentar una toma entre dos fechas.
+function fechaOperativaCDMX(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: OPERATING_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+  const byType = Object.fromEntries(parts.map(p => [p.type, p.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
+}
+
 let _minAppVersion = 0; // lo publica el Worker en los GET de arranque
 const ic = (n, s = 16) => `<svg class="ic" width="${s}" height="${s}"><use href="#i-${n}"/></svg>`;
 // R9b: esta app ya no habla con Apps Script — la toma vive en D1 y las
@@ -427,6 +448,8 @@ let _remoteLockedZones = {};
 let _manFotoB64     = null;
 let _lastZoneClosedMsg = '';
 let _templateItemsByCod = {};
+let _receiptPdfLoader = null;
+const _receiptPending = new Set();
 
 const lsKey = k => `xtux_${k}_${ALMACEN}`;
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(lsKey(k))); } catch { return null; } };
@@ -462,8 +485,36 @@ function normalizeSesion(d) {
     pendingCompletedZoneRemovals:d.pendingCompletedZoneRemovals||[],
     zoneConfigId:d.zoneConfigId||'',
     zoneSnapshot:(d.zoneSnapshot && d.zoneSnapshot.length) ? d.zoneSnapshot : null,
+    receipts:d.receipts||[],
+    pendingReceiptEvents:{},
     snapshotSynced:true // viene del servidor: no re-enviar (y si es null, no inventarle uno)
   };
+}
+
+function mergeServerReceipts(receipts) {
+  if (!S || !Array.isArray(receipts)) return;
+  const dev = getDeviceId();
+  const byId = new Map((S.receipts || []).map(receipt => [receipt.id, receipt]));
+  receipts
+    .filter(receipt => receipt && receipt.deviceId === dev)
+    .forEach(receipt => {
+      const previous = byId.get(receipt.id) || {};
+      byId.set(receipt.id, {
+        ...previous,
+        ...receipt,
+        items: receipt.items ?? previous.items,
+        manualItems: receipt.manualItems ?? previous.manualItems
+      });
+    });
+  S.receipts = [...byId.values()]
+    .sort((a, b) => String(a.receivedAt || '').localeCompare(String(b.receivedAt || '')));
+  lsSet('s', S);
+}
+
+function latestReceiptForZone(zoneKey) {
+  return (S?.receipts || [])
+    .filter(receipt => receipt.zoneKey === zoneKey && receipt.deviceId === getDeviceId())
+    .sort((a, b) => String(b.receivedAt || '').localeCompare(String(a.receivedAt || '')))[0] || null;
 }
 
 function countedCodCount(sesion) {
@@ -552,14 +603,14 @@ async function fetchSesionAbiertaWorker(dias = 7) {
 let _syncSeq = 0;
 const _syncUltimo = {};   // zoneKey -> seq de la sync más reciente emitida
 
-function syncSesionWorker() {
+function syncSesionWorker(options = {}) {
   if (!S) return;
   // Solo enviamos la zona activa de este dispositivo. Clave "zoneIdx:deviceId" garantiza
   // que el merge del Worker no pise los conteos de otros dispositivos en la misma zona.
   const myKey = CZ !== null ? myZoneKey(CZ) : null;
   const cbz   = myKey ? { [myKey]: S.countsByZone?.[myKey]  || {} } : {};
   const pcbz  = myKey ? { [myKey]: S.presChoiceByZone?.[myKey] || {} } : {};
-  enviarPayloadSesion(cbz, pcbz);
+  enviarPayloadSesion(cbz, pcbz, options);
 }
 
 // Reenvía TODAS las rebanadas de este dispositivo, no solo la zona activa. Repara
@@ -574,7 +625,7 @@ function resincronizarTodo() {
   enviarPayloadSesion(cbz, pcbz);
 }
 
-function enviarPayloadSesion(cbz, pcbz) {
+function enviarPayloadSesion(cbz, pcbz, options = {}) {
   const removeCompletedZones = S.pendingCompletedZoneRemovals || [];
   // El snapshot pesa (todas las zonas con artículos): se envía solo hasta que el
   // Worker lo tenga (first-write-wins allá; snapshotSynced acá).
@@ -593,12 +644,25 @@ function enviarPayloadSesion(cbz, pcbz) {
     removeCompletedZones,
     manuales:S.manuales||[],
     zoneConfigId:S.zoneConfigId||'',
-    zoneSnapshot: sendSnapshot ? S.zoneSnapshot : undefined
+    zoneSnapshot: sendSnapshot ? S.zoneSnapshot : undefined,
+    requestReceipt: options.requestReceipt === true,
+    receiptZoneKey: options.receiptZoneKey,
+    receiptZoneName: options.receiptZoneName,
+    receiptEventId: options.receiptEventId
   };
   const seq  = ++_syncSeq;
   const keys = Object.keys(cbz);
   keys.forEach(k => { _syncUltimo[k] = seq; });
-  enviarSesion(body, { seq, keys, intento:0, removeCompletedZones, sendSnapshot });
+  enviarSesion(body, {
+    seq,
+    keys,
+    intento:0,
+    removeCompletedZones,
+    sendSnapshot,
+    receiptZoneKey: options.receiptZoneKey || '',
+    receiptEventId: options.receiptEventId || '',
+    autoDownloadReceipt: options.autoDownloadReceipt === true
+  });
 }
 
 // Un payload deja de estar vigente cuando ya salió una sync más nueva para la misma
@@ -612,11 +676,13 @@ function enviarSesion(body, ctx) {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify(body)
   })
-  .then(r => {
+  .then(async r => {
     // R12: el Worker rechaza escrituras de app vieja — avisar sin perder nada
     // (todo sigue en localStorage y se re-sincroniza tras actualizar)
     if (r.status === 426) { mostrarBannerUpdate(); return; }
     if (!r.ok) { reintentarSesion(body, ctx); return; }
+    let data = {};
+    try { data = await r.json(); } catch (_) {}
     ocultarBannerSync();
     let dirty = false;
     if (ctx.removeCompletedZones.length && S) {
@@ -625,15 +691,35 @@ function enviarSesion(body, ctx) {
     }
     if (ctx.sendSnapshot && S) { S.snapshotSynced = true; dirty = true; }
     if (dirty && S) lsSet('s', S);
+    if (data.receipt) {
+      registerReceipt(data.receipt, ctx.autoDownloadReceipt);
+    } else if (ctx.receiptZoneKey) {
+      receiptAttemptFailed(ctx,
+        'El servidor recibió la zona, pero no devolvió el acuse. Toca "Confirmar y PDF" para intentarlo de nuevo.');
+    }
   })
   .catch(e => { console.warn('sesion sync:', e); reintentarSesion(body, ctx); });
 }
 
 function reintentarSesion(body, ctx) {
   if (!syncVigente(ctx)) return;
-  if (ctx.intento >= 5) { mostrarBannerSync(); return; }
+  if (ctx.intento >= 5) {
+    mostrarBannerSync();
+    receiptAttemptFailed(ctx,
+      'No fue posible confirmar el acuse con el servidor. Tu conteo sigue guardado en este dispositivo; toca "Confirmar y PDF" para reintentar.');
+    return;
+  }
   const espera = 1000 * Math.pow(2, ctx.intento) + Math.floor(Math.random() * 500);
   setTimeout(() => enviarSesion(body, { ...ctx, intento: ctx.intento + 1 }), espera);
+}
+
+function receiptAttemptFailed(ctx, message) {
+  if (!S || !ctx.receiptZoneKey) return;
+  const currentEvent = S.pendingReceiptEvents?.[ctx.receiptZoneKey];
+  if (ctx.receiptEventId && currentEvent !== ctx.receiptEventId) return;
+  _receiptPending.delete(ctx.receiptZoneKey);
+  _lastZoneClosedMsg = message;
+  if (document.getElementById('screen-overview')?.classList.contains('active')) renderOverview();
 }
 
 // Al recuperar conexión, reenviar todo lo de este dispositivo (incluye zonas ya
@@ -661,6 +747,7 @@ async function pollLocks() {
     if (d.ok && d.found) {
       _remoteLockedZones = d.lockedZones || {};
       S.correctionsByZone = d.correctionsByZone || S.correctionsByZone || {};
+      mergeServerReceipts(d.receipts || []);
       renderOverview();
     }
   } catch(e) {}
@@ -758,9 +845,11 @@ async function resolveZonasFromConfig(cfgZones) {
     const r = await fetch(WORKER_URL + '/articulos?almacen=' + ALMACEN);
     if (r.ok) {
       const d = await r.json();
-      (d.articulos || []).forEach(a => {
+      const rm = T?.rowMap;
+      (d.articulos || []).filter(a => !rm || a.codigo in rm).forEach(a => {
         lookup[a.codigo] = { cod: a.codigo, art: a.nombre, uni: (T?.unitMap?.[a.codigo]) || a.unidad || '', grp: a.subgrupo || a.grupo || '' };
       });
+      indexTemplateItems(Object.values(lookup));
     }
   } catch(e) { console.warn('articulos fetch:', e); }
   if (T?.raw) {
@@ -809,6 +898,7 @@ async function resolveZonas() {
       items = (d.articulos || d || [])
         .filter(a => !rm || a.codigo in rm)
         .map(a => ({ cod: a.codigo, art: a.nombre, uni: (T?.unitMap?.[a.codigo]) || a.unidad, grp: a.subgrupo || a.grupo || '' }));
+      indexTemplateItems(items);
     }
   } catch(e) { console.warn('articulos fetch:', e); }
 
@@ -849,7 +939,7 @@ async function selectArea(key) {
   T = null;
   _templateItemsByCod = {};
   setColor(CFG.color);
-  document.getElementById('inp-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('inp-fecha').value = fechaOperativaCDMX();
 
   S = lsGet('s');
   const [ok, zcfg] = await Promise.all([fetchPlantillaWorker(), fetchZoneConfigWorker()]);
@@ -873,6 +963,7 @@ async function selectArea(key) {
   // la toma abierta más reciente del Worker (puede ser de un día anterior).
   _remoteSes = S?.fecha ? await fetchSesionWorker(S.fecha) : await fetchSesionAbiertaWorker();
   if (ALMACEN !== savedKey) return;
+  if (S && _remoteSes?.receipts?.length) mergeServerReceipts(_remoteSes.receipts);
 
   renderAreaWelcome();
 }
@@ -1002,7 +1093,7 @@ function renderAreaWelcome() {
     let remoteCard = '';
     if (_remoteSes) {
       const rc = Object.values(_remoteSes.countsByZone||{}).reduce((a,z)=>a+Object.keys(z).length,0);
-      const hoy = new Date().toISOString().slice(0,10);
+      const hoy = fechaOperativaCDMX();
       const otroDia = _remoteSes.fecha !== hoy
         ? `<div style="font-size:12px;color:#b45309;margin-bottom:8px">${ic('triangle-alert',13)} Iniciada otro día y sin cerrar. Continúala para que el conteo no se fragmente en dos sesiones.</div>`
         : '';
@@ -1025,6 +1116,7 @@ function loadRemoteSesion() {
   if (S && countedCodCount(S) > 0 && !confirm('Esto reemplazará la sesión local de este dispositivo con la toma del servidor. ¿Continuar?')) return;
   _remoteLockedZones = _remoteSes.lockedZones || {};
   S = normalizeSesion(_remoteSes);
+  S.receipts = (S.receipts || []).filter(receipt => receipt.deviceId === getDeviceId());
   _remoteSes = null;
   // La toma remota trae su propio snapshot de zonas: usarlo tal cual
   if (S.zoneSnapshot?.length) ZONAS = S.zoneSnapshot;
@@ -1049,7 +1141,7 @@ function startSession() {
   if (!fecha)    { alert('Selecciona la fecha'); return; }
   // Snapshot §14: la toma congela zonas/orden/activos con los que inició — editar
   // la preparación después no la altera. Se envía al Worker en el primer sync.
-  S = { operario, fecha, templateHash: T?.templateHash||'', countsByZone:{}, presChoiceByZone:{}, correctionsByZone:{}, completedZones:[], manuales:[], reopenedZones:{}, pendingCompletedZoneRemovals:[],
+  S = { operario, fecha, templateHash: T?.templateHash||'', countsByZone:{}, presChoiceByZone:{}, correctionsByZone:{}, completedZones:[], manuales:[], reopenedZones:{}, pendingCompletedZoneRemovals:[], receipts:[], pendingReceiptEvents:{},
         zoneConfigId: ZCFG?.id || '', zoneSnapshot: JSON.parse(JSON.stringify(ZONAS || [])), snapshotSynced: false };
   lsSet('s', S);
   syncSesionWorker();
@@ -1083,12 +1175,18 @@ function reopenZone(zoneIdx) {
     startCount(zoneIdx);
     return;
   }
-  if (!confirm(`Editar "${zone.nombre}"?\n\nLos cambios que hagas se marcarán en amarillo en Admin y Sheets.`)) return;
+  if (!confirm(
+    `Reabrir y modificar "${zone.nombre}"?\n\n` +
+    'La zona dejará de aparecer como CERRADA mientras editas. ' +
+    'Los cambios posteriores quedarán marcados como corrección en Admin y Sheets.'
+  )) return;
   S.completedZones = (S.completedZones || []).filter(z => z !== zid);
   if (!S.reopenedZones) S.reopenedZones = {};
   if (!S.pendingCompletedZoneRemovals) S.pendingCompletedZoneRemovals = [];
   S.reopenedZones[zid] = true;
   if (!S.pendingCompletedZoneRemovals.includes(zid)) S.pendingCompletedZoneRemovals.push(zid);
+  _receiptPending.delete(zid);
+  if (S.pendingReceiptEvents) delete S.pendingReceiptEvents[zid];
   _lastZoneClosedMsg = `${zone.nombre} reabierta. Los cambios quedarán marcados como corrección.`;
   lsSet('s', S);
   syncSesionWorker();
@@ -1187,10 +1285,11 @@ function renderItemRow(item, zid, inOtherZone) {
       <span class="lt-badge" id="ltb_${zid}_${esc(item.cod)}">${ltStr} ${item.uni}</span>`;
   }
 
-  const unitLabel = desglosado          ? `${displayItem.uni} · desglosado`
-                  : opts.length === 1   ? `bots × ${opts[0].factor} ${displayItem.uni}`
-                  : opts.length > 1     ? `${displayItem.uni} · selecciona presentación`
-                  : displayItem.uni;
+  const baseUnitLabel = desglosado          ? `${displayItem.uni} · desglosado`
+                      : opts.length === 1   ? `bots × ${opts[0].factor} ${displayItem.uni}`
+                      : opts.length > 1     ? `${displayItem.uni} · selecciona presentación`
+                      : displayItem.uni;
+  const unitLabel = inOtherZone ? `disponible aquí · ${baseUnitLabel}` : baseUnitLabel;
   const unitWarn  = UNIDAD_PESO_VOLUMEN.test(displayItem.uni || '') && opts.length === 0 ? ' warn' : '';
   const inputStep = opts.length > 0 && !UNIDAD_PIEZA.test(displayItem.uni || '') ? '0.5' : '0.01';
 
@@ -1399,9 +1498,12 @@ function updateProgress() {
   const zone   = ZONAS[CZ];
   const zbz    = S.countsByZone?.[myZoneKey(CZ)] || {};
   const filled = zone.items.filter(i => zbz[i.cod] !== undefined).length;
+  const preferred = new Set(zone.items.map(i => i.cod));
+  const extraFilled = Object.keys(zbz).filter(cod => !preferred.has(cod)).length;
   const pct    = zone.items.length ? filled / zone.items.length * 100 : 0;
   document.getElementById('count-bar').style.width = pct + '%';
-  document.getElementById('count-pct').textContent = filled + '/' + zone.items.length;
+  document.getElementById('count-pct').textContent =
+    filled + '/' + zone.items.length + (extraFilled ? ` · +${extraFilled}` : '');
 }
 
 function hlMatch(text, q) {
@@ -1439,50 +1541,31 @@ function filterCount(q) {
   if (!ql) { extra.innerHTML = ''; return; }
 
   const currentCods = new Set(CZ !== null ? ZONAS[CZ].items.map(i => i.cod) : []);
-  let html = '';
+  const disponibles = new Map();
 
-  // Resultados de otras zonas
-  ZONAS.forEach((zone, zi) => {
-    if (zi === CZ) return;
-    const matches = zone.items.filter(item =>
-      !currentCods.has(item.cod) &&
-      matchesSearchText(itemSearchText(item), ql)
-    );
-    if (!matches.length) return;
-    html += `<div class="subgrupo-hdr" style="background:#fef3c7;color:#92400e">${esc(zone.nombre)}</div>`;
-    matches.forEach(item => { html += renderItemRow(item, myZoneKey(CZ), true); currentCods.add(item.cod); });
+  // La preparación solo decide qué se ve de entrada. Al buscar, unificamos los
+  // artículos preparados en otras zonas y el resto de la plantilla en UNA lista,
+  // sin insinuar que el artículo pertenece a otra ubicación.
+  ZONAS.forEach(zone => zone.items.forEach(item => {
+    if (!currentCods.has(item.cod) && !disponibles.has(item.cod)) disponibles.set(item.cod, item);
+  }));
+  Object.keys(T?.rowMap || {}).forEach(cod => {
+    if (currentCods.has(cod) || disponibles.has(cod)) return;
+    disponibles.set(cod, _templateItemsByCod[cod] || {
+      cod,
+      art: cod,
+      uni: T?.unitMap?.[cod] || '',
+      grp: ''
+    });
   });
 
-  // Fuera de zona: en plantilla pero no en ninguna zona
-  if (T?.rowMap) {
-    const allZoneCods = new Set(ZONAS.flatMap(z => z.items.map(i => i.cod)));
-    const fuera = Object.keys(T.rowMap).filter(cod =>
-      !allZoneCods.has(cod) &&
-      matchesSearchText(itemSearchText(_templateItemsByCod[cod] || { cod, art: cod, uni: T.unitMap?.[cod] || '' }), ql)
-    );
-    if (fuera.length) {
-      html += `<div class="subgrupo-hdr" style="background:#f0fdf4;color:#166534;border-top:2px solid #e5e7eb">Fuera de zona · en plantilla</div>`;
-      fuera.forEach(cod => {
-        const zid   = myZoneKey(CZ);
-        const raw   = (S.countsByZone?.[zid])?.[cod];
-        const opts  = getPresOptions(cod);
-        const filled= raw !== undefined ? 'filled' : '';
-        const flt   = raw !== undefined ? parseFloat(raw) : NaN;
-        const f     = opts[0]?.factor ?? null;
-        const ltStr = f && !isNaN(flt) ? fmtNum(flt * f) : (raw!==undefined?String(raw):'—');
-        const item = _templateItemsByCod[cod] || { cod, art: cod, uni: T.unitMap?.[cod] || '' };
-        html += `<div class="item-row" data-search="${esc(itemSearchText(item))}">
-          <div class="item-text"><div class="item-name">${esc(item.art)}</div><div class="item-unit">fuera de zona · ${esc(item.uni || '')}</div></div>
-          <div class="qty-wrap">
-            ${f ? `<span class="lt-badge" id="ltb_${esc(zid)}_${esc(cod)}">${ltStr} LT</span>` : ''}
-            <input type="number" class="qty-input ${filled}" inputmode="decimal" step="0.01" min="0" placeholder="0"
-              value="${raw!==undefined?raw:''}" data-zid="${esc(zid)}" data-cod="${esc(cod)}" oninput="onQty(this)" onfocus="this.select()">
-          </div></div>`;
-      });
-    }
-  }
-
-  extra.innerHTML = html ? `<div class="subgrupo-hdr" style="background:#f0f0f0;color:#666;border-top:2px solid #e5e7eb">Otras zonas</div>${html}` : '';
+  const matches = [...disponibles.values()].filter(item =>
+    matchesSearchText(itemSearchText(item), ql)
+  );
+  extra.innerHTML = matches.length
+    ? `<div class="subgrupo-hdr" style="background:#f0fdf4;color:#166534;border-top:2px solid #86efac">Más artículos de la plantilla · disponibles en esta zona</div>` +
+      matches.map(item => renderItemRow(item, myZoneKey(CZ), true)).join('')
+    : '';
 }
 
 function clearSearch() {
@@ -1498,21 +1581,97 @@ function exitCount() {
   go('overview');
 }
 
+function requestZoneReceipt(zoneIdx, autoDownload = true) {
+  if (!S || !ZONAS?.[zoneIdx]) return;
+  const zid = myZoneKey(zoneIdx);
+  const zoneCounts = S.countsByZone?.[zid] || {};
+  const choices = { ...(S.presChoiceByZone?.[zid] || {}) };
+
+  // Congelar también el factor por defecto de cada captura simple. Así el acuse
+  // y el export no cambian si mañana se edita la plantilla/presentación.
+  for (const [cod, raw] of Object.entries(zoneCounts)) {
+    if (!Array.isArray(raw) && choices[cod] == null) {
+      choices[cod] = getPresChoice(zid, cod) ?? (getPresOptions(cod)[0]?.factor ?? 1);
+    }
+  }
+  if (!S.presChoiceByZone) S.presChoiceByZone = {};
+  S.presChoiceByZone[zid] = choices;
+  if (!S.pendingReceiptEvents) S.pendingReceiptEvents = {};
+  if (!S.pendingReceiptEvents[zid]) S.pendingReceiptEvents[zid] = newManualId();
+
+  _receiptPending.add(zid);
+  lsSet('s', S);
+  if (document.getElementById('screen-overview')?.classList.contains('active')) renderOverview();
+  enviarPayloadSesion(
+    { [zid]: zoneCounts },
+    { [zid]: choices },
+    {
+      requestReceipt: true,
+      receiptZoneKey: zid,
+      receiptZoneName: ZONAS[zoneIdx].nombre,
+      receiptEventId: S.pendingReceiptEvents[zid],
+      autoDownloadReceipt: autoDownload
+    }
+  );
+}
+
+function registerReceipt(receipt, autoDownload) {
+  if (!S || !receipt?.id) return;
+  mergeServerReceipts([receipt]);
+  const zid = receipt.zoneKey;
+  const isCurrentEvent = S.pendingReceiptEvents?.[zid] === receipt.eventId;
+  if (isCurrentEvent) {
+    _receiptPending.delete(zid);
+    delete S.pendingReceiptEvents[zid];
+    _lastZoneClosedMsg =
+      `${receipt.zoneName || 'La zona'} quedó CONFIRMADA por el servidor. ` +
+      `Acuse ${receipt.id}. El PDF ${autoDownload ? 'se está descargando' : 'está disponible'}.`;
+  } else {
+    _lastZoneClosedMsg = S.pendingReceiptEvents?.[zid]
+      ? `Llegó el acuse ${receipt.id} del cierre anterior; el cierre actual sigue confirmándose.`
+      : `El servidor confirmó el acuse ${receipt.id} del cierre anterior. La zona permanece abierta para corrección.`;
+  }
+  lsSet('s', S);
+  if (document.getElementById('screen-overview')?.classList.contains('active')) renderOverview();
+  if (autoDownload) {
+    downloadReceiptPdf(receipt, true).catch(error => {
+      console.warn('acuse PDF:', error);
+      _lastZoneClosedMsg =
+        `El servidor confirmó el acuse ${receipt.id}, pero el dispositivo no pudo descargarlo automáticamente. ` +
+        'Toca "Descargar PDF" en la zona cerrada.';
+      if (document.getElementById('screen-overview')?.classList.contains('active')) renderOverview();
+    });
+  }
+}
+
 function doneZone() {
   if (CZ === null) return;
   const zone = ZONAS[CZ];
   const zid = myZoneKey(CZ);
   const zbz = S.countsByZone?.[zid] || {};
   const filled = zone.items.filter(i => zbz[i.cod] !== undefined).length;
-  if (!confirm(`Cerrar "${zone.nombre}"?\n\nCapturaste ${filled} de ${zone.items.length} artículos en esta zona. Después volverás al listado para elegir otra zona.`)) return;
+  const preferred = new Set(zone.items.map(i => i.cod));
+  const extraFilled = Object.keys(zbz).filter(cod => !preferred.has(cod)).length;
+  const extraTxt = extraFilled
+    ? ` También capturaste ${extraFilled} artículo${extraFilled !== 1 ? 's' : ''} adicional${extraFilled !== 1 ? 'es' : ''} de la plantilla.`
+    : '';
+  if (!confirm(
+    `Cerrar "${zone.nombre}"?\n\n` +
+    `Capturaste ${filled} de ${zone.items.length} artículos preparados en esta zona.${extraTxt}\n\n` +
+    'Al confirmar quedará marcada en verde como CERRADA y los conteos se enviarán al servidor. ' +
+    'Después podrás tocar su tarjeta para reabrirla y modificarla.'
+  )) return;
   if ((S.completedZones||[]).indexOf(zid) === -1) {
     if (!S.completedZones) S.completedZones = [];
     S.completedZones.push(zid);
   }
-  _lastZoneClosedMsg = `${zone.nombre} quedó cerrada para ${S.operario}. Elige otra zona para continuar la toma.`;
+  _lastZoneClosedMsg =
+    `${zone.nombre} quedó CERRADA para ${S.operario}. Se está confirmando con el servidor; ` +
+    'al recibir el folio se descargará el PDF. Puedes reabrirla después si necesitas corregir.';
   lsSet('s', S);
   if (CZ !== null) { lockZone(CZ, true); delete _remoteLockedZones[CZ]; }
-  syncSesionWorker();
+  clearTimeout(_syncTimer);
+  requestZoneReceipt(CZ, true);
   CZ = null;
   go('overview');
 }
@@ -1545,8 +1704,11 @@ function renderOverview() {
       }
     }
 	    const zoneFilled = zone.items.filter(it => zbz[it.cod] !== undefined).length;
+	    const preferredCods = new Set(zone.items.map(it => it.cod));
+	    const extraFilled = Object.keys(zbz).filter(cod => !preferredCods.has(cod)).length;
 	    const done       = (S.completedZones||[]).indexOf(myZoneKey(i)) !== -1;
 	    const zid        = myZoneKey(i);
+	    const receipt    = latestReceiptForZone(zid);
 	    const correctedCount = Object.keys(S.correctionsByZone?.[zid] || {}).length;
 	    const pct        = zone.items.length ? Math.round(zoneFilled / zone.items.length * 100) : 0;
     total  += zone.items.length;
@@ -1555,12 +1717,26 @@ function renderOverview() {
     const remoteLock    = _remoteLockedZones[i];
     const otherCounting = !done && remoteLock && remoteLock.device_id !== getDeviceId();
     const myLock        = !done && remoteLock && remoteLock.device_id === getDeviceId();
-	    const cls    = correctedCount ? 'corrected' : done ? 'done' : zoneFilled > 0 ? 'partial' : '';
-	    const icon   = correctedCount ? '!' : done ? '✓' : myLock ? '✎' : zoneFilled > 0 ? '...' : '○';
-	    let metaLine = zoneFilled + '/' + zone.items.length + ' · ' + pct + '%';
+	    const cls    = [done ? 'done' : (zoneFilled > 0 ? 'partial' : ''), correctedCount ? 'corrected' : ''].filter(Boolean).join(' ');
+	    const status = done
+	      ? '<span class="zone-status-closed">✓ CERRADA</span>'
+	      : (correctedCount ? '!' : myLock ? '✎' : zoneFilled > 0 ? '...' : '○');
+	    let metaLine = zoneFilled + '/' + zone.items.length + ' preparados · ' + pct + '%';
+	    if (extraFilled) metaLine += ` · ${extraFilled} adicional${extraFilled !== 1 ? 'es' : ''}`;
 	    if (otherCounting) metaLine += ' · ' + esc(remoteLock.operario) + ' contando';
-	    if (done) metaLine += ' · cerrada, toca para editar';
+	    if (done) metaLine += ' · Toca para reabrir y modificar';
+	    const receiptAwaiting = !!S.pendingReceiptEvents?.[zid];
+	    if (receipt) metaLine += ` · ${receiptAwaiting ? 'Acuse anterior' : 'Acuse'} ${esc(receipt.id)}`;
 	    if (correctedCount) metaLine += ` · ${correctedCount} correccion${correctedCount!==1?'es':''}`;
+	    const receiptAction = done
+	      ? _receiptPending.has(zid)
+	        ? '<span class="zone-receipt-pending">Confirmando servidor…</span>'
+	        : receiptAwaiting
+	          ? `<button class="zone-receipt-btn" onclick="event.stopPropagation();requestZoneReceipt(${i},true)">Confirmar y PDF</button>`
+	          : receipt
+	          ? `<button class="zone-receipt-btn" onclick="event.stopPropagation();downloadReceiptById('${esc(receipt.id)}')">Descargar PDF</button>`
+	          : `<button class="zone-receipt-btn" onclick="event.stopPropagation();requestZoneReceipt(${i},true)">Confirmar y PDF</button>`
+	      : '';
 	    const clickAttr = done ? ` onclick="reopenZone(${i})"` : ` onclick="startCount(${i})"`;
     return `<div class="zone-card ${cls}"${clickAttr}>
       <div class="zone-dot" style="background:${zone.color}"></div>
@@ -1569,7 +1745,7 @@ function renderOverview() {
         <div class="zone-meta">${metaLine}</div>
         <div class="progress-bar" style="margin-top:4px"><div class="progress-fill" style="width:${pct}%"></div></div>
       </div>
-      <div class="zone-status">${icon}</div>
+      <div class="zone-status">${status}${receiptAction}</div>
     </div>`;
   }).join('');
 
@@ -1934,9 +2110,187 @@ async function compartirManuales() {
   try { await navigator.clipboard.writeText(texto); alert('Lista copiada al portapapeles'); } catch(e) { alert(texto); }
 }
 
+// ── Acuse PDF individual y auditable ──────────────────────────────────────
+
+function loadReceiptPdfLibrary() {
+  if (window.html2pdf) return Promise.resolve(window.html2pdf);
+  if (_receiptPdfLoader) return _receiptPdfLoader;
+  _receiptPdfLoader = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = new URL('vendor/html2pdf.bundle.min.js?v=0.10.1', document.baseURI).href;
+    script.onload = () => window.html2pdf
+      ? resolve(window.html2pdf)
+      : reject(new Error('La librería PDF no quedó disponible'));
+    script.onerror = () => reject(new Error('No se pudo cargar el generador PDF local'));
+    document.head.appendChild(script);
+  }).catch(error => {
+    _receiptPdfLoader = null;
+    throw error;
+  });
+  return _receiptPdfLoader;
+}
+
+function receiptNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? String(Number(n.toFixed(4))) : '0';
+}
+
+function receiptCaptureText(item) {
+  if (item.mode === 'breakdown') {
+    return (item.lines || []).map(line => {
+      const name = line.name || 'Abierto / suelto';
+      return `${receiptNumber(line.quantity)} × ${name} (${receiptNumber(line.factor)} ${item.unit || 'base'})`;
+    }).join(' + ') || 'Sin líneas';
+  }
+  if (Number(item.factor) !== 1) {
+    return `${receiptNumber(item.entered)} × ${item.presentation || 'presentación'} ` +
+      `(${receiptNumber(item.factor)} ${item.unit || 'base'})`;
+  }
+  return `${receiptNumber(item.entered)} ${item.unit || ''}`.trim();
+}
+
+function receiptFilename(receipt) {
+  const safe = value => String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return `Acuse_${safe(receipt.almacen)}_${safe(receipt.fecha)}_Zona-${Number(receipt.zoneIndex) + 1}_${safe(receipt.id)}.pdf`;
+}
+
+async function downloadReceiptById(id) {
+  try {
+    let receipt = (S?.receipts || []).find(item => item.id === id);
+    if (!receipt || !Array.isArray(receipt.items)) {
+      const response = await fetch(WORKER_URL + '/inv/receipt?id=' + encodeURIComponent(id));
+      const data = await response.json();
+      if (!response.ok || !data.ok || !data.found) throw new Error('Acuse no encontrado en el servidor');
+      receipt = data.receipt;
+      mergeServerReceipts([receipt]);
+    }
+    await downloadReceiptPdf(receipt, false);
+  } catch (error) {
+    alert('No se pudo descargar el acuse: ' + error.message);
+  }
+}
+
+async function downloadReceiptPdf(receipt, automatic = false) {
+  if (!receipt?.id || !receipt?.hash) throw new Error('El acuse no tiene folio o huella');
+  await loadReceiptPdfLibrary();
+
+  const verificationUrl = WORKER_URL + '/inv/receipt?id=' + encodeURIComponent(receipt.id);
+  const received = receipt.receivedAt
+    ? new Date(receipt.receivedAt).toLocaleString('es-MX', {
+        dateStyle:'medium',
+        timeStyle:'medium',
+        timeZone:OPERATING_TIME_ZONE
+      })
+    : '—';
+  const itemRows = (receipt.items || []).map((item, index) => `
+    <tr style="background:${index % 2 ? '#f8fafc' : '#fff'};page-break-inside:avoid">
+      <td>${esc(item.code)}</td>
+      <td>${esc(item.name)}</td>
+      <td>${esc(receiptCaptureText(item))}</td>
+      <td style="text-align:right;font-weight:700">${esc(receiptNumber(item.baseQuantity))}</td>
+      <td>${esc(item.unit || '')}</td>
+    </tr>`).join('');
+  const manualRows = (receipt.manualItems || []).map((item, index) => `
+    <tr style="background:${index % 2 ? '#fff7ed' : '#fffbeb'};page-break-inside:avoid">
+      <td>${esc(item.name)}</td>
+      <td style="text-align:right;font-weight:700">${esc(receiptNumber(item.quantity))}</td>
+      <td>${esc(item.unit || '')}</td>
+      <td>${item.presentation ? esc(item.presentation) : 'Captura directa'}${item.photoAttached ? ' · con foto' : ''}</td>
+    </tr>`).join('');
+  const container = document.createElement('div');
+  container.style.cssText =
+    'position:relative;z-index:20000;width:760px;background:#fff;color:#1f2937;' +
+    'font-family:Arial,sans-serif;font-size:11px;line-height:1.35;padding:22px';
+  container.innerHTML = `
+    <div style="border:2px solid #166534;border-radius:10px;padding:18px">
+      <div style="display:flex;justify-content:space-between;gap:20px;align-items:flex-start">
+        <div>
+          <div style="font-size:10px;letter-spacing:1.2px;color:#166534;font-weight:800">CONFIRMADO POR EL SERVIDOR</div>
+          <h1 style="font-size:20px;margin:4px 0 2px">Acuse de recepción de conteo</h1>
+          <div style="color:#64748b">${esc(CENTROS[centroDe(receipt.almacen)]?.nombre || CENTROS[CENTRO].nombre)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:9px;color:#64748b">FOLIO</div>
+          <div style="font-size:11px;font-weight:800;color:#166534">${esc(receipt.id)}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;margin-top:16px;padding:12px;background:#f0fdf4;border-radius:7px">
+        <div><strong>Almacén:</strong> ${esc(receipt.almacen)}</div>
+        <div><strong>Fecha operativa:</strong> ${esc(receipt.fecha)}</div>
+        <div><strong>Zona:</strong> ${esc(receipt.zoneName || `Zona ${Number(receipt.zoneIndex) + 1}`)}</div>
+        <div><strong>Operario declarado:</strong> ${esc(receipt.operario)}</div>
+        <div><strong>Recibido (CDMX):</strong> ${esc(received)}</div>
+        <div><strong>Dispositivo:</strong> ${esc(receipt.deviceId)}</div>
+      </div>
+      <h2 style="font-size:14px;margin:18px 0 7px">Artículos catalogados (${(receipt.items || []).length})</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:10px">
+        <thead><tr style="background:#166534;color:#fff">
+          <th>Código</th><th>Artículo</th><th>Captura original</th>
+          <th style="text-align:right">Cantidad base</th><th>Unidad</th>
+        </tr></thead>
+        <tbody>${itemRows || '<tr><td colspan="5" style="padding:10px;text-align:center">Zona cerrada sin cantidades catalogadas.</td></tr>'}</tbody>
+      </table>
+      ${(receipt.manualItems || []).length ? `
+        <h2 style="font-size:14px;margin:18px 0 7px">No catalogados (${receipt.manualItems.length})</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:10px">
+          <thead><tr style="background:#92400e;color:#fff">
+            <th>Artículo</th><th style="text-align:right">Cantidad base</th><th>Unidad</th><th>Evidencia</th>
+          </tr></thead>
+          <tbody>${manualRows}</tbody>
+        </table>` : ''}
+      <div style="margin-top:18px;padding:11px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;font-size:9px">
+        <strong>Alcance del acuse.</strong> Este documento acredita que el servidor recibió del dispositivo
+        indicado exactamente las capturas listadas. No representa aprobación final ni incorpora correcciones
+        posteriores de administración. Si la zona se reabre y vuelve a cerrarse, se emite un folio nuevo y este
+        acuse permanece en el historial.
+      </div>
+      <div style="margin-top:12px;font-size:8px;color:#475569;word-break:break-all">
+        <strong>SHA-256 del contenido:</strong> ${esc(receipt.hash)}<br>
+        <strong>Verificación:</strong> <a href="${esc(verificationUrl)}">${esc(verificationUrl)}</a><br>
+        <strong>Plantilla:</strong> ${esc(receipt.templateHash || '—')} ·
+        <strong>Evento:</strong> ${esc(receipt.eventId || '—')}
+      </div>
+    </div>
+    <style>
+      th,td{border:1px solid #d1d5db;padding:5px;text-align:left;vertical-align:top}
+      thead{display:table-header-group}
+    </style>`;
+  const cover = document.createElement('div');
+  cover.setAttribute('data-html2canvas-ignore', 'true');
+  cover.style.cssText =
+    'position:fixed;inset:0;z-index:20001;background:#f0fdf4;color:#166534;' +
+    'display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;' +
+    'padding:28px;font:800 16px system-ui,sans-serif';
+  cover.innerHTML =
+    '✓ Conteo confirmado por el servidor' +
+    '<span style="font-size:12px;font-weight:500;margin-top:8px">Generando tu acuse PDF…</span>';
+  document.body.prepend(container);
+  document.body.appendChild(cover);
+
+  try {
+    await window.html2pdf().set({
+      margin: 8,
+      filename: receiptFilename(receipt),
+      image: { type: 'jpeg', quality: 0.94 },
+      html2canvas: { scale: 1.4, useCORS: false, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+      pagebreak: { mode: ['css', 'legacy'] }
+    }).from(container).save();
+    _lastZoneClosedMsg =
+      `Acuse ${receipt.id} confirmado por el servidor y PDF ${automatic ? 'descargado automáticamente' : 'descargado'}.`;
+    if (document.getElementById('screen-overview')?.classList.contains('active')) renderOverview();
+  } finally {
+    cover.remove();
+    container.remove();
+  }
+}
+
 // ── Bootstrap ──────────────────────────────────────────────────────────────
 
-document.getElementById('inp-fecha').value = new Date().toISOString().slice(0,10);
+document.getElementById('inp-fecha').value = fechaOperativaCDMX();
 go('welcome');
 </script>
 </body>
