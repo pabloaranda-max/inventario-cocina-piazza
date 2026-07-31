@@ -98,7 +98,7 @@ with tempfile.TemporaryDirectory(prefix="r23-d1-") as persist_dir:
 
         body = {
             "action": "inv_sesion",
-            "appVersion": 1,
+            "appVersion": 2,
             "almacen": "CAVA",
             "operario": "Ana Auditora",
             "fecha": "2026-07-31",

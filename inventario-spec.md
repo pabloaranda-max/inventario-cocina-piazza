@@ -1354,10 +1354,11 @@ en caché exportó `#NUM!` (array × factor = NaN) 11 min después del deploy R1
 operario viejo no puede pisar rebanadas ajenas (merge por `zona:deviceId`), pero sí
 ver NaN y producir exports rotos — y cada slice futuro agranda el riesgo.
 
-**Modelo (decidido con Pablo 2026-07-23).** Versión entera monotónica, se bumpea SOLO
-cuando cambia el formato de datos (v1 = desglose R11):
+**Modelo (decidido con Pablo 2026-07-23).** Versión entera monotónica. Se bumpea
+cuando cambia el formato de datos o cuando el servidor debe exigir una garantía
+nueva de escritura (v1 = desglose R11; v2 = ningún cierre sin acuse R23):
 
-- Frontends: `const APP_VERSION = 1` (inventario.html y admin.html); viaja como
+- Frontends: `const APP_VERSION = 2` (inventario.html y admin.html); viaja como
   `appVersion` en cada POST `/inv/*`.
 - Worker: `MIN_APP_VERSION` en `wrangler.toml [vars]` (por entorno). POST con
   `appVersion < min` → **426** `{appUpdateRequired, minAppVersion}` — cliente sin
@@ -1370,7 +1371,7 @@ cuando cambia el formato de datos (v1 = desglose R11):
   la caché de Pages; conserva `?centro=`).
 - admin.html: el login (`inv_admin_check`) ya es la puerta — un admin viejo recibe el
   426 con instrucción de Ctrl+F5; además chequeo de `minAppVersion` al cargar Tomas.
-  Imports de módulos con sufijo `?v=1` (bump junto con APP_VERSION): HTML y
+  Imports de módulos con sufijo `?v=2` (bump junto con APP_VERSION): HTML y
   `sesion-merge.js`/`plantilla-parser.js` se actualizan atómicamente — el skew
   intra-página fue exactamente el incidente.
 - ⚠️ Alcance honesto: el xlsx del export se genera client-side ANTES de marcar
@@ -1386,7 +1387,9 @@ lockout de toda la flota vieja mientras Pages propaga.
 **Done.** Staging: POST sin `appVersion` → 426, con versión → 200; Playwright: pantalla
 de bloqueo al entrar con `minAppVersion` alto, banner tras sync 426, flujo normal
 intacto. Prod: rollout con el playbook, verificado con curl que un POST estilo-viejo
-rebota y los GET publican `minAppVersion`.
+rebota y los GET publican `minAppVersion`. **R23, 2026-07-31:** frontend v2 publicado
+y verificado antes de subir producción a `MIN_APP_VERSION=2`; staging conserva
+`MIN_APP_VERSION=1` para no fingir que `inventario-beta.html` ya incluye R23.
 
 ### R13 — Escritura atómica de sesiones (diseño, 2026-07-24) — BLOQUEANTE
 

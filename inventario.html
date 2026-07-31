@@ -333,11 +333,10 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
 // ── Configuración ──────────────────────────────────────────────────────────
 
 const WORKER_URL = 'https://operaciones-api.pablo-aranda.workers.dev';
-// R12 — versión de datos de la app: bump SOLO cuando cambie el formato de lo
-// que se escribe en D1 (v1 = desglose por presentación R11). El Worker rechaza
-// escrituras con versión menor a su MIN_APP_VERSION (426) para que una app con
-// caché vieja no conviva con datos que no entiende. Spec §15 R12.
-const APP_VERSION = 1;
+// R12 — versión del protocolo de escritura. v1 = desglose R11; v2 = cada cierre
+// de zona debe solicitar el acuse auditable R23. El Worker rechaza versiones
+// menores a MIN_APP_VERSION (426), incluida una app cacheada que cerraría sin PDF.
+const APP_VERSION = 2;
 const OPERATING_TIME_ZONE = 'America/Mexico_City';
 
 // La fecha que identifica una toma es la fecha operativa de CDMX, no la UTC del

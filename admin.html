@@ -397,9 +397,9 @@ const SCRIPT_CENTRO = {
 
 const ic = (n, s = 15) => `<svg class="ic" width="${s}" height="${s}"><use href="#i-${n}"/></svg>`;
 const WORKER_URL = 'https://operaciones-api.pablo-aranda.workers.dev';
-// R12 — versión de datos (bump junto con inventario.html y el ?v= de los
-// imports de módulos al final del archivo). v1 = desglose R11. Spec §15 R12.
-const APP_VERSION = 1;
+// R12 — versión del protocolo de escritura (bump junto con inventario.html y
+// el ?v= de los imports). v1 = desglose R11; v2 = acuses auditables R23.
+const APP_VERSION = 2;
 const OPERATING_TIME_ZONE = 'America/Mexico_City';
 const INVENTARIO_AREAS = {
   BARRA_RESTAURANTE: { titulo:'Barra Restaurante', scriptUrl: SCRIPT_CENTRO.PIAZZA,
@@ -2661,8 +2661,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // R12: el ?v= amarra el módulo a esta versión del HTML — sin él, un admin.html
 // fresco puede correr con un módulo viejo de caché (o al revés), que fue
 // exactamente el incidente #NUM! de 2026-07-23. Bump junto con APP_VERSION.
-import { parsePlantilla, hashRaw } from './js/plantilla-parser.js?v=1';
-import { factorDefault, calcularTotalesSesion, cantidadBase, lineasDesglose } from './js/sesion-merge.js?v=1';
+import { parsePlantilla, hashRaw } from './js/plantilla-parser.js?v=2';
+import { factorDefault, calcularTotalesSesion, cantidadBase, lineasDesglose } from './js/sesion-merge.js?v=2';
 window.parsePlantilla = parsePlantilla;
 window.hashRaw = hashRaw;
 window.factorDefault = factorDefault;

@@ -74,7 +74,7 @@ try:
         # --- B: entra bien (min == APP_VERSION) pero el sync es rechazado → banner
         page = browser.new_page()
         page.on("dialog", lambda d: d.accept())
-        page.route(WORKER + "/**", make_stub(1, True))
+        page.route(WORKER + "/**", make_stub(2, True))
         page.goto(BASE)
         entrar(page)
         ok(page.locator("text=Iniciar nueva toma →").count() == 1, "B: min==APP_VERSION entra normal")
@@ -93,7 +93,7 @@ try:
 
         # --- C: flujo normal intacto (regresión R11b)
         page = browser.new_page()
-        page.route(WORKER + "/**", make_stub(1, False))
+        page.route(WORKER + "/**", make_stub(2, False))
         page.goto(BASE)
         entrar(page)
         page.click("text=Iniciar nueva toma →")

@@ -7,9 +7,10 @@ account_id = "ee88d3b7085fc0e166ee75e77918e6c6"
 crons = ["0 10 * * 6", "0 10 28-31 * *"]
 
 # R12 — versión mínima de app aceptada en POST /inv/*. Bumpear SOLO después de
-# que Pages sirva el frontend nuevo (playbook spec §15 R12). v1 = desglose R11.
+# que Pages sirva el frontend nuevo (playbook spec §15 R12).
+# v1 = desglose R11; v2 = cierre con acuse auditable R23.
 [vars]
-MIN_APP_VERSION = "1"
+MIN_APP_VERSION = "2"
 
 [[d1_databases]]
 binding = "DB"
