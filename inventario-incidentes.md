@@ -45,6 +45,119 @@ patrón se repite, tres entradas honestas apuntan mejor que una teoría inventad
 
 ---
 
+## 2026-07-31 — La plantilla de ALIMENTARI pasó por GENERAL y dejó 230 artículos pegados
+
+- **Impacto:** durante la carga de las 7 plantillas frescas de Piazza, XTINV000288
+  (ALIMENTARI) estuvo cargada en `GENERAL`. La plantilla se corrigió a XTINV000285 y
+  quedó bien —434 artículos, 0 sin nombre—, pero **el catálogo de GENERAL conserva 230
+  códigos de ALIMENTARI de forma permanente**, porque el upsert de R25 no borra. Catálogo
+  en 672 donde correspondían 442. **Sin pérdida de conteos y sin efecto operativo:** no
+  había tomas abiertas, y los dos consumos del catálogo filtran contra `rowMap`, así que
+  un operario en GENERAL nunca ve esos 230. Es contaminación silenciosa de datos, no una
+  degradación del servicio.
+- **Detección:** por aritmética, no por aviso. Al verificar la tanda se había predicho un
+  catálogo de 443 para GENERAL y salió 672; los 229 de diferencia no tenían explicación.
+- **Causa raíz:** **confirmada en cuanto al mecanismo, no en cuanto al gesto.** Nadie
+  reportó el paso en falso; se dedujo del dato. Lo confirmado es por qué nada lo frenó:
+  **R26 no protege la primera carga a un almacén sin plantilla**, porque su guarda entera
+  vive dentro de `if (previousTemplate?.row_map)`. GENERAL era exactamente ese caso, el
+  único almacén sin plantilla previa, y por eso fue el único de los 7 donde un archivo
+  equivocado podía entrar sin resistencia — el mismo día en que R26 salió a producción
+  precisamente para impedir cruces. Y como R25 escribe catálogo sin `DELETE`, corregir la
+  plantilla después no deshizo nada.
+- **Evidencia:** de los 238 sobrantes del catálogo de GENERAL, **230 aparecen en
+  XTINV000288 (96.6 %)**, con nombres inequívocamente de ALIMENTARI (`ACQUA PANNA 250ML`,
+  `AGITADOR MADERA 15 CM`, `ALEX LIMPIADOR PISOS`). Contra las otras seis plantillas de la
+  tanda el cruce cae a 23.9 % o menos. Los 8 restantes son los sobrantes preexistentes que
+  GENERAL ya tenía antes de la carga. La plantilla vigente sí es la correcta: XTINV000285,
+  434 códigos, ninguno con sufijo `_NNNN`.
+- **Resolución:** **ninguna todavía.** El residuo sigue en producción; retirarlo es
+  justamente R27. Al limpiar debe quedar en 442.
+- **Lección:** **el hueco que se documenta pero no se cierra se cobra el mismo día.** El
+  primer incidente de la noche dejó escrito que la guarda debía ser server-side y
+  fail-closed; R26 se publicó cumpliendo eso para los almacenes con plantilla y dejando
+  fuera los que no la tienen, que son los únicos donde un error es indetectable por
+  comparación. La segunda lección es de método: **la contaminación no se detecta por
+  aritmética de conjuntos.** Aquí uno de los 8 sobrantes legítimos también existe en la
+  plantilla de ALIMENTARI, así que `catálogo − plantilla` no distingue residuo de
+  histórico ni siquiera en un caso ya conocido. Sin procedencia por lote, la limpieza no
+  puede ser automática.
+
+---
+
+## 2026-07-31 — La plantilla de CAVA se cargó en UH_MERCH
+
+- **Impacto:** `UH_MERCH` quedó temporalmente con XTINV000289 de CAVA: su plantilla
+  pasó de 8 artículos de mercancía a 149 vinos y su catálogo de 8 a 157 filas. CAVA
+  no cambió. **No hubo pérdida de conteos:** UH_MERCH no tenía sesiones activas y
+  plantilla, catálogo y sesiones viven separados.
+- **Detección:** verificación inmediata posterior a la recarga de CAVA para activar
+  el catálogo incremental R25. CAVA seguía en 121/149 nombres y con su hora anterior;
+  al revisar todos los almacenes, UH_MERCH tenía el nombre, hash y 149 códigos exactos
+  de XTINV000289.
+- **Causa raíz:** **confirmada en el servidor.** El POST llegó con
+  `almacen=UH_MERCH`; el Worker confiaba en ese valor. La única defensa vivía en
+  Admin, comparaba códigos mediante un GET previo y era un `confirm` opcional
+  (además de fallar abierto si ese GET fallaba), por lo que no era una restricción.
+
+  **Por qué el daño llegó al catálogo, que el 27 de julio no había pasado — R25.** El
+  código anterior escribía catálogo solo `if (!row.n)`, es decir únicamente si el
+  almacén tenía CERO filas; con `UH_MERCH` en 8, una plantilla equivocada habría dejado
+  el catálogo intacto. R25 (`0b204f2`, 07:14:48Z) conserva ese `COUNT(*)` solo para
+  calcular la bandera `catalogoDerivado` de la UI y corre el upsert **sin condición**,
+  así que los 149 códigos ajenos entraron. Y como el upsert **no tiene `DELETE` por
+  diseño** ("conserva todo histórico"), volver a subir la plantilla correcta **no lo
+  habría deshecho**: R25 convirtió este error de reversible en no autocorregible, y por
+  eso la recuperación exigió restaurar desde respaldo en vez de una simple resubida.
+
+  **Cómo se seleccionó el almacén equivocado — NO CONFIRMADA.** Candidatos, en orden:
+  1. Verificación manual de R25 contra producción: la escritura ocurrió 5 minutos
+     después del commit, R25 cambia justo el camino que solo se activa cuando el
+     almacén **ya tiene catálogo** —`UH_MERCH` era uno de los pocos que calificaba— y el
+     archivo a la mano era el de CAVA. Encaja en tiempo y en motivo.
+  2. El selector `plt-almacen` conserva su valor entre subidas y se subió sin recorrerlo.
+- **Evidencia:** UH_MERCH registró `updated_at=2026-07-31T07:19:48.056Z`,
+  `template_hash=a3714f89ede7d6c6`, 149 códigos de CAVA y 157 filas de catálogo
+  (8 originales + 149 entrantes); cero sesiones en los últimos 30 días. El respaldo
+  previo R25 contenía XTINV000027, hash `9632e56996df68d4` y exactamente 8 códigos.
+  No eran dos archivos parecidos sino **el mismo**: coincidían `templateHash` y el
+  SHA-256 del `raw` (`a3714f89ede7d6c66b90…`). Medido en vivo antes de la restauración,
+  el catálogo daba `{'3-1 VINO': 148, 'MERCH': 8, 'GRUPO DE PRODUCTO': 1}` con los 8
+  propios (`CAMISA BLANCA`, `CAMISETA NEGRA`…) todavía presentes, lo que confirma que el
+  upsert no borra. **Lo que queda descartado:** la prueba nueva
+  `tests/smoke-worker-catalog-upsert.py` **no fue la causa** — corre contra wrangler
+  local con datos sintéticos (`XTINVOLD`/`XTINVNEW`), solo toca `CAVA` y no menciona
+  `UH_MERCH` ni `XTINV000289`. Tampoco es el incidente del 27 de julio repetido: el
+  archivo era una plantilla legítima de Xetux, así que la guarda R16
+  (`Application: SheetJS` / columna Cantidad llena) **hizo bien en no dispararse** — el
+  problema no era el archivo sino el destino. Que los 148 vinos entraran al catálogo es
+  además la prueba de que el Worker con R25 ya estaba desplegado en producción a las
+  07:19:48Z: con el código anterior era imposible, porque `UH_MERCH` no tenía el
+  catálogo vacío.
+- **Resolución:** se guardó también el estado contaminado, se ensayó la restauración
+  contra D1 local y se restauraron únicamente `inv_plantillas` y
+  `catalogo_articulos` de UH_MERCH desde
+  `operaciones-db-backup-2026-07-31-r25.sql`. Verificación final: XTINV000027,
+  hash esperado, 8/8 códigos exactos; CAVA permaneció intacto. R26 convierte el
+  cruce menor a 20 % en bloqueo sin override tanto en Admin como en Worker.
+- **Lección:** tres.
+  1. **Una guarda contra corrupción entre almacenes debe ser autoritativa, server-side y
+     fail-closed.** Un diálogo de confirmación no es una barrera de integridad y una
+     validación solo en cliente no protege clientes viejos ni fallas de red. Nota sobre
+     la lección del 27 de julio: se escribió "cuando dos rutas hacen lo mismo, la guarda
+     va en las dos" y se cumplió para las dos rutas del navegador, pero la ruta que de
+     verdad escribe —el Worker— se quedó sin comprobar nada.
+  2. **Ampliar lo que toca una escritura amplía lo que rompe un error de destino.** R25
+     es correcto en lo suyo, pero pasó de escribir catálogo en un caso raro (almacén
+     vacío) a escribirlo siempre, y nadie revisó qué pasaba si el almacén estaba mal. El
+     radio de daño de una función es parte de su diseño, no un detalle de implementación.
+  3. **Una tabla sin `DELETE` necesita un camino de reversa explícito.** "Conserva todo
+     histórico" es la decisión correcta para el uso normal y deja sin salida al error;
+     aquí la reversa fue restaurar desde respaldo. Mientras R25 siga, hace falta una
+     forma soportada de quitar códigos que entraron por el almacén equivocado.
+
+---
+
 ## 2026-07-27 — El export de CAVA se subió como plantilla de SALUMERÍA
 
 - **Impacto:** SALUMERÍA quedó con la lista de artículos de CAVA (vinos) como plantilla
