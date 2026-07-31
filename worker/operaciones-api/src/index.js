@@ -854,6 +854,33 @@ async function handleInvPost(db, body, env = {}, request = null) {
     const { almacen, rowMap, cantidadColIdx, presMap, unitMap, raw, originalFilename, templateHash } = body;
     if (!almacen || !rowMap || cantidadColIdx == null) return json({ error: 'Datos incompletos' }, 400);
 
+    // R26: defensa autoritativa contra almacén cruzado. El Admin ya comparaba
+    // códigos, pero era un confirm opcional y además fallaba abierto si su GET
+    // previo no respondía. El servidor no debe confiar en esa prevalidación.
+    const previousTemplate = await db.prepare(
+      'SELECT row_map FROM inv_plantillas WHERE almacen = ?'
+    ).bind(almacen).first();
+    if (previousTemplate?.row_map) {
+      let previousCodes = [];
+      try { previousCodes = Object.keys(JSON.parse(previousTemplate.row_map || '{}')); } catch (_) {}
+      if (previousCodes.length) {
+        const incomingCodes = new Set(Object.keys(rowMap));
+        const common = previousCodes.filter(code => incomingCodes.has(code)).length;
+        if (common / previousCodes.length < 0.2) {
+          return json({
+            ok: false,
+            plantillaAlmacenIncompatible: true,
+            error:
+              `Carga bloqueada: el archivo solo comparte ${common} de ${previousCodes.length} ` +
+              `artículos con ${almacen}. Selecciona el almacén correcto.`,
+            comunes: common,
+            previos: previousCodes.length,
+            entrantes: incomingCodes.size,
+          }, 409);
+        }
+      }
+    }
+
     // R25: la plantilla es también una fuente incremental del catálogo. Antes
     // solo se derivaba cuando el almacén tenía CERO filas: una vez poblado,
     // cualquier código nuevo quedaba fuera para siempre y sus acuses mostraban

@@ -2,8 +2,8 @@
 """Smoke R16 en navegador (2026-07-28) — el camino VISUAL de las guardas del admin,
 que el commit 469e7a7 dejó validado solo en node. A) un export de la app se bloquea:
 sale el alert con las dos señales (SheetJS + cantidades) y el input queda limpio.
-B) una plantilla legítima con cruce alto sube sin fricción. C) el confirm de almacén
-cruzado se puede cancelar (no sube nada) y también aceptar (decide la persona).
+B) una plantilla legítima con cruce alto sube sin fricción. C) una plantilla de
+almacén cruzado se bloquea sin posibilidad de confirmar y continuar.
 D) borrar una sesión fantasma refresca la lista y distingue "ya no existe" de una
 falla real. El export de A se genera con el MISMO SheetJS del CDN que usa la app,
 así la señal Application viene del escritor real, no de un fixture a mano."""
@@ -19,7 +19,7 @@ FIXTURE = "tests/fixtures/cava-synthetic.xlsx"
 # "Microsoft Excel", columna Cantidad vacía): pasa la guarda 1 legítimamente.
 PREVIOS = {
     "CAVA":      {"MP0001": 1, "MP0002": 3, "MP0003": 5},              # cruce 3/3 → sube sin aviso
-    "SALUMERIA": {"SL0001": 1, "SL0002": 2, "SL0003": 3, "SL0004": 4}, # cruce 0/4 → confirm
+    "SALUMERIA": {"SL0001": 1, "SL0002": 2, "SL0003": 3, "SL0004": 4}, # cruce 0/4 → bloqueo
 }
 
 passed = 0
@@ -109,11 +109,9 @@ try:
         stub = Stub()
         page = browser.new_page()
         dialogos = []
-        modo = {"aceptar_confirm": True}
         def on_dialog(d):
             dialogos.append((d.type, d.message))
-            if d.type == "confirm" and not modo["aceptar_confirm"]: d.dismiss()
-            else: d.accept()
+            d.accept()
         page.on("dialog", on_dialog)
         entrar(page, stub)
         page.click(".tab:has-text('Plantillas')")
@@ -148,28 +146,22 @@ try:
         ok("guardada correctamente" in page.locator("#plt-msg").inner_text(),
            "B: confirmación verde en pantalla")
 
-        # C: plantilla de OTRO almacén → confirm; cancelar no sube nada
+        # C: plantilla de OTRO almacén → bloqueo sin override
         dialogos.clear()
-        modo["aceptar_confirm"] = False
         page.select_option("#plt-almacen", "SALUMERIA")
         page.wait_for_selector(".plt-status-card")
         page.set_input_files("#plt-file", FIXTURE)
         page.wait_for_timeout(1000)
-        confirms = [m for t, m in dialogos if t == "confirm"]
-        ok(len(confirms) == 1 and "solo 0 de los 4" in confirms[0]
-           and "Subirla reemplaza la actual" in confirms[0],
-           "C: el confirm de almacén cruzado sale y dice el cruce real (0 de 4)")
-        ok("Cancelado" in page.locator("#plt-msg").inner_text(),
-           "C: cancelar deja el aviso 'Cancelado, no se subió nada'")
+        alerts = [m for t, m in dialogos if t == "alert"]
+        ok(not any(t == "confirm" for t, _ in dialogos),
+           "C: el almacén cruzado no ofrece un confirm para saltarse la guarda")
+        ok(len(alerts) == 1 and "CARGA BLOQUEADA" in alerts[0] and "solo 0 de los 4" in alerts[0],
+           "C: el bloqueo explica el cruce real (0 de 4)")
+        ok("Carga bloqueada" in page.locator("#plt-msg").inner_text(),
+           "C: queda un mensaje rojo inequívoco en pantalla")
         ok(page.evaluate("document.getElementById('plt-file').value") == "",
-           "C: el input queda limpio tras cancelar")
+           "C: el input queda limpio tras el bloqueo")
         ok(len(stub.subidas) == 1, "C: nada nuevo llegó al Worker")
-        # ...y aceptar sí sube: el aviso informa, la persona decide (criterio R6)
-        modo["aceptar_confirm"] = True
-        page.set_input_files("#plt-file", FIXTURE)
-        page.wait_for_timeout(1200)
-        ok(len(stub.subidas) == 2 and stub.subidas[1]["almacen"] == "SALUMERIA",
-           "C: aceptar el confirm sí sube — el aviso no bloquea, informa")
         page.close()
 
         # ── D: borrar sesión — refresca también en el error ───────────────────

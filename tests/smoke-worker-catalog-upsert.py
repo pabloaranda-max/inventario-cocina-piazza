@@ -34,8 +34,11 @@ def request_json(path, method="GET", body=None, admin=False):
     if admin:
         headers["X-Admin-Password"] = ADMIN_PASSWORD
     request = urllib.request.Request(BASE + path, data=data, method=method, headers=headers)
-    with urllib.request.urlopen(request, timeout=10) as response:
-        return response.status, json.loads(response.read())
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return response.status, json.loads(response.read())
+    except urllib.error.HTTPError as error:
+        return error.code, json.loads(error.read())
 
 
 with tempfile.TemporaryDirectory(prefix="r25-d1-") as persist_dir:
@@ -156,6 +159,30 @@ with tempfile.TemporaryDirectory(prefix="r25-d1-") as persist_dir:
         _, catalog_after = request_json("/articulos?almacen=CAVA")
         ok(repeated.get("catalogoSincronizado") == 2, "repetir la carga sigue sincronizando")
         ok(len(catalog_after.get("articulos", [])) == 3, "repetir la carga es idempotente")
+
+        crossed = dict(body)
+        crossed.update({
+            "rowMap": {"WRONG": 1},
+            "unitMap": {"WRONG": "PZA"},
+            "articulos": [{"codigo": "WRONG", "nombre": "ALMACEN EQUIVOCADO", "unidad": "PZA"}],
+            "templateHash": "tpl-wrong",
+        })
+        status, rejected = request_json("/inv/plantilla", "POST", crossed, admin=True)
+        ok(
+            status == 409 and rejected.get("plantillaAlmacenIncompatible") is True,
+            "el Worker bloquea un almacén cruzado aunque el cliente intente enviarlo",
+        )
+        _, template_after_rejection = request_json("/inv/plantilla?almacen=CAVA")
+        _, catalog_after_rejection = request_json("/articulos?almacen=CAVA")
+        ok(
+            template_after_rejection.get("templateHash") == "tpl-new",
+            "el rechazo conserva la plantilla correcta",
+        )
+        ok(
+            "WRONG" not in {item["codigo"] for item in catalog_after_rejection.get("articulos", [])},
+            "el rechazo no contamina el catálogo",
+        )
+
     finally:
         worker.terminate()
         try:

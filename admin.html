@@ -2149,10 +2149,9 @@ async function uploadPlantilla(file) {
       return;
     }
 
-    // Guarda 2 — no pisar un almacén con la plantilla de otro. Si lo entrante
-    // casi no comparte códigos con lo que ese almacén ya tiene, casi siempre es
-    // el archivo equivocado. Se avisa y decide la persona; nunca se autocorrige
-    // (mismo criterio que R6).
+    // Guarda 2 — no pisar un almacén con la plantilla de otro. Desde R26 el
+    // cruce bajo BLOQUEA: el confirm anterior permitió cargar CAVA en UH_MERCH.
+    // El Worker repite esta misma defensa para cubrir Admin viejo o falla del GET.
     let previos = [];
     try {
       const pr = await fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen));
@@ -2161,12 +2160,15 @@ async function uploadPlantilla(file) {
     } catch(_) {}
     if (previos.length) {
       const comunes = previos.filter(c => rowMap[c] !== undefined).length;
-      if (comunes / previos.length < 0.2 && !confirm(
-        `"${file.name}" trae ${Object.keys(rowMap).length} artículos, pero solo ${comunes} de los ` +
-        `${previos.length} que ${tituloAlmacen(almacen)} ya tiene.\n\n` +
-        `¿Seguro que es la plantilla de ${tituloAlmacen(almacen)}? Subirla reemplaza la actual.`
-      )) {
-        msg.textContent = 'Cancelado, no se subió nada.';
+      if (comunes / previos.length < 0.2) {
+        msg.style.color = '#dc2626';
+        msg.textContent = `✗ Carga bloqueada: el archivo no corresponde a ${tituloAlmacen(almacen)}.`;
+        alert(
+          `CARGA BLOQUEADA — no se subió nada.\n\n` +
+          `"${file.name}" trae ${Object.keys(rowMap).length} artículos, pero solo ${comunes} de los ` +
+          `${previos.length} que ${tituloAlmacen(almacen)} ya tiene.\n\n` +
+          `Selecciona el almacén correcto antes de volver a intentarlo.`
+        );
         document.getElementById('plt-file').value = '';
         return;
       }
