@@ -2193,7 +2193,11 @@ async function uploadPlantilla(file) {
       await loadPlantillaStatus();
       msg.style.color = '#16a34a';
       msg.textContent = `✓ Plantilla de ${tituloAlmacen(almacen)} guardada correctamente` +
-        (d.catalogoDerivado ? ` · catálogo creado con ${d.catalogoDerivado} artículos` : '');
+        (d.catalogoSincronizado != null
+          ? ` · catálogo sincronizado con ${d.catalogoSincronizado} artículos`
+          : d.catalogoDerivado
+            ? ` · catálogo creado con ${d.catalogoDerivado} artículos`
+            : '');
     } else {
       msg.style.color = '#dc2626';
       msg.textContent = 'Error: ' + (d.error || 'desconocido');

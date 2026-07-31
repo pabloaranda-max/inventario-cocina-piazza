@@ -853,6 +853,55 @@ async function handleInvPost(db, body, env = {}, request = null) {
   if (body.action === 'inv_plantilla') {
     const { almacen, rowMap, cantidadColIdx, presMap, unitMap, raw, originalFilename, templateHash } = body;
     if (!almacen || !rowMap || cantidadColIdx == null) return json({ error: 'Datos incompletos' }, 400);
+
+    // R25: la plantilla es también una fuente incremental del catálogo. Antes
+    // solo se derivaba cuando el almacén tenía CERO filas: una vez poblado,
+    // cualquier código nuevo quedaba fuera para siempre y sus acuses mostraban
+    // únicamente el código. Upsert de los artículos entrantes, sin DELETE:
+    // agrega nuevos, refresca los vigentes y conserva todo histórico.
+    //
+    // El catálogo se escribe ANTES de reemplazar la plantilla. Si esta fase
+    // falla, la plantilla activa permanece intacta; un reintento es idempotente.
+    let catalogoDerivado = 0;
+    let catalogoSincronizado = 0;
+    const byCode = new Map();
+    for (const a of (body.articulos || [])) {
+      const codigo = String(a?.codigo || '').trim();
+      const nombre = String(a?.nombre || '').trim();
+      if (!codigo || !nombre || !Object.prototype.hasOwnProperty.call(rowMap, codigo)) continue;
+      byCode.set(codigo, {
+        codigo,
+        nombre,
+        grupo: String(a?.grupo || '').trim(),
+        subgrupo: String(a?.subgrupo || '').trim(),
+        unidad: String(a?.unidad || '').trim(),
+      });
+    }
+    const arts = [...byCode.values()];
+    if (arts.length) {
+      const prior = await db.prepare(
+        'SELECT COUNT(*) AS n FROM catalogo_articulos WHERE almacen = ?'
+      ).bind(almacen).first();
+      const now = Date.now();
+      const stmt = db.prepare(`
+        INSERT INTO catalogo_articulos
+          (codigo,nombre,grupo,subgrupo,unidad,almacen,updated_at)
+        VALUES (?,?,?,?,?,?,?)
+        ON CONFLICT(codigo, almacen) DO UPDATE SET
+          nombre = excluded.nombre,
+          grupo = CASE WHEN excluded.grupo <> '' THEN excluded.grupo ELSE catalogo_articulos.grupo END,
+          subgrupo = CASE WHEN excluded.subgrupo <> '' THEN excluded.subgrupo ELSE catalogo_articulos.subgrupo END,
+          unidad = CASE WHEN excluded.unidad <> '' THEN excluded.unidad ELSE catalogo_articulos.unidad END,
+          updated_at = excluded.updated_at
+      `);
+      for (let i = 0; i < arts.length; i += 50) {
+        await db.batch(arts.slice(i, i + 50).map(a =>
+          stmt.bind(a.codigo, a.nombre, a.grupo, a.subgrupo, a.unidad, almacen, now)));
+      }
+      catalogoSincronizado = arts.length;
+      if (!Number(prior?.n || 0)) catalogoDerivado = arts.length; // compatibilidad UI anterior
+    }
+
     await db.prepare(`
       INSERT INTO inv_plantillas (almacen, row_map, cantidad_col_idx, pres_map, unit_map, raw, original_filename, template_hash, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -867,23 +916,7 @@ async function handleInvPost(db, body, env = {}, request = null) {
         updated_at = excluded.updated_at
     `).bind(almacen, JSON.stringify(rowMap), cantidadColIdx, JSON.stringify(presMap || {}), JSON.stringify(unitMap || {}), raw || '', originalFilename || '', templateHash || '', new Date().toISOString()).run();
 
-    // R8: almacén sin catálogo D1 (sync_d1 solo cubre Piazza) → derivarlo de la
-    // plantilla. Solo si está vacío: catálogos existentes nunca se pisan.
-    let catalogoDerivado = 0;
-    const arts = (body.articulos || []).filter(a => a && a.codigo && a.nombre);
-    if (arts.length) {
-      const row = await db.prepare('SELECT COUNT(*) AS n FROM catalogo_articulos WHERE almacen = ?').bind(almacen).first();
-      if (!row.n) {
-        const now = new Date().toISOString();
-        const stmt = db.prepare('INSERT OR REPLACE INTO catalogo_articulos (codigo,nombre,grupo,subgrupo,unidad,almacen,updated_at) VALUES (?,?,?,?,?,?,?)');
-        for (let i = 0; i < arts.length; i += 50) {
-          await db.batch(arts.slice(i, i + 50).map(a =>
-            stmt.bind(a.codigo, a.nombre, a.grupo || '', a.subgrupo || '', a.unidad || '', almacen, now)));
-        }
-        catalogoDerivado = arts.length;
-      }
-    }
-    return json({ ok: true, catalogoDerivado });
+    return json({ ok: true, catalogoDerivado, catalogoSincronizado });
   }
 
   if (body.action === 'inv_defaults') {

@@ -1,6 +1,14 @@
-# inventario.html — Especificación técnica v4.18
+# inventario.html — Especificación técnica v4.19
 
-> Última actualización: 2026-07-31. Estado: **v4.18 EN PRODUCCIÓN**.
+> Última actualización: 2026-07-31. Estado: **v4.19 EN PRODUCCIÓN**.
+> v4.19 (2026-07-31): cada carga de plantilla hace upsert de sus artículos en
+> `catalogo_articulos`, incluso cuando el almacén ya tenía catálogo. La regla
+> anterior solo derivaba el catálogo si estaba totalmente vacío: CAVA quedó con
+> 28 códigos presentes en XTINV000289 pero ausentes del catálogo y, por tanto,
+> sin nombre humano en los acuses. El upsert no borra históricos, filtra contra
+> `rowMap`, conserva metadatos existentes cuando el xlsx trae campos vacíos y se
+> ejecuta antes de reemplazar la plantilla para que un fallo no cambie el archivo
+> activo. Repetir la misma carga es idempotente.
 > v4.18 (2026-07-31): CAVA confirmó un bug aguas arriba: Xetux muestra únicamente
 > la presentación de 1 litro de `XMAT2410000317 · VT UNLITRO AMELEIA`, pero su
 > export nuevo conserva una asociación oculta con 750 ml. El parser ahora conserva
@@ -948,6 +956,7 @@ Guardar/activar debe requerir password admin.
 | R22 | **Carga revisada de plantillas en lote** — seleccionar varios xlsx o una carpeta, inferir almacén por huella de códigos y revisar el mapeo completo antes de una sola escritura. Ver diseño abajo | FUTURO — diferido por Pablo 2026-07-30: la comodidad no justifica introducir riesgo de asignación antes del inventario |
 | R23 | **Acuse PDF individual y auditable** — al cerrar una zona, el Worker conserva un payload inmutable por dispositivo, emite folio + SHA-256 y solo entonces el teléfono genera/descarga el PDF. Reabrir y cerrar de nuevo crea otro acuse; los anteriores permanecen. Admin los lista y el endpoint por folio recalcula la huella para verificarlos | HECHO — **EN PROD 2026-07-31**. Respaldo D1 → migración 0008 → Pages/espejo UH v2 → Worker prod `1d1f7ac9` (MIN=2). Prueba remota staging limpia, sin tomas artificiales residuales. `tests/test-receipt.mjs` (11), `tests/smoke-worker-receipt.py` (18, incluida alteración detectada) y `tests/smoke-receipt.py` (26, PDF real inspeccionado, multipágina, reintento tras corrección e historial admin) |
 | R24 | **Botellas explícitas de 1 LT + corrección UNLITRO** — conservar factor 1 cuando nombra un envase; seguir descartando la unidad base automática; neutralizar únicamente la relación fantasma de 750 ml de `XMAT2410000317` sin modificar el raw de Xetux | HECHO — **EN PROD 2026-07-31**. Archivo real XTINV000289: 149 artículos, UNLITRO queda solo como `BOTELLA DE 1 LT × 1`, SHA-256 del raw intacto. Parser 22/22, captura R11b 19/19, merge 21/21, acuse 13/13 y flujo plantilla→export 9/9 |
+| R25 | **Catálogo incremental desde cada plantilla** — cada `inv_plantilla` agrega o actualiza sus artículos aunque el catálogo ya exista; nunca elimina históricos y nunca acepta códigos fuera de `rowMap` | HECHO — **EN PROD 2026-07-31**. Nació al verificar XTINV000289: 28/149 códigos de CAVA no tenían nombre en D1 aunque sí estaban en el xlsx. Prueba Worker+D1 local cubre catálogo preexistente, actualización, alta, preservación histórica, filtro fuera de plantilla e idempotencia |
 | — | **GENERAL sin plantilla en D1** — la app cae a "Iniciar conteo sin plantilla" y la toma no es exportable. Subir su plantilla Xetux o retirarlo de `AREA_CONFIG` | PENDIENTE (bloqueante solo si se opera GENERAL) |
 | — | **Preparación reducida de COCINA** — la preparación activa expone 58 artículos y su `templateHash` es anterior a la plantilla vigente; los 58 códigos siguen existiendo y el resto permanece disponible mediante búsqueda | ACEPTADO 2026-07-30 — Pablo confirma que los 58 son correctos por ahora. Al subir plantilla fresca, refrescar la preparación sin convertirla en bloqueo duro |
 | — | **`defaultPres` vacío en 9 de los 11 almacenes con plantilla** — verificado en D1 el 2026-07-28: solo CAVA (`LT → botella .75`) y UH_COCINA lo tienen configurado. Vacíos: ALIMENTARI, BARRA, BARRA_AMICI, BARRA_RESTAURANTE, COCINA, SALUMERIA, UH_BARRA, UH_MERCH, UH_SUMINISTROS. Los demás cuentan todo en unidad base; correcto por diseño, pero conviene confirmarlo almacén por almacén antes de escalar. Ojo: subir una plantilla nueva NO pisa `default_pres` (el upsert no toca esa columna), así que un `{}` es que nunca se configuró, no que se haya borrado | PENDIENTE |
