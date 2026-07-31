@@ -19,27 +19,34 @@ ok(
 );
 
 const template = {
-  unitMap: { A1: 'LT', B2: 'KG' },
-  presMap: { A1: [{ nombre: 'BOTELLA', factor: 0.75 }] },
+  unitMap: { A1: 'LT', B2: 'KG', U1: 'LT' },
+  presMap: {
+    A1: [{ nombre: 'BOTELLA', factor: 0.75 }],
+    U1: [{ nombre: 'BOTELLA DE 1 LT', factor: 1 }],
+  },
   defaultPres: {},
 };
 const items = normalizeReceiptItems({
   counts: {
     B2: [{ n: 'BOLSA', f: 2, q: 3 }, { n: '', f: 1, q: 0.5 }],
     A1: 4,
+    U1: 3,
   },
   presChoices: { A1: 0.75 },
   catalog: {
     A1: { nombre: 'VINO TEST', unidad: 'LT' },
     B2: { nombre: 'QUESO TEST', unidad: 'KG' },
+    U1: { nombre: 'VT UNLITRO', unidad: 'LT' },
   },
   template,
 });
-ok(items.map(item => item.code).join(',') === 'A1,B2', 'artículos ordenados por código');
+ok(items.map(item => item.code).join(',') === 'A1,B2,U1', 'artículos ordenados por código');
 ok(items[0].baseQuantity === 3, 'captura simple aplica factor explícito');
 ok(items[0].presentation === 'BOTELLA', 'presentación queda congelada en el acuse');
 ok(items[1].baseQuantity === 6.5, 'desglose suma cantidad × factor');
 ok(items[1].lines.length === 2, 'desglose conserva todas sus líneas');
+ok(items[2].baseQuantity === 3, 'botella de 1 LT conserva conversión 1:1 en el acuse');
+ok(items[2].presentation === 'BOTELLA DE 1 LT', 'acuse identifica la presentación de 1 LT');
 
 const manuals = normalizeReceiptManuals([
   { id: 'm2', deviceId: 'dev-b', zona: 'Cava', nombre: 'AJENO', cantidad: 1 },

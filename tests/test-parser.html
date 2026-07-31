@@ -49,8 +49,8 @@ assert(P.presMap.MP0002?.[0]?.factor === 5, 'MP0002 KG → COSTAL 5');
 // R3: PZA factor grande es válido
 assert(P.presMap.MP0003?.[0]?.factor === 12, 'R3: PZA factor 12 (caja) válido');
 
-// R1: factor 1.0 ignorado
-assert(!P.presMap.MP0004, 'R1: factor 1.0 ignorado');
+// R1: la unidad base disfrazada de presentación se ignora
+assert(!P.presMap.MP0004, 'R1: factor 1.0 con nombre de unidad base ignorado');
 
 // R2: LT factor 1000 ignorado
 assert(!P.presMap.MP0005, 'R2: LT factor 1000 (mL) ignorado');
@@ -70,6 +70,30 @@ assert(motivos['MP0004:factor_1'], 'R6: MP0004 reportado como factor_1');
 assert(motivos['MP0005:ml_g']?.factor === 1000, 'R6: MP0005 reportado como ml_g con factor 1000');
 assert(motivos['MP0008:duplicada'], 'R6: MP0008 duplicado reportado');
 assert(!P.sospechosas.some(s => s.cod === 'MP0001'), 'R6: caso sano (MP0001) no genera sospechas');
+
+// R24: factor 1 con nombre de envase sí es una presentación útil. La excepción
+// confirmada de UNLITRO elimina del mapa de captura la relación fantasma de .750
+// sin tocar el xlsx crudo que posteriormente se devuelve a Xetux.
+const rows1L = [
+  ['#','Tipo','Grupo','Subgrupo','Código','Artículo','Unidad','Cantidad'],
+  [1,'3-VINO','3-1 VINO','VINO','MP0009','VINO BOTELLA UNO','LT',''],
+  [1,'3-VINO','3-1 VINO','','MP0009_9001','---- (P) BOTELLA DE 1 LT (1.0 LT)','BOTELLA DE 1 LT',''],
+  [2,'3-VINO','3-1 VINO','VINO','XMAT2410000317','VT UNLITRO AMELEIA','LT',''],
+  [2,'3-VINO','3-1 VINO','','XMAT2410000317_2283','---- (P) BOTELLA DE 750 ML (0.75 LT)','BOTELLA DE 750 ML',''],
+  [2,'3-VINO','3-1 VINO','','XMAT2410000317_2','---- (P) LT (1.0 LT)','LT',''],
+];
+const wb1L = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(wb1L, XLSX.utils.aoa_to_sheet(rows1L), 'Inventario');
+const P1L = parsePlantilla(XLSX.write(wb1L, { type:'array', bookType:'xlsx' }));
+assert(P1L.presMap.MP0009?.[0]?.nombre === 'BOTELLA DE 1 LT' &&
+       P1L.presMap.MP0009?.[0]?.factor === 1,
+       'R24: presentación nombrada de 1 LT se conserva');
+assert(P1L.presMap.XMAT2410000317?.length === 1 &&
+       P1L.presMap.XMAT2410000317?.[0]?.nombre === 'BOTELLA DE 1 LT' &&
+       P1L.presMap.XMAT2410000317?.[0]?.factor === 1,
+       'R24: UNLITRO usa únicamente BOTELLA DE 1 LT');
+assert(P1L.correcciones?.some(c => c.cod === 'XMAT2410000317'),
+       'R24: la corrección de Xetux queda reportada');
 
 // hashRaw: determinístico y conocido (sha256("abc") truncado a 16 hex)
 assert(await hashRaw('abc') === 'ba7816bf8f01cfea', 'hashRaw determinístico (sha256 truncado)');

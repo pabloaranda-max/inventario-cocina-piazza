@@ -1940,7 +1940,7 @@ const UNIDAD_PESO_VOLUMEN = /^(KG|K|G|GR|GRS|LT|LTS|L|ML)$/i;
 
 const MOTIVOS_R6 = {
   ml_g:            { titulo: 'Factor >10 en LT/KG — probable mL/g mal capturado en Xetux', accion: 'DESCARTADA al parsear. Corregir el factor en Xetux y re-subir la plantilla.', color: '#dc2626' },
-  factor_1:        { titulo: 'Factor 1.0 — no convierte nada', accion: 'DESCARTADA al parsear. Si el artículo sí necesita presentación, corregir en Xetux.', color: '#d97706' },
+  factor_1:        { titulo: 'Factor 1.0 con nombre de unidad base', accion: 'DESCARTADA porque solo repite LT/KG/PZA. Una presentación nombrada, por ejemplo BOTELLA DE 1 LT, sí se conserva.', color: '#d97706' },
   factor_ilegible: { titulo: 'Sin factor legible en el nombre', accion: 'DESCARTADA al parsear. El nombre del artículo presentación no trae "(0.75 LT)".', color: '#d97706' },
   nombre_ambiguo:  { titulo: 'Mismo nombre con factores distintos', accion: 'CONSERVADAS ambas — el operario ve dos opciones iguales de nombre. Unificar en Xetux.', color: '#d97706' },
   duplicada:       { titulo: 'Presentación repetida (mismo factor)', accion: 'Se usa una sola. Limpieza cosmética en Xetux, sin urgencia.', color: '#6b7280' },
@@ -1954,6 +1954,7 @@ function renderRevisionPresentaciones(d) {
   try { P = parsePlantilla(b64ToArrayBuffer(d.raw)); } catch(e) { return; }
   const nombres = itemsFromRaw(d.raw, d);
   const nom = cod => nombres[cod]?.nombre || cod;
+  const correcciones = P.correcciones || [];
 
   const grupos = {};
   for (const s of (P.sospechosas || [])) (grupos[s.motivo] = grupos[s.motivo] || []).push(s);
@@ -1962,12 +1963,21 @@ function renderRevisionPresentaciones(d) {
     !((d.defaultPres || {})[P.unitMap[cod]]?.length));
 
   const total = (P.sospechosas || []).length + sinPres.length;
+  let html = '';
+  if (correcciones.length) {
+    html += `<details open style="border:1px solid #86efac;border-radius:10px;background:#f0fdf4;margin-bottom:8px">
+      <summary style="padding:10px 12px;cursor:pointer;font-size:13px;font-weight:700;color:#166534">Correcciones operativas aplicadas (${correcciones.length})</summary>
+      <div style="padding:0 12px 12px">
+        ${correcciones.map(c => `<div style="font-size:12px;color:#14532d;padding:3px 0"><strong>${esc(c.cod)} · ${esc(nom(c.cod))}</strong> — ${esc(c.detalle || c.nombre)}</div>`).join('')}
+      </div>
+    </details>`;
+  }
   if (!total) {
-    cont.innerHTML = `<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px;font-size:13px;color:#166534">✓ Revisión de presentaciones: sin hallazgos.</div>`;
+    cont.innerHTML = html || `<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px;font-size:13px;color:#166534">✓ Revisión de presentaciones: sin hallazgos.</div>`;
     return;
   }
 
-  let html = `<details style="border:1px solid #fcd34d;border-radius:10px;background:#fffbeb">
+  html += `<details style="border:1px solid #fcd34d;border-radius:10px;background:#fffbeb">
     <summary style="padding:10px 12px;cursor:pointer;font-size:13px;font-weight:700;color:#92400e">Revisión de presentaciones: ${total} hallazgo${total !== 1 ? 's' : ''} — requieren decisión humana, nada se corrige solo</summary>
     <div style="padding:4px 12px 12px">`;
   for (const [motivo, lista] of Object.entries(grupos)) {
@@ -2660,8 +2670,9 @@ document.addEventListener('DOMContentLoaded', () => {
 <script type="module">
 // R12: el ?v= amarra el módulo a esta versión del HTML — sin él, un admin.html
 // fresco puede correr con un módulo viejo de caché (o al revés), que fue
-// exactamente el incidente #NUM! de 2026-07-23. Bump junto con APP_VERSION.
-import { parsePlantilla, hashRaw } from './js/plantilla-parser.js?v=2';
+// exactamente el incidente #NUM! de 2026-07-23. `r24` invalida solo el parser;
+// el contrato de escritura con el Worker permanece en APP_VERSION 2.
+import { parsePlantilla, hashRaw } from './js/plantilla-parser.js?v=2-r24';
 import { factorDefault, calcularTotalesSesion, cantidadBase, lineasDesglose } from './js/sesion-merge.js?v=2';
 window.parsePlantilla = parsePlantilla;
 window.hashRaw = hashRaw;

@@ -14,11 +14,12 @@ WORKER = "https://operaciones-api.pablo-aranda.workers.dev"
 
 PLANTILLA = {
     "ok": True, "found": True,
-    "rowMap": {"V1": 10, "V2": 11, "D1": 12},
+    "rowMap": {"V1": 10, "V2": 11, "D1": 12, "U1": 13},
     "cantidadColIdx": 7,
     "presMap": {"V1": [{"nombre": "BOTELLA", "factor": 0.75},
-                        {"nombre": "MAGNUM", "factor": 1.5}]},
-    "unitMap": {"V1": "LT", "V2": "LT", "D1": "KG"},
+                        {"nombre": "MAGNUM", "factor": 1.5}],
+                "U1": [{"nombre": "BOTELLA DE 1 LT", "factor": 1}]},
+    "unitMap": {"V1": "LT", "V2": "LT", "D1": "KG", "U1": "LT"},
     "defaultPres": {"LT": [{"nombre": "BOTELLA 0.75", "factor": 0.75}]},
     "templateHash": "smokehash", "raw": None,
 }
@@ -26,6 +27,7 @@ ARTICULOS = {"articulos": [
     {"codigo": "V1", "nombre": "VINO TESTO", "unidad": "LT", "grupo": "VINOS"},
     {"codigo": "V2", "nombre": "VINO SEGUNDO", "unidad": "LT", "grupo": "VINOS"},
     {"codigo": "D1", "nombre": "QUESO DIRECTO", "unidad": "KG", "grupo": "QUESOS"},
+    {"codigo": "U1", "nombre": "VT UNLITRO", "unidad": "LT", "grupo": "VINOS"},
 ]}
 
 passed = 0
@@ -124,11 +126,20 @@ try:
         v2 = page.evaluate("Object.values(S.countsByZone)[0]['V2']")
         ok(v2 == 4, f"V2 legacy sigue siendo número ({v2})")
 
+        # --- R24: presentación explícita de factor 1 cuenta botellas 1:1,
+        # sin caer al default de 0.75 del almacén.
+        page.fill('input.qty-input[data-cod="U1"]:not(.desg-input)', "3")
+        page.wait_for_timeout(100)
+        u1 = page.evaluate("Object.values(S.countsByZone)[0]['U1']")
+        ok(u1 == 3, f"U1 conserva el conteo simple como número ({u1})")
+        ok(page.locator('[id^="ltb_"][id$="_U1"]').inner_text() == "3 LT",
+           "BOTELLA DE 1 LT: 3 botellas → 3 LT, no 2.25 LT")
+
         # --- validación: totales polimórficos + conteo de desglosados
         page.evaluate("go('generate')")
         page.wait_for_timeout(100)
         vtxt = page.locator("#validation-out").inner_text()
-        ok("2 artículos con cantidad" in vtxt, "validación: 2 artículos con cantidad")
+        ok("3 artículos con cantidad" in vtxt, "validación: 3 artículos con cantidad")
         ok("1 con desglose" in vtxt, "validación: 1 con desglose")
 
         # --- persistencia: reload → continuar toma → fila V1 sigue desglosada
