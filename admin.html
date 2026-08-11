@@ -364,6 +364,37 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
   </div>
 </div>
 
+<!-- MODAL: con qué plantilla se exporta.
+     Elegir plantilla no cabe en un confirm(): un aceptar/cancelar para dos
+     caminos distintos se acepta sin leer, y de aquí sale el archivo a Xetux. -->
+<div id="modal-plantilla-export" class="modal-notas-overlay">
+  <div class="modal-notas-box" style="max-width:540px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <h2 style="font-size:17px;" id="plx-titulo">¿Con qué plantilla exportas?</h2>
+      <button onclick="cerrarModalPlantillaExport()" style="background:#e2e8f0;color:#333;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:bold;">Cancelar</button>
+    </div>
+    <div id="plx-sub" style="font-size:13px;color:#6b7280;margin-bottom:14px;line-height:1.5"></div>
+
+    <button onclick="plxElegir('fresca')" style="width:100%;text-align:left;background:#ecfdf5;border:1px solid #86efac;border-radius:10px;padding:12px 14px;margin-bottom:10px;cursor:pointer">
+      <div style="font-size:14px;font-weight:800;color:#166534">Subir la plantilla fresca de Xetux</div>
+      <div style="font-size:12px;color:#4b5563;margin-top:3px;line-height:1.45">
+        La que Xetux acaba de exportar al crear la toma. Es lo normal al cerrar:
+        el archivo lleva el consecutivo de esa toma y si no coincide, Xetux lo rechaza.
+      </div>
+    </button>
+
+    <button onclick="plxElegir('guardada')" style="width:100%;text-align:left;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;cursor:pointer">
+      <div style="font-size:14px;font-weight:800;color:#1e40af">Usar la plantilla guardada</div>
+      <div style="font-size:12px;color:#4b5563;margin-top:3px;line-height:1.45">
+        La que ya está cargada para este almacén.
+      </div>
+      <div style="font-size:11px;color:#475569;margin-top:6px">
+        Archivo: <code id="plx-nombre" style="background:#f1f5f9;border-radius:4px;padding:1px 5px;word-break:break-all"></code>
+      </div>
+    </button>
+  </div>
+</div>
+
 <!-- MODAL DETALLE SESIÓN D1 -->
 <div id="modal-detalle-sesion" class="modal-notas-overlay">
   <div class="modal-notas-box modal-detalle-box">
@@ -900,10 +931,7 @@ function renderSesionesInventario() {
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button class="btn-notas" onclick="verDetalleSesion('${a}','${f}')">${ic('search',13)} Explorar</button>
           <button class="btn-notas" onclick="imprimirSesion('${a}','${f}')">${ic('printer',13)} PDF</button>
-          <button class="btn-pdf-card" onclick="cerrarConPlantillaFresca('${a}','${f}')">${ic('file-spreadsheet',13)} ${c.exportados ? 'Rehacer con plantilla fresca' : 'Cerrar con plantilla fresca'}</button>
-          <button class="btn-notas" onclick="exportarSesionInventario('${a}','${f}',false)">${ic('download',13)} Generar XLSX y enviar</button>
-          ${c.exportados ? `<button class="btn-notas" onclick="verArchivoDeToma('${a}','${f}')">${ic('file-spreadsheet',13)} Nombre del archivo</button>` : ''}
-          ${c.exportados ? `<button class="btn-notas" onclick="exportarSesionInventario('${a}','${f}',true)">${ic('upload',13)} Re-exportar</button>` : ''}
+          <button class="btn-pdf-card" onclick="abrirModalPlantillaExport('${a}','${f}')">${ic('download',13)} ${c.exportados ? 'Re-exportar' : 'Exportar'}</button>
           <button class="btn-borrar" onclick="borrarSesionInventario('${a}','${f}')">${ic('trash-2',13)} Borrar ${c.tramos.length > 1 ? 'conteo' : 'sesión'}</button>
         </div>
       </div>
@@ -1060,15 +1088,16 @@ async function verDetalleSesion(almacen, fecha) {
     const manualesReales = manuales.filter(m => m.type !== 'comment');
     const manualRows = manualesReales.map(m => {
       const id = esc(m.id || '');
+      const fechaOrigen = esc(m._fechaOrigen || fecha);
       return `<tr id="mrow-${id}">
         <td>${esc(m.zona || '—')}</td>
         <td class="mrow-nombre">${esc(m.nombre || '—')}</td>
         <td class="mrow-cantidad" style="text-align:right">${esc(m.cantidad ?? '—')}</td>
         <td class="mrow-uni">${esc(m.uni || m.unidad || '')}</td>
         <td style="white-space:nowrap">
-          <button onclick="editarManual('${esc(almacen)}','${esc(fecha)}',${JSON.stringify(m).replace(/"/g,'&quot;')})"
+          <button onclick="editarManual('${esc(almacen)}','${fechaOrigen}',${JSON.stringify(m).replace(/"/g,'&quot;')})"
             style="background:#dbeafe;color:#1d4ed8;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:bold;margin-right:4px">Editar</button>
-          <button onclick="borrarManual('${esc(almacen)}','${esc(fecha)}','${id}')"
+          <button onclick="borrarManual('${esc(almacen)}','${fechaOrigen}','${id}')"
             style="background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:bold">Borrar</button>
         </td>
       </tr>`;
@@ -1139,9 +1168,14 @@ async function verDetalleSesion(almacen, fecha) {
         <div class="detalle-stat"><div class="detalle-stat-num">${receipts.length}</div><div class="detalle-stat-label">Acuses auditables</div></div>
       </div>
       <div style="background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:12px">
-        <strong>${esc(almacen)}</strong> · ${esc(fecha)} · Operario sesión: ${esc(S.operario || '—')}<br>
+        <strong>${esc(almacen)}</strong> · ${esc(tramosDetalle.map(fechaConteoLegible).join(' y '))} · Operario sesión: ${esc(S.operario || '—')}<br>
         ${opsResumen ? `Capturaron: ${opsResumen} artículos<br>` : ''}
         Actualizada: ${updated} · Exportada: ${esc(exported)}${S.exportedBy ? ` por ${esc(S.exportedBy)}` : ''}
+        <div style="margin-top:6px;font-size:12px;color:#475569">
+          Archivo Xetux: <code id="detalle-archivo-xetux" style="background:#f1f5f9;border-radius:4px;padding:1px 5px;word-break:break-all">${esc(template.originalFilename || 'sin nombre de Xetux (plantilla pre-v4.7)')}</code>
+          ${template.originalFilename ? `<button onclick="copiarNombreArchivoDetalle()" style="background:#e2e8f0;color:#334155;border:none;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px">Copiar</button>` : ''}
+          <span id="detalle-archivo-copiado" style="color:#16a34a;margin-left:4px"></span>
+        </div>
       </div>
       ${receiptsHtml}
       <input id="detalle-search" type="text" placeholder="Buscar código o artículo…"
@@ -1297,7 +1331,9 @@ async function editarManual(almacen, fecha, m) {
   const uni      = prompt('Unidad:', m.uni || m.unidad || '');
   if (uni === null) return;
   try {
-    const updated = { ...m, nombre, cantidad, uni, unidad: uni };
+    // `_fechaOrigen` sólo enruta el modal unido; no se persiste en D1.
+    const { _fechaOrigen, ...manualPersistible } = m;
+    const updated = { ...manualPersistible, nombre, cantidad, uni, unidad: uni };
     const r = await fetch(WORKER_URL + '/inv/sesion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'inv_sesion', appVersion: APP_VERSION, almacen, fecha, operario: adminActual,
@@ -1530,6 +1566,74 @@ function cerrarModalArchivo() {
   _archivoXetux = null;
 }
 
+// ── Exportar: elegir plantilla ─────────────────────────────
+// Antes eran dos botones en la tarjeta ("Cerrar con plantilla fresca" y
+// "Generar XLSX y enviar"). Son el mismo trámite con distinta plantilla, así que
+// ahora hay un solo botón que pregunta. El nombre del archivo Xetux se enseña
+// aquí, que es cuando de verdad hace falta.
+let _plxDestino = null;   // { almacen, fecha }
+
+async function abrirModalPlantillaExport(almacen, fecha) {
+  const tramos = fechasDeTomaDeAlmacen(almacen, fecha);
+  const yaExportado = sesionesInventario
+    .some(s => s.almacen === almacen && tramos.includes(s.fecha) && s.exportedAt);
+  // El botón ya dice "Re-exportar": la intención está expresada, así que no se
+  // vuelve a preguntar "¿ya fue exportada, re-exportar de todos modos?". La
+  // confirmación de cobertura (cuántos van en CERO) sí sale siempre.
+  _plxDestino = { almacen, fecha, force: yaExportado };
+  document.getElementById('plx-titulo').textContent =
+    yaExportado ? '¿Con qué plantilla re-exportas?' : '¿Con qué plantilla exportas?';
+  document.getElementById('plx-sub').innerHTML =
+    `${esc(tituloAlmacen(almacen))} · ${esc(tramos.map(fechaConteoLegible).join(' y '))}` +
+    (tramos.length > 1 ? `<br>Los ${tramos.length} tramos salen en un solo archivo.` : '');
+  const nombreEl = document.getElementById('plx-nombre');
+  nombreEl.textContent = 'consultando…';
+  document.getElementById('modal-plantilla-export').style.display = 'block';
+
+  const btnGuardada = document.querySelector('[onclick="plxElegir(\'guardada\')"]');
+  btnGuardada.disabled = false;
+  btnGuardada.style.opacity = '1';
+  try {
+    const r = await fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen));
+    const d = await r.json();
+    if (!d.ok || !d.found || !d.raw) throw new Error('sin plantilla');
+    nombreEl.textContent = d.originalFilename || '(plantilla sin nombre de Xetux)';
+  } catch (_) {
+    // Sin plantilla guardada, exportar con ella fallaría más adelante: mejor
+    // cerrar esa puerta aquí que dejar que reviente a medio camino.
+    nombreEl.textContent = 'no hay plantilla guardada para este almacén';
+    btnGuardada.disabled = true;
+    btnGuardada.style.opacity = '.5';
+  }
+}
+
+function cerrarModalPlantillaExport() {
+  document.getElementById('modal-plantilla-export').style.display = 'none';
+  _plxDestino = null;
+}
+
+function plxElegir(cual) {
+  const destino = _plxDestino;
+  if (!destino) return;
+  cerrarModalPlantillaExport();
+  // La ruta "fresca" ya exporta con force (sube plantilla y cierra en un paso).
+  if (cual === 'fresca') cerrarConPlantillaFresca(destino.almacen, destino.fecha);
+  else exportarSesionInventario(destino.almacen, destino.fecha, destino.force);
+}
+
+// Mismo dato que el modal de archivo, dentro de Explorar: sustituye al botón
+// "Nombre del archivo" que colgaba de la tarjeta.
+async function copiarNombreArchivoDetalle() {
+  const el = document.getElementById('detalle-archivo-copiado');
+  const nombre = document.getElementById('detalle-archivo-xetux')?.textContent || '';
+  try {
+    await navigator.clipboard.writeText(nombre);
+    el.style.color = '#16a34a'; el.textContent = 'Copiado.';
+  } catch(e) {
+    el.style.color = '#dc2626'; el.textContent = 'Cópialo a mano.';
+  }
+}
+
 async function copiarNombreArchivo() {
   const el = document.getElementById('archivo-copiado');
   try {
@@ -1580,22 +1684,9 @@ async function guardarArchivoXetux() {
   msg.textContent = 'Descargado a tu carpeta de descargas. Si ya existía uno igual, borra el viejo: este bajó como "(1)" y Xetux lo rechaza.';
 }
 
-// Nombre del archivo de una toma ya exportada, para no confundirse entre los
-// XTINVxxxxxx que se acumulan en la carpeta. Se pide la plantilla al vuelo.
-async function verArchivoDeToma(almacen, fecha) {
-  try {
-    const r = await fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen));
-    const d = await r.json();
-    if (!d.ok || !d.found) throw new Error('Sin plantilla en el servidor');
-    if (!d.originalFilename) throw new Error('Esta plantilla se subió sin nombre de Xetux (pre-v4.7). Vuelve a subirla desde el tab Plantillas.');
-    abrirModalArchivo({
-      fname: d.originalFilename, bytes: null, almacen, fecha,
-      extraHtml: 'Este es el nombre de la plantilla vigente del almacén. Si vas a re-importar, usa el archivo que bajaste con ese nombre exacto.'
-    });
-  } catch(e) {
-    alert('No se pudo obtener el nombre del archivo: ' + e.message);
-  }
-}
+// El nombre del archivo XTINVxxxxxx ya no tiene botón propio en la tarjeta:
+// se ve en el modal de exportar y en la cabecera de Explorar, que son los dos
+// momentos en que hace falta. Ver abrirModalPlantillaExport y verDetalleSesion.
 
 async function marcarExportacion(almacen, fecha, force) {
   const r = await fetch(WORKER_URL + '/inv/sesion', {
@@ -1850,12 +1941,15 @@ async function exportarSesionInventario(almacen, fecha, force, opts) {
         catalogado: true, corregido: false, observacion: observacionDe(cod)
       });
     }
-    const manuales = (S.manuales || []).filter(m => m.type !== 'comment').map(m => ({
-      ...m,
-      unidad: m.unidad || m.uni || '',
-      descripcion: m.descripcion || m.zona || '',
-      foto_base64: m.foto_base64 || m.foto || null
-    }));
+    const manuales = (S.manuales || []).filter(m => m.type !== 'comment').map(m => {
+      const { _fechaOrigen, ...manualPersistible } = m;
+      return {
+        ...manualPersistible,
+        unidad: m.unidad || m.uni || '',
+        descripcion: m.descripcion || m.zona || '',
+        foto_base64: m.foto_base64 || m.foto || null
+      };
+    });
 
     const { bytes, fname } = construirXlsxInventario(almacen, fechaCierre, T, totales);
 
@@ -1997,7 +2091,10 @@ async function cargarDatosPDFSesion(almacen, fechas) {
       tramos: sesiones.map(s => `${fechaConteoLegible(s.fecha)} (${s.operario || '—'})`),
       operario: datos.operarios.join(', ') || unida.operario || '',
       exportedAt: unida.exportedAt,
-      exportedBy: unida.exportedBy
+      exportedBy: unida.exportedBy,
+      tramosExportados: unida.tramosExportados,
+      totalTramos: unida.tramos.length,
+      xlsxCompleto: unida.xlsxCompleto
     },
     items: datos.items,
     corrs: datos.correcciones,
@@ -2301,7 +2398,7 @@ function dibujarResumenVectorPDFAdmin(pdf, secciones, y, tituloContinuacion) {
     capturaron: seccion.toma.operario || '—',
     renglones: seccion.items.length,
     correcciones: (seccion.corrs || []).length,
-    estado: seccion.toma.exportedAt ? 'XLSX generado' : 'Sin XLSX (incluida)'
+    estado: estadoXlsxPDFAdmin(seccion.toma).resumen
   }));
   return dibujarTablaVectorPDFAdmin(pdf, { columnas, filas, y, tituloContinuacion });
 }
@@ -2328,20 +2425,50 @@ function fechasTomaPDFAdmin(toma) {
   return fechas.length ? fechas : [toma?.fecha].filter(Boolean);
 }
 
+function estadoXlsxPDFAdmin(toma) {
+  const totalDeclarado = Number(toma?.totalTramos);
+  const total = Number.isFinite(totalDeclarado) && totalDeclarado > 0
+    ? totalDeclarado
+    : Math.max((toma?.tramos || []).length, 1);
+  const exportadosDeclarados = Number(toma?.tramosExportados);
+  const exportados = Number.isFinite(exportadosDeclarados)
+    ? Math.max(0, Math.min(total, exportadosDeclarados))
+    : (toma?.exportedAt ? total : 0);
+  const completo = typeof toma?.xlsxCompleto === 'boolean'
+    ? toma.xlsxCompleto
+    : exportados === total;
+  const quien = toma?.exportedBy ? String(toma.exportedBy) : '';
+  if (!exportados) {
+    return { total, exportados, completo: false, resumen: 'Sin XLSX (incluida)', detalle: 'XLSX aún no generado' };
+  }
+  if (completo) {
+    return {
+      total, exportados, completo: true, resumen: 'XLSX generado',
+      detalle: `XLSX generado${quien ? ` por ${quien}` : ''}`
+    };
+  }
+  return {
+    total, exportados, completo: false,
+    resumen: `XLSX parcial (${exportados}/${total})`,
+    detalle: `XLSX parcial: ${exportados} de ${total} tramos${quien ? ` · último marcado por ${quien}` : ''}`
+  };
+}
+
 function dibujarMetaAlmacenVectorPDFAdmin(pdf, seccion, y) {
   const { toma, items, corrs, notaGeneral } = seccion;
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(7.5);
   pdf.setTextColor(75, 85, 99);
   const fechas = fechasTomaPDFAdmin(toma);
+  const estadoXlsx = estadoXlsxPDFAdmin(toma);
   const meta = [
     `Almacén: ${toma.almacen_nombre} | Fecha: ${fechas.map(fechaConteoLegible).join(' y ')} | Renglones: ${items.length} | Correcciones: ${(corrs || []).length}`,
-    `Capturaron: ${toma.operario || '—'}${toma.exportedBy ? ` | XLSX generado por: ${toma.exportedBy}` : ' | XLSX aún no generado'}`
+    `Capturaron: ${toma.operario || '—'} | ${estadoXlsx.detalle}`
   ];
-  // El cambio de día parte la captura en dos filas de D1; el PDF las une y hay
-  // que decirlo, o el total no cuadra contra ninguna fila suelta.
+  // Una captura puede distribuirse entre dos fechas operativas; el PDF las une
+  // y lo dice sin afirmar que ocurrió justo al cruzar la medianoche.
   if ((toma.tramos || []).length > 1) {
-    meta.push(`Toma unida: el cambio de día la partió en ${toma.tramos.length} tramos — ${toma.tramos.join(' · ')}. Cada zona se suma una sola vez.`);
+    meta.push(`Toma unida: captura distribuida en ${toma.tramos.length} fechas — ${toma.tramos.join(' · ')}. Los tramos se consolidan en el total conjunto.`);
   }
   for (const linea of meta) {
     const lineas = lineasTextoPDFAdmin(pdf, linea, PDF_ADMIN_LAYOUT.anchoContenido);
@@ -2372,7 +2499,7 @@ function dibujarDocumentoGeneralPDFAdmin(pdf, documento) {
   const { centro, fecha, secciones } = documento;
   const operarios = [...new Set(secciones.flatMap(s => s.operarios || []))];
   const totalRenglones = secciones.reduce((n, s) => n + s.items.length, 0);
-  const sinXlsx = secciones.filter(s => !s.toma.exportedAt).length;
+  const sinXlsxCompleto = secciones.filter(s => !estadoXlsxPDFAdmin(s.toma).completo).length;
   const fechasConteo = [...new Set(secciones.flatMap(s => fechasTomaPDFAdmin(s.toma)))].sort();
   const rangoConteo = fechasConteo.length > 1
     ? `${fechaConteoLegible(fechasConteo[0])} a ${fechaConteoLegible(fechasConteo[fechasConteo.length - 1])}`
@@ -2384,9 +2511,9 @@ function dibujarDocumentoGeneralPDFAdmin(pdf, documento) {
       `Almacenes: ${secciones.length} | Renglones: ${totalRenglones} | Personas que capturaron: ${operarios.length}`,
       `Revisado por: ${documento.revisadoPor || '—'} | Generado: ${documento.generadoEn}`
     ]);
-  if (sinXlsx) {
+  if (sinXlsxCompleto) {
     y = dibujarAvisoPDFAdmin(pdf,
-      `${sinXlsx} toma${sinXlsx !== 1 ? 's' : ''} todavía no ${sinXlsx !== 1 ? 'tienen' : 'tiene'} XLSX. Se ${sinXlsx !== 1 ? 'incluyen' : 'incluye'} de todas formas con el conteo guardado hasta este momento.`,
+      `${sinXlsxCompleto} toma${sinXlsxCompleto !== 1 ? 's' : ''} todavía no ${sinXlsxCompleto !== 1 ? 'tienen' : 'tiene'} el XLSX completo. Se ${sinXlsxCompleto !== 1 ? 'incluyen' : 'incluye'} de todas formas con el conteo guardado hasta este momento.`,
       y, 'aviso');
   }
   y = dibujarResumenVectorPDFAdmin(pdf, secciones, y, 'Resumen de almacenes - continuación');
@@ -3349,7 +3476,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // el contrato de escritura con el Worker permanece en APP_VERSION 2.
 import { parsePlantilla, hashRaw } from './js/plantilla-parser.js?v=2-r24';
 import { factorDefault, calcularTotalesSesion, cantidadBase, lineasDesglose } from './js/sesion-merge.js?v=2';
-import { construirDatosPDFSesion, unirSesionesDeAlmacen } from './js/admin-pdf.js?v=2';
+import { construirDatosPDFSesion, unirSesionesDeAlmacen } from './js/admin-pdf.js?v=2-r1';
 window.parsePlantilla = parsePlantilla;
 window.hashRaw = hashRaw;
 window.factorDefault = factorDefault;

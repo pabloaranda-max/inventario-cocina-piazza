@@ -178,7 +178,7 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
       <label>Fecha</label>
       <input type="date" id="inp-fecha">
     </div>
-    <button class="btn btn-primary" style="margin-top:8px" onclick="startSession()">Iniciar →</button>
+    <button class="btn btn-primary" id="btn-iniciar-toma" style="margin-top:8px" onclick="startSession()">Iniciar →</button>
   </div>
 </div>
 
@@ -438,7 +438,11 @@ let ZCFG    = null;   // preparación activa del Worker (inv_zone_configs) o nul
 let T       = null;   // plantilla { rowMap, cantidadColIdx, presMap, templateHash, templateTs }
 let S       = null;   // sesión activa
 let CZ      = null;   // índice de zona en curso
-let _remoteSes      = null;
+// Sesión del servidor para MI misma toma: solo se usa para confirmar mis acuses.
+// Nunca reemplaza la sesión local — ver fetchResumenTomasWorker().
+let _sesionServidor = null;
+// Resumen de tomas del almacén, solo para avisar. No trae conteos.
+let _tomasAlmacen   = [];
 let _syncTimer      = null;
 let _pollTimer      = null;
 let _supervisorActual = JSON.parse(localStorage.getItem('inv_supervisor') || 'null');
@@ -577,20 +581,22 @@ async function fetchSesionWorker(fecha) {
   } catch(e) { console.warn('sesion fetch:', e); return null; }
 }
 
-// Busca la toma abierta (no exportada) más reciente del almacén, aunque sea de un
-// día anterior. inv_sesiones tiene PK (almacen, fecha): si esto no se ofrece, un
-// dispositivo nuevo al día siguiente arranca sesión vacía y fragmenta el conteo.
-async function fetchSesionAbiertaWorker(dias = 7) {
+// Resumen de las tomas recientes del almacén, SOLO PARA INFORMAR. Antes esto
+// buscaba la toma abierta más reciente y ofrecía adoptarla; adoptar reemplazaba
+// la sesión local y arrastraba zoneSnapshot y candados ajenos, y dio problemas.
+// Regla vigente: cada equipo abre su propia toma y el admin decide qué es un
+// solo conteo (une los tramos de días contiguos al imprimir y al exportar).
+// Devuelve las filas del listado, no sesiones completas: para un aviso basta.
+async function fetchResumenTomasWorker(dias = 7) {
   try {
     const r = await fetch(WORKER_URL + '/inv/sesiones?almacen=' + ALMACEN + '&dias=' + dias);
-    if (!r.ok) return null;
+    if (!r.ok) return [];
     const d = await r.json();
-    if (!d.ok) return null;
-    const abiertas = (d.sesiones || []).filter(s => !s.exportedAt && s.articulosContados > 0);
-    if (!abiertas.length) return null;
-    abiertas.sort((a, b) => b.fecha.localeCompare(a.fecha));
-    return await fetchSesionWorker(abiertas[0].fecha);
-  } catch(e) { console.warn('sesiones fetch:', e); return null; }
+    if (!d.ok) return [];
+    return (d.sesiones || [])
+      .filter(s => s.almacen === ALMACEN && (s.articulosContados || 0) > 0)
+      .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  } catch(e) { console.warn('sesiones fetch:', e); return []; }
 }
 
 // Un POST fallido (red caída, 5xx, conflicto de escritura) se descartaba en
@@ -958,11 +964,18 @@ async function selectArea(key) {
   }
   if (ALMACEN !== savedKey) return;
 
-  // Con sesión local: sincronizar contra su misma fecha. Sin sesión local: ofrecer
-  // la toma abierta más reciente del Worker (puede ser de un día anterior).
-  _remoteSes = S?.fecha ? await fetchSesionWorker(S.fecha) : await fetchSesionAbiertaWorker();
+  // Con sesión local se lee la MISMA toma (misma fecha) solo para recuperar mis
+  // acuses; sin sesión local se pide el resumen del almacén solo para avisar.
+  // En ningún caso se carga el conteo del servidor sobre la sesión local.
+  if (S?.fecha) {
+    _sesionServidor = await fetchSesionWorker(S.fecha);
+    _tomasAlmacen = [];
+  } else {
+    _sesionServidor = null;
+    _tomasAlmacen = await fetchResumenTomasWorker();
+  }
   if (ALMACEN !== savedKey) return;
-  if (S && _remoteSes?.receipts?.length) mergeServerReceipts(_remoteSes.receipts);
+  if (S && _sesionServidor?.receipts?.length) mergeServerReceipts(_sesionServidor.receipts);
 
   renderAreaWelcome();
 }
@@ -1068,14 +1081,9 @@ function renderAreaWelcome() {
 
   if (S && S.fecha) {
     const counted = countedCodCount(S);
-    const remoteCount = countedCodCount(_remoteSes);
-    const remotePrompt = _remoteSes && _remoteSes.fecha === S.fecha && remoteCount > counted
-      ? `<div class="alert alert-warn" style="margin-top:8px">
-          <div class="alert-title">${ic('refresh-cw',15)} Hay una toma con más conteos en servidor</div>
-          Servidor: ${remoteCount} artículos · Este dispositivo: ${counted}
-          <div style="margin-top:8px"><button class="btn btn-primary btn-sm" style="width:auto;display:inline-block" onclick="loadRemoteSesion()">Cargar toma del servidor</button></div>
-        </div>`
-      : '';
+    // Este dispositivo muestra SU conteo. Lo que capturaron otros equipos en la
+    // misma toma vive en el servidor y se une allá; cargarlo aquí reemplazaría
+    // la sesión local, que es justo lo que ya no se hace.
     const done    = new Set((S.completedZones||[]).map(k => baseZone(k))).size;
     const warnHash = T.templateHash && S.templateHash && T.templateHash !== S.templateHash
       ? `<div class="alert alert-warn" style="margin-top:8px"><div class="alert-title">${ic('triangle-alert',15)} La plantilla cambió desde que inició esta toma</div>Los factores de conversión pueden haber cambiado.</div>` : '';
@@ -1083,44 +1091,44 @@ function renderAreaWelcome() {
       <div style="font-weight:700;margin-bottom:2px">Toma del ${S.fecha}</div>
       <div style="font-size:13px;color:#888">${S.operario} · ${done}/${ZONAS.length} zonas · ${counted} artículos contados</div>
       ${warnHash}
-      ${remotePrompt}
       <div class="row">
         <button class="btn btn-primary" style="flex:2" onclick="go('overview')">Continuar →</button>
         <button class="btn btn-gray btn-sm" style="flex:1" onclick="confirmNewSession()">Nueva</button>
       </div></div>`;
   } else {
-    let remoteCard = '';
-    if (_remoteSes) {
-      const rc = Object.values(_remoteSes.countsByZone||{}).reduce((a,z)=>a+Object.keys(z).length,0);
-      const hoy = fechaOperativaCDMX();
-      const otroDia = _remoteSes.fecha !== hoy
-        ? `<div style="font-size:12px;color:#b45309;margin-bottom:8px">${ic('triangle-alert',13)} Iniciada otro día y sin cerrar. Continúala para que el conteo no se fragmente en dos sesiones.</div>`
-        : '';
-      remoteCard = `<div class="card" style="border-left:4px solid #f59e0b;margin-bottom:16px">
-        <div style="font-weight:700;margin-bottom:2px">${ic('refresh-cw',15)} Toma abierta del ${esc(_remoteSes.fecha)}</div>
-        <div style="font-size:13px;color:#888;margin-bottom:8px">${esc(_remoteSes.operario)} · ${rc} artículos contados</div>
-        ${otroDia}
-        <div class="row">
-          <button class="btn btn-primary" style="flex:2" onclick="loadRemoteSesion()">Continuar esta toma →</button>
-          <button class="btn btn-gray btn-sm" style="flex:1" onclick="_remoteSes=null;renderAreaWelcome()">Ignorar</button>
-        </div></div>`;
-    }
-    html += remoteCard +
+    html += avisoTomasDelAlmacen() +
       `<button class="btn btn-primary" onclick="go('session')">Iniciar nueva toma →</button>`;
   }
   body.innerHTML = html;
 }
 
-function loadRemoteSesion() {
-  if (S && countedCodCount(S) > 0 && !confirm('Esto reemplazará la sesión local de este dispositivo con la toma del servidor. ¿Continuar?')) return;
-  _remoteLockedZones = _remoteSes.lockedZones || {};
-  S = normalizeSesion(_remoteSes);
-  S.receipts = (S.receipts || []).filter(receipt => receipt.deviceId === getDeviceId());
-  _remoteSes = null;
-  // La toma remota trae su propio snapshot de zonas: usarlo tal cual
-  if (S.zoneSnapshot?.length) ZONAS = S.zoneSnapshot;
-  lsSet('s', S);
-  go('overview');
+// Informa, no ofrece. Este equipo abre siempre su propia toma; saber que alguien
+// más ya está contando el almacén evita que dos personas crean que llevan tomas
+// separadas el mismo día, sin darles un botón que reemplace su captura.
+function avisoTomasDelAlmacen() {
+  if (!_tomasAlmacen.length) return '';
+  const hoy = fechaOperativaCDMX();
+  const deHoy = _tomasAlmacen.find(s => s.fecha === hoy);
+  const previa = _tomasAlmacen.find(s => s.fecha !== hoy && !s.exportedAt);
+  let html = '';
+  if (deHoy) {
+    const quienes = (deHoy.operarios && deHoy.operarios.length)
+      ? deHoy.operarios.join(' · ') : (deHoy.operario || '—');
+    // Mismo (almacén, fecha) = misma fila en D1, y cada equipo escribe su propia
+    // rebanada `zonaIdx:dispositivo`: los conteos se suman, no se pisan.
+    html += `<div class="card" style="border-left:4px solid #0ea5e9;margin-bottom:12px">
+      <div style="font-weight:700;margin-bottom:2px">${ic('store',15)} Ya hay una toma de hoy en este almacén</div>
+      <div style="font-size:13px;color:#888">${esc(quienes)} · ${deHoy.articulosContados || 0} artículos contados</div>
+      <div style="font-size:12px;color:#0369a1;margin-top:6px">Tu conteo se suma al de ellos por zona. Toma zonas distintas para no contar lo mismo dos veces.</div>
+    </div>`;
+  }
+  if (previa) {
+    html += `<div class="card" style="border-left:4px solid #f59e0b;margin-bottom:12px">
+      <div style="font-weight:700;margin-bottom:2px">${ic('triangle-alert',15)} Hay una toma sin cerrar del ${esc(previa.fecha)}</div>
+      <div style="font-size:12px;color:#b45309;margin-top:4px">No la retomas desde aquí: cuenta normal y el admin la unirá con la de hoy si son el mismo conteo.</div>
+    </div>`;
+  }
+  return html;
 }
 
 async function confirmNewSession() {
@@ -1133,15 +1141,43 @@ async function confirmNewSession() {
 
 // ── Sesión ─────────────────────────────────────────────────────────────────
 
-function startSession() {
+async function startSession() {
   const operario = document.getElementById('inp-operario').value.trim();
   const fecha    = document.getElementById('inp-fecha').value;
   if (!operario) { alert('Ingresa tu nombre'); return; }
   if (!fecha)    { alert('Selecciona la fecha'); return; }
+
+  // Si el almacén ya tiene toma de esta fecha, este equipo cuenta CONTRA EL MISMO
+  // mapa de zonas. No es adoptar la toma —no llega ni un conteo— pero las
+  // rebanadas se guardan como `zonaIdx:dispositivo`: si el admin editó la
+  // preparación a media jornada, el "índice 2" de este equipo no sería el
+  // "índice 2" congelado y su captura quedaría bajo el nombre de zona ajeno.
+  // El Worker ya protege el dato (zone_snapshot es first-write-wins); esto
+  // protege lo que el operario cree que está contando.
+  let zonas = ZONAS;
+  let zoneConfigId = ZCFG?.id || '';
+  let snapshotSynced = false;
+  // Doble toque en un teléfono lento: sin esto salen dos sesiones y dos syncs.
+  const btn = document.getElementById('btn-iniciar-toma');
+  if (btn?.disabled) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Preparando…'; }
+  try {
+    // Sin red devuelve null y se arranca con las zonas locales: nunca bloquea.
+    const yaEnServidor = await fetchSesionWorker(fecha);
+    if (yaEnServidor?.zoneSnapshot?.length) {
+      zonas = yaEnServidor.zoneSnapshot;
+      zoneConfigId = yaEnServidor.zoneConfigId || zoneConfigId;
+      snapshotSynced = true;   // el del servidor manda; no reenviar el propio
+      ZONAS = zonas;
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Iniciar →'; }
+  }
+
   // Snapshot §14: la toma congela zonas/orden/activos con los que inició — editar
   // la preparación después no la altera. Se envía al Worker en el primer sync.
   S = { operario, fecha, templateHash: T?.templateHash||'', countsByZone:{}, presChoiceByZone:{}, correctionsByZone:{}, completedZones:[], manuales:[], reopenedZones:{}, pendingCompletedZoneRemovals:[], receipts:[], pendingReceiptEvents:{},
-        zoneConfigId: ZCFG?.id || '', zoneSnapshot: JSON.parse(JSON.stringify(ZONAS || [])), snapshotSynced: false };
+        zoneConfigId, zoneSnapshot: JSON.parse(JSON.stringify(zonas || [])), snapshotSynced };
   lsSet('s', S);
   syncSesionWorker();
   go('overview');

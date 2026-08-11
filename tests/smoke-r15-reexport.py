@@ -77,10 +77,15 @@ try:
         page.fill("#nombre-input", "Auditor")
         page.fill("#pwd-input", "x")
         page.click(".btn-login")
-        page.wait_for_selector(".btn-notas:has-text('Re-exportar')")
+        page.wait_for_selector(".btn-pdf-card:has-text('Re-exportar')")
 
         # ── A: Re-exportar muestra la cobertura; cancelar no exporta ──────────
-        page.click(".btn-notas:has-text('Re-exportar')")
+        # El botón abre el modal de plantilla; la salida "guardada" es el export
+        # de siempre. Como la tarjeta ya dice "Re-exportar", no vuelve a
+        # preguntar si re-exportar: va directo a la cobertura.
+        page.click(".btn-pdf-card:has-text('Re-exportar')")
+        page.wait_for_selector("#modal-plantilla-export", state="visible")
+        page.click("[onclick=\"plxElegir('guardada')\"]")
         page.wait_for_timeout(600)
         confirms = [m for t, m in dialogos if t == "confirm"]
         ok(len(confirms) == 1 and confirms[0].startswith("Re-exportar la toma"),
@@ -92,10 +97,12 @@ try:
         ok(stub.posts == [], "A: cancelar no escribió nada en el Worker")
         ok(not any(t == "alert" for t, _ in dialogos), "A: sin errores en pantalla")
 
-        # ── B: "Generar XLSX" sobre sesión exportada → re-export + cobertura ──
+        # ── B: tarjeta obsoleta (otro admin exportó mientras estaba en pantalla)
+        # → el export entra con force=false y la guarda sigue preguntando antes
+        # de pisar, sin saltarse la cobertura ──────────────────────────────────
         dialogos.clear()
         plan.append(True)    # aceptar "¿Re-exportar de todos modos?"; cancelar la cobertura
-        page.click(".btn-notas:has-text('Generar XLSX')")
+        page.evaluate("exportarSesionInventario('CAVA','2026-07-27', false)")
         page.wait_for_timeout(600)
         confirms = [m for t, m in dialogos if t == "confirm"]
         ok(len(confirms) == 2 and "Re-exportar de todos modos" in confirms[0],
@@ -103,6 +110,14 @@ try:
         ok(confirms[1].startswith("Re-exportar la toma") and "Se escriben 1 de los 8" in confirms[1],
            "B: y la cobertura ya no se salta aunque force quedó en true")
         ok(stub.posts == [], "B: cancelar la cobertura no escribió nada en el Worker")
+
+        # ── C: la tarjeta quedó con los 4 botones acordados ───────────────────
+        etiquetas = [t.strip() for t in page.eval_on_selector_all(
+            ".toma-card button", "els => els.map(e => e.textContent.trim())")]
+        ok(len(etiquetas) == 4, f"C: la tarjeta tiene exactamente 4 botones ({etiquetas})")
+        ok(any("Explorar" in e for e in etiquetas) and any("PDF" in e for e in etiquetas)
+           and any("Re-exportar" in e for e in etiquetas) and any("Borrar" in e for e in etiquetas),
+           "C: son Explorar, PDF, Re-exportar y Borrar")
         browser.close()
     print(f"\n✅ smoke R15 re-export: {passed} asserts OK")
 finally:

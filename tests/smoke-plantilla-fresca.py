@@ -96,7 +96,14 @@ try:
         page.fill("#nombre-input", "Auditor")
         page.fill("#pwd-input", "x")
         page.click(".btn-login")
-        page.wait_for_selector(".btn-pdf-card:has-text('plantilla fresca')")
+        page.wait_for_selector(".btn-pdf-card:has-text('Exportar')")
+
+        # "Cerrar con plantilla fresca" dejó de ser un botón de la tarjeta: ahora
+        # es una de las dos salidas del modal que abre "Exportar".
+        def elegir_plantilla_fresca():
+            page.click(".btn-pdf-card")
+            page.wait_for_selector("#modal-plantilla-export", state="visible")
+            return page.locator("[onclick=\"plxElegir('fresca')\"]")
 
         # ── A: un export del MISMO almacén se frena (antes se colaba: sus códigos
         # coinciden todos, así que la validación de contados no lo detectaba) ────
@@ -113,8 +120,9 @@ try:
           }
           return XLSX.write(wb, { type:'base64', bookType:'xlsx' });
         }""")
+        opcion_fresca = elegir_plantilla_fresca()
         with page.expect_file_chooser() as fc_info:
-            page.click(".btn-pdf-card:has-text('plantilla fresca')")
+            opcion_fresca.click()
         fc_info.value.set_files([{
             "name": "Inventario XTINV000279 20260727 CAVA.xlsx",
             "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -128,8 +136,9 @@ try:
 
         # ── B: con la plantilla legítima el par completo funciona ─────────────
         dialogos.clear()
+        opcion_fresca = elegir_plantilla_fresca()
         with page.expect_file_chooser() as fc_info:
-            page.click(".btn-pdf-card:has-text('plantilla fresca')")
+            opcion_fresca.click()
         fc_info.value.set_files(FIXTURE)
         page.wait_for_selector("#modal-archivo", state="visible", timeout=15000)
 

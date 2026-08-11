@@ -88,8 +88,8 @@ assert.deepEqual(datos.operarios, ['Ana', 'Luis', 'Operario legacy']);
 
 console.log('✅ admin-pdf: autoria multiple y correcciones OK');
 
-// Un almacen es UN conteo: la toma que cruza la medianoche deja dos filas en D1
-// y el PDF las une sin duplicar el almacen ni perder la mitad del conteo.
+// Un almacen es UN conteo: una captura distribuida entre dos fechas deja dos
+// filas en D1 y el PDF las une sin duplicar el almacen ni perder la mitad.
 const tramoNoche = {
   fecha: '2026-08-09', operario: 'Alexin',
   countsByZone: { '1:devTienda': { MP1: 2, MP2: 5 } },
@@ -125,8 +125,11 @@ assert.deepEqual(datosUnidos.operarios, ['Alexin', 'Pablo']);
 // La correccion admin y el manual de un tramo sobreviven a la union.
 assert.equal(datosUnidos.items.find(item => item.codigo === 'MP2').cantidadFinal, 4);
 assert.equal(datosUnidos.items.filter(item => item.manual).length, 1);
+assert.equal(unida.manuales[0]._fechaOrigen, '2026-08-09');
 // exportedAt gana el tramo que sí se exportó, aunque llegue primero en la lista.
 assert.equal(unida.exportedBy, 'pablo');
+assert.equal(unida.tramosExportados, 1);
+assert.equal(unida.xlsxCompleto, false);
 
 // Unir un solo tramo no cambia nada: los almacenes de un día siguen igual.
 assert.deepEqual(
@@ -134,7 +137,7 @@ assert.deepEqual(
   construirDatosPDFSesion({ sesion: tramoNoche, plantilla }).items
 );
 
-console.log('✅ admin-pdf: toma partida por el cambio de día se une en un almacén OK');
+console.log('✅ admin-pdf: captura distribuida en dos fechas se une en un almacén OK');
 
 // Lo que el EXPORT necesita de la union y el PDF no usaba. Si algo de esto se
 // pierde, el XLSX manda a Xetux como CERO lo que contó el otro tramo.

@@ -99,7 +99,7 @@ export function unirSesionesDeAlmacen(sesiones) {
     correctionsByZone: {}, manuales: [], zoneSnapshot: [],
     operariosByDevice: {}, receipts: [], completedZones: [], lockedZones: {},
     exportedAt: '', exportedBy: '', templateHash: '', templateHashes: [],
-    fechas: [], tramos: []
+    fechas: [], tramos: [], tramosExportados: 0, xlsxCompleto: false
   };
   const zonasCerradas = new Set();
   for (const sesion of orden) {
@@ -117,7 +117,13 @@ export function unirSesionesDeAlmacen(sesiones) {
     for (const [claveZona, corrs] of Object.entries(sesion?.correctionsByZone || {})) {
       unida.correctionsByZone[claveZona] = { ...(unida.correctionsByZone[claveZona] || {}), ...corrs };
     }
-    unida.manuales.push(...(sesion?.manuales || []));
+    // La fecha de origen normalmente vive en la PK de la sesión. Al unir fechas
+    // hay que conservarla para que editar o borrar desde el modal escriba en el
+    // tramo donde realmente está el ítem.
+    unida.manuales.push(...(sesion?.manuales || []).map(manual => ({
+      ...manual,
+      _fechaOrigen: sesion?.fecha || manual?._fechaOrigen || ''
+    })));
     unida.receipts.push(...(sesion?.receipts || []));
     Object.assign(unida.operariosByDevice, sesion?.operariosByDevice || {});
     Object.assign(unida.lockedZones, sesion?.lockedZones || {});
@@ -138,6 +144,9 @@ export function unirSesionesDeAlmacen(sesiones) {
     }
   }
   unida.completedZones = [...zonasCerradas];
+  unida.tramosExportados = unida.tramos.filter(tramo => tramo.exportedAt).length;
+  unida.xlsxCompleto = unida.tramos.length > 0
+    && unida.tramosExportados === unida.tramos.length;
   return unida;
 }
 
