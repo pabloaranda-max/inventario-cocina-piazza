@@ -763,6 +763,46 @@ function renderAccionesPDFGeneral() {
   </div>`;
 }
 
+// Una tarjeta = UN conteo de UN almacén. Si el cambio de día lo partió en varias
+// filas de D1, aquí se ven como una sola toma: dos tarjetas con aviso de "partida"
+// confundían más que el problema, porque cada botón hacía lo mismo que el gemelo.
+function conteosDeSesiones(sesiones) {
+  const porAlmacen = new Map();
+  for (const s of sesiones) {
+    if (!porAlmacen.has(s.almacen)) porAlmacen.set(s.almacen, []);
+    porAlmacen.get(s.almacen).push(s);
+  }
+  const conteos = [];
+  for (const [almacen, filas] of porAlmacen) {
+    for (const fechas of agruparFechasEnConteos(filas.map(s => s.fecha))) {
+      const tramos = filas
+        .filter(s => fechas.includes(s.fecha))
+        .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+      if (!tramos.length) continue;
+      const cierre = fechas[fechas.length - 1];
+      const suma = clave => tramos.reduce((n, s) => n + (Number(s[clave]) || 0), 0);
+      conteos.push({
+        almacen, fechas, cierre, tramos,
+        // Los artículos NO se suman: un código contado en dos tramos es UN
+        // renglón en el XLSX. El total exacto sale de unir las sesiones, que
+        // cuesta un fetch por tramo; aquí basta la cota inferior del tramo mayor.
+        articulos: Math.max(...tramos.map(s => Number(s.articulosContados || s.countedItems) || 0)),
+        articulosAprox: tramos.length > 1,
+        zonas: suma('zonasCompletadas'),
+        correcciones: suma('correcciones'),
+        manualesN: suma('manuales'),
+        comentarios: suma('comentarios'),
+        operarios: [...new Set(tramos.flatMap(s => (s.operarios && s.operarios.length) ? s.operarios : [s.operario]).filter(Boolean))],
+        exportados: tramos.filter(s => s.exportedAt).length,
+        exportedBy: [...tramos].reverse().find(s => s.exportedAt)?.exportedBy || '',
+        updatedAt: tramos.map(s => s.updatedAt).filter(Boolean).sort().pop() || ''
+      });
+    }
+  }
+  return conteos.sort((a, b) => String(b.cierre).localeCompare(String(a.cierre))
+                             || tituloAlmacen(a.almacen).localeCompare(tituloAlmacen(b.almacen), 'es'));
+}
+
 function renderSesionesInventario() {
   const el = document.getElementById('sesiones-container');
   if (!el) return;
@@ -774,46 +814,53 @@ function renderSesionesInventario() {
     el.innerHTML = '<div class="empty-state" style="background:white;border-radius:10px">Sin tomas en los últimos 30 días</div>';
     return;
   }
-  el.innerHTML = sesiones.map(s => {
-    const cfg = INVENTARIO_AREAS[s.almacen] || { titulo:s.almacen, scriptUrl:null };
-    const exp = s.exportedAt
+  el.innerHTML = conteosDeSesiones(sesiones).map(c => {
+    const todoExportado = c.exportados === c.tramos.length;
+    const exp = todoExportado
       ? `<span style="background:#dcfce7;color:#166534;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">${ic('circle-check',11)} Exportada</span>`
       : `<span style="background:#fffbeb;color:#92400e;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">${ic('clock',11)} Pendiente</span>`;
-    const updated = s.updatedAt ? new Date(s.updatedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short', timeZone:OPERATING_TIME_ZONE }) : '—';
-    const exportTxt = s.exportedAt ? ` · Exportada por ${esc(s.exportedBy || '—')}` : '';
-    const corrTxt = s.correcciones ? ` · ${s.correcciones} corrección${s.correcciones!==1?'es':''}` : '';
-    const manTxt = s.manuales ? ` · ${s.manuales} no catalogado${s.manuales!==1?'s':''}` : '';
-    const comTxt = s.comentarios ? ` · ${s.comentarios} comentario${s.comentarios!==1?'s':''}` : '';
-    // R5.1: nombres reales de quienes capturaron; el operario inicial es el fallback
-    const quienes = (s.operarios && s.operarios.length) ? s.operarios.join(' · ') : (s.operario || '—');
-    // Un almacén es UN conteo: si quedó partido, decirlo aquí — el PDF y el XLSX
-    // van a unir los tramos, y sin este aviso parecen dos tomas independientes.
-    const tramosCard = fechasDeTomaDeAlmacen(s.almacen, s.fecha);
-    const avisoPartida = tramosCard.length > 1
-      ? `<div class="toma-meta" style="color:#92400e;background:#fffbeb;border-radius:6px;padding:4px 7px;margin-top:5px">
-           ${ic('triangle-alert',12)} Toma partida en ${tramosCard.length} tramos (${esc(tramosCard.map(fechaConteoLegible).join(' y '))}).
-           El PDF y el XLSX los unen en un solo conteo.
+    const updated = c.updatedAt ? new Date(c.updatedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short', timeZone:OPERATING_TIME_ZONE }) : '—';
+    // Sin esto el badge decía "Pendiente" y el meta "Exportada" en la misma línea.
+    const exportTxt = !c.exportados ? ''
+      : todoExportado ? ` · Exportada por ${esc(c.exportedBy || '—')}`
+      : ` · ${c.exportados} de ${c.tramos.length} tramos exportados por ${esc(c.exportedBy || '—')}`;
+    const corrTxt = c.correcciones ? ` · ${c.correcciones} correc${c.correcciones!==1?'ciones':'ción'}` : '';
+    const manTxt = c.manualesN ? ` · ${c.manualesN} no catalogado${c.manualesN!==1?'s':''}` : '';
+    const comTxt = c.comentarios ? ` · ${c.comentarios} comentario${c.comentarios!==1?'s':''}` : '';
+    const quienes = c.operarios.length ? c.operarios.join(' · ') : '—';
+    const fechaTxt = c.fechas.map(fechaConteoLegible).join(' y ');
+    // El conteo unido se explica en una línea sobria, no en una alerta: es lo
+    // normal cuando la captura cruza la medianoche, no una anomalía.
+    const notaUnida = c.tramos.length > 1
+      ? `<div class="toma-meta" style="color:#475569;background:#f8fafc;border-radius:6px;padding:4px 7px;margin-top:5px">
+           ${ic('refresh-cw',12)} Un solo conteo capturado en ${c.tramos.length} días
+           (${c.tramos.map(t => `${esc(fechaConteoLegible(t.fecha))}: ${esc((t.operarios && t.operarios[0]) || t.operario || '—')}${t.exportedAt ? ', ya exportado' : ''}`).join(' · ')}).
+           El PDF y el XLSX lo tratan como uno.
          </div>`
       : '';
-    return `<div class="toma-card" style="border-left-color:${s.exportedAt ? '#16a34a' : '#f59e0b'}">
+    // Los botones operan sobre el conteo completo: reciben la fecha de cierre y
+    // cada acción resuelve sus tramos con fechasDeTomaDeAlmacen().
+    const f = esc(c.cierre);
+    const a = esc(c.almacen);
+    return `<div class="toma-card" style="border-left-color:${todoExportado ? '#16a34a' : '#f59e0b'}">
       <div class="toma-header">
-        <div class="toma-operario">${esc(tituloAlmacen(s.almacen))} ${exp}</div>
-        <div class="toma-almacen">${esc(s.almacen)}</div>
+        <div class="toma-operario">${esc(tituloAlmacen(c.almacen))} ${exp}</div>
+        <div class="toma-almacen">${esc(c.almacen)}</div>
       </div>
       <div class="toma-meta">
-        Fecha ${esc(s.fecha)} · ${s.articulosContados || s.countedItems || 0} artículos · ${s.zonasCompletadas || 0} zonas listas${manTxt}${comTxt}${corrTxt} · Actualizada ${updated}${exportTxt}
+        Fecha ${esc(fechaTxt)} · ${c.articulos}${c.articulosAprox ? '+' : ''} artículos · ${c.zonas} zonas listas${manTxt}${comTxt}${corrTxt} · Actualizada ${updated}${exportTxt}
       </div>
-      ${avisoPartida}
+      ${notaUnida}
       <div class="toma-footer" style="flex-wrap:wrap;gap:6px;">
         <div class="toma-items">Capturaron: ${esc(quienes)}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="btn-notas" onclick="verDetalleSesion('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('search',13)} Explorar</button>
-          <button class="btn-notas" onclick="imprimirSesion('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('printer',13)} PDF</button>
-          <button class="btn-pdf-card" onclick="cerrarConPlantillaFresca('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('file-spreadsheet',13)} ${s.exportedAt ? 'Rehacer con plantilla fresca' : 'Cerrar con plantilla fresca'}</button>
-          <button class="btn-notas" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',false)">${ic('download',13)} Generar XLSX y enviar</button>
-          ${s.exportedAt ? `<button class="btn-notas" onclick="verArchivoDeToma('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('file-spreadsheet',13)} Nombre del archivo</button>` : ''}
-          ${s.exportedAt ? `<button class="btn-notas" onclick="exportarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}',true)">${ic('upload',13)} Re-exportar</button>` : ''}
-          <button class="btn-borrar" onclick="borrarSesionInventario('${esc(s.almacen)}','${esc(s.fecha)}')">${ic('trash-2',13)} Borrar sesión</button>
+          <button class="btn-notas" onclick="verDetalleSesion('${a}','${f}')">${ic('search',13)} Explorar</button>
+          <button class="btn-notas" onclick="imprimirSesion('${a}','${f}')">${ic('printer',13)} PDF</button>
+          <button class="btn-pdf-card" onclick="cerrarConPlantillaFresca('${a}','${f}')">${ic('file-spreadsheet',13)} ${c.exportados ? 'Rehacer con plantilla fresca' : 'Cerrar con plantilla fresca'}</button>
+          <button class="btn-notas" onclick="exportarSesionInventario('${a}','${f}',false)">${ic('download',13)} Generar XLSX y enviar</button>
+          ${c.exportados ? `<button class="btn-notas" onclick="verArchivoDeToma('${a}','${f}')">${ic('file-spreadsheet',13)} Nombre del archivo</button>` : ''}
+          ${c.exportados ? `<button class="btn-notas" onclick="exportarSesionInventario('${a}','${f}',true)">${ic('upload',13)} Re-exportar</button>` : ''}
+          <button class="btn-borrar" onclick="borrarSesionInventario('${a}','${f}')">${ic('trash-2',13)} Borrar ${c.tramos.length > 1 ? 'conteo' : 'sesión'}</button>
         </div>
       </div>
     </div>`;
@@ -870,13 +917,22 @@ async function verDetalleSesion(almacen, fecha) {
   modal.style.display = 'block';
   body.innerHTML = '<div class="loading-state"><div class="spinner-sm"></div>Cargando sesión...</div>';
   try {
-    const [sr, tr] = await Promise.all([
-      fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(fecha)),
+    // Se LEE el conteo completo (si el cambio de día lo partió, unido) pero se
+    // ESCRIBE al tramo de cierre: las correcciones `_admin` de cualquier tramo
+    // las recoge la unión, así que basta con guardarlas todas en uno.
+    const tramosDetalle = fechasDeTomaDeAlmacen(almacen, fecha);
+    const [crudas, tr] = await Promise.all([
+      Promise.all(tramosDetalle.map(async f => {
+        const r = await fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(f));
+        const d = await r.json();
+        if (!d.ok || !d.found) throw new Error(`Sesión no encontrada: ${almacen} ${f}`);
+        return { ...d, fecha: f };
+      })),
       fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen))
     ]);
-    const S = await sr.json();
     const T = await tr.json();
-    if (!S.ok || !S.found) throw new Error('Sesión no encontrada');
+    const S = unirSesionesDeAlmacen(crudas);
+    S.updatedAt = crudas.map(s => s.updatedAt).filter(Boolean).sort().pop() || '';
     const template = T.ok && T.found ? T : {};
     _modalSesion = S;
     _modalTemplate = template;
@@ -1248,24 +1304,42 @@ async function guardarCorrecciones(almacen, fecha) {
 }
 
 async function borrarSesionInventario(almacen, fecha) {
-  if (!confirm(`Borrar la sesión activa de ${tituloAlmacen(almacen)} del ${fecha}?\nEsto borra la sesión del Worker/Admin. No borra registros ya enviados a Google Sheets.`)) return;
+  // La tarjeta muestra el conteo entero, así que borrar tiene que llevarse todos
+  // sus tramos: dejar uno vivo lo haría reaparecer como tarjeta suelta, y esa
+  // media toma es justo la que exporta CEROS a Xetux.
+  const tramos = fechasDeTomaDeAlmacen(almacen, fecha);
+  const detalle = tramos.length > 1
+    ? `Borrar el conteo completo de ${tituloAlmacen(almacen)}?\n\nSe borran sus ${tramos.length} tramos: ${tramos.map(fechaConteoLegible).join(' y ')}.\n`
+    : `Borrar la sesión activa de ${tituloAlmacen(almacen)} del ${fechaConteoLegible(fecha)}?\n`;
+  if (!confirm(detalle + 'Esto borra la sesión del Worker/Admin. No borra los acuses ni los registros ya enviados a Google Sheets.')) return;
   try {
-    const r = await fetch(WORKER_URL + '/inv/sesion', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify({
-        action:'inv_delete', appVersion: APP_VERSION,
-        almacen,
-        fecha,
-        operario:adminActual,
-        adminPassword:adminPasswordActual,
-        adminUser:adminActual
-      })
-    });
-    const d = await r.json();
-    if (!d.ok) throw new Error(d.error || 'No se pudo borrar la sesión');
+    const borrados = [];
+    for (const f of tramos) {
+      const r = await fetch(WORKER_URL + '/inv/sesion', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({
+          action:'inv_delete', appVersion: APP_VERSION,
+          almacen,
+          fecha: f,
+          operario:adminActual,
+          adminPassword:adminPasswordActual,
+          adminUser:adminActual
+        })
+      });
+      const d = await r.json();
+      if (!d.ok) {
+        // Con un solo tramo el mensaje va tal cual: decorarlo solo estorba. El
+        // detalle de qué tramo falló y cuáles ya se fueron importa cuando hay varios.
+        const base = d.error || 'No se pudo borrar la sesión';
+        if (tramos.length === 1) throw new Error(base);
+        const parcial = borrados.length ? `\n\nYa se borraron: ${borrados.map(fechaConteoLegible).join(', ')}.` : '';
+        throw new Error(`${base} (tramo ${fechaConteoLegible(f)})${parcial}`);
+      }
+      borrados.push(f);
+    }
     await cargarSesionesInventario();
-    alert('Sesión borrada del Admin/Worker. Los registros enviados a Sheets no se tocaron.');
+    alert(`${borrados.length > 1 ? `Conteo borrado (${borrados.length} tramos)` : 'Sesión borrada'} del Admin/Worker. Los acuses y los registros de Sheets no se tocaron.`);
   } catch(e) {
     // La tarjeta pudo quedar obsoleta entre que se pintó y el clic: otro admin
     // borró la sesión, o un teléfono que seguía sincronizando la recreó con otra
