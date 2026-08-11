@@ -681,48 +681,82 @@ function fechaConteoLegible(fecha) {
   return partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : String(fecha || '');
 }
 
-function sesionesDePDFGeneral(centro, fecha, soloTerminadas = true) {
-  return sesionesInventario
-    .filter(s => almacenPermitidoUI(s.almacen))
-    .filter(s => centroDe(s.almacen) === centro && s.fecha === fecha)
-    .filter(s => !soloTerminadas || !!s.exportedAt)
-    .sort((a, b) => tituloAlmacen(a.almacen).localeCompare(tituloAlmacen(b.almacen), 'es'));
+function diasEntreFechas(a, b) {
+  return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000);
 }
 
-// Un botón por restaurante y fecha. El filtro de almacén no reduce el PDF:
-// "general" siempre significa todas las tomas terminadas que el admin puede ver.
+// Fechas contiguas = el mismo conteo. La captura que cruza la medianoche deja
+// dos filas en D1 y no son dos tomas: es una sola partida en dos.
+function agruparFechasEnConteos(fechas) {
+  const grupos = [];
+  for (const fecha of [...new Set(fechas)].sort()) {
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && diasEntreFechas(ultimo[ultimo.length - 1], fecha) <= 1) ultimo.push(fecha);
+    else grupos.push([fecha]);
+  }
+  return grupos;
+}
+
+function sesionesDeCentro(centro) {
+  return sesionesInventario
+    .filter(s => almacenPermitidoUI(s.almacen))
+    .filter(s => centroDe(s.almacen) === centro);
+}
+
+// El conteo se identifica por su fecha de cierre (la más nueva de su grupo).
+function fechasDelConteo(centro, fechaCierre) {
+  const conteo = agruparFechasEnConteos(sesionesDeCentro(centro).map(s => s.fecha))
+    .find(g => g[g.length - 1] === fechaCierre);
+  return conteo || [fechaCierre];
+}
+
+function sesionesDePDFGeneral(centro, fechaCierre) {
+  const fechas = fechasDelConteo(centro, fechaCierre);
+  return sesionesDeCentro(centro)
+    .filter(s => fechas.includes(s.fecha))
+    .sort((a, b) => tituloAlmacen(a.almacen).localeCompare(tituloAlmacen(b.almacen), 'es')
+                 || String(a.fecha).localeCompare(String(b.fecha)));
+}
+
+// Un botón por restaurante y conteo. El filtro de almacén no reduce el PDF:
+// "general" siempre significa todas las tomas que el admin puede ver. El PDF es
+// independiente del XLSX: exportedAt solo describe la carga a Xetux.
 function renderAccionesPDFGeneral() {
   const el = document.getElementById('pdf-general-container');
   if (!el) return;
-  const candidatas = sesionesInventario
+  const centros = [...new Set(sesionesInventario
     .filter(s => almacenPermitidoUI(s.almacen))
-    .filter(s => filtroCentro === 'TODOS' || centroDe(s.almacen) === filtroCentro);
-  const grupos = new Map();
-  for (const sesion of candidatas) {
-    const centro = centroDe(sesion.almacen);
-    const key = `${centro}|${sesion.fecha}`;
-    if (!grupos.has(key)) grupos.set(key, { centro, fecha: sesion.fecha, todas: [] });
-    grupos.get(key).todas.push(sesion);
+    .map(s => centroDe(s.almacen)))]
+    .filter(c => filtroCentro === 'TODOS' || c === filtroCentro);
+  const disponibles = [];
+  for (const centro of centros) {
+    const delCentro = sesionesDeCentro(centro);
+    for (const conteo of agruparFechasEnConteos(delCentro.map(s => s.fecha))) {
+      const todas = delCentro.filter(s => conteo.includes(s.fecha));
+      if (!todas.length) continue;
+      disponibles.push({
+        centro, fechas: conteo, cierre: conteo[conteo.length - 1],
+        almacenes: new Set(todas.map(s => s.almacen)).size
+      });
+    }
   }
-  const disponibles = [...grupos.values()]
-    .map(g => ({ ...g, terminadas: g.todas.filter(s => !!s.exportedAt) }))
-    .filter(g => g.terminadas.length)
-    .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)) || a.centro.localeCompare(b.centro));
+  disponibles.sort((a, b) => String(b.cierre).localeCompare(String(a.cierre)) || a.centro.localeCompare(b.centro));
   if (!disponibles.length) { el.innerHTML = ''; return; }
 
   el.innerHTML = `<div class="pdf-general-card">
     <div>
-      <div class="pdf-general-title">PDF general del restaurante</div>
-      <div class="pdf-general-help">Reúne todas las tomas exportadas de la misma fecha en un archivo, incluso si filtraste un almacén.</div>
+      <div class="pdf-general-title">PDF integral del restaurante</div>
+      <div class="pdf-general-help">Reúne todos los almacenes del conteo en un archivo, aunque todavía no hayas generado los XLSX. Un almacén contado a caballo de dos días va como una sola sección.</div>
     </div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end">
       ${disponibles.map(g => {
-        const pendientes = g.todas.length - g.terminadas.length;
-        const key = `${g.centro}|${g.fecha}`;
-        return `<button class="btn-pdf-general" data-pdf-general="${esc(key)}"
-          onclick="imprimirConteoGeneral('${esc(g.centro)}','${esc(g.fecha)}')">
-          ${ic('printer',13)} ${esc(CENTROS[g.centro].nombre)} · ${esc(fechaConteoLegible(g.fecha))}
-          (${g.terminadas.length} ${g.terminadas.length !== 1 ? 'almacenes' : 'almacén'})${pendientes ? ` · ${pendientes} pendiente${pendientes !== 1 ? 's' : ''} fuera` : ''}
+        const rango = g.fechas.length > 1
+          ? `${fechaConteoLegible(g.fechas[0])}–${fechaConteoLegible(g.cierre)}`
+          : fechaConteoLegible(g.cierre);
+        return `<button class="btn-pdf-general" data-pdf-general="${esc(`${g.centro}|${g.cierre}`)}"
+          onclick="imprimirConteoGeneral('${esc(g.centro)}','${esc(g.cierre)}')">
+          ${ic('printer',13)} ${esc(CENTROS[g.centro].nombre)} · ${esc(rango)}
+          (${g.almacenes} ${g.almacenes !== 1 ? 'almacenes' : 'almacén'})
         </button>`;
       }).join('')}
     </div>
@@ -752,6 +786,15 @@ function renderSesionesInventario() {
     const comTxt = s.comentarios ? ` · ${s.comentarios} comentario${s.comentarios!==1?'s':''}` : '';
     // R5.1: nombres reales de quienes capturaron; el operario inicial es el fallback
     const quienes = (s.operarios && s.operarios.length) ? s.operarios.join(' · ') : (s.operario || '—');
+    // Un almacén es UN conteo: si quedó partido, decirlo aquí — el PDF y el XLSX
+    // van a unir los tramos, y sin este aviso parecen dos tomas independientes.
+    const tramosCard = fechasDeTomaDeAlmacen(s.almacen, s.fecha);
+    const avisoPartida = tramosCard.length > 1
+      ? `<div class="toma-meta" style="color:#92400e;background:#fffbeb;border-radius:6px;padding:4px 7px;margin-top:5px">
+           ${ic('triangle-alert',12)} Toma partida en ${tramosCard.length} tramos (${esc(tramosCard.map(fechaConteoLegible).join(' y '))}).
+           El PDF y el XLSX los unen en un solo conteo.
+         </div>`
+      : '';
     return `<div class="toma-card" style="border-left-color:${s.exportedAt ? '#16a34a' : '#f59e0b'}">
       <div class="toma-header">
         <div class="toma-operario">${esc(tituloAlmacen(s.almacen))} ${exp}</div>
@@ -760,6 +803,7 @@ function renderSesionesInventario() {
       <div class="toma-meta">
         Fecha ${esc(s.fecha)} · ${s.articulosContados || s.countedItems || 0} artículos · ${s.zonasCompletadas || 0} zonas listas${manTxt}${comTxt}${corrTxt} · Actualizada ${updated}${exportTxt}
       </div>
+      ${avisoPartida}
       <div class="toma-footer" style="flex-wrap:wrap;gap:6px;">
         <div class="toma-items">Capturaron: ${esc(quienes)}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -1488,9 +1532,16 @@ async function subirPlantillaYExportar(almacen, fecha, file) {
       return;
     }
 
-    const sr = await fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(fecha));
-    const S = await sr.json();
-    if (!S.ok || !S.found) throw new Error('Sesión no encontrada');
+    // La cobertura se mide contra la toma COMPLETA: si el almacén quedó partido
+    // en dos fechas, validar una sola fila daría por buena una plantilla a la
+    // que le faltan los códigos de la otra.
+    const tramosFrescos = fechasDeTomaDeAlmacen(almacen, fecha);
+    const S = unirSesionesDeAlmacen(await Promise.all(tramosFrescos.map(async f => {
+      const sr = await fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(f));
+      const d = await sr.json();
+      if (!d.ok || !d.found) throw new Error(`Sesión no encontrada: ${almacen} ${f}`);
+      return { ...d, fecha: f };
+    })));
     const contados = new Set();
     for (const zc of Object.values(S.countsByZone || {}))
       for (const cod of Object.keys(zc || {})) contados.add(cod);
@@ -1509,7 +1560,8 @@ async function subirPlantillaYExportar(almacen, fecha, file) {
     // así que aquí va también la cobertura (lo no contado entra a Xetux como CERO).
     const enCero = Object.keys(rowMap).length - contados.size;
     if (!confirm(
-      `"${file.name}"\n${Object.keys(rowMap).length} artículos; cubre los ${contados.size} contados en la toma del ${fecha}.\n\n` +
+      `"${file.name}"\n${Object.keys(rowMap).length} artículos; cubre los ${contados.size} contados en la toma del ${tramosFrescos.map(fechaConteoLegible).join(' y ')}.\n\n` +
+      (tramosFrescos.length > 1 ? `La toma está partida en ${tramosFrescos.length} tramos y se exportarán juntos.\n\n` : '') +
       `Los otros ${enCero} van SIN cantidad — Xetux los aplica como CERO.\n\n` +
       `¿Subirla como plantilla de ${tituloAlmacen(almacen)} y exportar la sesión?`
     )) return;
@@ -1533,7 +1585,12 @@ async function subirPlantillaYExportar(almacen, fecha, file) {
 
 async function exportarSesionInventario(almacen, fecha, force, opts) {
   const cfg = INVENTARIO_AREAS[almacen] || {};
-  const exportKey = `${almacen}:${fecha}`;
+  // Un almacén es UN conteo: si quedó partido en varias filas de D1, el XLSX
+  // lleva la unión. Exportar una fila sola manda a Xetux como CERO todo lo que
+  // contó la otra, que es la forma silenciosa de borrar existencias.
+  const tramos = fechasDeTomaDeAlmacen(almacen, fecha);
+  const fechaCierre = tramos[tramos.length - 1];
+  const exportKey = `${almacen}:${tramos.join(',')}`;
   if (exportandoSesiones.has(exportKey)) {
     alert('Esta sesión ya se está exportando en esta ventana.');
     return;
@@ -1543,15 +1600,30 @@ async function exportarSesionInventario(almacen, fecha, force, opts) {
   // Xetux al aplicar), que es lo que de verdad hay que revisar antes de exportar.
   exportandoSesiones.add(exportKey);
   try {
-    const [sr, tr] = await Promise.all([
-      fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(fecha)),
+    const [crudas, tr] = await Promise.all([
+      Promise.all(tramos.map(async f => {
+        const r = await fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(f));
+        const d = await r.json();
+        if (!d.ok || !d.found) throw new Error(`Sesión no encontrada: ${almacen} ${f}`);
+        return { ...d, fecha: f };
+      })),
       fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen))
     ]);
-    const S = await sr.json();
     const T = await tr.json();
-    if (!S.ok || !S.found) throw new Error('Sesión no encontrada');
     if (!T.ok || !T.found || !T.raw) throw new Error('Plantilla Xetux no disponible');
-    if (S.templateHash && T.templateHash && S.templateHash !== T.templateHash) {
+    const S = unirSesionesDeAlmacen(crudas);
+    const partida = crudas.length > 1;
+    const detalleTramos = S.tramos
+      .map(t => `${fechaConteoLegible(t.fecha)} (${t.operario || '—'}${t.exportedAt ? ', ya exportada' : ''})`)
+      .join('\n  · ');
+    // El merge es explícito en la ruta a Xetux: nada se une en silencio.
+    if (partida && !confirm(
+      `${tituloAlmacen(almacen)} quedó partido en ${crudas.length} tramos:\n  · ${detalleTramos}\n\n` +
+      'Un almacén es UN conteo, así que el XLSX llevará los tramos SUMADOS y los marcará todos como exportados.\n\n' +
+      '¿Son el mismo conteo? (Si son conteos distintos, cancela: exportarlos juntos mezclaría dos tomas.)'
+    )) return;
+    // Basta con que un tramo se haya capturado contra otra plantilla para revisar.
+    if (T.templateHash && S.templateHashes.some(h => h !== T.templateHash)) {
       // Plantilla re-subida a mitad de toma (Xetux solo acepta el nombre de su
       // último export, así que re-subirla es rutina). Exportar sigue siendo
       // válido si todos los códigos con conteo existen en la plantilla vigente;
@@ -1577,7 +1649,10 @@ async function exportarSesionInventario(almacen, fecha, force, opts) {
       )) return;
     }
     if (S.exportedAt && !force) {
-      const msg = S.exportedBy ? `Ya fue exportada por ${S.exportedBy}.` : 'Ya fue exportada.';
+      const yaExportados = S.tramos.filter(t => t.exportedAt).length;
+      const msg = partida
+        ? `${yaExportados} de los ${crudas.length} tramos ya se exportaron${S.exportedBy ? ` (último: ${S.exportedBy})` : ''}.\nEste archivo los reemplaza con la toma completa.`
+        : (S.exportedBy ? `Ya fue exportada por ${S.exportedBy}.` : 'Ya fue exportada.');
       if (!confirm(`${msg}\n¿Re-exportar de todos modos?`)) return;
       force = true;
     }
@@ -1601,12 +1676,13 @@ async function exportarSesionInventario(almacen, fecha, force, opts) {
     // propia línea de cobertura. Los demás caminos la ven aquí — incluido
     // re-exportar (force), que aplicaría los mismos CEROs que la primera vez.
     if (!opts?.hashVerificado && !confirm(
-      `${force ? 'Re-exportar' : 'Exportar'} la toma de ${tituloAlmacen(almacen)} del ${fecha}?\n\n` +
+      `${force ? 'Re-exportar' : 'Exportar'} la toma de ${tituloAlmacen(almacen)} del ${tramos.map(fechaConteoLegible).join(' y ')}?\n\n` +
+      (partida ? `Une los ${crudas.length} tramos en un solo archivo.\n` : '') +
       `Se escriben ${seEscriben} de los ${enPlantilla} artículos de la plantilla.\n` +
       `Los otros ${enCero} van SIN cantidad — Xetux los aplica como CERO.\n` +
       (zonasAbiertas > 0 ? `\n⚠️ Quedan ${zonasAbiertas} zona(s) sin cerrar: puede que alguien siga contando.\n` : '') +
       (force ? `\nEsta toma ya se había exportado; el archivo se genera de nuevo.`
-             : `\nEsto marcará la sesión como exportada.`)
+             : `\nEsto marcará ${partida ? 'los tramos' : 'la sesión'} como exportad${partida ? 'os' : 'a'}.`)
     )) return;
 
     const corrections = correctionsByCod(S);
@@ -1661,7 +1737,7 @@ async function exportarSesionInventario(almacen, fecha, force, opts) {
       foto_base64: m.foto_base64 || m.foto || null
     }));
 
-    const { bytes, fname } = construirXlsxInventario(almacen, fecha, T, totales);
+    const { bytes, fname } = construirXlsxInventario(almacen, fechaCierre, T, totales);
 
     // R9b: a Sheets solo viajan EXCEPCIONES — manuales (con foto) y
     // catalogados con observación. La toma íntegra ya vive en D1 y el
@@ -1678,7 +1754,8 @@ async function exportarSesionInventario(almacen, fecha, force, opts) {
           exportadoPor: adminActual,
           area: almacen,
           almacen,
-          fecha,
+          fecha: fechaCierre,
+          tramos: tramos.join(' + '),
           timestamp: new Date().toISOString(),
           productos: excepciones,
           manuales
@@ -1691,19 +1768,40 @@ async function exportarSesionInventario(almacen, fecha, force, opts) {
       resumenSheets = 'Sin Sheets configurado para este almacén.';
     }
 
-    await marcarExportacion(almacen, fecha, force);
+    // Todos los tramos quedan marcados: si uno se quedara pendiente, la app
+    // volvería a ofrecerlo como toma suelta y alguien lo re-exportaría solo,
+    // que es exactamente el CERO en Xetux que esto viene a evitar. Secuencial,
+    // porque el Worker serializa escrituras por sesión (R13).
+    const marcados = [];
+    for (const f of tramos) {
+      const yaExportado = S.tramos.some(t => t.fecha === f && t.exportedAt);
+      try {
+        await marcarExportacion(almacen, f, force || yaExportado);
+        marcados.push(f);
+      } catch (e) {
+        throw new Error(
+          `El archivo se generó, pero no se pudo marcar el tramo del ${fechaConteoLegible(f)}: ${e.message}\n\n` +
+          (marcados.length ? `Sí quedaron marcados: ${marcados.map(fechaConteoLegible).join(', ')}.\n` : '') +
+          'Vuelve a exportar para dejar todos los tramos marcados.'
+        );
+      }
+    }
     await cargarSesionesInventario();
+    const etiquetaFecha = tramos.map(fechaConteoLegible).join(' y ');
+    const notaTramos = partida
+      ? `<div style="margin-top:6px;color:#92400e">Este archivo une ${crudas.length} tramos (${esc(etiquetaFecha)}) en un solo conteo.</div>`
+      : '';
     // El modal va al final: guardar necesita un clic propio (ver abrirModalArchivo).
     // Si el modal fallara, el archivo no se puede perder: se baja a la antigua.
     try {
-      abrirModalArchivo({ fname, bytes, almacen, fecha, extraHtml: esc(resumenSheets) });
+      abrirModalArchivo({ fname, bytes, almacen, fecha: etiquetaFecha, extraHtml: esc(resumenSheets) + notaTramos });
     } catch(e) {
       console.warn('modal archivo:', e);
       const url = URL.createObjectURL(new Blob([bytes], { type: XLSX_MIME }));
       const a = document.createElement('a');
       a.href = url; a.download = fname; a.click();
       URL.revokeObjectURL(url);
-      alert(`Descargado: ${fname}\n(${tituloAlmacen(almacen)} · ${fecha})\n\n${resumenSheets}`);
+      alert(`Descargado: ${fname}\n(${tituloAlmacen(almacen)} · ${etiquetaFecha})\n\n${resumenSheets}`);
     }
   } catch(e) {
     alert('Error al exportar: ' + e.message);
@@ -1747,18 +1845,25 @@ function generarReporte() {
 // El PDF se reconstruye desde la sesion D1. Ademas del total, conserva cada
 // aporte zona/dispositivo para no perder autoría cuando varias personas cuentan
 // el mismo artículo.
-async function cargarDatosPDFSesion(almacen, fecha) {
-  const [sr, tr] = await Promise.all([
-    fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(fecha)),
-    fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen))
+// `fechas` puede traer varios tramos del MISMO almacén: la toma que cruzó la
+// medianoche vive partida en D1 y aquí se vuelve a unir, para que el PDF no
+// muestre dos veces el mismo almacén con la mitad del conteo cada vez.
+async function cargarDatosPDFSesion(almacen, fechas) {
+  const tramos = [...new Set([].concat(fechas))].sort();
+  const [sesiones, T] = await Promise.all([
+    Promise.all(tramos.map(async f => {
+      const r = await fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(f));
+      const S = await r.json();
+      if (!S.ok || !S.found) throw new Error(`Sesión no encontrada: ${almacen} ${f}`);
+      return { ...S, fecha: f };
+    })),
+    fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen)).then(r => r.json())
   ]);
-  const S = await sr.json();
-  const T = await tr.json();
-  if (!S.ok || !S.found) throw new Error(`Sesión no encontrada: ${almacen}`);
   const template = T.ok && T.found ? T : {};
   const rawLookup = template.raw ? itemsFromRaw(template.raw, template) : {};
+  const unida = unirSesionesDeAlmacen(sesiones);
   const datos = construirDatosPDFSesion({
-    sesion: S,
+    sesion: unida,
     plantilla: template,
     articulos: rawLookup,
     nombresLegacy: INVENTARIO_AREAS[almacen]?.zonaNames || []
@@ -1767,10 +1872,12 @@ async function cargarDatosPDFSesion(almacen, fecha) {
     toma: {
       almacen_nombre: almacen,
       area: tituloAlmacen(almacen),
-      fecha,
-      operario: datos.operarios.join(', ') || S.operario || '',
-      exportedAt: S.exportedAt || '',
-      exportedBy: S.exportedBy || ''
+      fecha: tramos[tramos.length - 1],
+      fechas: tramos,
+      tramos: sesiones.map(s => `${fechaConteoLegible(s.fecha)} (${s.operario || '—'})`),
+      operario: datos.operarios.join(', ') || unida.operario || '',
+      exportedAt: unida.exportedAt,
+      exportedBy: unida.exportedBy
     },
     items: datos.items,
     corrs: datos.correcciones,
@@ -1779,9 +1886,19 @@ async function cargarDatosPDFSesion(almacen, fecha) {
   };
 }
 
+// Los tramos del almacén dentro de su conteo, para que el PDF de la tarjeta
+// traiga la toma completa y no solo el pedazo de la fila que se tocó.
+function fechasDeTomaDeAlmacen(almacen, fecha) {
+  const suyas = sesionesInventario
+    .filter(s => s.almacen === almacen)
+    .map(s => s.fecha);
+  const conteo = agruparFechasEnConteos(suyas).find(g => g.includes(fecha));
+  return conteo || [fecha];
+}
+
 async function imprimirSesion(almacen, fecha) {
   try {
-    const seccion = await cargarDatosPDFSesion(almacen, fecha);
+    const seccion = await cargarDatosPDFSesion(almacen, fechasDeTomaDeAlmacen(almacen, fecha));
     await generarPDFAdmin(seccion.toma, seccion.items, seccion.corrs, seccion.notaGeneral);
   } catch (e) {
     alert('No se pudo generar el PDF: ' + e.message);
@@ -1804,111 +1921,28 @@ function estadoBotonPDFGeneral(centro, fecha, cargando) {
 }
 
 async function imprimirConteoGeneral(centro, fecha) {
-  const sesiones = sesionesDePDFGeneral(centro, fecha, true);
+  const sesiones = sesionesDePDFGeneral(centro, fecha);
   if (!sesiones.length) {
-    alert('No hay tomas terminadas para generar el PDF general.');
+    alert('No hay tomas para generar el PDF integral.');
     return;
   }
   estadoBotonPDFGeneral(centro, fecha, true);
   try {
+    // Una sección por almacén, no por fila de D1.
+    const porAlmacen = new Map();
+    for (const s of sesiones) {
+      if (!porAlmacen.has(s.almacen)) porAlmacen.set(s.almacen, []);
+      porAlmacen.get(s.almacen).push(s.fecha);
+    }
     const secciones = await Promise.all(
-      sesiones.map(s => cargarDatosPDFSesion(s.almacen, s.fecha))
+      [...porAlmacen].map(([almacen, fechas]) => cargarDatosPDFSesion(almacen, fechas))
     );
-    const todas = sesionesDePDFGeneral(centro, fecha, false);
-    await generarPDFAdminGeneral(centro, fecha, secciones, todas.length - sesiones.length);
+    await generarPDFAdminGeneral(centro, fecha, secciones);
   } catch (e) {
     alert('No se pudo generar el PDF general: ' + e.message);
   } finally {
     estadoBotonPDFGeneral(centro, fecha, false);
   }
-}
-
-function cantidadPDF(valor) {
-  if (valor == null || valor === '') return '—';
-  const n = Number(valor);
-  return Number.isFinite(n)
-    ? n.toLocaleString('es-MX', { maximumFractionDigits: 4 })
-    : esc(valor);
-}
-
-function aportesHTMLPDF(item) {
-  if (!(item.aportes || []).length) {
-    return '<span style="color:#9ca3af">Sin captura individual (agregado por admin)</span>';
-  }
-  return item.aportes.map(aporte => `
-    <div class="aporte"><strong>${esc(aporte.operario || 'Sin atribución')}</strong> ·
-      ${esc(aporte.zona || 'Sin zona')}: <strong>${cantidadPDF(aporte.cantidad)}</strong></div>
-  `).join('');
-}
-
-function tablaItemsPDF(items, corrs) {
-  if (!items.length) return '<div class="sin-datos">Sin artículos inventariados.</div>';
-  const corrMap = {};
-  (corrs || []).forEach(c => { if (c.codigo) corrMap[c.codigo] = c; });
-  return `<table class="items-table">
-    <colgroup>
-      <col style="width:12%"><col style="width:22%"><col style="width:6%">
-      <col style="width:8%"><col style="width:8%"><col style="width:29%"><col style="width:15%">
-    </colgroup>
-    <thead><tr>
-      <th>Código</th><th>Artículo</th><th class="centro">UM</th>
-      <th class="numero">Contado</th><th class="numero">Final</th>
-      <th>Quién contó / aportación</th><th>Corrección admin</th>
-    </tr></thead>
-    <tbody>${items.map((item, i) => {
-      const correccion = item.correccion || corrMap[item.codigo];
-      const clase = correccion ? 'corregido' : (item.manual ? 'manual' : (i % 2 ? 'alterno' : ''));
-      const detalleCorr = correccion ? `
-        <strong>${cantidadPDF(correccion.cantCorregida ?? correccion.qty)}</strong>
-        ${correccion.operario ? `<br>por ${esc(correccion.operario)}` : ''}
-        ${correccion.nota ? `<br><span>${esc(correccion.nota)}</span>` : ''}` : '<span style="color:#9ca3af">—</span>';
-      return `<tr class="${clase}">
-        <td>${esc(item.codigo)}</td>
-        <td><strong>${esc(item.nombre)}</strong>${item.manual ? '<br><span class="manual-badge">No catalogado</span>' : ''}</td>
-        <td class="centro">${esc(item.unidad || '')}</td>
-        <td class="numero">${cantidadPDF(item.cantidadContada)}</td>
-        <td class="numero final ${correccion ? 'ajustado' : ''}">${cantidadPDF(item.cantidadFinal)}</td>
-        <td>${aportesHTMLPDF(item)}</td>
-        <td class="correccion-cell">${detalleCorr}</td>
-      </tr>`;
-    }).join('')}</tbody>
-  </table>`;
-}
-
-function seccionAlmacenHTMLPDF(seccion, { titulo = true, firmas = false } = {}) {
-  const { toma, items, corrs, notaGeneral } = seccion;
-  const notaHtml = notaGeneral ? `
-    <div class="nota"><strong>Nota general:</strong> ${esc(notaGeneral)}</div>` : '';
-  const firmasHtml = firmas ? `
-    <div class="firma">
-      <div class="firma-box">Firma del Operario</div>
-      <div class="firma-box">Firma del Supervisor</div>
-    </div>` : '';
-  return `${titulo ? `<h2>${esc(toma.area || toma.almacen_nombre)}</h2>` : ''}
-    <div class="meta">
-      <strong>Almacén:</strong> ${esc(toma.almacen_nombre)} &nbsp;|&nbsp;
-      <strong>Fecha:</strong> ${esc(fechaConteoLegible(toma.fecha))} &nbsp;|&nbsp;
-      <strong>Renglones:</strong> ${items.length} &nbsp;|&nbsp;
-      <strong>Correcciones:</strong> ${(corrs || []).length}<br>
-      <strong>Capturaron:</strong> ${esc(toma.operario || '—')}
-      ${toma.exportedBy ? ` &nbsp;|&nbsp; <strong>Cerrado por:</strong> ${esc(toma.exportedBy)}` : ''}
-    </div>
-    ${notaHtml}
-    <div class="aclaracion">El total contado suma todas las aportaciones. Si hubo corrección, "Final" muestra el valor administrativo y las aportaciones conservan el conteo original.</div>
-    ${tablaItemsPDF(items, corrs)}
-    ${firmasHtml}`;
-}
-
-function resumenGeneralHTMLPDF(secciones) {
-  return `<table class="resumen-table">
-    <thead><tr><th>Almacén</th><th>Capturaron</th><th class="numero">Renglones</th><th class="numero">Correcciones</th></tr></thead>
-    <tbody>${secciones.map(seccion => `<tr>
-      <td><strong>${esc(seccion.toma.area)}</strong></td>
-      <td>${esc(seccion.toma.operario || '—')}</td>
-      <td class="numero">${seccion.items.length}</td>
-      <td class="numero">${seccion.corrs.length}</td>
-    </tr>`).join('')}</tbody>
-  </table>`;
 }
 
 let _html2pdfAdminPromise = null;
@@ -1930,108 +1964,404 @@ function cargarHtml2PdfAdmin() {
   return _html2pdfAdminPromise;
 }
 
-function estilosPDFAdmin() {
-  return `
-    .pdf-admin-document,.pdf-admin-document *{box-sizing:border-box}
-    .pdf-admin-document{font-family:Arial,sans-serif;padding:12px;color:#1f2937;font-size:10.5px;margin:0;background:#fff;}
-    .pdf-admin-document h1{font-size:19px;margin:0 0 5px;color:#111827;}
-    .pdf-admin-document h2{font-size:16px;margin:0 0 5px;color:#1e3a8a;}
-    .pdf-admin-document .subtitulo{font-size:12px;color:#4b5563;margin-bottom:14px;}
-    .pdf-admin-document .meta{font-size:10px;color:#4b5563;margin-bottom:9px;border-bottom:1px solid #d1d5db;padding-bottom:7px;line-height:1.45;}
-    .pdf-admin-document .nota{border:1px solid #cbd5e1;padding:8px;border-radius:5px;font-size:10.5px;margin-bottom:8px;background:#f8fafc;}
-    .pdf-admin-document .aclaracion{font-size:9.5px;color:#64748b;margin:0 0 7px;line-height:1.35;}
-    .pdf-admin-document .items-table,.pdf-admin-document .resumen-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px;}
-    .pdf-admin-document .items-table thead,.pdf-admin-document .resumen-table thead{display:table-header-group;}
-    .pdf-admin-document .items-table th,.pdf-admin-document .resumen-table th{border:1px solid #cbd5e1;padding:4px;text-align:left;background:#e0e7ff;color:#1e3a8a;font-weight:700;}
-    .pdf-admin-document .items-table td,.pdf-admin-document .resumen-table td{border:1px solid #d1d5db;padding:3px 4px;vertical-align:top;overflow-wrap:anywhere;line-height:1.3;}
-    .pdf-admin-document .items-table tr,.pdf-admin-document .resumen-table tr{break-inside:avoid;page-break-inside:avoid;}
-    .pdf-admin-document .items-table tr.alterno td{background:#f8fafc;}
-    .pdf-admin-document .items-table tr.corregido td{background:#fef9c3;}
-    .pdf-admin-document .items-table tr.manual td{background:#eff6ff;}
-    .pdf-admin-document .centro{text-align:center!important;}.pdf-admin-document .numero{text-align:right!important;white-space:nowrap;}
-    .pdf-admin-document .final{font-weight:800;}.pdf-admin-document .final.ajustado{color:#b91c1c;}
-    .pdf-admin-document .aporte+.aporte{border-top:1px dotted #cbd5e1;margin-top:2px;padding-top:2px;}
-    .pdf-admin-document .correccion-cell{font-size:8.5px;color:#92400e;}
-    .pdf-admin-document .manual-badge{display:inline-block;margin-top:2px;padding:1px 4px;border-radius:8px;background:#dbeafe;color:#1d4ed8;font-size:8px;font-weight:700;}
-    .pdf-admin-document .resumen-table{margin:10px 0 14px;font-size:9.5px;}
-    .pdf-admin-document .resumen-table th,.pdf-admin-document .resumen-table td{padding:5px;}
-    .pdf-admin-document .almacen-pdf-section{padding-top:16px;}
-    .pdf-admin-document .firma{margin-top:34px;display:flex;gap:55px;break-inside:avoid;page-break-inside:avoid;}
-    .pdf-admin-document .firma-box{flex:1;border-top:1px solid #333;padding-top:7px;font-size:10px;color:#4b5563;}
-    .pdf-admin-document .sin-datos{padding:18px;text-align:center;color:#94a3b8;border:1px solid #e2e8f0;}`;
+const PDF_ADMIN_LAYOUT = Object.freeze({
+  izquierda: 10, derecha: 10, arriba: 10, abajo: 12,
+  anchoPagina: 210, altoPagina: 297, anchoContenido: 190,
+  limiteInferior: 282
+});
+
+function textoPDFAdmin(valor) {
+  return String(valor == null ? '' : valor)
+    .replace(/\r/g, '')
+    .replace(/\u00a0/g, ' ');
 }
 
-async function descargarPDFAdmin(filename, contenidoHtml, general = false) {
-  const escala = general ? 1.25 : 2;
-  const calidad = general ? 0.92 : 0.97;
-  const host = document.createElement('div');
-  host.className = 'pdf-admin-document';
-  host.setAttribute('aria-hidden', 'true');
-  // Debe participar en el flujo del documento: html2pdf puede producir una hoja
-  // vacía si la raiz fuente esta posicionada absoluta o fuera del viewport.
-  host.style.cssText = 'position:relative;z-index:10001;width:760px;background:#fff;';
-  host.innerHTML = `<style>${estilosPDFAdmin()}</style>${contenidoHtml}`;
+function cantidadTextoPDFAdmin(valor) {
+  if (valor == null || valor === '') return '—';
+  const n = Number(valor);
+  return Number.isFinite(n)
+    ? n.toLocaleString('es-MX', { maximumFractionDigits: 4 })
+    : textoPDFAdmin(valor);
+}
+
+function lineasTextoPDFAdmin(pdf, valor, ancho) {
+  const resultado = [];
+  for (const parrafo of textoPDFAdmin(valor).split('\n')) {
+    const lineas = pdf.splitTextToSize(parrafo || ' ', Math.max(2, ancho));
+    resultado.push(...(Array.isArray(lineas) ? lineas : [lineas]));
+  }
+  return resultado.length ? resultado : [''];
+}
+
+function escribirLineasPDFAdmin(pdf, lineas, x, y, altoLinea, opciones = {}) {
+  lineas.forEach((linea, i) => pdf.text(textoPDFAdmin(linea), x, y + (i * altoLinea), opciones));
+  return y + (lineas.length * altoLinea);
+}
+
+function nuevaPaginaPDFAdmin(pdf, tituloContinuacion) {
+  pdf.addPage();
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(9);
+  pdf.setTextColor(30, 58, 138);
+  pdf.text(textoPDFAdmin(tituloContinuacion), PDF_ADMIN_LAYOUT.izquierda, 11);
+  pdf.setDrawColor(203, 213, 225);
+  pdf.line(PDF_ADMIN_LAYOUT.izquierda, 14, 200, 14);
+  pdf.setTextColor(31, 41, 55);
+  return 18;
+}
+
+function dibujarTituloPDFAdmin(pdf, titulo, subtitulo, metadatos) {
+  let y = PDF_ADMIN_LAYOUT.arriba + 2;
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(15);
+  pdf.setTextColor(17, 24, 39);
+  const tituloLineas = lineasTextoPDFAdmin(pdf, titulo, PDF_ADMIN_LAYOUT.anchoContenido);
+  y = escribirLineasPDFAdmin(pdf, tituloLineas, PDF_ADMIN_LAYOUT.izquierda, y, 6.2) + 0.5;
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8.5);
+  pdf.setTextColor(75, 85, 99);
+  const subtituloLineas = lineasTextoPDFAdmin(pdf, subtitulo, PDF_ADMIN_LAYOUT.anchoContenido);
+  y = escribirLineasPDFAdmin(pdf, subtituloLineas, PDF_ADMIN_LAYOUT.izquierda, y, 4) + 2;
+
+  pdf.setFontSize(7.5);
+  const metaLineas = metadatos.flatMap(linea => lineasTextoPDFAdmin(pdf, linea, PDF_ADMIN_LAYOUT.anchoContenido - 4));
+  const altoMeta = Math.max(9, (metaLineas.length * 3.5) + 4);
+  pdf.setFillColor(248, 250, 252);
+  pdf.setDrawColor(203, 213, 225);
+  pdf.roundedRect(PDF_ADMIN_LAYOUT.izquierda, y, PDF_ADMIN_LAYOUT.anchoContenido, altoMeta, 1.5, 1.5, 'FD');
+  pdf.setTextColor(75, 85, 99);
+  escribirLineasPDFAdmin(pdf, metaLineas, PDF_ADMIN_LAYOUT.izquierda + 2, y + 3.5, 3.5);
+  return y + altoMeta + 3;
+}
+
+function dibujarParrafoPDFAdmin(pdf, texto, y, { color = [100, 116, 139], tamano = 7.5 } = {}) {
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(tamano);
+  pdf.setTextColor(...color);
+  const lineas = lineasTextoPDFAdmin(pdf, texto, PDF_ADMIN_LAYOUT.anchoContenido);
+  return escribirLineasPDFAdmin(pdf, lineas, PDF_ADMIN_LAYOUT.izquierda, y, 3.6) + 2;
+}
+
+function dibujarAvisoPDFAdmin(pdf, texto, y, tipo = 'info') {
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(7.5);
+  const lineas = lineasTextoPDFAdmin(pdf, texto, PDF_ADMIN_LAYOUT.anchoContenido - 4);
+  const alto = (lineas.length * 3.5) + 4;
+  const esAviso = tipo === 'aviso';
+  pdf.setFillColor(...(esAviso ? [255, 251, 235] : [248, 250, 252]));
+  pdf.setDrawColor(...(esAviso ? [253, 230, 138] : [203, 213, 225]));
+  pdf.roundedRect(PDF_ADMIN_LAYOUT.izquierda, y, PDF_ADMIN_LAYOUT.anchoContenido, alto, 1.5, 1.5, 'FD');
+  pdf.setTextColor(...(esAviso ? [146, 64, 14] : [71, 85, 105]));
+  escribirLineasPDFAdmin(pdf, lineas, PDF_ADMIN_LAYOUT.izquierda + 2, y + 3.5, 3.5);
+  return y + alto + 3;
+}
+
+function dibujarTablaVectorPDFAdmin(pdf, {
+  columnas, filas, y, tituloContinuacion, colorFila
+}) {
+  const altoCabecera = 8;
+  const altoLinea = 3.05;
+  const tamano = 6.4;
+
+  const dibujarCabecera = () => {
+    let x = PDF_ADMIN_LAYOUT.izquierda;
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.2);
+    for (const columna of columnas) {
+      // pdf.text() deja el color del texto como relleno activo del stream, y
+      // jsPDF no vuelve a emitir el suyo si cree que no cambió: sin repetir
+      // setFillColor por celda, la cabecera sale azul sobre azul.
+      pdf.setFillColor(224, 231, 255);
+      pdf.setDrawColor(148, 163, 184);
+      pdf.setTextColor(30, 58, 138);
+      pdf.rect(x, y, columna.ancho, altoCabecera, 'FD');
+      const lineas = lineasTextoPDFAdmin(pdf, columna.titulo, columna.ancho - 2).slice(0, 2);
+      escribirLineasPDFAdmin(pdf, lineas, x + (columna.align === 'right' ? columna.ancho - 1 : 1), y + 3, 2.7,
+        columna.align === 'right' ? { align: 'right' } : {});
+      x += columna.ancho;
+    }
+    y += altoCabecera;
+  };
+
+  if (!filas.length) {
+    return dibujarAvisoPDFAdmin(pdf, 'Sin artículos inventariados.', y);
+  }
+
+  dibujarCabecera();
+  filas.forEach((fila, indice) => {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(tamano);
+    const celdas = columnas.map(columna => ({
+      columna,
+      lineas: lineasTextoPDFAdmin(pdf, fila[columna.clave], columna.ancho - 2)
+    }));
+    const maxLineas = Math.max(1, ...celdas.map(celda => celda.lineas.length));
+    const altoFila = Math.max(6.5, (maxLineas * altoLinea) + 2);
+    if (y + altoFila > PDF_ADMIN_LAYOUT.limiteInferior) {
+      y = nuevaPaginaPDFAdmin(pdf, tituloContinuacion);
+      dibujarCabecera();
+    }
+
+    const fondo = colorFila ? colorFila(fila, indice) : (indice % 2 ? [248, 250, 252] : [255, 255, 255]);
+    let x = PDF_ADMIN_LAYOUT.izquierda;
+    for (const { columna, lineas } of celdas) {
+      pdf.setFillColor(...fondo);
+      pdf.setDrawColor(203, 213, 225);
+      pdf.rect(x, y, columna.ancho, altoFila, 'FD');
+      const color = typeof columna.color === 'function' ? columna.color(fila) : [31, 41, 55];
+      pdf.setTextColor(...color);
+      const posX = columna.align === 'right' ? x + columna.ancho - 1 : x + 1;
+      escribirLineasPDFAdmin(pdf, lineas, posX, y + 3, altoLinea,
+        columna.align === 'right' ? { align: 'right' } : {});
+      x += columna.ancho;
+    }
+    y += altoFila;
+  });
+  return y + 3;
+}
+
+function filasItemsVectorPDFAdmin(items, corrs) {
+  const corrMap = {};
+  (corrs || []).forEach(c => { if (c.codigo) corrMap[c.codigo] = c; });
+  return (items || []).map(item => {
+    const correccion = item.correccion || corrMap[item.codigo];
+    const aportes = (item.aportes || []).length
+      ? item.aportes.map(aporte => `${aporte.operario || 'Sin atribución'} / ${aporte.zona || 'Sin zona'}: ${cantidadTextoPDFAdmin(aporte.cantidad)}`).join('\n')
+      : 'Sin captura individual (agregado por admin)';
+    const detalleCorreccion = correccion
+      ? `${cantidadTextoPDFAdmin(correccion.cantCorregida ?? correccion.qty)}${correccion.operario ? `\npor ${correccion.operario}` : ''}${correccion.nota ? `\n${correccion.nota}` : ''}`
+      : '—';
+    return {
+      codigo: item.codigo,
+      nombre: `${item.nombre || item.codigo}${item.manual ? '\nNo catalogado' : ''}`,
+      unidad: item.unidad || '',
+      contado: cantidadTextoPDFAdmin(item.cantidadContada),
+      final: cantidadTextoPDFAdmin(item.cantidadFinal),
+      aportes,
+      correccion: detalleCorreccion,
+      _manual: !!item.manual,
+      _corregido: !!correccion
+    };
+  });
+}
+
+function dibujarItemsVectorPDFAdmin(pdf, seccion, y, tituloContinuacion) {
+  const columnas = [
+    { clave:'codigo', titulo:'Código', ancho:22 },
+    { clave:'nombre', titulo:'Artículo', ancho:39 },
+    { clave:'unidad', titulo:'UM', ancho:11 },
+    { clave:'contado', titulo:'Contado', ancho:16, align:'right' },
+    { clave:'final', titulo:'Final', ancho:16, align:'right', color:f => f._corregido ? [185, 28, 28] : [31, 41, 55] },
+    { clave:'aportes', titulo:'Quién contó / aportación', ancho:52 },
+    { clave:'correccion', titulo:'Corrección admin', ancho:34, color:f => f._corregido ? [146, 64, 14] : [100, 116, 139] }
+  ];
+  return dibujarTablaVectorPDFAdmin(pdf, {
+    columnas,
+    filas: filasItemsVectorPDFAdmin(seccion.items, seccion.corrs),
+    y,
+    tituloContinuacion,
+    colorFila: (fila, indice) => fila._corregido ? [254, 249, 195]
+      : (fila._manual ? [239, 246, 255] : (indice % 2 ? [248, 250, 252] : [255, 255, 255]))
+  });
+}
+
+function dibujarResumenVectorPDFAdmin(pdf, secciones, y, tituloContinuacion) {
+  const columnas = [
+    { clave:'almacen', titulo:'Almacén', ancho:42 },
+    { clave:'fecha', titulo:'Fecha', ancho:26 },
+    { clave:'capturaron', titulo:'Capturaron', ancho:48 },
+    { clave:'renglones', titulo:'Renglones', ancho:20, align:'right' },
+    { clave:'correcciones', titulo:'Correcciones', ancho:24, align:'right' },
+    { clave:'estado', titulo:'Estado', ancho:30 }
+  ];
+  const filas = secciones.map(seccion => ({
+    almacen: seccion.toma.area || seccion.toma.almacen_nombre,
+    fecha: fechasTomaPDFAdmin(seccion.toma).map(fechaConteoLegible).join('\ny '),
+    capturaron: seccion.toma.operario || '—',
+    renglones: seccion.items.length,
+    correcciones: (seccion.corrs || []).length,
+    estado: seccion.toma.exportedAt ? 'XLSX generado' : 'Sin XLSX (incluida)'
+  }));
+  return dibujarTablaVectorPDFAdmin(pdf, { columnas, filas, y, tituloContinuacion });
+}
+
+function dibujarFirmasVectorPDFAdmin(pdf, y, etiquetas, tituloContinuacion) {
+  if (y + 28 > PDF_ADMIN_LAYOUT.limiteInferior) y = nuevaPaginaPDFAdmin(pdf, tituloContinuacion);
+  y += 18;
+  const separacion = 18;
+  const ancho = (PDF_ADMIN_LAYOUT.anchoContenido - (separacion * (etiquetas.length - 1))) / etiquetas.length;
+  etiquetas.forEach((etiqueta, indice) => {
+    const x = PDF_ADMIN_LAYOUT.izquierda + (indice * (ancho + separacion));
+    pdf.setDrawColor(51, 65, 85);
+    pdf.line(x, y, x + ancho, y);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(75, 85, 99);
+    pdf.text(textoPDFAdmin(etiqueta), x, y + 4);
+  });
+  return y + 8;
+}
+
+function fechasTomaPDFAdmin(toma) {
+  const fechas = (toma?.fechas || []).filter(Boolean);
+  return fechas.length ? fechas : [toma?.fecha].filter(Boolean);
+}
+
+function dibujarMetaAlmacenVectorPDFAdmin(pdf, seccion, y) {
+  const { toma, items, corrs, notaGeneral } = seccion;
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(7.5);
+  pdf.setTextColor(75, 85, 99);
+  const fechas = fechasTomaPDFAdmin(toma);
+  const meta = [
+    `Almacén: ${toma.almacen_nombre} | Fecha: ${fechas.map(fechaConteoLegible).join(' y ')} | Renglones: ${items.length} | Correcciones: ${(corrs || []).length}`,
+    `Capturaron: ${toma.operario || '—'}${toma.exportedBy ? ` | XLSX generado por: ${toma.exportedBy}` : ' | XLSX aún no generado'}`
+  ];
+  // El cambio de día parte la captura en dos filas de D1; el PDF las une y hay
+  // que decirlo, o el total no cuadra contra ninguna fila suelta.
+  if ((toma.tramos || []).length > 1) {
+    meta.push(`Toma unida: el cambio de día la partió en ${toma.tramos.length} tramos — ${toma.tramos.join(' · ')}. Cada zona se suma una sola vez.`);
+  }
+  for (const linea of meta) {
+    const lineas = lineasTextoPDFAdmin(pdf, linea, PDF_ADMIN_LAYOUT.anchoContenido);
+    y = escribirLineasPDFAdmin(pdf, lineas, PDF_ADMIN_LAYOUT.izquierda, y, 3.5);
+  }
+  y += 1.5;
+  pdf.setDrawColor(203, 213, 225);
+  pdf.line(PDF_ADMIN_LAYOUT.izquierda, y, 200, y);
+  y += 3;
+  if (notaGeneral) y = dibujarAvisoPDFAdmin(pdf, `Nota general: ${notaGeneral}`, y);
+  return dibujarParrafoPDFAdmin(pdf,
+    'El total contado suma todas las aportaciones. Si hubo corrección, "Final" muestra el valor administrativo y las aportaciones conservan el conteo original.', y);
+}
+
+function dibujarDocumentoIndividualPDFAdmin(pdf, documento) {
+  const seccion = documento.seccion;
+  const { toma } = seccion;
+  let y = dibujarTituloPDFAdmin(pdf,
+    `${CENTROS[centroDe(toma.almacen_nombre)].nombre} - Toma de inventario`,
+    'Reporte administrativo con autoría por artículo',
+    [`Revisado por: ${documento.revisadoPor || '—'} | Generado: ${documento.generadoEn}`]);
+  y = dibujarMetaAlmacenVectorPDFAdmin(pdf, seccion, y);
+  y = dibujarItemsVectorPDFAdmin(pdf, seccion, y, `${toma.area || toma.almacen_nombre} - continuación`);
+  dibujarFirmasVectorPDFAdmin(pdf, y, ['Firma del Operario', 'Firma del Supervisor'], 'Firmas');
+}
+
+function dibujarDocumentoGeneralPDFAdmin(pdf, documento) {
+  const { centro, fecha, secciones } = documento;
+  const operarios = [...new Set(secciones.flatMap(s => s.operarios || []))];
+  const totalRenglones = secciones.reduce((n, s) => n + s.items.length, 0);
+  const sinXlsx = secciones.filter(s => !s.toma.exportedAt).length;
+  const fechasConteo = [...new Set(secciones.flatMap(s => fechasTomaPDFAdmin(s.toma)))].sort();
+  const rangoConteo = fechasConteo.length > 1
+    ? `${fechaConteoLegible(fechasConteo[0])} a ${fechaConteoLegible(fechasConteo[fechasConteo.length - 1])}`
+    : fechaConteoLegible(fechasConteo[0] || fecha);
+  let y = dibujarTituloPDFAdmin(pdf,
+    `${CENTROS[centro].nombre} - Conteo integral de inventario`,
+    `Fecha del conteo: ${rangoConteo} | Un archivo con todos los almacenes`,
+    [
+      `Almacenes: ${secciones.length} | Renglones: ${totalRenglones} | Personas que capturaron: ${operarios.length}`,
+      `Revisado por: ${documento.revisadoPor || '—'} | Generado: ${documento.generadoEn}`
+    ]);
+  if (sinXlsx) {
+    y = dibujarAvisoPDFAdmin(pdf,
+      `${sinXlsx} toma${sinXlsx !== 1 ? 's' : ''} todavía no ${sinXlsx !== 1 ? 'tienen' : 'tiene'} XLSX. Se ${sinXlsx !== 1 ? 'incluyen' : 'incluye'} de todas formas con el conteo guardado hasta este momento.`,
+      y, 'aviso');
+  }
+  y = dibujarResumenVectorPDFAdmin(pdf, secciones, y, 'Resumen de almacenes - continuación');
+  dibujarParrafoPDFAdmin(pdf,
+    'Cada almacén comienza en una página nueva. Cuando varias personas contaron el mismo artículo, aparecen todas sus aportaciones y la suma conserva el total del conteo.', y);
+
+  let yFinal = y;
+  secciones.forEach(seccion => {
+    pdf.addPage();
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(13);
+    pdf.setTextColor(30, 58, 138);
+    pdf.text(textoPDFAdmin(seccion.toma.area || seccion.toma.almacen_nombre), PDF_ADMIN_LAYOUT.izquierda, 12);
+    let ySeccion = dibujarMetaAlmacenVectorPDFAdmin(pdf, seccion, 18);
+    yFinal = dibujarItemsVectorPDFAdmin(pdf, seccion, ySeccion,
+      `${seccion.toma.area || seccion.toma.almacen_nombre} - continuación`);
+  });
+  dibujarFirmasVectorPDFAdmin(pdf, yFinal,
+    ['Responsable de Inventarios', 'Supervisor / Contraloría'], 'Firmas del conteo integral');
+}
+
+async function crearDocumentoBasePDFAdmin() {
+  await cargarHtml2PdfAdmin();
+  // html2pdf ya trae jsPDF. Se inicializa con un lienzo diminuto y, desde ahí,
+  // todo el reporte se escribe como texto/vector. Así nunca existe el lienzo
+  // gigante que en Safari/Android devolvía páginas blancas.
+  const semilla = document.createElement('div');
+  semilla.setAttribute('aria-hidden', 'true');
+  semilla.style.cssText = 'position:fixed;left:0;bottom:0;width:2px;height:2px;background:#fff;pointer-events:none;';
+  document.body.appendChild(semilla);
+  try {
+    const worker = window.html2pdf().set({
+      margin: 0,
+      image: { type:'jpeg', quality:0.8 },
+      html2canvas: { scale:1, logging:false },
+      jsPDF: { unit:'mm', format:'a4', orientation:'portrait', compress:true }
+    }).from(semilla).toPdf();
+    await worker;
+    return await worker.get('pdf');
+  } finally {
+    semilla.remove();
+  }
+}
+
+function numerarPaginasPDFAdmin(pdf) {
+  const total = pdf.getNumberOfPages();
+  for (let pagina = 1; pagina <= total; pagina++) {
+    pdf.setPage(pagina);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(100, 116, 139);
+    pdf.text(`${pagina} / ${total}`, 200, 291, { align:'right' });
+  }
+}
+
+async function descargarPDFAdmin(filename, documento, general = false) {
   const cover = document.createElement('div');
-  cover.setAttribute('data-html2canvas-ignore', 'true');
   cover.style.cssText = 'position:fixed;inset:0;z-index:10002;background:rgba(255,255,255,.96);color:#166534;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px;font:800 16px system-ui,sans-serif';
-  cover.innerHTML = `${general ? 'Preparando PDF general del restaurante' : 'Preparando PDF administrativo'}<span style="font-size:12px;font-weight:500;margin-top:8px;color:#4b5563">Puede tardar unos segundos…</span>`;
-  document.body.prepend(host);
+  cover.innerHTML = `${general ? 'Preparando PDF integral del restaurante' : 'Preparando PDF administrativo'}<span style="font-size:12px;font-weight:500;margin-top:8px;color:#4b5563">Puede tardar unos segundos…</span>`;
   document.body.appendChild(cover);
   try {
-    await cargarHtml2PdfAdmin();
-    await window.html2pdf().set({
-      margin: [8, 7, 10, 7],
-      filename,
-      image: { type: 'jpeg', quality: calidad },
-      html2canvas: { scale: escala, useCORS: false, logging: false },
-      pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', '.firma'] },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true }
-    }).from(host).save();
+    const pdf = await crearDocumentoBasePDFAdmin();
+    if (documento.tipo === 'general') dibujarDocumentoGeneralPDFAdmin(pdf, documento);
+    else dibujarDocumentoIndividualPDFAdmin(pdf, documento);
+    numerarPaginasPDFAdmin(pdf);
+    pdf.setProperties({
+      title: filename.replace(/\.pdf$/i, ''),
+      subject: 'Conteo de inventario',
+      author: documento.revisadoPor || 'Inventarios Piazza',
+      creator: 'App de inventarios'
+    });
+    const guardado = pdf.save(filename, { returnPromise:true });
+    if (guardado && typeof guardado.then === 'function') await guardado;
   } finally {
     cover.remove();
-    host.remove();
   }
 }
 
 async function generarPDFAdmin(toma, items, corrs, notaGeneral) {
-  const fechaImp = new Date().toLocaleString('es-MX', { timeZone: OPERATING_TIME_ZONE });
-  const seccion = { toma, items, corrs: corrs || [], notaGeneral: notaGeneral || '' };
-  const contenido = `
-    <h1>${esc(CENTROS[centroDe(toma.almacen_nombre)].nombre)} — Toma de inventario</h1>
-    <div class="subtitulo">Reporte administrativo con autoría por artículo · Revisado por ${esc(adminActual || '—')} · Generado ${esc(fechaImp)}</div>
-    ${seccionAlmacenHTMLPDF(seccion, { titulo:false, firmas:true })}`;
-  return descargarPDFAdmin(`Toma_${toma.almacen_nombre}_${toma.fecha}.pdf`, contenido, false);
+  const documento = {
+    tipo: 'individual',
+    revisadoPor: adminActual || '',
+    generadoEn: new Date().toLocaleString('es-MX', { timeZone: OPERATING_TIME_ZONE }),
+    seccion: { toma, items, corrs: corrs || [], notaGeneral: notaGeneral || '' }
+  };
+  return descargarPDFAdmin(`Toma_${toma.almacen_nombre}_${toma.fecha}.pdf`, documento, false);
 }
 
-async function generarPDFAdminGeneral(centro, fecha, secciones, pendientes = 0) {
-  const fechaImp = new Date().toLocaleString('es-MX', { timeZone: OPERATING_TIME_ZONE });
-  const operarios = [...new Set(secciones.flatMap(s => s.operarios || []))];
-  const totalRenglones = secciones.reduce((n, s) => n + s.items.length, 0);
-  const avisoPendientes = pendientes ? `
-    <div class="nota" style="background:#fffbeb;border-color:#fde68a;color:#92400e">
-      ${pendientes} toma${pendientes !== 1 ? 's' : ''} pendiente${pendientes !== 1 ? 's' : ''} no se incluyeron; este archivo contiene solo tomas exportadas.
-    </div>` : '';
-  const portada = `
-    <h1>${esc(CENTROS[centro].nombre)} — Conteo general de inventario</h1>
-    <div class="subtitulo">Fecha del conteo: ${esc(fechaConteoLegible(fecha))} · Un solo archivo con todos los almacenes terminados</div>
-    <div class="meta">
-      <strong>Almacenes:</strong> ${secciones.length} &nbsp;|&nbsp;
-      <strong>Renglones:</strong> ${totalRenglones} &nbsp;|&nbsp;
-      <strong>Personas que capturaron:</strong> ${operarios.length}<br>
-      <strong>Revisado por:</strong> ${esc(adminActual || '—')} &nbsp;|&nbsp;
-      <strong>Generado:</strong> ${esc(fechaImp)}
-    </div>
-    ${avisoPendientes}
-    ${resumenGeneralHTMLPDF(secciones)}
-    <div class="aclaracion">Cada almacén comienza en una página nueva. Cuando varias personas contaron el mismo artículo, aparecen todas sus aportaciones y la suma conserva el total del conteo.</div>`;
-  const detalle = secciones.map(seccion => `
-    <div class="html2pdf__page-break"></div>
-    <section class="almacen-pdf-section">${seccionAlmacenHTMLPDF(seccion)}</section>`).join('');
-  const firmas = `<div class="firma">
-    <div class="firma-box">Responsable de Inventarios</div>
-    <div class="firma-box">Supervisor / Contraloria</div>
-  </div>`;
-  return descargarPDFAdmin(`Conteo_general_${centro}_${fecha}.pdf`, portada + detalle + firmas, true);
+async function generarPDFAdminGeneral(centro, fecha, secciones) {
+  const documento = {
+    tipo: 'general', centro, fecha, secciones,
+    revisadoPor: adminActual || '',
+    generadoEn: new Date().toLocaleString('es-MX', { timeZone: OPERATING_TIME_ZONE })
+  };
+  return descargarPDFAdmin(`Conteo_general_${centro}_${fecha}.pdf`, documento, true);
 }
 
 // ── GROQ CHAT ─────────────────────────────────────────────
@@ -2899,7 +3229,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // el contrato de escritura con el Worker permanece en APP_VERSION 2.
 import { parsePlantilla, hashRaw } from './js/plantilla-parser.js?v=2-r24';
 import { factorDefault, calcularTotalesSesion, cantidadBase, lineasDesglose } from './js/sesion-merge.js?v=2';
-import { construirDatosPDFSesion } from './js/admin-pdf.js?v=1';
+import { construirDatosPDFSesion, unirSesionesDeAlmacen } from './js/admin-pdf.js?v=2';
 window.parsePlantilla = parsePlantilla;
 window.hashRaw = hashRaw;
 window.factorDefault = factorDefault;
@@ -2907,6 +3237,7 @@ window.calcularTotalesSesion = calcularTotalesSesion;
 window.cantidadBase = cantidadBase;
 window.lineasDesglose = lineasDesglose;
 window.construirDatosPDFSesion = construirDatosPDFSesion;
+window.unirSesionesDeAlmacen = unirSesionesDeAlmacen;
 </script>
 </body>
 </html>

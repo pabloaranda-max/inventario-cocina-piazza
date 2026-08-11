@@ -19,8 +19,8 @@ SESIONES = [
      "exportedBy": "Auditor", "articulosContados": 1, "zonasCompletadas": 1,
      "correcciones": 1, "manuales": 0, "comentarios": 0, "operarios": ["Ana", "Luis"]},
     {"almacen": "CAVA", "operario": "Omar", "fecha": "2026-07-31",
-     "updatedAt": "2026-08-01T06:00:00Z", "exportedAt": "2026-08-01T07:00:00Z",
-     "exportedBy": "Auditor", "articulosContados": 1, "zonasCompletadas": 1,
+     "updatedAt": "2026-08-01T06:00:00Z", "exportedAt": "",
+     "articulosContados": 1, "zonasCompletadas": 1,
      "correcciones": 0, "manuales": 0, "comentarios": 0, "operarios": ["Omar"]},
     {"almacen": "GENERAL", "operario": "Pablo", "fecha": "2026-07-31",
      "updatedAt": "2026-08-01T06:00:00Z", "exportedAt": "",
@@ -48,9 +48,28 @@ DETALLES = {
         "zoneSnapshot": [{"nombre": "Racks", "items": [
             {"cod": "CV1", "art": "Vino prueba", "uni": "PZA"}]}],
         "operariosByDevice": {"devO": {"operario": "Omar"}}, "receipts": [],
-        "exportedAt": "2026-08-01T07:00:00Z", "exportedBy": "Auditor"
+        "exportedAt": "", "exportedBy": ""
+    },
+    "GENERAL": {
+        "ok": True, "found": True, "operario": "Pablo", "fecha": "2026-07-31",
+        "countsByZone": {"0:devP": {"GN1": 9}}, "presChoiceByZone": {},
+        "correctionsByZone": {}, "completedZones": [], "manuales": [],
+        "zoneSnapshot": [{"nombre": "Anaqueles", "items": [
+            {"cod": "GN1", "art": "Producto general", "uni": "PZA"}]}],
+        "operariosByDevice": {"devP": {"operario": "Pablo"}}, "receipts": [],
+        "exportedAt": "", "exportedBy": ""
     }
 }
+
+# Una toma larga, equivalente al volumen real de Barra Restaurante (163
+# renglones), obliga al generador a paginar y protege contra el PDF blanco que
+# provocaba rasterizar toda la tabla en un solo canvas.
+for indice in range(2, 172):
+    codigo = f"CV{indice:03d}"
+    DETALLES["CAVA"]["countsByZone"]["0:devO"][codigo] = indice / 10
+    DETALLES["CAVA"]["zoneSnapshot"][0]["items"].append(
+        {"cod": codigo, "art": f"Vino prueba {indice:03d}", "uni": "PZA"})
+SESIONES[1]["articulosContados"] = 171
 
 
 class Stub:
@@ -75,7 +94,8 @@ class Stub:
             route.fulfill(json=DETALLES.get(almacen, {"ok": True, "found": False}))
         elif parsed.path.endswith("/inv/plantilla"):
             almacen = query.get("almacen", [""])[0]
-            unidades = {"COCINA": {"MP1": "KG"}, "CAVA": {"CV1": "PZA"}}
+            unidades = {"COCINA": {"MP1": "KG"}, "CAVA": {"CV1": "PZA"},
+                        "GENERAL": {"GN1": "PZA"}}
             route.fulfill(json={"ok": True, "found": True, "raw": None,
                                 "unitMap": unidades.get(almacen, {}),
                                 "presMap": {}, "defaultPres": {}})
@@ -115,9 +135,21 @@ try:
         boton = page.locator(".btn-pdf-general")
         check(boton.count() == 1, "hay un boton general para restaurante y fecha")
         texto = boton.inner_text()
-        check("Piazza Pasticcio" in texto and "2 almacenes" in texto,
-              "el boton anuncia los dos almacenes terminados")
-        check("1 pendiente" in texto, "la toma pendiente queda explicitamente fuera")
+        check("Piazza Pasticcio" in texto and "3 almacenes" in texto,
+              "el boton integral anuncia todas las tomas aun sin XLSX")
+        check("pendiente" not in texto.lower(),
+              "el PDF integral ya no depende del estado de exportacion XLSX")
+
+        # El generador solo debe usar un lienzo semilla diminuto. El reporte se
+        # escribe como texto/vector para no rebasar el limite de canvas en movil.
+        page.evaluate("""() => {
+          window.__pdfCanvasAreas = [];
+          const original = HTMLCanvasElement.prototype.toDataURL;
+          HTMLCanvasElement.prototype.toDataURL = function(...args) {
+            window.__pdfCanvasAreas.push(this.width * this.height);
+            return original.apply(this, args);
+          };
+        }""")
 
         # Ejecuta html2pdf real antes de sustituir los generadores para inspeccionar
         # sus argumentos en las pruebas siguientes.
@@ -128,15 +160,40 @@ try:
         check(bool(descarga), "html2pdf real genera y descarga el PDF administrativo")
         check(descarga.suggested_filename == "Toma_COCINA_2026-07-31.pdf",
               "la descarga real conserva el nombre del PDF administrativo")
-        check(os.path.getsize(descarga.path()) > 5000,
-              "el PDF individual contiene el reporte renderizado, no una pagina vacia")
+        check(os.path.getsize(descarga.path()) > 3000,
+              "el PDF individual contiene el reporte, no una pagina vacia")
+        texto_individual = subprocess.check_output(
+            ["pdftotext", str(descarga.path()), "-"], text=True)
+        check("Producto compartido" in texto_individual and "Ana" in texto_individual,
+              "el PDF individual contiene texto seleccionable y datos de la toma")
+
+        tarjeta_cava = page.locator(".toma-card").filter(has_text="CAVA")
+        with page.expect_download(timeout=60000) as descarga_cava_info:
+            tarjeta_cava.locator("button").filter(has_text="PDF").click()
+        descarga_cava = descarga_cava_info.value
+        texto_cava = subprocess.check_output(
+            ["pdftotext", str(descarga_cava.path()), "-"], text=True)
+        info_cava = subprocess.check_output(
+            ["pdfinfo", str(descarga_cava.path())], text=True)
+        paginas_cava = int(next(line.split(":", 1)[1] for line in info_cava.splitlines()
+                                if line.startswith("Pages:")))
+        check("Vino prueba 171" in texto_cava and paginas_cava > 1,
+              "una toma de 171 articulos se pagina completa y no sale blanca")
         with page.expect_download(timeout=60000) as descarga_general_info:
             boton.click()
         descarga_general = descarga_general_info.value
         check(descarga_general.suggested_filename == "Conteo_general_PIAZZA_2026-07-31.pdf",
               "html2pdf real descarga tambien el consolidado en un solo archivo")
-        check(os.path.getsize(descarga_general.path()) > 8000,
-              "el PDF general contiene portada y almacenes renderizados")
+        check(os.path.getsize(descarga_general.path()) > 4000,
+              "el PDF integral contiene portada y almacenes")
+        texto_general_pdf = subprocess.check_output(
+            ["pdftotext", str(descarga_general.path()), "-"], text=True)
+        check(all(nombre in texto_general_pdf for nombre in
+                  ["Producto compartido", "Vino prueba 171", "Producto general"]),
+              "el PDF integral contiene los tres almacenes, incluidos los que no tienen XLSX")
+        areas_canvas = page.evaluate("window.__pdfCanvasAreas")
+        check(not areas_canvas or max(areas_canvas) <= 100,
+              f"el PDF no rasteriza la tabla completa en un lienzo gigante ({areas_canvas})")
         page.wait_for_function("!document.querySelector('.btn-pdf-general')?.disabled")
 
         page.evaluate("""() => {
@@ -149,17 +206,17 @@ try:
         boton.click()
         page.wait_for_function("Array.isArray(window.__generalArgs)")
         general = page.evaluate("""() => {
-          const [centro, fecha, secciones, pendientes] = window.__generalArgs;
+          const [centro, fecha, secciones] = window.__generalArgs;
           const cocina = secciones.find(s => s.toma.almacen_nombre === 'COCINA');
           const item = cocina.items.find(i => i.codigo === 'MP1');
-          return { centro, fecha, pendientes, almacenes: secciones.map(s => s.toma.almacen_nombre), item };
+          return { centro, fecha, almacenes: secciones.map(s => s.toma.almacen_nombre), item };
         }""")
         check(general["centro"] == "PIAZZA" and general["fecha"] == "2026-07-31",
               "el consolidado conserva restaurante y fecha")
-        check(sorted(general["almacenes"]) == ["CAVA", "COCINA"],
-              "el consolidado incluye todas y solo las tomas terminadas")
-        check(general["pendientes"] == 1 and "GENERAL" not in stub.detalles_pedidos,
-              "una toma pendiente no se descarga ni se mezcla")
+        check(sorted(general["almacenes"]) == ["CAVA", "COCINA", "GENERAL"],
+              "el consolidado incluye todas las tomas aunque no tengan XLSX")
+        check("GENERAL" in stub.detalles_pedidos and "CAVA" in stub.detalles_pedidos,
+              "las tomas sin XLSX se consultan y se incorporan")
         check(general["item"]["cantidadContada"] == 5 and general["item"]["cantidadFinal"] == 6,
               "conteo original y correccion final permanecen separados")
         check(general["item"]["aportes"] == [
@@ -176,13 +233,18 @@ try:
           await window.__generarGeneralReal(...args);
         }""")
         general_download = page.evaluate("window.__generalDownloadArgs")
-        html_general = general_download[1]
+        documento_general = general_download[1]
         check(general_download[0] == "Conteo_general_PIAZZA_2026-07-31.pdf",
               "el archivo general recibe un nombre enviable y estable")
-        check(html_general.count('class="almacen-pdf-section"') == 2,
-              "cada almacen del consolidado inicia en pagina propia")
-        check("Ana" in html_general and "Luis" in html_general and "Camara fria" in html_general,
-              "el HTML del PDF general imprime ambas autorias y la zona")
+        check(documento_general["tipo"] == "general" and
+              len(documento_general["secciones"]) == 3,
+              "el documento integral conserva las tres secciones paginables")
+        cocina_doc = next(s for s in documento_general["secciones"]
+                          if s["toma"]["almacen_nombre"] == "COCINA")
+        check(cocina_doc["items"][0]["aportes"] == [
+            {"operario": "Ana", "zona": "Camara fria", "cantidad": 2},
+            {"operario": "Luis", "zona": "Camara fria", "cantidad": 3}],
+              "el documento integral conserva ambas autorias y la zona")
 
         tarjeta_cocina.locator("button").filter(has_text="PDF").click()
         page.wait_for_function("Array.isArray(window.__individualArgs)")
@@ -203,9 +265,10 @@ try:
           };
           await window.__generarIndividualReal(...args);
         }""")
-        html_individual = page.evaluate("window.__individualDownloadArgs[1]")
-        check("Quién contó / aportación" in html_individual and "Validado en bascula" in html_individual,
-              "el PDF individual imprime autoria y correccion administrativa")
+        documento_individual = page.evaluate("window.__individualDownloadArgs[1]")
+        check(documento_individual["tipo"] == "individual" and
+              documento_individual["seccion"]["corrs"][0]["nota"] == "Validado en bascula",
+              "el PDF individual conserva autoria y correccion administrativa")
 
         check(not errores, "admin.html carga y ejecuta sin errores JavaScript")
         context.close()

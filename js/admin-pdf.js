@@ -88,6 +88,59 @@ export function construirAportesPorCodigo(sesion, plantilla, nombresLegacy = [])
   return { aportesPorCodigo, totalesContados };
 }
 
+// Un almacen es UN conteo. Cuando la captura cruza la medianoche, D1 la parte
+// en una fila por fecha y cada fila ignora lo que conto la otra; el PDF las
+// vuelve a unir. Las claves de countsByZone son `indiceZona:dispositivo`, asi
+// que zonas distintas se suman y una zona recapturada gana la fecha mas nueva.
+export function unirSesionesDeAlmacen(sesiones) {
+  const orden = [...sesiones].sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+  const unida = {
+    operario: '', countsByZone: {}, presChoiceByZone: {},
+    correctionsByZone: {}, manuales: [], zoneSnapshot: [],
+    operariosByDevice: {}, receipts: [], completedZones: [], lockedZones: {},
+    exportedAt: '', exportedBy: '', templateHash: '', templateHashes: [],
+    fechas: [], tramos: []
+  };
+  const zonasCerradas = new Set();
+  for (const sesion of orden) {
+    // Cada dispositivo lleva su zona completa (el cliente sincroniza con la
+    // fecha fija de SU toma), asi que zonas distintas se suman y una misma zona
+    // recapturada mas tarde gana: nunca se suma dos veces el mismo conteo.
+    for (const [claveZona, conteos] of Object.entries(sesion?.countsByZone || {})) {
+      unida.countsByZone[claveZona] = { ...(unida.countsByZone[claveZona] || {}), ...conteos };
+    }
+    for (const [claveZona, pres] of Object.entries(sesion?.presChoiceByZone || {})) {
+      unida.presChoiceByZone[claveZona] = { ...(unida.presChoiceByZone[claveZona] || {}), ...pres };
+    }
+    // Todas las claves, no solo _admin: las correcciones por zona alimentan las
+    // observaciones que el export manda a Sheets.
+    for (const [claveZona, corrs] of Object.entries(sesion?.correctionsByZone || {})) {
+      unida.correctionsByZone[claveZona] = { ...(unida.correctionsByZone[claveZona] || {}), ...corrs };
+    }
+    unida.manuales.push(...(sesion?.manuales || []));
+    unida.receipts.push(...(sesion?.receipts || []));
+    Object.assign(unida.operariosByDevice, sesion?.operariosByDevice || {});
+    Object.assign(unida.lockedZones, sesion?.lockedZones || {});
+    for (const zona of (sesion?.completedZones || [])) zonasCerradas.add(zona);
+    (sesion?.zoneSnapshot || []).forEach((zona, i) => { if (zona) unida.zoneSnapshot[i] = zona; });
+    if (sesion?.operario) unida.operario = String(sesion.operario);
+    if (sesion?.templateHash) {
+      unida.templateHash = sesion.templateHash;
+      if (!unida.templateHashes.includes(sesion.templateHash)) unida.templateHashes.push(sesion.templateHash);
+    }
+    if (sesion?.fecha) {
+      unida.fechas.push(sesion.fecha);
+      unida.tramos.push({ fecha: sesion.fecha, operario: sesion.operario || '', exportedAt: sesion.exportedAt || '' });
+    }
+    if (sesion?.exportedAt) {
+      unida.exportedAt = sesion.exportedAt;
+      unida.exportedBy = sesion.exportedBy || '';
+    }
+  }
+  unida.completedZones = [...zonasCerradas];
+  return unida;
+}
+
 export function construirDatosPDFSesion({
   sesion,
   plantilla = {},

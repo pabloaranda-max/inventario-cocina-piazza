@@ -45,6 +45,84 @@ patrón se repite, tres entradas honestas apuntan mejor que una teoría inventad
 
 ---
 
+## 2026-07-31 — Dos operarios en el mismo celular: el segundo cierre borró el conteo del primero
+
+- **Impacto:** en COCINA, durante la primera toma 100 % digital, **Lau perdió 18 artículos
+  de una zona ya cerrada**. Cerró a las 05:27:55Z con 18 artículos; tres minutos después
+  Enrique cerró desde el **mismo dispositivo** (`mrv09m7me1xm0i0nb8i`) con 3 artículos, y
+  la rebanada quedó con esos 3. Silencioso: ambos POST devolvieron 200 y la app mostró la
+  zona cerrada correctamente. Sin pérdida final —los 18 vivían íntegros en el acuse— pero
+  de haber exportado sin revisar, 15 artículos de repostería (chocolates, avellana,
+  pistache, crema para batir) habrían entrado a Xetux como CERO. El mismo mecanismo se
+  llevó una rebanada de 2 artículos de Pablo en ALIMENTARI.
+- **Detección:** por reconciliación, no por aviso. Nadie reportó nada. Al comparar los 28
+  acuses de la jornada contra las sesiones vivas, apareció una rebanada cuyo acuse
+  histórico tenía 18 códigos y la sesión 3.
+- **Causa raíz:** **confirmada.** La clave de rebanada es `zonaIdx:deviceId`
+  (`js/sesion-merge.js:9`) y **no incluye al operario**. `mergeZoneMap` reemplaza la
+  rebanada completa cuando la clave lleva `:` —comportamiento correcto y deliberado, es lo
+  que permite borrar una cantidad—, así que dos personas que usan el mismo aparato
+  comparten clave y la última escritura gana. La atribución también se pierde:
+  `operarios_by_device` guarda solo el último operario por dispositivo, así que la sesión
+  quedó diciendo que esa rebanada era de Enrique.
+- **Evidencia:** acuse `2026-08-01T05:27:55.277Z` (Laura, 18 ítems) y acuse
+  `2026-08-01T05:30:20.063Z` (Enrique, 3 ítems), ambos con `device_id`
+  `mrv09m7me1xm0i0nb8i` y `zone_key` `0:mrv09m7me1xm0i0nb8i`. Los 3 de Enrique son códigos
+  distintos a los 18 de Lau: no fue un recuento, fue un reemplazo. De los 18, 17 no
+  chocaban con nadie; el MP0482 sí, y era duplicado exacto del que ya tenía Lucero
+  (13 × PIEZA .980KG en ambos).
+- **Resolución:** los 17 se restauraron el 2026-08-01 en una rebanada nueva
+  `0:mrv09m7me1xm0i0nb8i-lau` vía `POST /inv/sesion`, aditiva, sin tocar los 3 de Enrique.
+  Verificado contra el acuse artículo por artículo. **El bug sigue en producción:** nada
+  impide que vuelva a pasar mañana.
+- **Lección:** **lo que salvó la toma fue R23.** `inv_receipts` es append-only y ningún
+  `DELETE` del Worker la toca; sin los acuses, esta pérdida habría sido irreversible y
+  probablemente invisible. Segunda lección: **la clave colaborativa protege contra
+  dispositivos distintos, no contra personas distintas.** En un almacén con más operarios
+  que teléfonos —que fue el caso de COCINA, 9 personas— compartir aparato es lo normal, no
+  la excepción. El arreglo es incluir al operario en la clave o generar `deviceId` nuevo al
+  cambiar de operario.
+
+---
+
+## 2026-07-31 — La toma se partió en tres fechas y el export habría puesto en cero lo contado
+
+- **Impacto:** la primera toma 100 % digital quedó repartida en **filas de tres fechas
+  distintas**: ALIMENTARI y COCINA con una fila del 31/07 y otra del 01/08, y
+  BARRA_RESTAURANTE con 127 artículos de contrabarra en una fila del **28/07**. Como el
+  export es por `(almacen, fecha)`, exportar cualquiera de ellas habría mandado a Xetux
+  como CERO lo que contó la otra: **159 artículos en riesgo**. Sin pérdida final: se
+  detectó antes de exportar y ninguna toma se había exportado.
+- **Detección:** al listar las sesiones escritas durante la jornada apareció una fila con
+  `fecha = 2026-07-28` actualizada a las 05:57Z de hoy, y dos almacenes con dos filas cada
+  uno.
+- **Causa raíz:** **confirmada, y son dos mecanismos distintos.** (1) `inv_sesiones` tiene
+  `PRIMARY KEY (almacen, fecha)` y el cliente propone `fechaOperativaCDMX()`: una toma que
+  cruza la medianoche real de CDMX arranca fila nueva. La app **sí avisa**
+  ("Iniciada otro día y sin cerrar. Continúala para que el conteo no se fragmente",
+  `inventario.html:1096`) con botón "Continuar esta toma", pero el aviso es ignorable y se
+  ignoró. (2) El dispositivo de Carlos (`ms57xty69bmf4nhv8pv`, creado el 28/07 16:19 CDMX)
+  nunca recargó la app: siguió mandando el hash de plantilla viejo `0a43e966cd7c3a55`
+  cuando el vigente era `95df67c1ba3e805a`, y escribió el conteo de hoy en su sesión del 28.
+- **Evidencia:** acuse `2026-08-01T05:57:05.677Z` de Carlos, 127 ítems, `fecha` 2026-07-28,
+  zona "CONTRA BARRA". En paralelo, la zona "Contrabarra" de la toma del 31 figuraba sin
+  capturar. Los 127 códigos sí existen en la plantilla vigente, así que no habrían caído
+  del XLSX por código ausente — habrían caído por estar en la fecha equivocada.
+- **Resolución:** consolidado el 2026-08-01 en la fila del 31/07 de cada almacén, con
+  escrituras aditivas y las filas origen intactas. El caso de Carlos necesitó **remapear la
+  zona 2 → 1**: en la preparación legacy el índice 2 era "CONTRA BARRA", pero en la
+  preparación vigente (`cfg_ms8l5pdn9ldn`) el 2 es "Refris servicio" y "Contrabarra" es el
+  1; sin remapear, la app habría dado por contada una zona que sigue pendiente.
+- **Lección:** **la regla de negocio y el modelo de datos no coinciden.** Para Piazza un
+  almacén es UN conteo sin importar el cambio de día; para el sistema, la fecha es parte de
+  la llave primaria. Mientras no se cierre esa brecha, toda toma que cruce la medianoche
+  hay que consolidarla a mano antes de exportar. Segunda lección: **un aviso que se puede
+  ignorar no es una guarda.** Tercera: un dispositivo con la PWA en caché puede seguir
+  escribiendo contra una plantilla vieja días después, y el `template_hash` de la sesión es
+  la señal que lo delata.
+
+---
+
 ## 2026-07-31 — La plantilla de ALIMENTARI pasó por GENERAL y dejó 230 artículos pegados
 
 - **Impacto:** durante la carga de las 7 plantillas frescas de Piazza, XTINV000288

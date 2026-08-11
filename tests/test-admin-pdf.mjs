@@ -6,6 +6,7 @@ import {
   dispositivoDeZona,
   nombreZonaSesion,
   operarioDeZona,
+  unirSesionesDeAlmacen,
 } from '../js/admin-pdf.js';
 
 const plantilla = {
@@ -86,3 +87,89 @@ assert.equal(datos.notaGeneral, 'MP1: Revisar empaque');
 assert.deepEqual(datos.operarios, ['Ana', 'Luis', 'Operario legacy']);
 
 console.log('✅ admin-pdf: autoria multiple y correcciones OK');
+
+// Un almacen es UN conteo: la toma que cruza la medianoche deja dos filas en D1
+// y el PDF las une sin duplicar el almacen ni perder la mitad del conteo.
+const tramoNoche = {
+  fecha: '2026-08-09', operario: 'Alexin',
+  countsByZone: { '1:devTienda': { MP1: 2, MP2: 5 } },
+  presChoiceByZone: { '1:devTienda': { MP1: 1 } },
+  correctionsByZone: { _admin: { MP2: { qty: 4, operario: 'Auditora' } } },
+  manuales: [{ id: 'n1', nombre: 'Caja suelta', cantidad: 1, zona: 'Tienda', deviceId: 'devTienda' }],
+  zoneSnapshot: [{ nombre: 'Almacén', items: [] }, { nombre: 'Tienda', items: [] }],
+  operariosByDevice: { devTienda: { operario: 'Alexin' } },
+  exportedAt: '2026-08-10T05:00:00.000Z', exportedBy: 'pablo'
+};
+const tramoManana = {
+  fecha: '2026-08-10', operario: 'Pablo',
+  countsByZone: { '0:devAlmacen': { MP1: 3, MP3: 7 } },
+  presChoiceByZone: { '0:devAlmacen': { MP1: 1 } },
+  manuales: [],
+  zoneSnapshot: [{ nombre: 'Almacén', items: [] }, { nombre: 'Tienda', items: [] }],
+  operariosByDevice: { devAlmacen: { operario: 'Pablo' } }
+};
+
+const unida = unirSesionesDeAlmacen([tramoManana, tramoNoche]); // desordenadas a proposito
+const datosUnidos = construirDatosPDFSesion({ sesion: unida, plantilla });
+assert.deepEqual(
+  datosUnidos.items.filter(i => !i.manual).map(i => i.codigo).sort(),
+  ['MP1', 'MP2', 'MP3']
+);
+const unidoMP1 = datosUnidos.items.find(item => item.codigo === 'MP1');
+assert.equal(unidoMP1.cantidadContada, 5); // 2 (Tienda) + 3 (Almacén), sin pisarse
+assert.deepEqual(unidoMP1.aportes, [
+  { operario: 'Alexin', zona: 'Tienda', cantidad: 2 },
+  { operario: 'Pablo', zona: 'Almacén', cantidad: 3 }
+]);
+assert.deepEqual(datosUnidos.operarios, ['Alexin', 'Pablo']);
+// La correccion admin y el manual de un tramo sobreviven a la union.
+assert.equal(datosUnidos.items.find(item => item.codigo === 'MP2').cantidadFinal, 4);
+assert.equal(datosUnidos.items.filter(item => item.manual).length, 1);
+// exportedAt gana el tramo que sí se exportó, aunque llegue primero en la lista.
+assert.equal(unida.exportedBy, 'pablo');
+
+// Unir un solo tramo no cambia nada: los almacenes de un día siguen igual.
+assert.deepEqual(
+  construirDatosPDFSesion({ sesion: unirSesionesDeAlmacen([tramoNoche]), plantilla }).items,
+  construirDatosPDFSesion({ sesion: tramoNoche, plantilla }).items
+);
+
+console.log('✅ admin-pdf: toma partida por el cambio de día se une en un almacén OK');
+
+// Lo que el EXPORT necesita de la union y el PDF no usaba. Si algo de esto se
+// pierde, el XLSX manda a Xetux como CERO lo que contó el otro tramo.
+const exportA = {
+  fecha: '2026-08-09', operario: 'Alexin', templateHash: 'hashViejo',
+  countsByZone: { '1:devTienda': { MP1: 2 } },
+  correctionsByZone: {
+    '1:devTienda': { MP1: { qty: 2, operario: 'Alexin' } },
+    _admin: { MP2: { qty: 9, operario: 'Auditora' } }
+  },
+  completedZones: ['1:devTienda'],
+  lockedZones: { '1': 'devTienda' },
+  zoneSnapshot: [{ nombre: 'Almacén' }, { nombre: 'Tienda' }],
+  exportedAt: '2026-08-10T05:00:00.000Z', exportedBy: 'pablo'
+};
+const exportB = {
+  fecha: '2026-08-10', operario: 'Pablo', templateHash: 'hashNuevo',
+  countsByZone: { '0:devAlmacen': { MP3: 4 } },
+  correctionsByZone: { '0:devAlmacen': { MP3: { qty: 4, operario: 'Pablo' } } },
+  completedZones: ['0:devAlmacen'],
+  lockedZones: { '0': 'devAlmacen' },
+  zoneSnapshot: [{ nombre: 'Almacén' }, { nombre: 'Tienda' }]
+};
+const paraExport = unirSesionesDeAlmacen([exportB, exportA]);
+// Las zonas cerradas de los dos tramos: sin esto el aviso de "zonas sin cerrar"
+// asusta con zonas que sí se cerraron el otro día.
+assert.deepEqual([...paraExport.completedZones].sort(), ['0:devAlmacen', '1:devTienda']);
+assert.deepEqual(paraExport.lockedZones, { '0': 'devAlmacen', '1': 'devTienda' });
+// correctionsByZone completo, no solo _admin: alimenta las observaciones a Sheets.
+assert.deepEqual(Object.keys(paraExport.correctionsByZone).sort(), ['0:devAlmacen', '1:devTienda', '_admin']);
+// Los dos hashes quedan a la vista para poder exigir revisión de plantilla.
+assert.deepEqual(paraExport.templateHashes.sort(), ['hashNuevo', 'hashViejo']);
+// Los tramos se ordenan por fecha aunque lleguen al revés, y traen su estado.
+assert.deepEqual(paraExport.fechas, ['2026-08-09', '2026-08-10']);
+assert.deepEqual(paraExport.tramos.map(t => `${t.fecha}:${t.operario}:${t.exportedAt ? 'exp' : 'pend'}`),
+  ['2026-08-09:Alexin:exp', '2026-08-10:Pablo:pend']);
+
+console.log('✅ admin-pdf: la unión conserva lo que el export manda a Xetux OK');
