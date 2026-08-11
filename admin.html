@@ -803,6 +803,49 @@ function conteosDeSesiones(sesiones) {
                              || tituloAlmacen(a.almacen).localeCompare(tituloAlmacen(b.almacen), 'es'));
 }
 
+// El total exacto de un conteo unido no está en /inv/sesiones: esa lista trae
+// artículos POR FILA y sumarlas contaría dos veces los códigos presentes en los
+// dos tramos (en ALIMENTARI, 31 de 81 — sumar daría 112). La unión exige las
+// sesiones completas, así que la tarjeta pinta primero una cota ("66+") y la
+// afina enseguida, pidiendo tramos SOLO de las tarjetas unidas (hoy: una).
+// La clave lleva updatedAt, así que cualquier cambio invalida el caché solo.
+const _articulosDeConteo = new Map();
+
+function claveConteo(c) {
+  return `${c.almacen}|${c.fechas.join(',')}|${c.updatedAt}`;
+}
+
+function pintarArticulosDeConteo(clave) {
+  const exacto = _articulosDeConteo.get(clave);
+  if (exacto == null) return;
+  document.querySelectorAll(`[data-conteo-articulos="${CSS.escape(clave)}"]`)
+    .forEach(el => { el.textContent = `${exacto} artículos`; });
+}
+
+async function afinarArticulosDeConteos(conteos) {
+  for (const c of conteos.filter(x => x.tramos.length > 1)) {
+    const clave = claveConteo(c);
+    if (_articulosDeConteo.has(clave)) { pintarArticulosDeConteo(clave); continue; }
+    try {
+      const sesiones = await Promise.all(c.fechas.map(async f => {
+        const r = await fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(c.almacen) + '&fecha=' + encodeURIComponent(f));
+        return r.json();
+      }));
+      const cods = new Set();
+      for (const S of sesiones) {
+        if (!S?.ok || !S.found) throw new Error('tramo no disponible');
+        for (const zc of Object.values(S.countsByZone || {}))
+          for (const cod of Object.keys(zc || {})) cods.add(cod);
+      }
+      _articulosDeConteo.set(clave, cods.size);
+      pintarArticulosDeConteo(clave);
+    } catch (_) {
+      // Sin red o con un tramo caído se queda la cota: mejor "66+" que un número
+      // inventado, y el reintento llega solo en el siguiente refresco.
+    }
+  }
+}
+
 function renderSesionesInventario() {
   const el = document.getElementById('sesiones-container');
   if (!el) return;
@@ -814,7 +857,8 @@ function renderSesionesInventario() {
     el.innerHTML = '<div class="empty-state" style="background:white;border-radius:10px">Sin tomas en los últimos 30 días</div>';
     return;
   }
-  el.innerHTML = conteosDeSesiones(sesiones).map(c => {
+  const conteos = conteosDeSesiones(sesiones);
+  el.innerHTML = conteos.map(c => {
     const todoExportado = c.exportados === c.tramos.length;
     const exp = todoExportado
       ? `<span style="background:#dcfce7;color:#166534;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">${ic('circle-check',11)} Exportada</span>`
@@ -848,7 +892,7 @@ function renderSesionesInventario() {
         <div class="toma-almacen">${esc(c.almacen)}</div>
       </div>
       <div class="toma-meta">
-        Fecha ${esc(fechaTxt)} · ${c.articulos}${c.articulosAprox ? '+' : ''} artículos · ${c.zonas} zonas listas${manTxt}${comTxt}${corrTxt} · Actualizada ${updated}${exportTxt}
+        Fecha ${esc(fechaTxt)} · <span data-conteo-articulos="${esc(claveConteo(c))}">${c.articulos}${c.articulosAprox ? '+' : ''} artículos</span> · ${c.zonas} zonas listas${manTxt}${comTxt}${corrTxt} · Actualizada ${updated}${exportTxt}
       </div>
       ${notaUnida}
       <div class="toma-footer" style="flex-wrap:wrap;gap:6px;">
@@ -865,6 +909,8 @@ function renderSesionesInventario() {
       </div>
     </div>`;
   }).join('');
+  // Después de pintar, no antes: la lista no espera a los fetches del afinado.
+  afinarArticulosDeConteos(conteos);
 }
 
 function zonaNombre(almacen, zid) {
