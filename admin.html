@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<!-- Sello de versión de ESTE archivo. Va en el <head> para que quepa en los
+     primeros 4 KB: la comprobación de "pestaña vieja" pide solo ese pedazo en
+     vez del HTML entero. Subirlo en cada deploy que cambie la interfaz. -->
+<meta name="build" content="2026-08-11-a">
 <title>Admin — Inventario Piazza Pasticcio</title>
 <link rel="icon" type="image/png" href="branding/icon-admin-192.png">
 <link rel="apple-touch-icon" href="branding/icon-admin-180.png">
@@ -543,7 +547,11 @@ async function login() {
   document.getElementById('pantalla-admin').style.display = 'block';
   document.getElementById('admin-nombre-display').textContent = `Admin — ${adminActual}`;
   cargarSesionesInventario();
+  // Al entrar y cada 10 min: la pestaña del admin se queda abierta días.
+  revisarVersionInterfaz();
+  if (!_timerVersion) _timerVersion = setInterval(revisarVersionInterfaz, 600000);
 }
+let _timerVersion = null;
 
 function logout() {
   document.getElementById('pantalla-login').style.display = 'flex';
@@ -675,19 +683,55 @@ function renderHistoricosSheets() {
 }
 
 // R12 — este admin quedó atrás del formato de datos: avisar y recargar sin caché
-function mostrarBannerUpdate() {
-  if (document.getElementById('update-banner')) return;
-  const b = document.createElement('div');
+function mostrarBannerUpdate(mensaje, color = '#b45309') {
+  const previo = document.getElementById('update-banner');
+  // El aviso de protocolo (R12) manda sobre el de interfaz: exportar con el
+  // formato viejo sí corrompe datos; una interfaz vieja solo desconcierta.
+  if (previo && previo.dataset.critico === '1') return;
+  const b = previo || document.createElement('div');
   b.id = 'update-banner';
-  b.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#b45309;color:#fff;z-index:10001;font:600 12px system-ui;padding:8px 12px;text-align:center';
-  b.innerHTML = 'Admin desactualizado: hay una versión nueva con otro formato de datos — exportar así puede salir mal. <button onclick="forzarActualizacion()" style="margin-left:8px;border:none;border-radius:6px;padding:4px 10px;font-weight:700;cursor:pointer">Actualizar</button>';
-  document.body.appendChild(b);
+  b.dataset.critico = color === '#b45309' ? '1' : '0';
+  b.style.cssText = `position:fixed;top:0;left:0;right:0;background:${color};color:#fff;z-index:10001;font:600 12px system-ui;padding:8px 12px;text-align:center`;
+  b.innerHTML = `${esc(mensaje)} <button onclick="forzarActualizacion()" style="margin-left:8px;border:none;border-radius:6px;padding:4px 10px;font-weight:700;cursor:pointer">Actualizar</button>`;
+  if (!previo) document.body.appendChild(b);
 }
 
 function forzarActualizacion() {
   const u = new URL(location.href);
   u.searchParams.set('v', Date.now()); // atraviesa la caché de Pages
   location.replace(u.toString());
+}
+
+// ── Pestaña vieja tras un deploy ───────────────────────────
+// El banner R12 solo salta cuando el Worker sube minAppVersion, es decir ante
+// un cambio de FORMATO. Un cambio de interfaz no toca el protocolo, así que una
+// pestaña abierta seguía corriendo la versión vieja en silencio hasta que
+// alguien se acordaba del truco del ?v=. Esto lo detecta: compara el sello del
+// <head> contra el del servidor. GitHub Pages cachea ~10 min, así que el aviso
+// aparece dentro de ese margen, no al instante.
+const BUILD_LOCAL = document.querySelector('meta[name="build"]')?.content || '';
+
+async function buildDelServidor() {
+  const u = new URL(location.pathname, location.origin);
+  u.searchParams.set('v', Date.now());   // atraviesa la caché de Pages
+  const r = await fetch(u.toString(), {
+    cache: 'no-store',
+    headers: { Range: 'bytes=0-4095' }   // el sello vive en el <head>
+  });
+  if (!r.ok) return '';
+  return (/name="build" content="([^"]+)"/.exec(await r.text()) || [])[1] || '';
+}
+
+async function revisarVersionInterfaz() {
+  if (!BUILD_LOCAL) return;
+  try {
+    const remoto = await buildDelServidor();
+    // Sin sello remoto no se concluye nada: un 206 raro o un proxy que recorta
+    // no son motivo para gritarle al admin que está desactualizado.
+    if (remoto && remoto !== BUILD_LOCAL) {
+      mostrarBannerUpdate('Hay una versión nueva del admin. Esta pestaña sigue con la anterior.', '#1d4ed8');
+    }
+  } catch (_) { /* sin red: el resto de la app ya avisa por su cuenta */ }
 }
 
 async function cargarSesionesInventario() {
@@ -699,7 +743,9 @@ async function cargarSesionesInventario() {
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || 'Error al cargar sesiones');
     // R12: pestaña vieja abierta días → banner antes de que un export salga mal
-    if ((Number(d.minAppVersion) || 0) > APP_VERSION) mostrarBannerUpdate();
+    if ((Number(d.minAppVersion) || 0) > APP_VERSION) {
+      mostrarBannerUpdate('Admin desactualizado: hay una versión nueva con otro formato de datos — exportar así puede salir mal.');
+    }
     sesionesInventario = d.sesiones || [];
     renderSesionesInventario();
   } catch(e) {
