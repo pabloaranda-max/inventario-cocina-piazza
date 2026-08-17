@@ -45,6 +45,68 @@ patrón se repite, tres entradas honestas apuntan mejor que una teoría inventad
 
 ---
 
+## 2026-08-16 — Reproducción deliberada: "nueva toma" borra la rebanada ya cerrada (UH_COCINA)
+
+> **No es un incidente** bajo el criterio de esta bitácora: no fue un evento *no planeado*.
+> Pablo lo provocó a propósito, en el celular de Daniel, **para observar exactamente qué
+> pasaba** — y descargó el acuse antes de disparar la prueba. Se asienta aquí, y no en el
+> spec, porque es la **confirmación experimental del incidente del 2026-07-31**: los dos se
+> leen juntos o ninguno se entiende. La corrupción de datos fue real y hubo que repararla,
+> así que merece registro con el mismo rigor.
+
+- **Qué se probó:** si darle **"nueva toma"** en un teléfono que ya cerró una zona destruye
+  su captura anterior. **Sí la destruye, en silencio.** Durante la primera toma completa de
+  Universal, Daniel Cervantes cerró la zona Cocina de `UH_COCINA` a las 20:48 CDMX con 63
+  artículos (acuse `ACU-20260816-8402168F64BB440B6E5219D2`). A las 20:49 Pablo bajó el PDF
+  del acuse; a las ~21:01 disparó "nueva toma" en ese mismo teléfono
+  (`mswlwo8p04zf12nr6lq7`), y a las 21:02 la sesión viva tenía 34 artículos en vez de 63.
+- **Impacto real:** **46 códigos desaparecieron de la sesión viva** en producción, durante
+  una toma en curso. El POST devolvió 200 y la app no advirtió nada. De haber exportado así,
+  esos 46 habrían entrado a Xetux como CERO. Sin pérdida definitiva: los 63 estaban íntegros
+  en el acuse y se restauraron el mismo día. **Ni Daniel ni ningún operario cometió error
+  alguno** — su captura de 63 y su segunda pasada de 35 eran las dos trabajo real y correcto.
+- **Mecanismo confirmado:** el mismo del 2026-07-31, ahora **reproducible a voluntad**.
+  `mergeZoneMap` (`js/sesion-merge.js:9`) reemplaza la rebanada completa cuando la clave
+  lleva `:`, porque esa clave representa el estado TOTAL de ese dispositivo. **"Nueva toma"
+  no cambia el `deviceId`**, así que el estado local nuevo viajó bajo la misma clave
+  `0:mswlwo8p04zf12nr6lq7` y sobreescribió los 63. El 31 de julio la variante fue *dos
+  operarios* en un celular; ésta es *el mismo operario* reiniciando. Un solo mecanismo, dos
+  disparadores distintos, cero advertencias en ambos.
+- **Evidencia:** el acuse verifica (`verified: true`, plantilla `23d5e56acf3167db`, la
+  misma de la sesión). Diagnóstico exacto: 46 códigos solo en el acuse, 17 solo en la
+  captura viva, y 17 en ambos **con cantidad distinta en los 17**. No era un subconjunto:
+  las dos pasadas traían trabajo real y distinto. La zona terminó con **tres acuses**, que
+  cuentan la historia completa: `…8402168F64BB440` (02:48:13Z, 63), `…195239DE68F1059`
+  (03:03:23Z, 34) y `…F575011AFFF46A9` (03:06:29Z, 35, el cierre bueno). Los tres bajo la
+  misma clave `0:mswlwo8p04zf12nr6lq7`, que es justamente el síntoma: la clave se reusó y
+  por eso la rebanada se pisó, pero cada cierre dejó su copia intacta.
+- **Resolución:** los 63 se restauraron desde el acuse bajo una clave de rebanada **nueva**
+  (`0:rec-acu840`), con la toma todavía viva y sin tocar la captura del teléfono. Pablo
+  confirmó que la segunda pasada era conteo real de otra área física, así que los 17
+  traslapados **se suman**. Verificado: 2 rebanadas (35 + 63), 81 códigos con total, los 46
+  recuperados con total > 0, y los traslapes en los valores esperados (CEBOLLA MORADA
+  1.785 + 14.005 = 15.79). Total base de la toma 715.477. Herramienta nueva y reutilizable:
+  `tools/restaurar-acuse.mjs` (dry-run por defecto, aborta si el acuse no verifica o si la
+  plantilla cambió desde el conteo). Sin cambios en el producto.
+- **Lección:** restaurar **siempre bajo clave nueva** — `calcularTotalesSesion` suma las
+  rebanadas, así que la suma sale sola, y como la clave no pertenece a ningún teléfono, los
+  syncs que siguen llegando no la pueden pisar. Por eso se pudo reparar **sin detener la
+  toma**. Dos trampas confirmadas al reconstruir: el acuse guarda las líneas de desglose
+  como `{name, factor, quantity}` pero `countsByZone` las espera `{n, f, q}` (copiarlas
+  literal deja 18 artículos en CERO), y el POST necesita `appVersion: 2` o la guarda R12
+  responde 426.
+  **Lo que la prueba compró:** el mecanismo deja de ser una teoría deducida del incidente
+  del 31 y pasa a ser reproducible a voluntad, que es lo que permite diseñar el arreglo con
+  confianza; y de paso probó la ruta de recuperación **de punta a punta sobre datos vivos**,
+  algo que staging no habría demostrado igual. **Lo que costó:** 46 artículos corruptos en
+  producción durante una toma real, salvados únicamente porque el acuse existe. La próxima
+  reproducción de este tipo va en `operaciones-api-staging`, que existe justo para esto;
+  si tiene que ser en producción, que sea con la zona ya exportada y no a media captura.
+  **Pendiente que esto vuelve urgente:** "nueva toma" sobre un dispositivo que ya contribuyó
+  a una toma abierta debe ser una **pregunta**, no un borrado silencioso — es el argumento
+  de la toma planeada. Y para el agente monitor: una rebanada que PIERDE artículos entre dos
+  syncs (63 → 34, misma clave) es detectable en automático y habría avisado a las 21:02.
+
 ## 2026-07-31 — Dos operarios en el mismo celular: el segundo cierre borró el conteo del primero
 
 - **Impacto:** en COCINA, durante la primera toma 100 % digital, **Lau perdió 18 artículos
