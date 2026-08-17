@@ -1,6 +1,32 @@
-# inventario.html — Especificación técnica v4.21
+# inventario.html — Especificación técnica v4.22
 
-> Última actualización: 2026-07-31. Estado: **v4.21 EN PRODUCCIÓN**.
+> Última actualización: 2026-08-17. Estado: **v4.22 EN PRODUCCIÓN**.
+> v4.22 (2026-08-17): **R28 checkpoints EN PROD**. Cada 10 artículos capturados, el
+> dispositivo guarda un acuse de la zona **abierta** en `inv_receipts`. Cierra la
+> ventana en que la captura vive solo en `inv_sesiones` —que sí se destruye— y que
+> el 2026-08-16 dejó 46 códigos de UH_COCINA recuperables únicamente a mano desde
+> el acuse de cierre anterior. El checkpoint viaja montado en un sync que ya iba a
+> salir; su `eventId` es estable por zona (`chk:<zoneKey>`), así que contenido
+> idéntico da la misma huella y el `INSERT OR IGNORE` existente lo colapsa. El campo
+> `kind` va **dentro del payload**, no en una columna, para quedar firmado por el
+> SHA-256: un checkpoint no puede disfrazarse de cierre. Se omite en los cierres y
+> `canonicalJson` descarta las claves `undefined`, así que **los acuses de cierre
+> hashean byte a byte igual que antes y los folios ya emitidos siguen verificando**
+> — sin migración de D1. Es invisible para el operario (sin PDF, sin mensaje, fuera
+> de `S.receipts`) y fuera del polling de `/inv/sesion` salvo `?receipts=all`. Un
+> CIERRE sigue exigiendo zona cerrada: la excepción es explícita y solo del
+> checkpoint. Sale junto con `estadoPropioDeSesion` (escrito el 2026-08-10, sin
+> desplegar hasta hoy): al abrir una toma el teléfono recupera **sus propias**
+> rebanadas del servidor —nunca hereda trabajo ajeno, pero tampoco puede destruir el
+> propio—, y el flujo de adoptar la toma de otro equipo queda retirado, reducido a un
+> resumen de solo lectura. Worker prod `05976e82` desplegado ANTES que Pages (acepta
+> `receiptKind` ausente, así que convive con clientes viejos). Pruebas:
+> `tests/test-checkpoint.mjs` 15/15 —incluye el acuse real
+> `ACU-20260816-8402168F64BB440B6E5219D2`, que conserva folio y huella—,
+> `tests/smoke-worker-checkpoint.py` 17/17 en staging, `tests/smoke-checkpoint.py`
+> 18/18 en Chromium y `tests/smoke-toma-nueva.py` 27/27; sin regresión en
+> test-receipt (13), test-merge (21), smoke-receipt (26) ni smoke-r11b (19).
+> v4.21 (2026-07-31): se cargaron las 7 plantillas frescas de Piazza
 > v4.21 (2026-07-31): se cargaron las 7 plantillas frescas de Piazza
 > (XTINV000285–291, todas `Apache POI` y con la columna Cantidad vacía). Los 11
 > almacenes quedan con plantilla y **los 7 de Piazza en CERO códigos sin nombre**
