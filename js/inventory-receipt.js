@@ -112,6 +112,11 @@ export function normalizeReceiptManuals(manuales = [], deviceId = '', zoneName =
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 
+// `kind` viaja DENTRO del payload —no solo en una columna— para que quede cubierto
+// por la huella: un checkpoint no se puede disfrazar de cierre sin romper el SHA-256.
+// Se omite cuando es un cierre, y `canonicalJson`/`JSON.stringify` descartan las
+// claves `undefined`, así que los acuses de cierre hashean byte a byte igual que
+// antes de existir los checkpoints. Los folios ya emitidos siguen verificando.
 export function buildReceiptPayload({
   eventId,
   almacen,
@@ -124,6 +129,7 @@ export function buildReceiptPayload({
   templateHash,
   items,
   manualItems,
+  kind,
 }) {
   return {
     schema: 'inventory-zone-receipt/v1',
@@ -138,7 +144,23 @@ export function buildReceiptPayload({
     templateHash: String(templateHash || ''),
     items: Array.isArray(items) ? items : [],
     manualItems: Array.isArray(manualItems) ? manualItems : [],
+    kind: kind === RECEIPT_KIND_CHECKPOINT ? RECEIPT_KIND_CHECKPOINT : undefined,
   };
+}
+
+export const RECEIPT_KIND_CHECKPOINT = 'checkpoint';
+
+// Un acuse sin `kind` es un cierre: así eran todos antes de los checkpoints.
+export function receiptKind(payload) {
+  return payload?.kind === RECEIPT_KIND_CHECKPOINT ? RECEIPT_KIND_CHECKPOINT : 'cierre';
+}
+
+// El `eventId` de un checkpoint es estable por zona y dispositivo, a propósito:
+// dos checkpoints con el MISMO contenido producen la misma huella, y el
+// `INSERT OR IGNORE` de `createInventoryReceipt` los colapsa en un solo renglón.
+// Solo se guarda un checkpoint nuevo cuando la captura cambió de verdad.
+export function checkpointEventId(zoneKey) {
+  return `chk:${String(zoneKey || '')}`;
 }
 
 export async function identifyReceipt(payload) {

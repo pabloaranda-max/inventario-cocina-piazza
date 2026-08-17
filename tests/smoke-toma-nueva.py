@@ -219,6 +219,65 @@ try:
         ok(not errores, f"sin errores JavaScript ({errores})")
         page.close()
 
+        # ── E: si ESTE deviceId ya tiene datos, recupera sólo su rebanada ────
+        # El Worker reemplaza por completo `zona:deviceId`; arrancar vacío y
+        # sincronizar esta zona borraría B2 aunque el servidor sí lo conserva.
+        dev = "equipo-recuperado"
+        SESION_DE_HOY["countsByZone"] = {
+            f"0:{dev}": {"A1": 7, "B2": 3},
+            "1:otroequipo": {"B2": 9},
+        }
+        SESION_DE_HOY["presChoiceByZone"] = {f"0:{dev}": {"A1": 1}}
+        SESION_DE_HOY["correctionsByZone"] = {
+            f"0:{dev}": {"A1": {"qty": 7, "operario": "Equipo Recuperado"}},
+            "_admin": {"B2": {"qty": 99, "operario": "Admin"}},
+        }
+        SESION_DE_HOY["completedZones"] = [f"0:{dev}", "1:otroequipo"]
+        SESION_DE_HOY["manuales"] = [
+            {"id": f"{dev}-m1", "deviceId": dev, "nombre": "Propio", "cantidad": 2},
+            {"id": "otro-m1", "deviceId": "otroequipo", "nombre": "Ajeno", "cantidad": 4},
+        ]
+        SESION_DE_HOY["receipts"] = [
+            {"id": "ACU-PROPIO", "deviceId": dev, "zoneKey": f"0:{dev}"},
+            {"id": "ACU-AJENO", "deviceId": "otroequipo", "zoneKey": "1:otroequipo"},
+        ]
+
+        page = browser.new_page()
+        page.add_init_script(FECHA_FIJA)
+        page.add_init_script(
+            f"localStorage.setItem('inv_device_id', {dev!r});")
+        page.route(WORKER + "/**", stub)
+        page.goto(BASE)
+        page.select_option("#area-select", "CAVA")
+        page.click("text=Continuar →")
+        page.wait_for_selector("text=Iniciar nueva toma →")
+        page.click("text=Iniciar nueva toma →")
+        page.fill("#inp-operario", "Equipo Recuperado")
+        page.click("#btn-iniciar-toma")
+        page.wait_for_function("() => typeof S !== 'undefined' && !!S", timeout=5000)
+
+        ok(page.evaluate("Object.keys(S.countsByZone).join('|')") == f"0:{dev}",
+           "E: recupera únicamente la rebanada del mismo dispositivo")
+        ok(page.evaluate(f"S.countsByZone['0:{dev}'].B2") == 3,
+           "E: conserva códigos que una sesión local vacía habría borrado")
+        ok(page.evaluate("Object.keys(S.correctionsByZone).join('|')") == f"0:{dev}",
+           "E: recupera correcciones propias, no las administrativas")
+        ok(page.evaluate("S.completedZones.join('|')") == f"0:{dev}",
+           "E: recupera sólo sus zonas cerradas")
+        ok(page.evaluate("S.manuales.map(m => m.id).join('|')") == f"{dev}-m1",
+           "E: recupera sólo sus no catalogados")
+        ok(page.evaluate("S.receipts.map(r => r.id).join('|')") == "ACU-PROPIO",
+           "E: recupera sólo sus acuses")
+
+        # Incluso si vuelve a sincronizar la zona, el payload lleva el estado
+        # completo recuperado y mergeZoneMap no puede reemplazarlo por {}.
+        page.evaluate("CZ = 0; syncSesionWorker()")
+        page.wait_for_timeout(300)
+        posts_con_conteo = [p for p in stub.posts if p.get("countsByZone")]
+        ok(posts_con_conteo[-1]["countsByZone"][f"0:{dev}"] == {"A1": 7, "B2": 3},
+           "E: el siguiente sync no borra su rebanada del Worker")
+        page.close()
+
         # ── El almacén sin toma previa no muestra ningún aviso ───────────────
         stub.hay_sesion_hoy = False
         page = browser.new_page()

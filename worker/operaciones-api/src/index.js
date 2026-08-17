@@ -4,6 +4,8 @@ import {
   identifyReceipt,
   normalizeReceiptItems,
   normalizeReceiptManuals,
+  receiptKind,
+  RECEIPT_KIND_CHECKPOINT,
 } from '../../../js/inventory-receipt.js';
 
 const CORS = {
@@ -54,6 +56,7 @@ function receiptSummaryFromRow(row) {
     zoneIndex: receipt.zoneIndex,
     zoneName: receipt.zoneName,
     templateHash: receipt.templateHash,
+    kind: receiptKind(receipt),
     itemCount: (receipt.items || []).length,
     manualItemCount: (receipt.manualItems || []).length,
   };
@@ -87,6 +90,7 @@ async function createInventoryReceipt(db, {
   zoneSnapshot,
   templateHash,
   receivedAt,
+  kind,
 }) {
   const splitAt = String(zoneKey).indexOf(':');
   const zoneIndex = parseInt(String(zoneKey), 10);
@@ -133,6 +137,7 @@ async function createInventoryReceipt(db, {
     templateHash: templateHash || templateRow?.template_hash || '',
     items,
     manualItems,
+    kind,
   });
   const identity = await identifyReceipt(payload);
 
@@ -605,7 +610,13 @@ async function handleInvGet(db, url, env = {}) {
       // El polling del operario consulta esta ruta cada 8 s. Enviar aquí solo
       // metadata evita repetir cientos de artículos; el PDF completo se obtiene
       // por folio en /inv/receipt cuando haga falta.
-      receipts = (rr.results || []).map(receiptSummaryFromRow);
+      // Por la misma razón los checkpoints quedan fuera salvo que se pidan: son
+      // decenas por zona y al operario solo le importan sus cierres. El admin y
+      // el monitor los piden con ?receipts=all.
+      const todos = url.searchParams.get('receipts') === 'all';
+      receipts = (rr.results || [])
+        .map(receiptSummaryFromRow)
+        .filter(r => todos || r?.kind !== RECEIPT_KIND_CHECKPOINT);
     } catch (_) {
       // Compatibilidad durante el despliegue: antes de migración 0008 no hay acuses.
     }
@@ -1006,9 +1017,13 @@ async function handleInvPost(db, body, env = {}, request = null) {
     const { almacen, operario, fecha, countsByZone, presChoiceByZone, correctionsByZone,
             completedZones, removeCompletedZones, manuales, removeManuales, templateHash, counts,
             zoneConfigId, zoneSnapshot, requestReceipt, receiptZoneKey,
-            receiptZoneName, receiptEventId } = body; // counts legacy para barra.html
+            receiptZoneName, receiptEventId, receiptKind: receiptKindPedido } = body; // counts legacy para barra.html
     if (!almacen || !operario || !fecha) return json({ error: 'Datos incompletos' }, 400);
     const wantsReceipt = requestReceipt === true;
+    // Checkpoint: copia inmutable de una zona que SIGUE ABIERTA. Nace del incidente
+    // 2026-08-16 — entre el sync y el cierre, la captura vive solo en inv_sesiones,
+    // que sí se destruye; el acuse de cierre llegaba demasiado tarde para salvarla.
+    const esCheckpoint = wantsReceipt && receiptKindPedido === RECEIPT_KIND_CHECKPOINT;
     if (wantsReceipt) {
       if (!receiptZoneKey || !receiptEventId) {
         return json({ error: 'Falta zona o evento para emitir el acuse' }, 400);
@@ -1016,7 +1031,9 @@ async function handleInvPost(db, body, env = {}, request = null) {
       if (!Object.prototype.hasOwnProperty.call(countsByZone || {}, receiptZoneKey)) {
         return json({ error: 'El acuse debe incluir la captura exacta de su zona' }, 400);
       }
-      if (!(completedZones || []).includes(receiptZoneKey)) {
+      // Un cierre solo se acusa si la zona quedó cerrada; un checkpoint es
+      // justamente lo contrario: prueba de lo capturado antes de cerrar.
+      if (!esCheckpoint && !(completedZones || []).includes(receiptZoneKey)) {
         return json({ error: 'Solo se emite acuse para una zona cerrada' }, 400);
       }
       if (String(receiptEventId).length > 120 || String(receiptZoneKey).length > 180) {
@@ -1180,6 +1197,7 @@ async function handleInvPost(db, body, env = {}, request = null) {
         eventId: receiptEventId,
         zoneKey: receiptZoneKey,
         zoneNameHint: receiptZoneName,
+        kind: esCheckpoint ? RECEIPT_KIND_CHECKPOINT : undefined,
         ...acceptedReceiptState,
       });
     }

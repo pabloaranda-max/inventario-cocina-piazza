@@ -1,0 +1,721 @@
+{
+ "payload": {
+  "schema": "inventory-zone-receipt/v1",
+  "eventId": "mswlwo8p04zf12nr6lq7-mswmwbr7-33yl",
+  "almacen": "UH_COCINA",
+  "fecha": "2026-08-16",
+  "operario": "DANIEL CERVANTES",
+  "deviceId": "mswlwo8p04zf12nr6lq7",
+  "zoneKey": "0:mswlwo8p04zf12nr6lq7",
+  "zoneIndex": 0,
+  "zoneName": "Cocina",
+  "templateHash": "23d5e56acf3167db",
+  "items": [
+   {
+    "code": "MP0001",
+    "name": "ACEITE DE AJONJOLI TOSTADO",
+    "unit": "L",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 0.7
+     }
+    ],
+    "baseQuantity": 0.7
+   },
+   {
+    "code": "MP0005",
+    "name": "AJO EN POLVO",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.63,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.63
+   },
+   {
+    "code": "MP0007",
+    "name": "AZUCAR REFINADA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.09,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.09
+   },
+   {
+    "code": "MP0008",
+    "name": "AZUCAR MASCABADO",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.745,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.745
+   },
+   {
+    "code": "MP0009",
+    "name": "BRISKET",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 17.999,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 17.999
+   },
+   {
+    "code": "MP0010",
+    "name": "CEBOLLA BLANCA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 1.84,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 1.84
+   },
+   {
+    "code": "MP0011",
+    "name": "CEBOLLA EN POLVO",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.995,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.995
+   },
+   {
+    "code": "MP0012",
+    "name": "CEBOLLA MORADA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 1.785,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 1.785
+   },
+   {
+    "code": "MP0018",
+    "name": "CREMA AGRIA FAGE",
+    "unit": "KG",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 0.4
+     }
+    ],
+    "baseQuantity": 0.4
+   },
+   {
+    "code": "MP0021",
+    "name": "DIEZMILLO",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 11.718,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 11.718
+   },
+   {
+    "code": "MP0025",
+    "name": "GRASA WAGYU",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 6.43,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 6.43
+   },
+   {
+    "code": "MP0033",
+    "name": "CATSUP HEINZ POUCH",
+    "unit": "KG",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 1.99
+     }
+    ],
+    "baseQuantity": 1.99
+   },
+   {
+    "code": "MP0036",
+    "name": "COGOLLO",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.17,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.17
+   },
+   {
+    "code": "MP0037",
+    "name": "LECHUGA ROMANA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.38,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.38
+   },
+   {
+    "code": "MP0040",
+    "name": "MAYONESA MCORMICK",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 3,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 3
+   },
+   {
+    "code": "MP0042",
+    "name": "MELAZA",
+    "unit": "KG",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 0.67
+     }
+    ],
+    "baseQuantity": 0.67
+   },
+   {
+    "code": "MP0045",
+    "name": "MOSTAZA DIJON",
+    "unit": "KG",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 0.4
+     }
+    ],
+    "baseQuantity": 0.4
+   },
+   {
+    "code": "MP0046",
+    "name": "MOSTAZA EN POLVO COLMANS",
+    "unit": "KG",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 0.02
+     }
+    ],
+    "baseQuantity": 0.02
+   },
+   {
+    "code": "MP0049",
+    "name": "PANKO BIMBO",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.55,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.55
+   },
+   {
+    "code": "MP0050",
+    "name": "PAPA FRANCESA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 84,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 84
+   },
+   {
+    "code": "MP0051",
+    "name": "PAPRIKA BADIA",
+    "unit": "KG",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 0.15
+     }
+    ],
+    "baseQuantity": 0.15
+   },
+   {
+    "code": "MP0052",
+    "name": "PEPINILLOS HEINZ",
+    "unit": "KG",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 1.405
+     }
+    ],
+    "baseQuantity": 1.405
+   },
+   {
+    "code": "MP0054",
+    "name": "PIMIENTA BLANCA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.93,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.93
+   },
+   {
+    "code": "MP0055",
+    "name": "PIMIENTA CAYENA",
+    "unit": "KG",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 0.35
+     }
+    ],
+    "baseQuantity": 0.35
+   },
+   {
+    "code": "MP0056",
+    "name": "PIMIENTA NEGRA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.89,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.89
+   },
+   {
+    "code": "MP0058",
+    "name": "PECHUGA DE POLLO",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 17.47,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 17.47
+   },
+   {
+    "code": "MP0059",
+    "name": "POLVO PARA HORNEAR ROYAL",
+    "unit": "KG",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "BOTE .500 KG",
+      "factor": 0.5,
+      "quantity": 0.2
+     }
+    ],
+    "baseQuantity": 0.1
+   },
+   {
+    "code": "MP0060",
+    "name": "QUESO CHEDDAR AMERICANO KIRKLAND",
+    "unit": "KG",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 1.565
+     }
+    ],
+    "baseQuantity": 1.565
+   },
+   {
+    "code": "MP0061",
+    "name": "QUESO PEPPERJACK WOOLSHURT",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.42,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.42
+   },
+   {
+    "code": "MP0063",
+    "name": "QUINOA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.85,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.85
+   },
+   {
+    "code": "MP0065",
+    "name": "SAL FINA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.595,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.595
+   },
+   {
+    "code": "MP0067",
+    "name": "SALSA BBQ",
+    "unit": "KG",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 1
+     }
+    ],
+    "baseQuantity": 1
+   },
+   {
+    "code": "MP0070",
+    "name": "SALSA DE CHILE HABANERO ROJO",
+    "unit": "L",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 0.05
+     }
+    ],
+    "baseQuantity": 0.05
+   },
+   {
+    "code": "MP0071",
+    "name": "SALSA SWEET CHILLI MAE PLOY",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.48,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.48
+   },
+   {
+    "code": "MP0072",
+    "name": "SALSA WORCESTERSHIRE",
+    "unit": "L",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 0.2
+     }
+    ],
+    "baseQuantity": 0.2
+   },
+   {
+    "code": "MP0073",
+    "name": "SRIRACHA",
+    "unit": "KG",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 0.68
+     }
+    ],
+    "baseQuantity": 0.68
+   },
+   {
+    "code": "MP0074",
+    "name": "SUERO DE LECHE",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.4,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.4
+   },
+   {
+    "code": "MP0075",
+    "name": "TOCINO",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 20.884,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 20.884
+   },
+   {
+    "code": "MP0077",
+    "name": "TRIP TIP",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 7.169,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 7.169
+   },
+   {
+    "code": "MP0079",
+    "name": "VINAGRE DE ARROZ MIZKAN",
+    "unit": "L",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 1.2
+     }
+    ],
+    "baseQuantity": 1.2
+   },
+   {
+    "code": "MP0080",
+    "name": "VINAGRE DE SIDRA DE MANZANA MOTHER EARTH",
+    "unit": "L",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 0.1
+     }
+    ],
+    "baseQuantity": 0.1
+   },
+   {
+    "code": "XMAT2605000001",
+    "name": "CHILE JALAPEÑO",
+    "unit": "KG",
+    "mode": "breakdown",
+    "lines": [
+     {
+      "name": "",
+      "factor": 1,
+      "quantity": 0.915
+     }
+    ],
+    "baseQuantity": 0.915
+   },
+   {
+    "code": "XMAT2606000035",
+    "name": "SAL PARRILLERA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.155,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.155
+   },
+   {
+    "code": "XMAT2607000038",
+    "name": "SEMILLA DE MOSTAZA NEGRA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.21,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.21
+   },
+   {
+    "code": "XMAT2607000041",
+    "name": "CURCUMA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.11,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.11
+   },
+   {
+    "code": "XMAT2607000043",
+    "name": "CANELA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.015,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.015
+   },
+   {
+    "code": "XMAT2607000044",
+    "name": "MIEL DE ABEJA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.4,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.4
+   },
+   {
+    "code": "XSUB2605000001",
+    "name": "SUB CEBOLLA CRISPY",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.965,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.965
+   },
+   {
+    "code": "XSUB2605000002",
+    "name": "SUB HARINA DE ESPECIAS",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 10,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 10
+   },
+   {
+    "code": "XSUB2605000003",
+    "name": "SUB JALAPENOS APANADOS",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.8,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.8
+   },
+   {
+    "code": "XSUB2605000009",
+    "name": "SUB COLESLAW",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.45,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.45
+   },
+   {
+    "code": "XSUB2605000010",
+    "name": "SUB MOJE MARINADA DE POLLO",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 7.53,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 7.53
+   },
+   {
+    "code": "XSUB2605000012",
+    "name": "SUB SAL DE PAPRIKA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.915,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.915
+   },
+   {
+    "code": "XSUB2605000014",
+    "name": "SUB MAYO SIRACHA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.25,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.25
+   },
+   {
+    "code": "XSUB2605000015",
+    "name": "SUB MAYO BUFALO",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.39,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.39
+   },
+   {
+    "code": "XSUB2605000016",
+    "name": "SUB MEZCLA DE CARNE",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 18.328,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 18.328
+   },
+   {
+    "code": "XSUB2605000017",
+    "name": "SUB SALSA MIL ISLAS",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.675,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.675
+   },
+   {
+    "code": "XSUB2605000019",
+    "name": "SUB SALSA UNIVERSAL",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.43,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.43
+   },
+   {
+    "code": "XSUB2605000021",
+    "name": "SUB ENCURTIDO ASIATICO",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.71,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.71
+   },
+   {
+    "code": "XSUB2605000023",
+    "name": "SUB PATTIE VEGETARIANO",
+    "unit": "PZ",
+    "mode": "simple",
+    "entered": 34,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 34
+   },
+   {
+    "code": "XSUB2605000024",
+    "name": "SUB MAYO CHIPOTLE",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.965,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.965
+   },
+   {
+    "code": "XSUB2605000025",
+    "name": "SUB MAYO MIEL MOSTAZA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 0.51,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 0.51
+   },
+   {
+    "code": "XSUB2607000036",
+    "name": "SUB MOSTAZA",
+    "unit": "KG",
+    "mode": "simple",
+    "entered": 2.47,
+    "factor": 1,
+    "presentation": "Unidad base / abierto",
+    "baseQuantity": 2.47
+   }
+  ],
+  "manualItems": []
+ },
+ "expectedId": "ACU-20260816-8402168F64BB440B6E5219D2",
+ "expectedHash": "8402168f64bb440b6e5219d24dd86667ab149924f9590e509907ef12f2404713"
+}

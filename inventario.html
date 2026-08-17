@@ -528,6 +528,32 @@ function countedCodCount(sesion) {
   return cods.size;
 }
 
+// Recuperación segura: una sesión del Worker contiene las rebanadas de TODOS
+// los equipos. Un teléfono no debe adoptarlas, pero tampoco puede arrancar vacío
+// si el servidor ya conserva datos de su mismo deviceId: al primer sync de esa
+// zona, mergeZoneMap reemplaza la rebanada completa `zona:deviceId` y borraría
+// silenciosamente los códigos que no estén en el estado local nuevo.
+function estadoPropioDeSesion(sesion) {
+  const dev = getDeviceId();
+  const esPropia = clave => {
+    const texto = String(clave || '');
+    const separador = texto.indexOf(':');
+    return separador >= 0 && texto.slice(separador + 1) === dev;
+  };
+  const filtrarMapa = mapa => Object.fromEntries(
+    Object.entries(mapa || {}).filter(([clave]) => esPropia(clave))
+  );
+  return {
+    countsByZone: filtrarMapa(sesion?.countsByZone),
+    presChoiceByZone: filtrarMapa(sesion?.presChoiceByZone),
+    correctionsByZone: filtrarMapa(sesion?.correctionsByZone),
+    completedZones: (sesion?.completedZones || []).filter(esPropia),
+    manuales: (sesion?.manuales || []).filter(manual =>
+      manual?.deviceId === dev || String(manual?.id || '').startsWith(dev + '-')),
+    receipts: (sesion?.receipts || []).filter(receipt => receipt?.deviceId === dev)
+  };
+}
+
 const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fmtNum = v => parseFloat(v.toFixed(4)).toString();
 
@@ -608,6 +634,18 @@ async function fetchResumenTomasWorker(dias = 7) {
 let _syncSeq = 0;
 const _syncUltimo = {};   // zoneKey -> seq de la sync más reciente emitida
 
+// ── Checkpoints ────────────────────────────────────────────────────────────
+// Entre el sync y el cierre, la captura vive solo en inv_sesiones, que SÍ se
+// destruye (incidente 2026-08-16: 46 artículos borrados por una rebanada nueva
+// bajo la misma clave). Un checkpoint guarda esa captura en inv_receipts, que no
+// borra nadie, sin esperar al cierre. No genera PDF y el operario no lo ve.
+// Espejo de checkpointEventId/RECEIPT_KIND_CHECKPOINT de js/inventory-receipt.js
+// — esta página no carga módulos.
+const CHECKPOINT_KIND  = 'checkpoint';
+const CHECKPOINT_CADA  = 10;    // artículos capturados entre checkpoint y checkpoint
+const _chkUltimo = {};          // zoneKey -> nº de artículos del último checkpoint pedido
+const checkpointEventId = zoneKey => `chk:${zoneKey}`;
+
 function syncSesionWorker(options = {}) {
   if (!S) return;
   // Solo enviamos la zona activa de este dispositivo. Clave "zoneIdx:deviceId" garantiza
@@ -615,6 +653,26 @@ function syncSesionWorker(options = {}) {
   const myKey = CZ !== null ? myZoneKey(CZ) : null;
   const cbz   = myKey ? { [myKey]: S.countsByZone?.[myKey]  || {} } : {};
   const pcbz  = myKey ? { [myKey]: S.presChoiceByZone?.[myKey] || {} } : {};
+  // El checkpoint viaja montado en un sync que ya iba a salir: ni una petición
+  // extra ni un timer propio. Nunca pisa un cierre en curso (options ya lo pide).
+  if (myKey && options.requestReceipt !== true) {
+    const n = Object.keys(cbz[myKey] || {}).length;
+    if (n > 0 && n - (_chkUltimo[myKey] ?? 0) >= CHECKPOINT_CADA) {
+      // Optimista: se avanza al pedirlo, no al confirmarlo. Si este sync queda
+      // obsoleto o falla, el siguiente checkpoint llega 10 artículos después en
+      // vez de reintentar cada 3 s; la captura sigue cubierta por el cierre.
+      _chkUltimo[myKey] = n;
+      options = {
+        ...options,
+        requestReceipt: true,
+        receiptKind: CHECKPOINT_KIND,
+        receiptZoneKey: myKey,
+        receiptZoneName: ZONAS?.[CZ]?.nombre || '',
+        receiptEventId: checkpointEventId(myKey),
+        autoDownloadReceipt: false,
+      };
+    }
+  }
   enviarPayloadSesion(cbz, pcbz, options);
 }
 
@@ -653,7 +711,8 @@ function enviarPayloadSesion(cbz, pcbz, options = {}) {
     requestReceipt: options.requestReceipt === true,
     receiptZoneKey: options.receiptZoneKey,
     receiptZoneName: options.receiptZoneName,
-    receiptEventId: options.receiptEventId
+    receiptEventId: options.receiptEventId,
+    receiptKind: options.receiptKind
   };
   const seq  = ++_syncSeq;
   const keys = Object.keys(cbz);
@@ -666,6 +725,7 @@ function enviarPayloadSesion(cbz, pcbz, options = {}) {
     sendSnapshot,
     receiptZoneKey: options.receiptZoneKey || '',
     receiptEventId: options.receiptEventId || '',
+    receiptKind: options.receiptKind || '',
     autoDownloadReceipt: options.autoDownloadReceipt === true
   });
 }
@@ -696,6 +756,11 @@ function enviarSesion(body, ctx) {
     }
     if (ctx.sendSnapshot && S) { S.snapshotSynced = true; dirty = true; }
     if (dirty && S) lsSet('s', S);
+    // Un checkpoint es una copia de seguridad del servidor, no un acuse del
+    // operario: ni mensaje, ni PDF, ni entra a S.receipts —si entrara,
+    // latestReceiptForZone podría ofrecer el PDF de un checkpoint en vez del
+    // cierre. Que falle tampoco se avisa: lo cubre el siguiente y el cierre.
+    if (ctx.receiptKind === CHECKPOINT_KIND) return;
     if (data.receipt) {
       registerReceipt(data.receipt, ctx.autoDownloadReceipt);
     } else if (ctx.receiptZoneKey) {
@@ -720,6 +785,7 @@ function reintentarSesion(body, ctx) {
 
 function receiptAttemptFailed(ctx, message) {
   if (!S || !ctx.receiptZoneKey) return;
+  if (ctx.receiptKind === CHECKPOINT_KIND) return;   // silencioso por diseño
   const currentEvent = S.pendingReceiptEvents?.[ctx.receiptZoneKey];
   if (ctx.receiptEventId && currentEvent !== ctx.receiptEventId) return;
   _receiptPending.delete(ctx.receiptZoneKey);
@@ -1157,6 +1223,7 @@ async function startSession() {
   let zonas = ZONAS;
   let zoneConfigId = ZCFG?.id || '';
   let snapshotSynced = false;
+  let propio = estadoPropioDeSesion(null);
   // Doble toque en un teléfono lento: sin esto salen dos sesiones y dos syncs.
   const btn = document.getElementById('btn-iniciar-toma');
   if (btn?.disabled) return;
@@ -1170,13 +1237,14 @@ async function startSession() {
       snapshotSynced = true;   // el del servidor manda; no reenviar el propio
       ZONAS = zonas;
     }
+    if (yaEnServidor) propio = estadoPropioDeSesion(yaEnServidor);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Iniciar →'; }
   }
 
   // Snapshot §14: la toma congela zonas/orden/activos con los que inició — editar
   // la preparación después no la altera. Se envía al Worker en el primer sync.
-  S = { operario, fecha, templateHash: T?.templateHash||'', countsByZone:{}, presChoiceByZone:{}, correctionsByZone:{}, completedZones:[], manuales:[], reopenedZones:{}, pendingCompletedZoneRemovals:[], receipts:[], pendingReceiptEvents:{},
+  S = { operario, fecha, templateHash: T?.templateHash||'', countsByZone:propio.countsByZone, presChoiceByZone:propio.presChoiceByZone, correctionsByZone:propio.correctionsByZone, completedZones:propio.completedZones, manuales:propio.manuales, reopenedZones:{}, pendingCompletedZoneRemovals:[], receipts:propio.receipts, pendingReceiptEvents:{},
         zoneConfigId, zoneSnapshot: JSON.parse(JSON.stringify(zonas || [])), snapshotSynced };
   lsSet('s', S);
   syncSesionWorker();
