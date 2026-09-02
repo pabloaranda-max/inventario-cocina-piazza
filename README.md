@@ -37,13 +37,19 @@ fuente de verdad** — esta app no gestiona inventario.
 | `costo-semanal/` `reportes-inventario/` | Scripts de Python que generan esos reportes |
 | `branding/` | Recursos de marca |
 
-## Otros proyectos que viven aquí
+## Otros proyectos que vivían aquí
 
-| Qué | Dónde | Nota |
-|---|---|---|
-| Mantenimiento del restaurante | Repo propio: `pabloaranda-max/mantenimiento-restaurante` (privado) | Salió de aquí el 2026-09-02. Se clona en `~/piazza/` |
-| Alimentari B2B | `brainalimentarib2b.html`, `worker/piazza-api/`, `alimentari-b2b/` | Se publica a **otro** repo de GitHub |
-| Operaciones (producción y mermas) | `operaciones.html`, `operaciones/` | |
+Todos salieron a su propio repositorio el **2026-09-02**. Se clonan en `~/piazza/`.
+
+| Proyecto | Dónde vive ahora |
+|---|---|
+| Mantenimiento del restaurante | `pabloaranda-max/mantenimiento-restaurante` (privado) |
+| Alimentari B2B | `pabloaranda-max/brainalimentaripasticiob2b` — frontend, Worker y Apps Script juntos |
+| nix-finanzas | `pbloaranda-hub/nix-finanzas` (otra cuenta de Cloudflare) |
+| Operaciones (producción y mermas) | Archivado en `archivo/` — su backend dejó de responder |
+
+Este repositorio es, desde entonces, **solo inventarios**.
+
 
 ## Respaldos
 
