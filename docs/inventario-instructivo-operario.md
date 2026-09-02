@@ -1,7 +1,7 @@
 # Instructivo del operario — antes de contar
 
 > **Este documento es la especificación, no solo documentación.** Se escribió desde la
-> cabeza de quien cuenta, y los pasos pendientes de `inventario-spec.md` §15 se dan por
+> cabeza de quien cuenta, y los pasos pendientes de `docs/inventario-spec.md` §15 se dan por
 > terminados cuando **cada línea de aquí es verdad en la app**. Si una línea miente, o se
 > arregla la app o se corrige la línea — pero no se imprime así.
 >

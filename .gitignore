@@ -17,3 +17,9 @@ sourcevenv/
 hackatongourmet/restaurant-app/scraper/downloads/
 hackatongourmet/restaurant-app/scraper/explore_output/
 scraper/downloads/
+
+# Salidas generadas (PDF, xlsx, HTML de reportes) — no son codigo
+reportes/
+
+# Config local de otras herramientas
+.codex

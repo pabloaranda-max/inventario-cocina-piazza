@@ -1,7 +1,7 @@
 # Inventario — Bitácora de incidentes
 
 > Registro **histórico** de fallas en producción de `inventario.html` / `admin.html` /
-> Worker `operaciones-api`. Complementa a `inventario-spec.md`, no compite con él:
+> Worker `operaciones-api`. Complementa a `docs/inventario-spec.md`, no compite con él:
 >
 > - **El spec es normativo** — describe cómo DEBE comportarse el sistema. Se corrige.
 > - **Esta bitácora es histórica** — registra qué PASÓ. Es *append-only*: una entrada
@@ -9,7 +9,7 @@
 >   Un incidente no deja de haber ocurrido porque ya esté resuelto.
 >
 > No es un documento de planeación (la regla del spec sobre no crear planes paralelos
-> sigue intacta: el plan vive en `inventario-spec.md` §15). Entradas más recientes
+> sigue intacta: el plan vive en `docs/inventario-spec.md` §15). Entradas más recientes
 > primero.
 
 ## Qué cuenta como incidente (definido con Pablo, 2026-07-26)

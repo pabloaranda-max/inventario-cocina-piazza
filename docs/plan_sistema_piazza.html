@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Sistema de Datos Piazza Pasticcio — Plan de Implementación</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 16px;
+    line-height: 1.75;
+    color: #1a1a1a;
+    background: #faf9f7;
+    padding: 0;
+  }
+
+  .page {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 60px 48px 120px;
+  }
+
+  /* PORTADA */
+  .cover {
+    min-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    border-bottom: 2px solid #1a1a1a;
+    padding-bottom: 48px;
+    margin-bottom: 72px;
+  }
+
+  .cover-label {
+    font-family: 'Courier New', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 24px;
+  }
+
+  .cover-title {
+    font-size: 2.8rem;
+    font-weight: normal;
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+
+  .cover-sub {
+    font-size: 1.1rem;
+    color: #555;
+    margin-bottom: 40px;
+  }
+
+  .cover-meta {
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    color: #888;
+    line-height: 2;
+  }
+
+  /* ÍNDICE */
+  .toc {
+    background: #f0ede8;
+    padding: 32px 36px;
+    margin-bottom: 72px;
+  }
+
+  .toc-title {
+    font-family: 'Courier New', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 20px;
+  }
+
+  .toc ol {
+    padding-left: 20px;
+  }
+
+  .toc li {
+    margin-bottom: 6px;
+    font-size: 0.95rem;
+  }
+
+  .toc li a {
+    color: #1a1a1a;
+    text-decoration: none;
+    border-bottom: 1px solid #ccc;
+  }
+
+  .toc li a:hover {
+    border-color: #1a1a1a;
+  }
+
+  /* SECCIONES */
+  section {
+    margin-bottom: 72px;
+  }
+
+  .section-label {
+    font-family: 'Courier New', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 12px;
+  }
+
+  h2 {
+    font-size: 1.9rem;
+    font-weight: normal;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 12px;
+    margin-bottom: 28px;
+  }
+
+  h3 {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-top: 36px;
+    margin-bottom: 12px;
+  }
+
+  p {
+    margin-bottom: 16px;
+    color: #2a2a2a;
+  }
+
+  /* CALLOUTS */
+  .callout {
+    border-left: 3px solid #1a1a1a;
+    padding: 16px 24px;
+    margin: 28px 0;
+    background: #f5f3ef;
+  }
+
+  .callout.verde { border-color: #3D6B2C; background: #f0f5ec; }
+  .callout.rojo  { border-color: #8B2A2A; background: #f5eded; }
+  .callout.gris  { border-color: #888;    background: #f0ede8; }
+
+  .callout p { margin: 0; }
+  .callout strong { display: block; margin-bottom: 4px; font-size: 0.85rem; letter-spacing: 0.05em; }
+
+  /* TABLA */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 0.9rem;
+  }
+
+  th {
+    font-family: 'Courier New', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-align: left;
+    border-bottom: 2px solid #1a1a1a;
+    padding: 8px 12px 8px 0;
+    color: #555;
+  }
+
+  td {
+    padding: 10px 12px 10px 0;
+    border-bottom: 1px solid #e8e5e0;
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  /* FASES */
+  .fase {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 0;
+    margin-bottom: 0;
+    border-top: 1px solid #ddd;
+    padding: 24px 0;
+  }
+
+  .fase:last-child { border-bottom: 1px solid #ddd; }
+
+  .fase-num {
+    font-family: 'Courier New', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: #888;
+    padding-top: 4px;
+  }
+
+  .fase-body h4 {
+    font-size: 1.05rem;
+    margin-bottom: 8px;
+  }
+
+  .fase-body p {
+    font-size: 0.9rem;
+    color: #444;
+    margin-bottom: 6px;
+  }
+
+  .tag {
+    display: inline-block;
+    font-family: 'Courier New', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border: 1px solid currentColor;
+    margin-right: 6px;
+    margin-bottom: 8px;
+  }
+
+  .tag.hecho   { color: #3D6B2C; }
+  .tag.proximo { color: #1a1a1a; }
+  .tag.diferido{ color: #888; }
+
+  /* DIAGRAMA ASCII */
+  .diagram {
+    font-family: 'Courier New', monospace;
+    font-size: 0.78rem;
+    background: #1a1a1a;
+    color: #e8e5e0;
+    padding: 32px;
+    margin: 28px 0;
+    line-height: 1.8;
+    overflow-x: auto;
+  }
+
+  /* KPI LIST */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .kpi-card {
+    border: 1px solid #ddd;
+    padding: 20px;
+  }
+
+  .kpi-card .kpi-name {
+    font-family: 'Courier New', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 8px;
+  }
+
+  .kpi-card .kpi-desc {
+    font-size: 0.88rem;
+    color: #333;
+    line-height: 1.5;
+  }
+
+  /* AREA CARDS */
+  .area-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .area-card {
+    border: 1px solid #ddd;
+    padding: 20px;
+  }
+
+  .area-card h4 {
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+  }
+
+  .area-card .encargado {
+    font-family: 'Courier New', monospace;
+    font-size: 0.68rem;
+    color: #888;
+    margin-bottom: 12px;
+    letter-spacing: 0.05em;
+  }
+
+  .area-card ul {
+    padding-left: 16px;
+    font-size: 0.85rem;
+    color: #444;
+  }
+
+  .area-card ul li { margin-bottom: 4px; }
+
+  /* NOTA AL PIE */
+  .footnote {
+    font-size: 0.82rem;
+    color: #888;
+    border-top: 1px solid #ddd;
+    padding-top: 16px;
+    margin-top: 16px;
+  }
+
+  /* CATEGORÍAS DE INGREDIENTES */
+  .cat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .cat-card {
+    border: 1px solid #ddd;
+    padding: 20px;
+  }
+
+  .cat-card .cat-label {
+    font-family: 'Courier New', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .cat-card.alta-baja .cat-label  { color: #3D6B2C; }
+  .cat-card.baja-alta .cat-label  { color: #8B2A2A; }
+  .cat-card.alta-alta .cat-label  { color: #8B6914; }
+
+  .cat-card .cat-ej {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 8px;
+  }
+
+  .cat-card .cat-logica {
+    font-size: 0.85rem;
+    color: #333;
+    line-height: 1.5;
+  }
+
+  @media print {
+    body { background: white; }
+    .page { padding: 40px 48px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- PORTADA -->
+  <div class="cover">
+    <div class="cover-label">Documento interno — Piazza Pasticcio</div>
+    <div class="cover-title">Sistema de Datos e<br>Inteligencia Operativa</div>
+    <div class="cover-sub">Plan de implementación, arquitectura y guía para líderes de área</div>
+    <div class="cover-meta">
+      Versión 1.0 — Marzo 2026<br>
+      Preparado por: Pablo Aranda<br>
+      Estado: Borrador para revisión
+    </div>
+  </div>
+
+  <!-- ÍNDICE -->
+  <div class="toc">
+    <div class="toc-title">Contenido</div>
+    <ol>
+      <li><a href="#problema">El problema que resuelve este sistema</a></li>
+      <li><a href="#vision">Qué es y cómo funciona (sin tecnicismos)</a></li>
+      <li><a href="#areas">Qué cambia para cada área</a></li>
+      <li><a href="#datos">Los datos que recopilamos y para qué sirven</a></li>
+      <li><a href="#kpis">Indicadores clave del negocio (KPIs)</a></li>
+      <li><a href="#kpis-avanzados">KPIs avanzados para fine dining</a></li>
+      <li><a href="#arquitectura">Arquitectura técnica</a></li>
+      <li><a href="#fases">Plan de implementación por fases</a></li>
+      <li><a href="#xetux">Nota para el equipo de xetux</a></li>
+    </ol>
+  </div>
+
+
+  <!-- 1. EL PROBLEMA -->
+  <section id="problema">
+    <div class="section-label">01</div>
+    <h2>El problema que resuelve este sistema</h2>
+
+    <p>Piazza Pasticcio tiene un sistema de punto de venta (xetux) que registra prácticamente todo lo que ocurre en el negocio: ventas, compras, producción, mermas, transferencias entre almacenes e inventarios. La información está ahí. El problema es que está atrapada.</p>
+
+    <p>Para verla hay que entrar manualmente al sistema, navegar entre menús, configurar filtros, esperar que cargue y descargar un archivo. Ese proceso toma tiempo, se hace irregularmente y depende de que alguien lo recuerde hacer. El resultado es que los datos existen pero no se usan para tomar decisiones.</p>
+
+    <div class="callout rojo">
+      <strong>Dolor concreto hoy</strong>
+      <p>Javier recibe transferencias entre almacenes por WhatsApp y las captura manualmente en xetux todos los días. Francisco o Matteo producen sin saber si lo que registran coincide con lo que debería consumirse según la receta. El encargado de pedidos no sabe si está rebasando el presupuesto hasta que ya lo rebasó. El inventario de cada app se actualiza solo cuando alguien lo hace manualmente.</p>
+    </div>
+
+    <p>Este sistema resuelve esos problemas extrayendo los datos de xetux de forma automática, organizándolos en una base de datos central y convirtiéndolos en información útil: reportes en Slack, catálogos siempre actualizados y alertas antes de que los problemas ocurran.</p>
+  </section>
+
+
+  <!-- 2. QUÉ ES -->
+  <section id="vision">
+    <div class="section-label">02</div>
+    <h2>Qué es y cómo funciona</h2>
+
+    <p>Imagina que hay un asistente invisible que entra a xetux todos los días en la madrugada, descarga todos los reportes relevantes, los organiza en tablas y los deja listos para que cualquier app o reporte los consulte. Eso es exactamente lo que hace este sistema.</p>
+
+    <p>Técnicamente se llama <em>scraper</em> — un robot que navega páginas web de forma automática, igual que lo haría una persona, pero sin errores y a las 3am sin quejarse.</p>
+
+    <div class="diagram">
+xetux (el sistema POS donde vive todo)
+  │
+  └── Robot automático (corre en la noche, sin necesitar computadora encendida)
+        │
+        ├── Cada día:
+        │     ventas del día, compras del día, foto del inventario actual
+        │
+        ├── Día 2 de cada mes:
+        │     mermas, producción, transferencias, consumo por receta,
+        │     inventario cerrado de los 5 almacenes
+        │
+        └── Cada sábado:
+              catálogo completo de artículos, recetas y mise en place
+
+                      ↓
+
+              Base de datos central (en la nube)
+
+                      ↓
+
+        ┌─────────────────────────────────────┐
+        │  Apps de inventario  │  Slack        │
+        │  App de operaciones  │  Dashboard    │
+        │  App IA hackaton     │  Reportes     │
+        └─────────────────────────────────────┘</div>
+
+    <p>La base de datos central actúa como el cerebro: recibe toda la información del scraper y la sirve a todas las aplicaciones que la necesitan. Si algo cambia en xetux (un nuevo artículo, una receta modificada), el sábado siguiente todas las apps ya lo reflejan automáticamente.</p>
+  </section>
+
+
+  <!-- 3. QUÉ CAMBIA POR ÁREA -->
+  <section id="areas">
+    <div class="section-label">03</div>
+    <h2>Qué cambia para cada área</h2>
+
+    <p>Este sistema no reemplaza xetux — lo complementa. xetux sigue siendo la fuente oficial de todos los registros. Lo que cambia es cómo llega la información a las personas y cuánto tiempo toma capturarla.</p>
+
+    <div class="area-grid">
+      <div class="area-card">
+        <h4>Cocina</h4>
+        <div class="encargado">Francisco · Matteo · Lucero</div>
+        <ul>
+          <li>App para registrar producción en &lt;20 segundos</li>
+          <li>Mise en place teórico disponible al seleccionar subreceta</li>
+          <li>Alerta visible antes de confirmar si desvío supera 5%</li>
+          <li>Hora de inicio/fin opcional para medir eficiencia por receta</li>
+          <li>Reporte semanal preventivo en Slack antes del día de pedido</li>
+          <li>Catálogo de inventario siempre actualizado en la app</li>
+        </ul>
+      </div>
+
+      <div class="area-card">
+        <h4>Barra</h4>
+        <div class="encargado">Andy</div>
+        <ul>
+          <li>App para registrar mermas con motivo (caducado, error, rotura, devolución…)</li>
+          <li>Notificación inmediata a Slack al registrar merma</li>
+          <li>Reporte semanal preventivo en Slack antes del día de pedido</li>
+          <li>Catálogo de inventario actualizado cada sábado</li>
+        </ul>
+      </div>
+
+      <div class="area-card">
+        <h4>Cava</h4>
+        <div class="encargado">Juanpi</div>
+        <ul>
+          <li>Reporte semanal de compras de vino y % costo</li>
+          <li>Catálogo actualizado con existencias reales</li>
+          <li>Días de inventario por artículo (cuándo pedir)</li>
+        </ul>
+      </div>
+
+      <div class="area-card">
+        <h4>Salumeria</h4>
+        <div class="encargado">Emiliano</div>
+        <ul>
+          <li>App para registrar producción y mermas</li>
+          <li>Reporte semanal de compras y % costo en Slack</li>
+          <li>Catálogo de inventario actualizado</li>
+        </ul>
+      </div>
+
+      <div class="area-card">
+        <h4>Alimentari</h4>
+        <div class="encargado">Alexin</div>
+        <ul>
+          <li>Catálogo de inventario siempre actualizado</li>
+          <li>Presupuesto de compras — fase posterior (depende de definir el flujo de transferencias con Cocina)</li>
+        </ul>
+      </div>
+
+      <div class="area-card">
+        <h4>Almacén general</h4>
+        <div class="encargado">Javier</div>
+        <ul>
+          <li>Las producciones y mermas autorizadas se cargan a xetux automáticamente — sin captura manual</li>
+          <li>Visibilidad de todos los movimientos desde un panel</li>
+          <li>Transferencias entre almacenes — fase posterior</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout verde">
+      <strong>Lo que NO cambia</strong>
+      <p>xetux sigue siendo el sistema oficial. Las compras, facturas y demás registros siguen entrando como siempre. Este sistema lee lo que ya está en xetux — no lo reemplaza ni lo modifica sin autorización.</p>
+    </div>
+  </section>
+
+
+  <!-- 4. LOS DATOS -->
+  <section id="datos">
+    <div class="section-label">04</div>
+    <h2>Los datos que recopilamos y para qué sirven</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Reporte</th>
+          <th>Frecuencia</th>
+          <th>Para qué sirve</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Ventas detalle</strong></td>
+          <td>Diario</td>
+          <td>Saber qué se vendió, en qué cantidad, con qué costo y margen por producto</td>
+        </tr>
+        <tr>
+          <td><strong>Compras detalle</strong></td>
+          <td>Diario</td>
+          <td>Seguimiento del presupuesto semanal por almacén</td>
+        </tr>
+        <tr>
+          <td><strong>Inventario actual</strong></td>
+          <td>Diario</td>
+          <td>Foto del stock real en todos los almacenes. Base para calcular días de inventario</td>
+        </tr>
+        <tr>
+          <td><strong>Mermas</strong></td>
+          <td>Mensual (día 2)</td>
+          <td>Auditoría de pérdidas y su impacto en el costo</td>
+        </tr>
+        <tr>
+          <td><strong>Producción</strong></td>
+          <td>Mensual (día 2)</td>
+          <td>Validar que las producciones registradas cuadren con el inventario</td>
+        </tr>
+        <tr>
+          <td><strong>Transferencias</strong></td>
+          <td>Mensual (día 2)</td>
+          <td>Movimientos entre almacenes para el balance de inventario</td>
+        </tr>
+        <tr>
+          <td><strong>Consumo por ventas</strong></td>
+          <td>Mensual (día 2)</td>
+          <td>Ventas ya traducidas a ingredientes (xetux aplica las recetas automáticamente). Clave para la auditoría de inventario</td>
+        </tr>
+        <tr>
+          <td><strong>Inventarios cerrados × 5</strong></td>
+          <td>Mensual (día 2)</td>
+          <td>Toma de inventario oficial de cada almacén. Se compara contra el inventario calculado para detectar diferencias</td>
+        </tr>
+        <tr>
+          <td><strong>Catálogos × 5 almacenes</strong></td>
+          <td>Sábados</td>
+          <td>Lista actualizada de todos los artículos. Alimenta las apps de inventario</td>
+        </tr>
+        <tr>
+          <td><strong>Recetas (mise en place)</strong></td>
+          <td>Sábados</td>
+          <td>Ingredientes y cantidades esperadas por subreceta. Base para validar producciones</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>La auditoría de inventario</h3>
+
+    <p>Con todos estos datos es posible verificar automáticamente si el inventario de xetux es correcto. La lógica es simple:</p>
+
+    <div class="callout gris">
+      <p><strong>Inventario inicio de mes</strong><br>
+      + Compras del mes<br>
+      − Consumo por ventas del mes (ingredientes usados según recetas)<br>
+      − Mermas registradas<br>
+      ± Transferencias entre almacenes<br>
+      <strong>= Inventario esperado al cierre</strong></p>
+      <p style="margin-top:12px">Si el inventario esperado coincide con el inventario cerrado real → todo cuadra.<br>
+      Si hay diferencia → hay un movimiento que no se registró o un descuento que no se aplicó.</p>
+    </div>
+
+    <p>Este cálculo, que hoy requeriría horas de trabajo en Excel, el sistema lo hace automáticamente el día 2 de cada mes y manda las diferencias relevantes a Slack.</p>
+  </section>
+
+
+  <!-- 5. KPIs -->
+  <section id="kpis">
+    <div class="section-label">05</div>
+    <h2>Indicadores clave del negocio</h2>
+
+    <p>El objetivo de costo de alimentos e insumos en un restaurante bien operado es alrededor del <strong>30% de las ventas</strong>. Este sistema hace visible ese número en tiempo real, por área, para que los encargados de pedidos puedan tomar decisiones antes de que el mes cierre.</p>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-name">% Costo por área</div>
+        <div class="kpi-desc">Compras de la semana ÷ Ventas de la semana. Objetivo: ≤30%. Se manda cada lunes a Slack con el margen disponible antes de rebasar.</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-name">Días de inventario</div>
+        <div class="kpi-desc">Stock actual ÷ consumo diario promedio. Indica cuántos días dura el inventario de cada artículo antes de agotarse. Ayuda a planear pedidos.</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-name">Variación de mise en place</div>
+        <div class="kpi-desc">Diferencia entre lo que debería consumirse según la receta y lo que realmente se consumió en producción. Alerta si supera 5% en un mes.</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-name">Diferencia de inventario</div>
+        <div class="kpi-desc">Inventario esperado (calculado) vs inventario real (contado). Detecta pérdidas no registradas, errores de captura o descuentos que no se aplicaron.</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-name">Costo real vs costo xetux</div>
+        <div class="kpi-desc">El costo calculado con los datos del scraper vs el costo que reporta xetux. Si divergen, algo no está siendo capturado correctamente en el sistema.</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-name">Rotación de artículos</div>
+        <div class="kpi-desc">Qué tan rápido se mueve cada insumo. Artículos de baja rotación pueden indicar sobrecompra o merma no reportada.</div>
+      </div>
+    </div>
+
+    <p class="footnote">Los KPIs de fin de mes (variación de inventario, costo real vs xetux) requieren la toma de inventario cerrada. Los KPIs semanales (% costo, días de inventario) se calculan con los datos diarios.</p>
+  </section>
+
+
+  <!-- 5b. KPIs AVANZADOS -->
+  <section id="kpis-avanzados">
+    <div class="section-label">05b</div>
+    <h2>KPIs avanzados para fine dining</h2>
+
+    <p>Más allá del costo porcentual, un restaurante de este nivel puede extraer una capa adicional de inteligencia de los mismos datos. Estos indicadores se calculan con información que el scraper ya recopila — no requieren captura extra.</p>
+
+    <h3>Margen bruto por plato vs. margen por rotación</h3>
+    <p>Dos platos con el mismo porcentaje de costo pueden aportar márgenes muy distintos en pesos si sus precios de venta difieren. Y un plato con margen alto pero poca rotación puede aportar menos al negocio que uno con margen menor pero que se vende cinco veces más en un turno. El sistema combina <em>precio − costo</em> con <em>cantidad vendida</em> para identificar los platos que más contribuyen al resultado real.</p>
+
+    <div class="callout gris">
+      <p><strong>Fórmula</strong><br>
+      Contribución = (precio venta − costo ingredientes) × unidades vendidas en el período<br>
+      <em>El reporte de ventas detalle ya incluye precio, costo unitario y cantidad vendida por producto.</em></p>
+    </div>
+
+    <h3>Clasificación de ingredientes por perecibilidad y rotación</h3>
+    <p>No todos los ingredientes se gestionan igual. Un sistema de alertas inteligente necesita entender qué tipo de artículo es cada uno para dar la recomendación correcta en el momento correcto.</p>
+
+    <div class="cat-grid">
+      <div class="cat-card alta-baja">
+        <div class="cat-label">Alta rotación · Baja perecibilidad</div>
+        <div class="cat-ej">Ej: harinas, aceites, conservas</div>
+        <div class="cat-logica">Pedidos por volumen. La alerta se activa cuando hay menos de 2 semanas de inventario.</div>
+      </div>
+      <div class="cat-card baja-alta">
+        <div class="cat-label">Baja rotación · Alta perecibilidad</div>
+        <div class="cat-ej">Ej: trufa, caviar, flores comestibles</div>
+        <div class="cat-logica">Justo a tiempo. La alerta se activa en ambas direcciones: stock insuficiente Y exceso de inventario.</div>
+      </div>
+      <div class="cat-card alta-alta">
+        <div class="cat-label">Alta rotación · Alta perecibilidad</div>
+        <div class="cat-ej">Ej: vegetales, proteínas frescas</div>
+        <div class="cat-logica">Reposición diaria o cada 2 días. La alerta se dispara si hay menos de 2 días de inventario.</div>
+      </div>
+    </div>
+
+    <p>La clasificación se configura inicialmente de forma manual por Pablo y se refina con datos históricos. Se almacena en la base de datos como un campo editable por área.</p>
+
+    <h3>Alertas predictivas de pedido</h3>
+    <p>Para cada artículo, el sistema calcula el consumo diario promedio de los últimos 7 y 30 días y lo compara con el stock actual. Antes del día de pedido de cada área, Slack recibe un mensaje preventivo:</p>
+
+    <div class="callout gris">
+      <p><strong>Ejemplo — Slack #reportes-cocina, cada martes 8am</strong></p>
+      <p style="margin-top:10px;font-family:'Courier New',monospace;font-size:0.8rem;line-height:2">
+        Resumen pre-pedido · Cocina · Semana 23–29 mar<br><br>
+        Presupuesto semana: $14,460 disponibles (30% de ventas est.)<br>
+        Comprado esta semana: $8,200 → quedan $6,260<br><br>
+        Artículos críticos:<br>
+        ⚠ HARINA 00           → 1.8 días de inventario (pedir hoy)<br>
+        ⚠ MANTEQUILLA SIN SAL → 2.1 días de inventario<br>
+        ✓ ACEITE DE OLIVA     → 12 días de inventario<br>
+        ● AZAFRÁN             → exceso (18 días, perecible — revisar)
+      </p>
+    </div>
+
+    <h3>Variación de mise en place por encargado</h3>
+    <p>El sistema ya registra quién produce qué. Con el tiempo se puede ver si ciertos encargados tienen desvíos consistentes en recetas específicas — no como auditoría, sino como herramienta de entrenamiento. Si Francisco siempre usa 10% más aceite en una receta, puede ser que la receta esté mal calibrada o que necesite una conversación de alineación.</p>
+
+    <h3>Eficiencia de producción por receta</h3>
+    <p>Registrando hora de inicio y fin (campo opcional en la app), el sistema puede inferir cuánto tiempo toma producir cada subreceta y compararlo entre distintas personas y momentos del día. Útil para optimizar la programación de cocina sin necesitar un sistema de RH separado.</p>
+
+    <h3>Costo de merma por motivo</h3>
+    <p>Al clasificar cada merma con un motivo (caducado, error de producción, rotura, devolución, exceso de producción), se puede calcular qué porcentaje de la merma era evitable. Una merma por caducidad es un problema de planeación de compras. Una merma por error de producción es un problema de capacitación. Tratarlas igual lleva a soluciones equivocadas.</p>
+
+    <h3>Tasa de utilización de subrecetas</h3>
+    <p>Para subrecetas que se usan en múltiples platos (ej. una salsa base, una masa), el sistema puede calcular qué porcentaje de lo producido se consumió antes de caducar. Una tasa baja indica que se produce más de lo que se necesita — oportunidad de ajustar lotes de producción.</p>
+
+    <h3>Margen por encargado de pedidos</h3>
+    <p>Asociar las compras al responsable que hizo el pedido permite ver, con el tiempo, si hay diferencias sistemáticas en el costo por área que puedan explicarse por hábitos de compra. El objetivo no es comparar personas sino identificar oportunidades de mejora en los criterios de decisión de cada área.</p>
+  </section>
+
+
+  <!-- 6. ARQUITECTURA TÉCNICA -->
+  <section id="arquitectura">
+    <div class="section-label">06</div>
+    <h2>Arquitectura técnica</h2>
+
+    <p>Esta sección describe cómo está construido el sistema. Está escrita para que cualquier persona con comprensión lectora pueda entender la lógica, sin necesidad de saber programar.</p>
+
+    <h3>Las piezas del sistema</h3>
+
+    <p><strong>xetux</strong> — El sistema de punto de venta donde vive toda la información. No se modifica. Este sistema solo lee de xetux, y solo escribe cuando una producción o merma ha sido autorizada.</p>
+
+    <p><strong>El scraper</strong> — Un programa escrito en Python que se conecta a xetux como si fuera un usuario, navega las páginas de reportes, descarga los archivos Excel y los guarda. Corre automáticamente en los horarios definidos usando GitHub Actions (un servicio gratuito de GitHub que ejecuta tareas programadas en la nube, sin necesitar ninguna computadora encendida).</p>
+
+    <p><strong>La base de datos central (D1)</strong> — Una base de datos en la nube de Cloudflare, el mismo proveedor que ya usa Piazza Pasticcio para la app B2B de Alimentari. El scraper convierte los archivos Excel en registros estructurados y los guarda aquí. Desde aquí, todas las apps y reportes obtienen la información que necesitan.</p>
+
+    <p><strong>El Worker (API)</strong> — Un programa también en Cloudflare que actúa como intermediario entre las apps y la base de datos. Las apps no acceden directamente a la base de datos — le preguntan al Worker y él responde. Esto permite controlar quién puede ver qué.</p>
+
+    <p><strong>Las apps</strong> — Páginas web que funcionan desde el navegador del celular, sin necesidad de instalar nada. El mismo formato que ya usan las apps de inventario de cocina, barra, alimentari y salumeria.</p>
+
+    <p><strong>Slack</strong> — Ya está integrado. El sistema manda mensajes automáticos a los canales de cada área con reportes, alertas y notificaciones de mermas o producciones.</p>
+
+    <p><strong>Playwright (carga a xetux)</strong> — El mismo tipo de robot que el scraper, pero en sentido inverso: en vez de leer de xetux, escribe en xetux. Se usa para cargar producciones y mermas autorizadas sin que Javier tenga que hacerlo manualmente.</p>
+
+    <h3>Flujo completo de una producción</h3>
+
+    <div class="diagram">
+1. Francisco abre la app en su celular
+2. Selecciona "Focaccia" de la lista de subrecetas
+3. La app muestra: "Para 1 pieza necesitas 200g harina, 15ml aceite..."
+4. Francisco captura: "Produje 8 piezas"
+5. La app calcula el mise en place esperado para 8 piezas
+   y pregunta cuánto usó realmente de cada ingrediente
+6. Francisco confirma cantidades → se guarda en la base de datos
+7. Slack notifica a #reportes-cocina con el resumen
+8. Matteo, Pablo y Javier votan en Slack (se necesitan 2 de 3)
+9. Al llegar el segundo voto → el sistema carga automáticamente
+   la producción en xetux vía Playwright
+10. Slack confirma: "Producción cargada en xetux ✓"</div>
+
+    <h3>Flujo completo de una merma</h3>
+
+    <div class="diagram">
+1. Andy registra merma en la app: "500ml de jarabe de tamarindo,
+   motivo: caducado"
+2. Se guarda en la base de datos
+3. Slack notifica inmediatamente a #reportes-barra y #reportes-almacen
+4. El sistema carga la merma en xetux automáticamente (sin votación)
+5. Slack confirma: "Merma cargada en xetux ✓"</div>
+
+    <h3>Seguridad y acceso</h3>
+
+    <p>Cada usuario tiene un PIN de 6 dígitos. El acceso se da mediante un link de invitación generado por Pablo (de un solo uso). Las sesiones expiran a los 30 días. Cada usuario solo ve la información de su área.</p>
+
+    <h3>Consideraciones técnicas para los KPIs avanzados</h3>
+
+    <p><strong>Clasificación de ingredientes.</strong> La base de datos incluirá un campo <code>categoria_perecibilidad</code> por artículo con tres valores posibles: <code>alta-baja</code>, <code>baja-alta</code>, <code>alta-alta</code>. Pablo puede editarlo desde el panel de administración. El sistema usa esta clasificación para definir umbrales de alerta diferenciados.</p>
+
+    <p><strong>Motivos de merma.</strong> La app de mermas presentará un selector con opciones predefinidas extraídas de xetux más opciones adicionales: caducado, error de producción, rotura, devolución, exceso de producción, otro. El motivo se almacena como campo en la tabla de mermas y se incluye en todos los reportes.</p>
+
+    <p><strong>Registro de encargado.</strong> Cada producción y merma se asocia automáticamente al usuario autenticado mediante PIN. No requiere campo extra — el sistema ya sabe quién está logueado. La variación de mise en place se puede filtrar por persona en el panel de administración.</p>
+
+    <p><strong>Hora de producción.</strong> La app de operaciones capturará opcionalmente la hora de inicio y fin de una producción. Ambos campos son opcionales para no generar fricción. Con el tiempo, los datos acumulados permiten calcular tiempos promedio por receta y por encargado.</p>
+
+    <p><strong>Umbrales configurables.</strong> El panel de administración permitirá a Pablo configurar: el porcentaje de desvío de mise en place que genera alerta (default 5%), los días mínimos de inventario por categoría antes de alertar, y el día de la semana en que se mandan los reportes preventivos a cada área.</p>
+  </section>
+
+
+  <!-- 7. PLAN DE IMPLEMENTACIÓN -->
+  <section id="fases">
+    <div class="section-label">07</div>
+    <h2>Plan de implementación</h2>
+
+    <p>El sistema se construye en fases para poder usar cada parte tan pronto como esté lista, sin esperar a que todo esté terminado.</p>
+
+    <div class="fase">
+      <div class="fase-num">FASE 0<br><span class="tag hecho">Completada</span></div>
+      <div class="fase-body">
+        <h4>Scrapers de xetux</h4>
+        <p>El robot que descarga automáticamente todos los reportes de xetux está terminado y probado. Descarga ventas, compras, inventario, mermas, producción, transferencias, consumo, inventarios cerrados, catálogos y recetas en los horarios definidos.</p>
+        <p>Tecnología: Python + Playwright, corre en GitHub Actions.</p>
+      </div>
+    </div>
+
+    <div class="fase">
+      <div class="fase-num">FASE 1<br><span class="tag proximo">Siguiente</span></div>
+      <div class="fase-body">
+        <h4>Base de datos central y catálogo en las apps</h4>
+        <p>Se crea la base de datos en Cloudflare D1. El scraper empieza a escribir los datos ahí después de descargarlos. Las apps de inventario (cocina, barra, alimentari, salumeria) se conectan a la base de datos para tener siempre el catálogo actualizado automáticamente.</p>
+        <p>Resultado visible: el catálogo de artículos en las apps ya no requiere actualización manual.</p>
+      </div>
+    </div>
+
+    <div class="fase">
+      <div class="fase-num">FASE 2<br><span class="tag proximo">Próxima</span></div>
+      <div class="fase-body">
+        <h4>App de operaciones (producción y merma)</h4>
+        <p>Una app por área para que cada operario registre producciones y mermas desde su celular. Incluye mise en place teórico, captura de cantidades reales, validación de desvíos y autenticación con PIN.</p>
+        <p>Panel de admin para Pablo: invitaciones, gestión de usuarios y votación de producciones.</p>
+      </div>
+    </div>
+
+    <div class="fase">
+      <div class="fase-num">FASE 3<br><span class="tag proximo">Próxima</span></div>
+      <div class="fase-body">
+        <h4>Carga automática a xetux</h4>
+        <p>GitHub Actions ejecuta Playwright para cargar en xetux las producciones autorizadas (2-a-1) y las mermas registradas. Elimina la captura manual de Javier para estos casos.</p>
+      </div>
+    </div>
+
+    <div class="fase">
+      <div class="fase-num">FASE 4<br><span class="tag proximo">Próxima</span></div>
+      <div class="fase-body">
+        <h4>Reportes Slack — presupuesto semanal y KPIs mensuales</h4>
+        <p>Reporte semanal cada lunes en Slack por área: ventas, compras, % costo real vs objetivo 30%, margen disponible, días de inventario de artículos críticos.</p>
+        <p>Reporte mensual el día 3: auditoría de inventario, variación de mise en place, costo real vs xetux.</p>
+        <p>Aplica a: Cocina (Francisco/Matteo), Barra (Andy), Cava (Juanpi), Salumeria (Emiliano).</p>
+      </div>
+    </div>
+
+    <div class="fase">
+      <div class="fase-num">DIFERIDO<br><span class="tag diferido">Fase posterior</span></div>
+      <div class="fase-body">
+        <h4>Transferencias entre almacenes</h4>
+        <p>Actualmente las transferencias se reportan por WhatsApp y Javier las captura manualmente. Automatizarlas requiere primero definir el proceso con claridad: quién empaca, qué se transfiere (subreceta vs producto terminado), en qué casos lo hace Cocina y en qué casos Alimentari.</p>
+        <p>Una vez que el proceso esté definido, la app puede reemplazar el WhatsApp y cargar las transferencias a xetux automáticamente.</p>
+      </div>
+    </div>
+
+    <div class="fase">
+      <div class="fase-num">FASE 2+<br><span class="tag diferido">Fase 2 del sistema</span></div>
+      <div class="fase-body">
+        <h4>Impresora de etiquetas e invitaciones por correo</h4>
+        <p>Al guardar una producción, se imprime automáticamente una etiqueta con nombre de subreceta, encargado, fecha y código de barras compatible con xetux. Impresora térmica WiFi (~$1,000 MXN).</p>
+        <p>Invitaciones de usuario por correo electrónico (actualmente son links generados manualmente por Pablo).</p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- 8. NOTA PARA XETUX -->
+  <section id="xetux">
+    <div class="section-label">08</div>
+    <h2>Nota para el equipo de xetux</h2>
+
+    <p>Este documento describe un sistema de automatización construido sobre xetux para Piazza Pasticcio. Lo que sigue es relevante para el equipo técnico de xetux.</p>
+
+    <h3>Lo que estamos haciendo hoy</h3>
+
+    <p>Actualmente usamos Playwright (automatización de navegador) para extraer datos de la interfaz web de xetux. El robot navega las páginas de reportes, aplica los filtros necesarios, descarga los archivos Excel y los procesa. También usamos Playwright para escribir en xetux: cargar producciones en <code>/inventory/production/crud.xhtml</code> y mermas en <code>/inventory/waste/crud.xhtml</code>.</p>
+
+    <p>Esto funciona, pero tiene limitaciones: es frágil ante cambios en la interfaz, depende de tiempos de carga de página y no escala bien si el volumen de registros crece.</p>
+
+    <h3>Lo que nos gustaría explorar</h3>
+
+    <p>Una API REST o GraphQL que exponga los mismos datos y operaciones que hoy accedemos vía navegador nos permitiría:</p>
+
+    <ul style="padding-left:24px; margin:16px 0; font-size:0.95rem; line-height:2">
+      <li>Hacer las lecturas más rápido y de forma más confiable</li>
+      <li>Escribir producciones y mermas directamente sin simular un navegador</li>
+      <li>Reaccionar en tiempo real a eventos (nueva venta, nueva compra) en lugar de descargar reportes periódicos</li>
+      <li>Construir integraciones más robustas a largo plazo</li>
+    </ul>
+
+    <p>Entendemos que una API es un producto con sus propios requerimientos de seguridad, documentación y soporte. Estamos abiertos a cualquier modalidad que tenga sentido para el equipo de xetux: acceso controlado, endpoints específicos, webhooks o cualquier otra forma de integración que ya esté disponible o que pueda desarrollarse.</p>
+
+    <p>El objetivo es construir sobre xetux, no alrededor de él. Piazza Pasticcio es un cliente que está invirtiendo en tecnología sobre su stack actual, y una integración oficial haría esa inversión más sólida para ambas partes.</p>
+
+    <div class="callout gris">
+      <strong>Contacto</strong>
+      <p>Pablo Aranda · pablo.aranda@piazza-pasticcio.com</p>
+    </div>
+  </section>
+
+  <div class="footnote" style="margin-top:48px; border-top: 2px solid #1a1a1a; padding-top:24px">
+    Piazza Pasticcio · Sistema de Datos e Inteligencia Operativa · Versión 1.0 — Marzo 2026<br>
+    Documento confidencial para uso interno y comunicación con proveedores tecnológicos.
+  </div>
+
+</div>
+</body>
+</html>

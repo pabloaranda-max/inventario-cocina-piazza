@@ -1,0 +1,377 @@
+<style>
+table.data td.txt{font-family:var(--body);font-size:14px;text-align:left;font-weight:400}
+table.data th.txt{text-align:left}
+</style>
+<div class="wrap">
+
+<header class="masthead">
+  <div class="brandline">
+    <div class="wordmark">Piazza Pasticcio</div>
+    <p class="eyebrow">Control de inventarios</p>
+  </div>
+  <p class="eyebrow">Costo de inventario · Julio 2026</p>
+  <h1>El inventario dice 36 %.<br>Las recetas dicen 26 %.</h1>
+  <p class="dek">Consumo físico contra consumo teórico del mes. La diferencia son {{PTS}} puntos,
+  ${{BRECHA}}, desglosados por almacén, por artículo y por causa.</p>
+  <div class="meta">
+    <span><b>Venta</b> 01–31/07/2026</span>
+    <span><b>Almacenes</b> 6 de 7 aplicados</span>
+    <span><b>Conteo físico</b> 31/07/2026</span>
+    <span><b>Fuente</b> Xetux</span>
+  </div>
+  <a class="dl" href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,__XLSX__" download="costo-inventario-julio-2026.xlsx">
+    Descargar el Excel de trabajo <small>10 hojas · __KB__ KB</small>
+  </a>
+</header>
+
+<section id="real">
+  <div class="sec-head"><p class="eyebrow">Resultado</p><h2>El costo real del mes</h2></div>
+  <div class="hero">
+    <div class="stats">
+      <div class="stat">
+        <span class="k">Costo real de consumo</span>
+        <span class="v neg">{{PCT_REAL}} %</span>
+        <span class="s">Lo que <strong>salió</strong> del inventario, por conteo físico.</span>
+      </div>
+      <div class="stat">
+        <span class="k">Costo teórico, por receta</span>
+        <span class="v">{{PCT_TEO}} %</span>
+        <span class="s">Lo que <strong>debió</strong> salir según lo vendido.</span>
+      </div>
+      <div class="stat">
+        <span class="k">Brecha</span>
+        <span class="v neg">{{PTS}} pts</span>
+        <span class="s">${{BRECHA}} sin registro que los sustente.</span>
+      </div>
+    </div>
+    <div class="prose" style="margin-top:26px">
+      <p style="margin-bottom:0">El costo real no depende de las recetas: es inventario inicial más
+      compras, menos lo contado físicamente al cierre.</p>
+    </div>
+    <table class="ledger" style="margin-top:8px">
+      <tr><td>Inventario inicial</td><td>${{INICIAL}}</td></tr>
+      <tr><td>Compras y transferencias recibidas</td><td>+{{COMPRAS}}</td></tr>
+      <tr><td>Inventario final contado</td><td>−{{FINAL}}</td></tr>
+      <tr><td>Desperdicio registrado</td><td>−113</td></tr>
+      <tr><td>Consumo interno registrado</td><td>−62</td></tr>
+      <tr class="sum"><td>Costo real, seis almacenes</td><td>${{REAL_BRUTO}}</td></tr>
+      <tr class="minus"><td>Transferencias entre almacenes contados<span class="note">Salen de uno y entran a otro: el mismo producto aparece dos veces</span></td><td>−{{INTRA}}</td></tr>
+      <tr class="sum"><td>Costo real consolidado</td><td>${{NETO}}</td></tr>
+      <tr><td>Costo teórico</td><td>{{TEORICO}}</td></tr>
+      <tr class="sum"><td>Brecha</td><td>${{BRECHA}}</td></tr>
+    </table>
+    <div class="flag" style="margin-bottom:0">
+      <b>La venta atribuida no es la venta del mes</b>
+      <b>«Venta atribuida» no es la venta del mes.</b> El mes vendió <b>${{VENTA_POS}}</b>. La venta atribuida a los seis almacenes suma <b>${{VENTA_ATRIB}}</b>: es la venta de los productos que sí tienen receta, los únicos que consumen de un almacén. La diferencia de ${{DIF_VENTA}} son los ${{SIN_RECETA}} de productos sin receta, que no descuentan de ningún inventario y por eso no se asignan a ninguno.
+    </div>
+  </div>
+</section>
+
+<section id="notas">
+  <div class="sec-head"><p class="eyebrow">Cómo leer las cifras</p><h2>Tres notas</h2></div>
+  <div class="warn-list">
+    <div class="warn">
+      <span class="n">01 · GENERAL no vende</span>
+      <p>Es almacén de distribución: origina el 87 % de las transferencias del mes y no recibe
+      ninguna. Su porcentaje de costo no es food cost y no se calcula. Sus $131,511 de salidas están
+      trazadas movimiento por movimiento.</p>
+    </div>
+    <div class="warn">
+      <span class="n">02 · El mes está completo</span>
+      <p>Los seis almacenes cubren el mes completo, del 30/06 al 31/07. COCINA y ALIMENTARI llegaron partidos en dos aplicaciones porque un inventario semanal quedó guardado como mensual, lo que truncó su periodo mensual al 08/07; aquí se reconstruyeron desde los saldos: inventario del 30/06 más compras de todo julio menos inventario del 31/07.</p>
+    </div>
+    <div class="warn">
+      <span class="n">03 · Qué está estimado</span>
+      <p>Solo el costo de los productos sin receta, calculado al 25.39 % —la razón observada en los
+      productos costeados—. El resto son cifras directas de Xetux.</p>
+    </div>
+  </div>
+</section>
+
+<section id="almacenes">
+  <div class="sec-head"><p class="eyebrow">Distribución</p><h2>Brecha por almacén</h2></div>
+  <div class="bars">__BARS_ALM__</div>
+  <div class="scroll">
+    <table class="data">
+      <thead><tr>
+        <th>Almacén</th><th>Desde</th><th>Costo real Xetux</th><th>Transf. internas</th>
+        <th>Real neto</th><th>Teórico</th><th>Brecha</th><th>% s/venta</th>
+      </tr></thead>
+      <tbody>__ROWS_ALM__</tbody>
+    </table>
+  </div>
+  <p class="dim" style="font-size:13px;margin-top:12px">ALIMENTARI consumió menos de lo esperado: su
+  conteo salió alto. AMICI al 94 % es artefacto de denominador —su almacén recibe $81,238 de los
+  $217,272 vendidos en sus ambientes—; normalizado corre a ~35 %.</p>
+
+  <h3 style="margin-top:44px">Cobertura del conteo</h3>
+  <div class="prose">
+    <p>Códigos contados contra códigos en plantilla. Las plantillas están sobradas y solo se cuenta
+    lo que rota, pero un código con existencia que no se cuenta entra al cierre en cero y su
+    inventario completo se convierte en consumo.</p>
+  </div>
+  <div class="scroll">
+    <table class="data">
+      <thead><tr><th>Almacén</th><th>Códigos contados</th><th>En plantilla</th><th>Cobertura</th><th>Brecha</th></tr></thead>
+      <tbody>
+        <tr><td>COCINA</td><td>69</td><td>742</td><td class="neg">9 %</td><td class="neg">${{COCINA_BRECHA}}</td></tr>
+        <tr><td>AMICI</td><td>95</td><td>366</td><td>26 %</td><td class="neg">{{AMICI_BRECHA}}</td></tr>
+        <tr><td>GENERAL</td><td>165</td><td>434</td><td>38 %</td><td class="neg">{{GENERAL_BRECHA}}</td></tr>
+        <tr><td>CAVA</td><td>67</td><td>149</td><td>45 %</td><td class="neg">{{CAVA_BRECHA}}</td></tr>
+        <tr><td>BARRA</td><td>147</td><td>387</td><td>38 %</td><td class="neg">{{BARRA_BRECHA}}</td></tr>
+        <tr><td>ALIMENTARI</td><td>78</td><td>378</td><td>21 %</td><td class="pos">−{{ALIMENTARI_BRECHA}}</td></tr>
+        <tr><td>SALUMERIA</td><td>15</td><td>80</td><td>19 %</td><td class="dim">pendiente</td></tr>
+        <tr class="total"><td>TOTAL</td><td>636</td><td>2,536</td><td>25 %</td><td class="neg">${{BRECHA}}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="dim" style="font-size:13px;margin-top:12px">COCINA concentra la mayor brecha en pesos y
+  tiene la menor cobertura: 69 códigos contados de 742.</p>
+</section>
+
+<section id="articulos">
+  <div class="sec-head"><p class="eyebrow">Detalle</p><h2>Los artículos que más pesan</h2></div>
+  <div class="prose">
+    <p>Cinco mayores faltantes de cada almacén. Es el punto de entrada para auditar: son códigos
+    concretos, con cantidad y costo.</p>
+  </div>
+  <div class="scroll">
+    <table class="data">
+      <thead><tr><th>Almacén</th><th class="txt">Artículo</th><th>Faltante</th></tr></thead>
+      <tbody>
+        <tr><td>COCINA</td><td class="txt">Trufa negra de verano</td><td class="neg">$7,735</td></tr>
+        <tr><td></td><td class="txt">Leche bronca a granel</td><td class="neg">7,450</td></tr>
+        <tr><td></td><td class="txt">Mantequilla Anchor</td><td class="neg">6,499</td></tr>
+        <tr><td></td><td class="txt">Palomilla de res wagyu</td><td class="neg">6,085</td></tr>
+        <tr><td></td><td class="txt">Crema para batir Lyncott</td><td class="neg">5,813</td></tr>
+        <tr><td>BARRA</td><td class="txt">Hielo en cubo</td><td class="neg">5,670</td></tr>
+        <tr><td></td><td class="txt">Café en grano variedad típica</td><td class="neg">5,551</td></tr>
+        <tr><td></td><td class="txt">Tequila Enemigo extra añejo</td><td class="neg">5,517</td></tr>
+        <tr><td></td><td class="txt">Cerveza Birra Poretti 4 cebadas</td><td class="neg">3,875</td></tr>
+        <tr><td></td><td class="txt">Tequila Loco Puro Corazón</td><td class="neg">2,759</td></tr>
+        <tr><td>CAVA</td><td class="txt">Ca' del Bosco Franciacorta</td><td class="neg">4,486</td></tr>
+        <tr><td></td><td class="txt">Provocation Rosé Champagne</td><td class="neg">3,621</td></tr>
+        <tr><td></td><td class="txt">Pelagrilli Brunello</td><td class="neg">3,086</td></tr>
+        <tr><td></td><td class="txt">Minotauro</td><td class="neg">2,091</td></tr>
+        <tr><td></td><td class="txt">Giacomo Fenocchio Barolo Bussia</td><td class="neg">1,897</td></tr>
+        <tr><td>GENERAL</td><td class="txt">Funda fibrosa 140 mm</td><td class="neg">4,734</td></tr>
+        <tr><td></td><td class="txt">Polen de hinojo</td><td class="neg">2,160</td></tr>
+        <tr><td></td><td class="txt">Botella de vidrio bordalesa .750</td><td class="neg">2,154</td></tr>
+        <tr><td></td><td class="txt">Tequila Cascahuín blanco tahona</td><td class="neg">1,991</td></tr>
+        <tr><td></td><td class="txt">Corcho de madera sintético</td><td class="neg">1,991</td></tr>
+        <tr><td>AMICI</td><td class="txt">Cinzano Pro Spritz</td><td class="neg">4,314</td></tr>
+        <tr><td></td><td class="txt">Mezcal Gatopardo espadín</td><td class="neg">2,398</td></tr>
+        <tr><td></td><td class="txt">Tequila Maestro Dobel tahona</td><td class="neg">2,198</td></tr>
+        <tr><td></td><td class="txt">Vermut Antica Formula</td><td class="neg">2,086</td></tr>
+        <tr><td></td><td class="txt">Licor Merlet crème de cassis</td><td class="neg">1,914</td></tr>
+        <tr><td>ALIMENTARI</td><td class="txt">Agua Panna 250 ml</td><td class="neg">1,780</td></tr>
+        <tr><td></td><td class="txt">Aceite de oliva siciliano 500 ml</td><td class="neg">1,470</td></tr>
+        <tr><td></td><td class="txt">Venere CMG</td><td class="neg">1,289</td></tr>
+        <tr><td></td><td class="txt">Soave Classico DOC</td><td class="neg">1,241</td></tr>
+        <tr><td></td><td class="txt">Cerveza Birra Poretti 4 cebadas</td><td class="neg">1,099</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="flag">
+    <b>Lo que dice el patrón</b>
+    En BARRA y AMICI los mayores faltantes son destilados y vermuts, consistente con preparación por
+    lote sin receta de desgaste. En COCINA son insumos de alto costo que se porcionan —trufa, wagyu,
+    lácteos—, donde la receta descuenta menos de lo que se usa. En GENERAL son empaque y consumibles
+    que no se contaron.
+  </div>
+</section>
+
+<section id="composicion">
+  <div class="sec-head"><p class="eyebrow">Causas</p><h2>Composición de la brecha</h2></div>
+
+  <div class="gap-item">
+    <div class="gap-head"><h3>Productos sin receta<span class="tag">acción inmediata</span></h3><span class="gap-amt">~${{FALTANTE}}</span></div>
+    <div class="prose">
+      <p><strong>73 productos vendieron ${{SIN_RECETA}} con costo asociado $0.00.</strong> Se sirvieron sin
+      descontar inventario. Los diez primeros concentran $213,682.</p>
+    </div>
+    <div class="scroll">
+      <table class="data">
+        <thead><tr><th>Producto</th><th>Piezas</th><th>Venta neta</th><th>Costo estimado</th></tr></thead>
+        <tbody>__ROWS_BTN__</tbody>
+      </table>
+    </div>
+    <p class="dim" style="font-size:13px;margin-top:12px">Los diez mayores; la lista completa está en
+    el Excel. 154 platos de spaghettoni salieron sin que se descontara un gramo de pasta.</p>
+  </div>
+
+  <div class="gap-item">
+    <div class="gap-head"><h3>GENERAL — conteo no realizado</h3><span class="gap-amt">${{GENERAL_BRECHA}}</span></div>
+    <div class="prose">
+      <p>Salieron $173,534 del almacén y $131,511 están trazados como transferencia, con origen,
+      destino, encargado y fecha. El residuo se desglosa así:</p>
+    </div>
+    <div class="bars">__BARS_GEN__</div>
+    <div class="flag">
+      <b>$25,535 son códigos con existencia contados en cero</b>
+      59 códigos con movimiento en el mes quedaron con conteo final en cero: el 79 % del residuo.
+      Bolsas de alto vacío, contenedores de paja, celofán, servilleta, corcho, botella bordalesa. Del
+      grupo EMPAQUE, 6 de 86 códigos recibieron conteo.
+    </div>
+    <div class="prose">
+      <p>A partir de agosto no se cuentan desechables ni suministros. Para que la partida cierre,
+      esos códigos deben salir del inventario valorizado —gasto directo en la compra— <strong>y</strong>
+      de las recetas. Si permanecen en el valorizado sin conteo, su compra íntegra se convierte en
+      variación cada mes. Ejecutado completo, la brecha consolidada baja a ~$230,800.</p>
+    </div>
+  </div>
+
+  <div class="gap-item">
+    <div class="gap-head"><h3>Recetas que descuentan de menos<span class="tag">medición parcial</span></h3><span class="gap-amt">$51,333</span></div>
+    <div class="prose">
+      <p>135 artículos con consumo mayor al que descuenta su receta: harina 75 kg usados contra 20
+      descontados, aceite de oliva 18.9 contra 4.7, pollo orgánico 23.0 contra 8.5.</p>
+      <p>Medición hecha sobre una semana, no sobre el mes: <strong>la cifra mensual será mayor</strong>.
+      Efecto: el costo teórico sale bajo y el margen reportado, mejor que el real.</p>
+    </div>
+  </div>
+
+  <div class="gap-item">
+    <div class="gap-head"><h3>Merma y consumo interno</h3><span class="gap-amt">$174 registrados</span></div>
+    <div class="prose">
+      <p>Dos registros en todo el mes: $112.50 de desperdicio y $62.00 de consumo interno. A 1.5 % de
+      venta lo esperable ronda $35,000. Lo no capturado queda dentro de la brecha.</p>
+      <p>El almacén COMIDA PERSONAL entrega producto por transferencia —$719 en el mes— en lugar de
+      registrarlo como consumo interno.</p>
+    </div>
+  </div>
+
+  <div class="gap-item">
+    <div class="gap-head"><h3>Atribución entre almacenes<span class="tag">reparto</span></h3><span class="gap-amt">$76,137 de venta</span></div>
+    <div class="prose">
+      <p>La comida de los salones Amici se costea a COCINA. Ajustado, COCINA pasa de {{COCINA_PCT}} % a ~26.8 %
+      y AMICI de 94 % a ~35 %. No modifica el consumo total ni la brecha consolidada.</p>
+    </div>
+  </div>
+
+  <div class="gap-item">
+    <div class="gap-head"><h3>CAVA — sin causa estructural identificada<span class="tag">auditar</span></h3><span class="gap-amt">${{CAVA_BRECHA}}</span></div>
+    <div class="prose">
+      <p>Recibe la venta que le corresponde, no transforma producto y no prepara mezclas: ninguna de
+      las causas anteriores aplica. 12 artículos con receta activa salieron sin venta asociada,
+      $17,994. Es la partida más limpia para auditar.</p>
+    </div>
+  </div>
+</section>
+
+<section id="menu">
+  <div class="sec-head"><p class="eyebrow">Contraparte</p><h2>El diseño del menú</h2></div>
+  <div class="prose">
+    <p>El menú está construido para correr a <strong>{{PCT_MENU}} % de costo</strong>, medido producto por
+    producto en el punto de venta sobre los 409 con receta cargada. Coincide con el {{PCT_TEO}} % teórico
+    que arrojan los almacenes: dos mediciones independientes que se validan entre sí.</p>
+    <p>La brecha no está en cómo se diseñó el menú, sino en que el consumo físico no se parece a él.</p>
+  </div>
+  <div class="flag">
+    <b>Dos porcentajes teóricos y uno real</b>
+    Dividir el costo registrado en el punto de venta (${{COSTO_POS}}) entre la venta total da <strong>{{PCT_REGISTRADO}} %</strong>,
+    resultado bajo porque 73 productos —el {{PCT_SIN_RECETA}} % de la venta— tienen costo cero. Sobre lo costeado,
+    <strong>{{PCT_MENU}} %</strong>. Ambos son teóricos: describen lo que las recetas dicen. El consumo medido
+    es <strong>{{PCT_REAL}} %</strong>.
+  </div>
+</section>
+
+<section id="ambientes">
+  <div class="sec-head"><p class="eyebrow">Venta</p><h2>Costo por ambiente</h2></div>
+  <div class="scroll">
+    <table class="data">
+      <thead><tr><th>Ambiente</th><th>Venta neta</th><th>Costo por receta</th><th>% de costo</th></tr></thead>
+      <tbody>__ROWS_AMB__</tbody>
+    </table>
+  </div>
+  <div class="flag">
+    <b>EVENTOS al 11.2 %</b>
+    La mitad del costo del salón restaurante, consumiendo de cava, ambas barras y cocina. Sus dos
+    botones genéricos —OTROS EVENTO y ALIMENTOS EVENTO— suman $74,138 sin costear, que es la mayor
+    parte de la diferencia.
+  </div>
+</section>
+
+<section id="trazabilidad">
+  <div class="sec-head"><p class="eyebrow">Verificación</p><h2>Trazabilidad</h2></div>
+  <div class="prose">
+    <p>599 movimientos de transferencia por $150,744, con origen, destino, encargado y fecha.
+    Reconcilian contra el reporte de inventario: Compras y Transf(+) menos transferencias recibidas
+    da la compra propia de cada almacén.</p>
+  </div>
+  <div class="scroll">
+    <table class="data">
+      <thead><tr><th>Almacén</th><th>Compras / Transf(+)</th><th>Transf. recibidas</th><th>Compra propia</th></tr></thead>
+      <tbody>__ROWS_TRZ__</tbody>
+    </table>
+  </div>
+  <div class="flag">
+    <b>Validación independiente</b>
+    SALUMERIA cuadra al peso: $52,023 de compra propia contra $52,023.00 de PRODUCTORES BARGE en su
+    reporte de proveedor.
+  </div>
+  <div class="prose">
+    <p>GENERAL origina el 87 % de las transferencias y no recibe ninguna; COCINA absorbe el 61 %.
+    <strong>Una persona registró 558 de los 599 movimientos.</strong></p>
+    <p>Cuatro almacenes tienen movimiento y ningún conteo: ALMACEN DE LIMPIEZA entrega $13,159, SALON
+    recibe $5,223, ALMACEN DE SUMINISTROS entrega $3,453 y ALMACEN COMIDA PERSONAL entrega $719.</p>
+  </div>
+</section>
+
+<section id="salumeria">
+  <div class="sec-head"><p class="eyebrow">Fuera de los totales</p><h2>SALUMERIA</h2></div>
+  <div class="prose">
+    <p>Su corte quedó anulado y no entra en ninguna cifra de este reporte. Con los datos actuales
+    aportaría <strong>${{SALUM_BRECHA}}</strong> de brecha, llevando el consolidado a <strong>~$297,900</strong>.</p>
+  </div>
+  <div class="scroll">
+    <table class="data">
+      <thead><tr><th>Concepto</th><th>Monto</th></tr></thead>
+      <tbody>
+        <tr><td>Inventario inicial</td><td>86,787</td></tr>
+        <tr><td>Compras y transferencias</td><td>52,312</td></tr>
+        <tr><td>Inventario final contado</td><td>76,847</td></tr>
+        <tr><td>Costo real</td><td>62,251</td></tr>
+        <tr><td>Costo teórico</td><td>8,188</td></tr>
+        <tr class="total"><td>Brecha</td><td class="neg">${{SALUM_BRECHA}}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="flag">
+    <b>Su mayor faltante es producción sin receta</b>
+    Cerdo de engorda en canal, $37,794 — el {{PCT_TEO_EXPLICA}} % de su brecha en un solo código. Le siguen pancetta
+    $10,015, cabeza de cerdo pelón $7,504 y spianata piccante $7,227. El cerdo entra en canal y sale
+    transformado en subrecetas que no lo descuentan.
+  </div>
+</section>
+
+<section id="acciones">
+  <div class="sec-head"><p class="eyebrow">Siguiente</p><h2>Acciones, por retorno</h2></div>
+  <ol class="acts">
+    <li><div><h3>Cargar receta a los 73 productos sin costeo</h3><p>Los diez primeros concentran $213,682 de venta. No requiere investigación previa: la lista está en el Excel.</p></div><span class="amt">${{FALTANTE}}</span></li>
+    <li><div><h3>Reaplicar SALUMERIA</h3><p>Auditar primero el cerdo en canal, que concentra el {{PCT_TEO_EXPLICA}} % de su brecha.</p></div><span class="amt">${{SALUM_BRECHA}}</span></li>
+    <li><div><h3>Recalibrar las 135 recetas que descuentan de menos</h3><p>Medido sobre una semana; la cifra mensual será mayor.</p></div><span class="amt">$51,333</span></li>
+    <li><div><h3>Auditar CAVA</h3><p>Empezar por los 12 artículos con receta activa que salieron sin venta asociada.</p></div><span class="amt">${{CAVA_BRECHA}}</span></li>
+    <li><div><h3>Capturar merma y consumo interno</h3><p>Empezar por el almacén COMIDA PERSONAL, que hoy entrega por transferencia.</p></div><span class="amt">~$35,000</span></li>
+    <li><div><h3>Subir la cobertura de conteo en COCINA</h3><p>69 códigos contados de 742, con la mayor brecha en pesos del mes.</p></div><span class="amt">${{COCINA_BRECHA}}</span></li>
+    <li><div><h3>Sacar desechables del inventario valorizado</h3><p>Del valorizado y de las recetas. A medias, su compra completa cae en la variación cada mes.</p></div><span class="amt">$12,994</span></li>
+    <li><div><h3>Corregir la atribución de venta de los salones Amici</h3><p>Normaliza dos almacenes a la vez sin alterar el consolidado.</p></div><span class="amt dim">reparto</span></li>
+    <li><div><h3>Aclarar con Xetux la diferencia entre dos de sus reportes</h3><p>Para GENERAL, el resumen declara salidas por $142,155 y el reporte de variaciones $147,002. La diferencia de $4,847 mueve el residuo calculado en $3,192.</p></div><span class="amt dim">método</span></li>
+  </ol>
+</section>
+
+<footer>
+  <p class="eyebrow">Fuentes y método</p>
+  <dl>
+    <dt>Almacenes</dt><dd>Informes de inventario de Xetux del 01/08/2026, uno por almacén.</dd>
+    <dt>Venta</dt><dd>Detallado por producto: 487 productos, 9 ambientes, mes completo.</dd>
+    <dt>Transferencias</dt><dd>Reporte de transferencias entre almacenes con origen y destino, 599 movimientos.</dd>
+    <dt>Desglose de GENERAL</dt><dd>Variaciones de inventario XTINV000285, 434 códigos.</dd>
+    <dt>Conteo físico</dt><dd>Toma del 31/07/2026: 16 personas, 7 almacenes, 636 códigos contados.</dd>
+    <dt>Consolidación</dt><dd>El costo consolidado no es la suma de los informes por almacén: las transferencias entre almacenes contados aparecen como salida del emisor y entrada del receptor. Se netean ${{INTRA}}.25.</dd>
+    <dt>Denominador</dt><dd>Venta atribuida por Xetux a los seis almacenes en sus propios periodos, ${{VENTA_ATRIB}}.18, neta de transferencias.</dd>
+  </dl>
+  <p style="margin-top:24px">Piazza Pasticcio · Control de inventarios · 1 de agosto de 2026</p>
+</footer>
+
+</div>

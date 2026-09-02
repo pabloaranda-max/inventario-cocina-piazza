@@ -1,12 +1,12 @@
 # [SUPERADO 2026-07-08] Plan por slices — Inventario Piazza Pasticcio
 
-> ⚠️ **Este documento fue reemplazado por `inventario-spec.md` §15 (Plan Slices v2).**
+> ⚠️ **Este documento fue reemplazado por `docs/inventario-spec.md` §15 (Plan Slices v2).**
 > No ejecutar slices desde aquí. Se conserva solo como registro histórico de las
 > decisiones del 2026-07-02 (Slice 0 completado, scraper estacionado, staging creado).
 
 > Versión 1.0 — 2026-07-02. Documento ejecutable: cada slice se trabaja en UNA sesión de IA,
 > con el prompt listo para pegar. Contexto completo del sistema: ver
-> `inventario-piazza-contexto-ia.txt` (Desktop) y `inventario-spec.md` (repo).
+> `inventario-piazza-contexto-ia.txt` (Desktop) y `docs/inventario-spec.md` (repo).
 > Filosofía vigente: "el spec informa; el test grita" — tests solo donde ya hubo falla real.
 
 ## Verificaciones ya hechas (2026-07-02) — no repetir

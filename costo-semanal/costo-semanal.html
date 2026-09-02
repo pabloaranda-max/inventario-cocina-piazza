@@ -1,0 +1,167 @@
+<title>Costo semanal · 1–9 agosto 2026</title>
+<style>
+:root{
+  --ground:#F5F6F3; --surface:#FFFFFF; --sunk:#EDEFE9;
+  --ink:#1A1D19; --ink-2:#4A5147; --ink-3:#767C71;
+  --line:#DDE0D8; --line-2:#C8CCC1;
+  --accent:#7A5C1E; --accent-soft:#F0E6CE;
+  --pos:#2F6B47; --neg:#A33A2A; --flag:#8A6A12;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --serif:ui-serif,Georgia,"Iowan Old Style","Palatino Linotype",serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#131512; --surface:#1B1E19; --sunk:#22261F;
+    --ink:#E9EBE4; --ink-2:#AEB4A6; --ink-3:#848A7C;
+    --line:#2E332A; --line-2:#3D4338;
+    --accent:#D2A94F; --accent-soft:#332C15;
+    --pos:#74C193; --neg:#E28B79; --flag:#D2A94F;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#131512; --surface:#1B1E19; --sunk:#22261F;
+  --ink:#E9EBE4; --ink-2:#AEB4A6; --ink-3:#848A7C;
+  --line:#2E332A; --line-2:#3D4338;
+  --accent:#D2A94F; --accent-soft:#332C15;
+  --pos:#74C193; --neg:#E28B79; --flag:#D2A94F;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:var(--sans); font-size:15px; line-height:1.55;
+  margin:0; padding:0;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:56px 28px 96px;
+  display:flex;flex-direction:column;gap:52px}
+h1,h2,h3{font-family:var(--serif);font-weight:600;text-wrap:balance;margin:0;
+  letter-spacing:-.01em}
+h1{font-size:clamp(30px,4.4vw,46px);line-height:1.1}
+h2{font-size:23px;line-height:1.25}
+p{margin:0;max-width:64ch;color:var(--ink-2)}
+.eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-3);margin:0 0 9px}
+header .lede{font-size:17px;margin-top:14px;color:var(--ink-2)}
+.rule{height:2px;background:var(--accent);width:46px;margin:20px 0 0;border:0}
+
+/* tiles */
+.tiles{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(198px,1fr))}
+.tile{background:var(--surface);border:1px solid var(--line);padding:19px 20px 17px;
+  display:flex;flex-direction:column;gap:5px}
+.tile .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3)}
+.tile .v{font-family:var(--mono);font-size:26px;font-variant-numeric:tabular-nums;
+  letter-spacing:-.02em;line-height:1.12}
+.tile .s{font-size:12.5px;color:var(--ink-3)}
+.tile.lead{background:var(--accent-soft);border-color:var(--accent)}
+.tile.lead .v{color:var(--accent)}
+
+section{display:flex;flex-direction:column;gap:15px}
+.scroll{overflow-x:auto;border:1px solid var(--line);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px}
+caption{text-align:left;padding:13px 16px;font-size:12.5px;color:var(--ink-3);
+  border-bottom:1px solid var(--line);background:var(--sunk)}
+th,td{padding:9px 14px;text-align:right;white-space:nowrap;
+  border-bottom:1px solid var(--line)}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--ink-3);font-weight:500;
+  border-bottom:1px solid var(--line-2)}
+th:first-child,td:first-child{text-align:left}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums}
+tbody tr:last-child td{border-bottom:0}
+tr.total td{border-top:2px solid var(--line-2);font-weight:600;background:var(--sunk)}
+tr.total td.n{font-family:var(--mono)}
+.pos{color:var(--pos)} .neg{color:var(--neg)}
+.tag{font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+  text-transform:uppercase;padding:2px 7px;border:1px solid var(--line-2);
+  color:var(--ink-3);white-space:nowrap}
+.tag.flag{color:var(--flag);border-color:var(--flag)}
+td.name{max-width:280px;overflow:hidden;text-overflow:ellipsis}
+
+.note{background:var(--surface);border-left:3px solid var(--accent);
+  padding:16px 20px;display:flex;flex-direction:column;gap:8px}
+.note p{max-width:72ch;font-size:14px}
+.note strong{color:var(--ink)}
+.grid2{display:grid;gap:15px;grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
+footer{border-top:1px solid var(--line);padding-top:22px;color:var(--ink-3);
+  font-size:12.5px;display:flex;flex-direction:column;gap:5px}
+footer code{font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+</style>
+<div class="wrap">
+<header>
+<p class="eyebrow">Piazza · periodo 1/08/26 → 9/08/26</p>
+<h1>Costo por almacén</h1>
+<hr class="rule">
+<p class="lede">Cuatro almacenes, 95 líneas de compra, 102 de venta y 23 folios de desperdicio. Todas las cifras se generan desde los reportes de Xetux; ninguna se transcribe a mano.</p>
+</header>
+<div class="tiles">
+<div class="tile lead"><span class="k">Costo real</span><span class="v">146,774.28</span><span class="s">38.37 % de la venta neta</span></div>
+<div class="tile"><span class="k">Del cual merma</span><span class="v">17,556.54</span><span class="s">4.59 %</span></div>
+<div class="tile"><span class="k">Del cual venta</span><span class="v">129,217.74</span><span class="s">33.78 %</span></div>
+<div class="tile"><span class="k">Consumo teórico</span><span class="v">128,491.60</span><span class="s">33.59 %</span></div>
+<div class="tile"><span class="k">Brecha de receta</span><span class="v">+726.14</span><span class="s">+0.19 % pts</span></div>
+</div>
+<div class="note"><p><strong>La merma es el problema, no la receta.</strong> Se tiraron 17,556.54 contra una brecha de receta de +726.14 — veinticuatro a uno. Dentro de la merma, 7,625.00 son empaque en dos folios, el 43 % del total de la semana en un solo renglón.</p></div>
+<section>
+<p class="eyebrow">Inventarios · compras · desperdicios</p>
+<h2>Cómo se forma el costo</h2>
+<p>Inventario inicial más lo que entró, menos lo que quedó. Lo que sale es todo lo que dejó el almacén; restando la merma queda lo que se vendió.</p>
+<div class="scroll"><table style="min-width:720px"><caption>Ecuación del costo, por almacén</caption><thead><tr><th>Almacén</th><th>Inicial</th><th>+ Compras</th><th>− Final</th><th>= Costo real</th><th>− Merma</th><th>= Costo de venta</th></tr></thead><tbody><tr><td>COCINA</td><td class="n">146,041.64</td><td class="n">102,340.16</td><td class="n">141,816.94</td><td class="n"><strong>106,564.86</strong></td><td class="n">8,810.84</td><td class="n">97,754.02</td></tr><tr><td>BARRA</td><td class="n">47,001.61</td><td class="n">16,127.07</td><td class="n">40,862.46</td><td class="n"><strong>22,266.22</strong></td><td class="n">1,120.70</td><td class="n">21,145.52</td></tr><tr><td>EMPAQUE</td><td class="n">32,447.50</td><td class="n">49,613.20</td><td class="n">65,340.50</td><td class="n"><strong>16,720.20</strong></td><td class="n">7,625.00</td><td class="n">9,095.20</td></tr><tr><td>MERCH</td><td class="n">90,861.00</td><td class="n">0.00</td><td class="n">89,638.00</td><td class="n"><strong>1,223.00</strong></td><td class="n">0.00</td><td class="n">1,223.00</td></tr><tr class="total"><td>Total</td><td class="n">316,351.75</td><td class="n">168,080.43</td><td class="n">337,657.90</td><td class="n">146,774.28</td><td class="n">17,556.54</td><td class="n">129,217.74</td></tr></tbody></table></div>
+</section>
+<section>
+<p class="eyebrow">Costo contra la venta que cada almacén surte</p>
+<h2>Porcentaje por almacén</h2>
+<p>El punto de venta registra el ingreso donde se cobra, no de dónde salió el producto. Los postres se venden por cocina con insumos de barra, y cada combo lleva una bebida que barra surte mientras cocina cobra. La venta se atribuye a quien pone el costo antes de dividir.</p>
+<div class="scroll"><table style="min-width:700px"><caption>Costo real sobre venta atribuida</caption><thead><tr><th>Almacén</th><th>Costo real</th><th>Venta base</th><th>% costo</th><th>Costo de venta</th><th>Teórico</th><th>Brecha</th></tr></thead><tbody><tr><td>COCINA</td><td class="n">106,564.86</td><td class="n">314,916.74</td><td class="n"><strong>33.84 %</strong></td><td class="n">97,754.02</td><td class="n">101,578.85</td><td class="n pos">−3,824.83</td></tr><tr><td>BARRA</td><td class="n">22,266.22</td><td class="n">65,017.30</td><td class="n"><strong>34.25 %</strong></td><td class="n">21,145.52</td><td class="n">20,071.85</td><td class="n neg">+1,073.67</td></tr><tr><td>EMPAQUE <span class="tag">no vende</span></td><td class="n">16,720.20</td><td class="n">venta total</td><td class="n"><strong>4.37 %</strong></td><td class="n">9,095.20</td><td class="n">5,087.90</td><td class="n neg">+4,007.30</td></tr><tr><td>MERCH</td><td class="n">1,223.00</td><td class="n">2,586.21</td><td class="n"><strong>47.29 %</strong></td><td class="n">1,223.00</td><td class="n">1,753.00</td><td class="n pos">−530.00</td></tr><tr class="total"><td>Total</td><td class="n">146,774.28</td><td class="n">382,520.25</td><td class="n">38.37 %</td><td class="n">129,217.74</td><td class="n">128,491.60</td><td class="n neg">+726.14</td></tr></tbody></table></div>
+<div class="scroll"><table style="min-width:520px"><caption>La atribución mueve ingreso, no lo crea · postres 13,396.54 y la parte del combo que surte barra 25,136.70</caption><thead><tr><th>Almacén</th><th>Registrada en el POS</th><th>Atribuida</th><th>Diferencia</th></tr></thead><tbody><tr><td>COCINA</td><td class="n">353,449.98</td><td class="n">314,916.74</td><td class="n neg">−38,533.24</td></tr><tr><td>BARRA</td><td class="n">26,484.06</td><td class="n">65,017.30</td><td class="n pos">+38,533.24</td></tr><tr><td>MERCH</td><td class="n">2,586.21</td><td class="n">2,586.21</td><td class="n ">+0.00</td></tr><tr class="total"><td>Total</td><td class="n">382,520.25</td><td class="n">382,520.25</td><td class="n">0.00</td></tr></tbody></table></div>
+<div class="note"><p>Sin esta corrección barra daría <strong>84.07 %</strong> de costo, midiendo su gasto contra una venta que no le acreditaron. Con ella, cocina y barra quedan casi empatadas: 33.84 % y 34.25 %.</p></div>
+</section>
+<section>
+<p class="eyebrow">El empaque no factura por sí mismo</p>
+<h2>Mercancía y empaque</h2>
+<div class="scroll"><table style="min-width:420px"><caption>Sobre venta neta de 382,520.25</caption><thead><tr><th>Concepto</th><th>Importe</th><th>% venta neta</th></tr></thead><tbody><tr><td>Mercancía · cocina, barra y merch</td><td class="n">130,054.08</td><td class="n">34.00 %</td></tr><tr><td>Empaque</td><td class="n">16,720.20</td><td class="n">4.37 %</td></tr><tr class="total"><td>Costo real</td><td class="n">146,774.28</td><td class="n">38.37 %</td></tr></tbody></table></div>
+</section>
+<section>
+<p class="eyebrow">Reporte Detallado de Compras-Tue Aug 11 12_21_02 CST 2026.xls</p>
+<h2>Compras del periodo</h2>
+<p>Agrupadas por fecha de recepción, no de documento: el inventario mide lo que está en el anaquel. Merch no tuvo compras en la semana.</p>
+<div class="grid2">
+<div class="scroll"><table style="min-width:300px"><caption>COCINA · 40 artículos</caption><thead><tr><th>Artículo</th><th>Importe</th></tr></thead><tbody><tr><td class="name">DIEZMILLO</td><td class="n">20,691.00</td></tr><tr><td class="name">BOLLO DE PAPA</td><td class="n">17,080.56</td></tr><tr><td class="name">BRISKET</td><td class="n">10,982.25</td></tr><tr><td class="name">PAPA FRANCESA</td><td class="n">10,750.00</td></tr><tr><td class="name">PECHUGA DE POLLO</td><td class="n">10,297.52</td></tr><tr><td class="name">TRIP TIP</td><td class="n">5,580.00</td></tr><tr><td class="name">GRASA WAGYU</td><td class="n">3,292.90</td></tr><tr><td class="name">QUESO CHEDDAR AMERICANO KIRKLAND</td><td class="n">3,179.95</td></tr><tr><td class="name">MAYONESA MCORMICK</td><td class="n">3,103.60</td></tr><tr><td class="name">TOCINO</td><td class="n">2,421.01</td></tr><tr><td class="name">MAYONESA ESPESA HELLMANS</td><td class="n">2,065.96</td></tr><tr><td class="name">ACEITE VEGETAL</td><td class="n">1,478.00</td></tr><tr><td class="name">COGOLLO</td><td class="n">1,425.00</td></tr><tr><td class="name">PEPINILLOS REBANADOS</td><td class="n">1,329.99</td></tr><tr><td class="name">JITOMATE BOLA</td><td class="n">1,035.00</td></tr><tr><td class="name">SALSA SWEET CHILLI MAE PLOY</td><td class="n">990.01</td></tr><tr><td class="name">MIEL DE ABEJA</td><td class="n">960.00</td></tr><tr><td class="name">LECHE ENTERA</td><td class="n">844.80</td></tr><tr><td class="name">CATSUP HEINZ POUCH</td><td class="n">810.00</td></tr><tr><td class="name">SALSA DE CAYENA RED FRANK HOT</td><td class="n">584.00</td></tr><tr><td class="name">CHILE JALAPEÑO EN LATA</td><td class="n">452.79</td></tr><tr><td class="name">MOSTAZA HEINZ POUCH</td><td class="n">405.00</td></tr><tr><td class="name">HARINA DE TRIGO</td><td class="n">290.00</td></tr><tr><td class="name">CEBOLLA BLANCA</td><td class="n">276.00</td></tr><tr><td class="name">CEBOLLA MORADA</td><td class="n">230.00</td></tr><tr><td class="name">AZUCAR REFINADA</td><td class="n">222.00</td></tr><tr><td class="name">SAL FINA</td><td class="n">211.00</td></tr><tr><td class="name">SUERO DE LECHE</td><td class="n">187.60</td></tr><tr><td class="name">CREMA AGRIA FAGE</td><td class="n">160.01</td></tr><tr><td class="name">QUINOA</td><td class="n">160.00</td></tr><tr><td class="name">VINAGRE DE VINO BLANCO</td><td class="n">153.20</td></tr><tr><td class="name">ESPINACA</td><td class="n">121.00</td></tr><tr><td class="name">COL VERDE</td><td class="n">119.69</td></tr><tr><td class="name">AJO EN POLVO</td><td class="n">100.80</td></tr><tr><td class="name">CEBOLLA EN POLVO</td><td class="n">96.00</td></tr><tr><td class="name">ZANAHORIA</td><td class="n">70.56</td></tr><tr><td class="name">HUEVO BLANCO</td><td class="n">55.68</td></tr><tr><td class="name">COL MORADA</td><td class="n">50.40</td></tr><tr><td class="name">VINAGRE BLANCO BARRILITO</td><td class="n">39.48</td></tr><tr><td class="name">LECHUGA ROMANA</td><td class="n">37.40</td></tr><tr class="total"><td>COCINA</td><td class="n">102,340.16</td></tr></tbody></table></div>
+<div class="scroll"><table style="min-width:300px"><caption>BARRA · 14 artículos</caption><thead><tr><th>Artículo</th><th>Importe</th></tr></thead><tbody><tr><td class="name">REF COCA COLA ZERO 355 ML</td><td class="n">3,129.20</td></tr><tr><td class="name">REF COCA COLA REGULAR 355 ML</td><td class="n">3,063.60</td></tr><tr><td class="name">MODELO ESPECIAL</td><td class="n">1,508.58</td></tr><tr><td class="name">MIEL DE ABEJA CARLOTA</td><td class="n">1,104.00</td></tr><tr><td class="name">AGU CIEL NATURAL</td><td class="n">1,100.40</td></tr><tr><td class="name">CER STELLA</td><td class="n">1,034.40</td></tr><tr><td class="name">CREMA PARA BATIR</td><td class="n">990.00</td></tr><tr><td class="name">CREMA DE AVELLANA</td><td class="n">987.99</td></tr><tr><td class="name">GALLETA CHOCOCHIP</td><td class="n">788.40</td></tr><tr><td class="name">LECHE ENTERA</td><td class="n">720.00</td></tr><tr><td class="name">LIMON</td><td class="n">701.50</td></tr><tr><td class="name">FRESA</td><td class="n">667.80</td></tr><tr><td class="name">DEXTROSA</td><td class="n">180.00</td></tr><tr><td class="name">JENGIBRE</td><td class="n">151.20</td></tr><tr class="total"><td>BARRA</td><td class="n">16,127.07</td></tr></tbody></table></div>
+<div class="scroll"><table style="min-width:300px"><caption>EMPAQUE · 7 artículos</caption><thead><tr><th>Artículo</th><th>Importe</th></tr></thead><tbody><tr><td class="name">CAJA PARA HAMBURGUESA</td><td class="n">25,550.00</td></tr><tr><td class="name">BOLSA 27X33</td><td class="n">6,500.00</td></tr><tr><td class="name">CHAROLA PARA HAMBURGUESA</td><td class="n">4,800.00</td></tr><tr><td class="name">VASO 16 OZ</td><td class="n">4,500.00</td></tr><tr><td class="name">SOUFFLERA 2 OZ PAPEL</td><td class="n">4,250.00</td></tr><tr><td class="name">SOUFFLE 2 OZ CON TAPA FECULA</td><td class="n">3,750.00</td></tr><tr><td class="name">AGUA PURIFICADA</td><td class="n">263.20</td></tr><tr class="total"><td>EMPAQUE</td><td class="n">49,613.20</td></tr></tbody></table></div>
+</div>
+<div class="scroll"><table style="min-width:400px"><caption>Por proveedor · 18 proveedores</caption><thead><tr><th>Proveedor</th><th>Importe</th></tr></thead><tbody><tr><td class="name">OCOTEPACKS</td><td class="n">49,350.00</td></tr><tr><td class="name">COMERCIALIZADORA SANTARDO</td><td class="n">40,546.15</td></tr><tr><td class="name">BRAND BUREAU</td><td class="n">16,688.00</td></tr><tr><td class="name">ALIMENTOS PRACTICOS Y SELECTOS</td><td class="n">10,750.00</td></tr><tr><td class="name">SERVICIOS INTEGRALES GOURPAR</td><td class="n">9,189.00</td></tr><tr><td class="name">PROPIMEX</td><td class="n">7,932.00</td></tr><tr><td class="name">KARLA ITZAMARA ESLAVA MENDEZ</td><td class="n">7,266.00</td></tr><tr><td class="name">COSTCO DE MEXICO</td><td class="n">5,600.96</td></tr><tr><td class="name">DISTRIBUIDORA ALIMENTICIA PARA HOTELES Y RESTAURANTES</td><td class="n">4,924.07</td></tr><tr><td class="name">JAIME PACHECO DOMINGUEZ</td><td class="n">4,854.06</td></tr><tr><td class="name">ALL SERVE FOOD SERVICE</td><td class="n">3,280.96</td></tr><tr><td class="name">SERGIO SANCHEZ ESPINOSA</td><td class="n">2,542.98</td></tr><tr><td class="name">TIENDAS SORIANA</td><td class="n">2,188.05</td></tr><tr><td class="name">JUAN PABLO CASTILLO CAMPOS</td><td class="n">1,195.01</td></tr><tr><td class="name">BAKE BU PSJ</td><td class="n">788.40</td></tr><tr><td class="name">NUEVA WAL MART DE MEXICO</td><td class="n">667.99</td></tr><tr><td class="name">MARIEL ROSALES LEGORRETA</td><td class="n">187.60</td></tr><tr><td class="name">CADENA COMERCIAL OXXO</td><td class="n">129.20</td></tr><tr class="total"><td>Total</td><td class="n">168,080.43</td></tr></tbody></table></div>
+</section>
+<section>
+<p class="eyebrow">Desperdicios-Tue Aug 11 15_27_55 CST 2026.xls</p>
+<h2>Desperdicio</h2>
+<p>Los 23 folios aplicados del periodo, a último costo para que casen con los inventarios. Es el renglón más caro de la semana.</p>
+<div class="scroll"><table style="min-width:620px"><caption>Folios de desperdicio aplicados</caption><thead><tr><th>Folio</th><th>Almacén</th><th>Encargado</th><th>Fecha</th><th>Importe</th></tr></thead><tbody><tr><td class="n">XDESP000084</td><td>EMPAQUE <span class="tag flag">43 % del total</span></td><td>Cesar Rosas</td><td class="n">7/08/26</td><td class="n">6,375.00</td></tr><tr><td class="n">XDESP000082</td><td>COCINA</td><td>Daniel Snell</td><td class="n">6/08/26</td><td class="n">2,169.51</td></tr><tr><td class="n">XDESP000078</td><td>EMPAQUE</td><td>Cesar Rosas</td><td class="n">8/08/26</td><td class="n">1,250.00</td></tr><tr><td class="n">XDESP000072</td><td>COCINA</td><td>Cesar Rosas</td><td class="n">3/08/26</td><td class="n">1,074.53</td></tr><tr><td class="n">XDESP000093</td><td>COCINA</td><td>Daniel Snell</td><td class="n">8/08/26</td><td class="n">1,016.70</td></tr><tr><td class="n">XDESP000092</td><td>COCINA</td><td>Daniel Snell</td><td class="n">7/08/26</td><td class="n">868.35</td></tr><tr><td class="n">XDESP000091</td><td>COCINA</td><td>Daniel Snell</td><td class="n">6/08/26</td><td class="n">728.67</td></tr><tr><td class="n">XDESP000090</td><td>COCINA</td><td>Daniel Snell</td><td class="n">5/08/26</td><td class="n">706.85</td></tr><tr><td class="n">XDESP000087</td><td>COCINA</td><td>Daniel Snell</td><td class="n">8/08/26</td><td class="n">611.67</td></tr><tr><td class="n">XDESP000089</td><td>COCINA</td><td>Daniel Snell</td><td class="n">4/08/26</td><td class="n">559.02</td></tr><tr><td class="n">XDESP000081</td><td>BARRA</td><td>Erick Guzman</td><td class="n">7/08/26</td><td class="n">534.46</td></tr><tr><td class="n">XDESP000071</td><td>COCINA</td><td>Daniel Snell</td><td class="n">1/08/26</td><td class="n">515.85</td></tr><tr><td class="n">XDESP000077</td><td>COCINA</td><td>Daniel Snell</td><td class="n">2/08/26</td><td class="n">291.25</td></tr><tr><td class="n">XDESP000088</td><td>COCINA</td><td>Daniel Snell</td><td class="n">9/08/26</td><td class="n">195.84</td></tr><tr><td class="n">XDESP000073</td><td>BARRA</td><td>Erick Guzman</td><td class="n">1/08/26</td><td class="n">122.70</td></tr><tr><td class="n">XDESP000076</td><td>BARRA</td><td>Erick Guzman</td><td class="n">4/08/26</td><td class="n">110.17</td></tr><tr><td class="n">XDESP000074</td><td>BARRA</td><td>Erick Guzman</td><td class="n">2/08/26</td><td class="n">82.71</td></tr><tr><td class="n">XDESP000083</td><td>COCINA</td><td>Daniel Snell</td><td class="n">7/08/26</td><td class="n">72.60</td></tr><tr><td class="n">XDESP000075</td><td>BARRA</td><td>Erick Guzman</td><td class="n">3/08/26</td><td class="n">69.03</td></tr><tr><td class="n">XDESP000080</td><td>BARRA</td><td>Erick Guzman</td><td class="n">6/08/26</td><td class="n">67.87</td></tr><tr><td class="n">XDESP000086</td><td>BARRA</td><td>Erick Guzman</td><td class="n">9/08/26</td><td class="n">53.92</td></tr><tr><td class="n">XDESP000085</td><td>BARRA</td><td>Erick Guzman</td><td class="n">8/08/26</td><td class="n">53.17</td></tr><tr><td class="n">XDESP000079</td><td>BARRA</td><td>Erick Guzman</td><td class="n">5/08/26</td><td class="n">26.67</td></tr><tr class="total"><td colspan="4">Total aplicado</td><td class="n">17,556.54</td></tr></tbody></table></div>
+<div class="scroll"><table style="min-width:380px"><caption>Por almacén</caption><thead><tr><th>Almacén</th><th>Importe</th><th>% venta neta</th></tr></thead><tbody><tr><td>COCINA</td><td class="n">8,810.84</td><td class="n">2.30 %</td></tr><tr><td>BARRA</td><td class="n">1,120.70</td><td class="n">0.29 %</td></tr><tr><td>EMPAQUE</td><td class="n">7,625.00</td><td class="n">1.99 %</td></tr><tr class="total"><td>Total</td><td class="n">17,556.54</td><td class="n">4.59 %</td></tr></tbody></table></div>
+</section>
+<section>
+<p class="eyebrow">Detallado por Producto-Tue Aug 11 12_17_30 CST 2026.xls</p>
+<h2>Venta del periodo</h2>
+<p>Venta neta de 382,520.25 después de 8,143.51 en descuentos. El costo de la columna derecha es el que registra el punto de venta por receta, no el del inventario.</p>
+<div class="grid2">
+<div class="scroll"><table style="min-width:340px"><caption>Por tipo de producto</caption><thead><tr><th>Tipo</th><th>Piezas</th><th>Venta neta</th><th>Costo POS</th></tr></thead><tbody><tr><td>1-ALIMENTOS</td><td class="n">2,947</td><td class="n">353,449.98</td><td class="n">111,017.37</td></tr><tr><td>2-BEBIDAS</td><td class="n">1,074</td><td class="n">25,759.92</td><td class="n">16,749.58</td></tr><tr><td>3-VINO</td><td class="n">7</td><td class="n">724.14</td><td class="n">640.15</td></tr><tr><td>6-MERCH</td><td class="n">5</td><td class="n">2,586.21</td><td class="n">1,753.00</td></tr><tr class="total"><td>Total</td><td class="n">4,033</td><td class="n">382,520.25</td><td class="n">130,160.10</td></tr></tbody></table></div>
+<div class="scroll"><table style="min-width:340px"><caption>Por familia · ENSAMBLE es el combo</caption><thead><tr><th>Familia</th><th>Piezas</th><th>Venta neta</th><th>Costo POS</th></tr></thead><tbody><tr><td>SMASH</td><td class="n">562</td><td class="n">112,273.71</td><td class="n">35,732.39</td></tr><tr><td>PARRILLA</td><td class="n">436</td><td class="n">98,379.74</td><td class="n">32,396.81</td></tr><tr><td>ENSAMBLE</td><td class="n">623</td><td class="n">53,094.83</td><td class="n">10,849.85</td></tr><tr><td>ACOMPAÑAMIENTOS</td><td class="n">426</td><td class="n">44,973.28</td><td class="n">15,384.07</td></tr><tr><td>POLLO</td><td class="n">148</td><td class="n">27,547.41</td><td class="n">11,622.58</td></tr><tr><td>REFRESCOS</td><td class="n">334</td><td class="n">16,660.77</td><td class="n">5,081.60</td></tr><tr><td>POSTRES</td><td class="n">234</td><td class="n">13,396.54</td><td class="n">3,506.42</td></tr><tr><td>CERVEZA</td><td class="n">116</td><td class="n">9,099.15</td><td class="n">2,344.26</td></tr><tr><td>VEGETARIANA</td><td class="n">20</td><td class="n">3,275.86</td><td class="n">862.56</td></tr><tr><td>MERCH</td><td class="n">5</td><td class="n">2,586.21</td><td class="n">1,753.00</td></tr><tr><td>VINO</td><td class="n">7</td><td class="n">724.14</td><td class="n">640.15</td></tr><tr><td>----</td><td class="n">1,122</td><td class="n">508.61</td><td class="n">9,986.41</td></tr></tbody></table></div>
+</div>
+<div class="note"><p>Los componentes de combo cargan <strong>9,754.92</strong> de costo sin venta propia: la bebida y la galleta que van dentro del ENSAMBLE, cuyo ingreso se cobra en el producto padre. Por eso el costo del POS por tipo no se puede repartir sin corregir.</p></div>
+</section>
+<section>
+<p class="eyebrow">COSTO SEMANAL UNIVERSAL semana del 13 al 19.xlsx</p>
+<h2>Contra el reporte hecho a mano</h2>
+<p>El mismo periodo, calculado por separado. Las siete líneas de compra de empaque nunca se cargaron, y con el inventario final ya contado la resta dio un costo negativo que nadie notó.</p>
+<div class="scroll"><table style="min-width:520px"><caption>Costo real: reporte manual contra generado</caption><thead><tr><th>Almacén</th><th>Reporte manual</th><th>Real</th><th>Diferencia</th></tr></thead><tbody><tr><td>Cocina</td><td class="n">110,067.03</td><td class="n">106,564.86</td><td class="n neg">−3,502.17</td></tr><tr><td>Barra</td><td class="n">8,566.60</td><td class="n">22,266.22</td><td class="n neg">+13,699.62</td></tr><tr><td>Empaque <span class="tag flag">costo negativo</span></td><td class="n">−26,125.50</td><td class="n">16,720.20</td><td class="n neg">+42,845.70</td></tr><tr><td>Merch</td><td class="n">3,308.00</td><td class="n">1,223.00</td><td class="n neg">−2,085.00</td></tr><tr class="total"><td>Total</td><td class="n">95,816.13</td><td class="n">146,774.28</td><td class="n neg">+50,958.15</td></tr><tr class="total"><td>% de la venta</td><td class="n">25.05 %</td><td class="n">38.37 %</td><td class="n neg">+13.32 % pts</td></tr></tbody></table></div>
+<div class="scroll"><table style="min-width:460px"><caption>Qué se quedó fuera</caption><thead><tr><th>Concepto</th><th>Importe</th></tr></thead><tbody><tr><td>Siete líneas de compra de empaque nunca cargadas</td><td class="n">49,556.00</td></tr><tr><td>Merma de suministros fuera de su resumen</td><td class="n">7,625.00</td></tr><tr><td>Merma de cocina sumada a medias</td><td class="n">4,687.09</td></tr><tr><td>Merma de barra, diferencia menor</td><td class="n">107.10</td></tr></tbody></table></div>
+</section>
+<footer>
+<p>Generado desde los reportes de Xetux. Lo único capturado a mano son los ocho totales de inventario y el consumo teórico.</p>
+<p><code>Reporte Detallado de Compras-Tue Aug 11 12_21_02 CST 2026.xls</code></p>
+<p><code>Detallado por Producto-Tue Aug 11 12_17_30 CST 2026.xls</code></p>
+<p><code>Desperdicios-Tue Aug 11 15_27_55 CST 2026.xls</code></p>
+<p><code>proyectos/costo-semanal · python3 build_html.py</code></p>
+</footer>
+</div>
