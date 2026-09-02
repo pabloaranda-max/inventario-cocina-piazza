@@ -41,7 +41,7 @@ fuente de verdad** — esta app no gestiona inventario.
 
 | Qué | Dónde | Nota |
 |---|---|---|
-| Mantenimiento del restaurante | `mantenimiento-restaurante/` | Next.js. Se despliega a su propio Worker |
+| Mantenimiento del restaurante | Repo propio: `pabloaranda-max/mantenimiento-restaurante` (privado) | Salió de aquí el 2026-09-02. Se clona en `~/piazza/` |
 | Alimentari B2B | `brainalimentarib2b.html`, `worker/piazza-api/`, `alimentari-b2b/` | Se publica a **otro** repo de GitHub |
 | Operaciones (producción y mermas) | `operaciones.html`, `operaciones/` | |
 
