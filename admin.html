@@ -376,8 +376,9 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
 
 <!-- MODAL: artículos contados que la plantilla de Xetux no trae.
      Antes era un alert(): no deja copiar, y reactivar los códigos en Xetux a mano
-     desde una captura era la fricción de cada cierre. Códigos y nombres se copian
-     por separado (una línea por artículo) porque en Xetux se busca por uno u otro. -->
+     desde una captura era la fricción de cada cierre. En Xetux se reactiva uno por
+     uno, así que cada fila copia SU código y se marca ✓ al copiarse para llevar la
+     cuenta; "todos" (códigos o nombres, una línea por artículo) es secundario. -->
 <div id="modal-fuera" class="modal-notas-overlay">
   <div class="modal-notas-box" style="max-width:640px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -389,16 +390,17 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead><tr style="background:#f8fafc;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:.4px">
           <th style="text-align:left;padding:8px 10px">Código</th><th style="text-align:left;padding:8px 10px">Artículo</th>
-          <th style="text-align:right;padding:8px 10px">Contado</th><th style="text-align:left;padding:8px 10px">Zona</th>
+          <th style="text-align:right;padding:8px 10px">Contado</th><th style="text-align:left;padding:8px 10px">Zona</th><th></th>
         </tr></thead>
         <tbody id="fuera-filas"></tbody>
       </table>
     </div>
-    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-      <button onclick="copiarFuera('cod')" style="flex:1;min-width:140px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer">Copiar códigos</button>
-      <button onclick="copiarFuera('nombre')" style="flex:1;min-width:140px;background:#e2e8f0;color:#334155;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer">Copiar nombres</button>
+    <div id="fuera-copiado" style="font-size:12px;color:#16a34a;height:16px;margin-top:6px"></div>
+    <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:12px;color:#94a3b8">Todos:</span>
+      <button onclick="copiarFuera('cod')" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer">códigos</button>
+      <button onclick="copiarFuera('nombre')" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer">nombres</button>
     </div>
-    <div id="fuera-copiado" style="font-size:12px;color:#16a34a;height:16px;margin-top:4px"></div>
     <div style="font-size:13px;color:#475569;margin-top:8px;line-height:1.55">
       <strong>No se exportó nada.</strong> Estas cantidades no tienen cómo llegar a Xetux mientras el
       almacén no tenga los artículos. Dos salidas:<br>
@@ -1666,15 +1668,33 @@ function mostrarFueraDePlantilla({ almacen, fecha, S, T, fuera, archivo }) {
   document.getElementById('fuera-sub').innerHTML =
     `${esc(tituloAlmacen(almacen))} · ${esc(fechaConteoLegible(fecha))}` +
     (archivo ? ` · plantilla <code>${esc(archivo)}</code>` : ' · la plantilla cambió desde que se capturó esta sesión');
-  document.getElementById('fuera-filas').innerHTML = _fuera.map(f => `
-    <tr style="border-top:1px solid #f1f5f9">
+  document.getElementById('fuera-filas').innerHTML = _fuera.map((f, i) => `
+    <tr id="fuera-fila-${i}" style="border-top:1px solid #f1f5f9">
       <td style="padding:7px 10px;font-family:monospace;white-space:nowrap">${esc(f.cod)}</td>
       <td style="padding:7px 10px">${esc(f.nombre || '—')}</td>
       <td style="padding:7px 10px;text-align:right;white-space:nowrap">${f.qty != null ? esc(String(+(+f.qty).toFixed(4))) + ' ' + esc(f.uni) : '—'}</td>
       <td style="padding:7px 10px;color:#64748b">${esc(f.zonas)}</td>
+      <td style="padding:4px 8px;white-space:nowrap"><button onclick="copiarFueraUno(${i})" id="fuera-btn-${i}" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer">Copiar</button></td>
     </tr>`).join('');
   document.getElementById('fuera-copiado').textContent = '';
   document.getElementById('modal-fuera').style.display = 'block';
+}
+
+// Copia el código de UNA fila y la marca ✓: el ritmo real es copiar → pegar en
+// Xetux → reactivar → volver por el siguiente, y la marca dice cuáles ya van.
+async function copiarFueraUno(i) {
+  const f = _fuera[i]; if (!f) return;
+  const el = document.getElementById('fuera-copiado');
+  try {
+    await navigator.clipboard.writeText(f.cod);
+    const fila = document.getElementById(`fuera-fila-${i}`), btn = document.getElementById(`fuera-btn-${i}`);
+    if (fila) fila.style.background = '#f0fdf4';
+    if (btn) { btn.textContent = '✓ Copiado'; btn.style.background = '#e2e8f0'; btn.style.color = '#166534'; }
+    const van = _fuera.filter((_, j) => document.getElementById(`fuera-btn-${j}`)?.textContent.startsWith('✓')).length;
+    el.style.color = '#16a34a'; el.textContent = `${f.cod} copiado · ${van} de ${_fuera.length}`;
+  } catch(e) {
+    el.style.color = '#dc2626'; el.textContent = 'No se pudo copiar; selecciónalo de la tabla.';
+  }
 }
 
 async function copiarFuera(que) {
