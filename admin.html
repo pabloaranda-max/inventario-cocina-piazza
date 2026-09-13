@@ -1,0 +1,3536 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<!-- Sello de versión de ESTE archivo. Va en el <head> para que quepa en los
+     primeros 4 KB: la comprobación de "pestaña vieja" pide solo ese pedazo en
+     vez del HTML entero. Subirlo en cada deploy que cambie la interfaz. -->
+<meta name="build" content="2026-08-11-a">
+<title>Admin — Inventario Piazza Pasticcio</title>
+<link rel="icon" type="image/png" href="branding/icon-admin-192.png">
+<link rel="apple-touch-icon" href="branding/icon-admin-180.png">
+<link rel="manifest" href="manifest-admin.webmanifest">
+<meta name="theme-color" content="#1e293b">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f5f5; color: #333; }
+button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
+
+/* LOGIN */
+#pantalla-login {
+  min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; padding: 24px;
+  background: white;
+}
+.login-titulo { font-size: 26px; margin-bottom: 8px; text-align: center; }
+.login-sub { color: #666; margin-bottom: 32px; text-align: center; }
+.login-input {
+  width: 100%; max-width: 320px; padding: 14px;
+  border: 1px solid #ddd; border-radius: 8px;
+  font-size: 16px; margin-bottom: 12px; display: block;
+}
+.btn-login {
+  width: 100%; max-width: 320px; padding: 14px;
+  background: #667eea; color: white; font-size: 16px;
+  border-radius: 28px; min-height: 48px;
+}
+
+/* ADMIN */
+#pantalla-admin { display: none; padding-bottom: 40px; }
+.admin-header {
+  background: #1e293b; color: white; padding: 16px;
+  position: sticky; top: 0; z-index: 50;
+}
+.admin-header h1 { font-size: 18px; margin-bottom: 4px; }
+.admin-header p { font-size: 13px; color: #94a3b8; }
+.admin-header-row { display: flex; justify-content: space-between; align-items: center; }
+.btn-logout { background: #475569; color: white; padding: 8px 14px; font-size: 13px; }
+
+/* TABS */
+.tabs { display: flex; overflow-x: auto; background: white; border-bottom: 2px solid #e2e8f0; padding: 0 16px; }
+.tab { padding: 14px 16px; font-size: 14px; font-weight: bold; color: #64748b; cursor: pointer; white-space: nowrap; border-bottom: 3px solid transparent; margin-bottom: -2px; background: none; border-radius: 0; min-height: auto; }
+.tab.active { color: #667eea; border-bottom-color: #667eea; background: #f5f6ff; }
+.tab { display: inline-flex; align-items: center; gap: 6px; }
+
+/* CONTENT */
+.tab-content { display: none; padding: 16px; }
+.tab-content.active { display: block; }
+
+/* STATS */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.stat-card { background: white; border-radius: 10px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+.stat-num { font-size: 28px; font-weight: bold; color: #667eea; }
+.stat-label { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+/* TOMAS */
+.toma-card {
+  background: white; border-radius: 10px; padding: 14px;
+  margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  border-left: 4px solid #667eea;
+}
+.toma-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.toma-operario { font-weight: bold; font-size: 15px; }
+.toma-almacen { font-size: 11px; background: #667eea; color: white; padding: 3px 8px; border-radius: 12px; }
+.toma-meta { font-size: 12px; color: #64748b; margin-bottom: 10px; }
+.toma-footer { display: flex; justify-content: space-between; align-items: center; }
+.toma-items { font-size: 13px; color: #374151; }
+.btn-borrar { background: #fee2e2; color: #dc2626; padding: 8px 14px; font-size: 13px; min-height: 36px; }
+.btn-borrar:hover { background: #fca5a5; }
+
+/* GROQ CHAT */
+.chat-container { background: white; border-radius: 10px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.chat-messages { min-height: 200px; max-height: 400px; overflow-y: auto; margin-bottom: 12px; }
+.msg { padding: 10px 14px; border-radius: 10px; margin-bottom: 8px; font-size: 14px; line-height: 1.5; }
+.msg.user { background: #667eea; color: white; margin-left: 20%; }
+.msg.ai { background: #f1f5f9; color: #333; margin-right: 20%; }
+.msg.ai.loading { color: #94a3b8; font-style: italic; }
+.chat-input-row { display: flex; gap: 8px; }
+.chat-input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+.btn-send { background: #667eea; color: white; padding: 12px 16px; min-height: 48px; }
+
+/* FILTROS */
+.filtros-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.filtro-chip { padding: 8px 14px; border-radius: 20px; font-size: 13px; background: #e2e8f0; color: #475569; cursor: pointer; min-height: 36px; }
+.filtro-chip.active { background: #667eea; color: white; }
+
+.empty-state { text-align: center; color: #94a3b8; padding: 40px 20px; font-size: 15px; }
+.loading-state { text-align: center; color: #94a3b8; padding: 40px 20px; }
+.spinner-sm { width: 24px; height: 24px; border: 3px solid #e2e8f0; border-top-color: #667eea; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-msg { background: #fee2e2; color: #dc2626; padding: 12px; border-radius: 8px; margin-bottom: 12px; font-size: 14px; }
+.success-msg { background: #dcfce7; color: #16a34a; padding: 12px; border-radius: 8px; margin-bottom: 12px; font-size: 14px; }
+.btn-notas { background: #dbeafe; color: #1d4ed8; padding: 8px 14px; font-size: 13px; min-height: 36px; }
+.btn-notas:hover { background: #bfdbfe; }
+.btn-pdf-card { background: #dcfce7; color: #16a34a; padding: 8px 14px; font-size: 13px; min-height: 36px; }
+.btn-pdf-card:hover { background: #bbf7d0; }
+.pdf-general-card { background:#ecfdf5;border:1px solid #86efac;border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap; }
+.pdf-general-title { color:#166534;font-size:14px;font-weight:800; }
+.pdf-general-help { color:#4b5563;font-size:12px;line-height:1.4;margin-top:2px; }
+.btn-pdf-general { background:#15803d;color:white;padding:9px 14px;font-size:13px;min-height:38px; }
+.btn-pdf-general:hover { background:#166534; }
+.btn-pdf-general:disabled { opacity:.65;cursor:wait; }
+.modal-notas-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:200; overflow-y:auto; padding:20px 12px; }
+.modal-notas-box { background:white; border-radius:12px; max-width:560px; margin:auto; padding:20px; }
+.modal-detalle-box { max-width:760px; }
+.detalle-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin-bottom:12px; }
+.detalle-stat { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px; }
+.detalle-stat-num { font-size:20px; font-weight:800; color:#1e293b; }
+.detalle-stat-label { font-size:11px; color:#64748b; margin-top:2px; }
+.detalle-table { width:100%; border-collapse:collapse; font-size:12px; }
+.detalle-table th { text-align:left; color:#64748b; font-size:11px; border-bottom:1px solid #e2e8f0; padding:6px 4px; }
+.detalle-table td { border-bottom:1px solid #f1f5f9; padding:6px 4px; vertical-align:top; }
+.detalle-table tr.corr-row td { background:#fffbeb; }
+.corr-badge { display:inline-block;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:700; }
+.edit-qty-input { width:70px;border:1px solid #c7d2fe;border-radius:5px;padding:3px 6px;font-size:12px;text-align:right; }
+.edit-qty-input.modified { border-color:#8b5cf6;background:#f5f3ff; }
+.btn-guardar-corr { background:#7c3aed;color:white;padding:8px 18px;border-radius:6px;font-size:13px;margin-top:12px; }
+.btn-guardar-corr:disabled { opacity:.5;cursor:not-allowed; }
+.corr-block { border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:8px; background:#f8fafc; }
+.corr-input { width:100%; border:1px solid #ddd; border-radius:6px; padding:7px; font-size:13px; margin-bottom:6px; box-sizing:border-box; }
+/* PLANTILLAS */
+.plt-drop { border:2px dashed #c4b5fd; border-radius:12px; padding:32px 16px; text-align:center; background:#faf5ff; cursor:pointer; transition:all .2s; }
+.plt-drop:hover, .plt-drop.over { border-color:#667eea; background:#f5f3ff; }
+.plt-drop p { color:#888; font-size:14px; margin-top:8px; }
+.plt-status-card { background:white; border-radius:8px; padding:14px; border:1px solid #e2e8f0; margin-bottom:14px; }
+.ic{display:inline-block;vertical-align:-3px;flex:none}
+</style>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<!-- Iconos Lucide (ISC) — sprite inline, cero red -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true"><symbol id="i-clipboard-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></symbol><symbol id="i-chart-column" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 3v16a2 2 0 0 0 2 2h16" /> <path d="M18 17V9" /> <path d="M13 17V5" /> <path d="M8 17v-3" /></symbol><symbol id="i-file-spreadsheet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M8 13h2" /> <path d="M14 13h2" /> <path d="M8 17h2" /> <path d="M14 17h2" /></symbol><symbol id="i-chef-hat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z" /> <path d="M6 17h12" /></symbol><symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /> <path d="M16 3.128a4 4 0 0 1 0 7.744" /> <path d="M22 21v-2a4 4 0 0 0-3-3.87" /> <circle cx="9" cy="7" r="4" /></symbol><symbol id="i-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /></symbol><symbol id="i-log-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m16 17 5-5-5-5" /> <path d="M21 12H9" /> <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /></symbol><symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /> <path d="M7 11V7a5 5 0 0 1 10 0v4" /></symbol><symbol id="i-refresh-cw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></symbol><symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /> <path d="M3 3v5h5" /> <path d="M12 7v5l4 2" /></symbol><symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></symbol><symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 15V3" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /> <path d="m7 10 5 5 5-5" /></symbol><symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 3v12" /> <path d="m17 8-5-5-5 5" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></symbol><symbol id="i-printer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /> <path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6" /> <rect x="6" y="14" width="12" height="8" rx="1" /></symbol><symbol id="i-circle-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="m9 12 2 2 4-4" /></symbol><symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></symbol><symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /></symbol><symbol id="i-trash-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></symbol><symbol id="i-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /> <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" /> <path d="M7 3v4a1 1 0 0 0 1 1h7" /></symbol><symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></symbol></svg>
+
+<!-- LOGIN -->
+<div id="pantalla-login">
+  <div class="login-titulo">Admin</div>
+  <div class="login-sub">Inventario Piazza Pasticcio</div>
+  <input type="text" class="login-input" id="nombre-input" placeholder="Tu nombre (ej: Javier)" onkeyup="if(event.key==='Enter') login()">
+  <input type="password" class="login-input" id="pwd-input" placeholder="Contraseña" onkeyup="if(event.key==='Enter') login()">
+  <input type="text" class="login-input" id="groq-key-input" placeholder="API Key GROQ (opcional)" style="margin-top:0; font-size:12px;">
+  <button class="btn-login" onclick="login()"><svg class="ic" width="14" height="14"><use href="#i-lock"/></svg> Entrar</button>
+  <div id="login-error" style="color:#dc2626;margin-top:12px;font-size:14px;"></div>
+</div>
+
+<!-- ADMIN -->
+<div id="pantalla-admin">
+  <div class="admin-header">
+    <div class="admin-header-row">
+      <div>
+        <h1 id="admin-nombre-display">Admin Inventario</h1>
+        <p>Piazza Pasticcio</p>
+      </div>
+      <button class="btn-logout" onclick="logout()"><svg class="ic" width="13" height="13"><use href="#i-log-out"/></svg> Salir</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('tomas')"><svg class="ic" width="14" height="14"><use href="#i-clipboard-list"/></svg> Tomas</button>
+    <button class="tab" onclick="showTab('reporte')"><svg class="ic" width="14" height="14"><use href="#i-chart-column"/></svg> Resumen</button>
+    <button class="tab" onclick="showTab('plantillas')"><svg class="ic" width="14" height="14"><use href="#i-file-spreadsheet"/></svg> Plantillas</button>
+    <button class="tab" onclick="showTab('preparacion')"><svg class="ic" width="14" height="14"><use href="#i-chef-hat"/></svg> Preparación</button>
+    <button class="tab" id="tab-btn-admins" onclick="showTab('admins')" style="display:none"><svg class="ic" width="14" height="14"><use href="#i-users"/></svg> Admins</button>
+    <button class="tab" onclick="showTab('groq')"><svg class="ic" width="14" height="14"><use href="#i-sparkles"/></svg> Asistente</button>
+  </div>
+
+  <!-- TAB: TOMAS -->
+  <div id="tab-tomas" class="tab-content active">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
+      <div style="font-weight:800;color:#1e293b">Tomas de inventario · últimos 30 días</div>
+      <button class="btn-notas" onclick="cargarSesionesInventario()"><svg class="ic" width="13" height="13"><use href="#i-refresh-cw"/></svg> Actualizar</button>
+    </div>
+    <!-- R9a: filtros de dos niveles — centro primero, almacén después -->
+    <div class="filtros-row" id="filtros-centro"></div>
+    <div class="filtros-row" id="filtros-almacen"></div>
+    <div id="pdf-general-container"></div>
+    <div id="sesiones-container">
+      <div class="loading-state"><div class="spinner-sm"></div>Cargando tomas...</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:26px 0 10px;gap:8px;flex-wrap:wrap">
+      <div style="font-weight:800;color:#64748b">Histórico en Google Sheets · Piazza (legado)</div>
+      <button class="btn-notas" onclick="cargarHistoricosSheets()" id="btn-historicos-sheets"><svg class="ic" width="13" height="13"><use href="#i-history"/></svg> Cargar histórico</button>
+    </div>
+    <div id="tomas-container">
+      <div class="empty-state" style="background:white;border-radius:10px">Las tomas recientes viven arriba. Este histórico consulta los Sheets de Piazza solo si lo pides.</div>
+    </div>
+  </div>
+
+  <!-- TAB: REPORTE -->
+  <div id="tab-reporte" class="tab-content">
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card"><div class="stat-num" id="stat-total">—</div><div class="stat-label">Tomas totales</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-operarios">—</div><div class="stat-label">Operarios activos</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-items">—</div><div class="stat-label">Ítems capturados</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-manuales">—</div><div class="stat-label">No catalogados</div></div>
+    </div>
+    <div id="reporte-detalle"></div>
+  </div>
+
+  <!-- TAB: PLANTILLAS -->
+  <div id="tab-plantillas" class="tab-content">
+    <div style="margin-bottom:16px">
+      <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:6px">Almacén</label>
+      <select id="plt-almacen" onchange="loadPlantillaStatus()" style="padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;width:100%;max-width:340px">
+        <option value="" disabled selected>— Seleccionar —</option>
+        <optgroup label="Piazza Pasticcio">
+          <option value="BARRA_RESTAURANTE">Barra Restaurante</option>
+          <option value="COCINA">Cocina</option>
+          <option value="ALIMENTARI">Alimentari</option>
+          <option value="CAVA">Cava</option>
+          <option value="SALUMERIA">Salumeria</option>
+          <option value="GENERAL">General</option>
+          <option value="BARRA_AMICI">Barra Amici</option>
+        </optgroup>
+        <optgroup label="Universal de Hamburguesas">
+          <option value="UH_MERCH">Merch</option>
+          <option value="UH_COCINA">Cocina</option>
+          <option value="UH_BARRA">Barra</option>
+          <option value="UH_SUMINISTROS">Suministros</option>
+        </optgroup>
+      </select>
+    </div>
+    <div id="plt-status"></div>
+    <div id="plt-upload" style="display:none">
+      <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:6px">Nueva plantilla (.xlsx)</label>
+      <p style="font-size:13px;color:#666;margin-bottom:12px">En Xetux: Inventarios → Gestión de inventario → Exportar. Activa <strong>Incluir presentaciones</strong>.</p>
+      <div class="plt-drop" id="plt-drop" onclick="document.getElementById('plt-file').click()">
+        <div style="font-size:15px;font-weight:800;color:#94a3b8;letter-spacing:2px">XLSX</div>
+        <p>Arrastra el .xlsx aquí o toca para seleccionar</p>
+        <input type="file" id="plt-file" accept=".xlsx,.xls" style="display:none" onchange="uploadPlantilla(this.files[0])">
+      </div>
+      <div id="plt-msg" style="margin-top:10px;font-size:13px;font-weight:600"></div>
+    </div>
+    <div id="plt-revision" style="margin-top:16px"></div>
+    <div id="plt-defaults-section" style="display:none;margin-top:20px;border-top:1px solid #e5e7eb;padding-top:16px">
+      <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:4px">Presentaciones por defecto</div>
+      <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Se aplican a artículos sin presentaciones en Xetux, según su unidad.</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:10px">
+        <thead><tr style="color:#9ca3af;font-size:11px;text-align:left">
+          <th style="padding:3px 6px;font-weight:600">Unidad</th>
+          <th style="padding:3px 6px;font-weight:600">Nombre presentación</th>
+          <th style="padding:3px 6px;font-weight:600;text-align:right">Factor</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="plt-defs-body"></tbody>
+      </table>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="addDefaultRow()" style="font-size:12px;padding:5px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;color:#374151">+ Agregar fila</button>
+        <button onclick="saveDefaults()" style="font-size:12px;padding:5px 12px;border:none;border-radius:6px;background:#1d4ed8;color:#fff;cursor:pointer;font-weight:600">Guardar</button>
+        <span id="plt-defs-msg" style="font-size:12px;color:#6b7280"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: PREPARACIÓN DE CONTEO -->
+  <div id="tab-preparacion" class="tab-content">
+    <div style="margin-bottom:16px">
+      <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:6px">Almacén</label>
+      <select id="prep-almacen" onchange="loadPreparacion()" style="padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;width:100%;max-width:340px">
+        <option value="" disabled selected>— Seleccionar —</option>
+        <optgroup label="Piazza Pasticcio">
+          <option value="BARRA_RESTAURANTE">Barra Restaurante</option>
+          <option value="COCINA">Cocina</option>
+          <option value="ALIMENTARI">Alimentari</option>
+          <option value="CAVA">Cava</option>
+          <option value="SALUMERIA">Salumeria</option>
+          <option value="GENERAL">General</option>
+          <option value="BARRA_AMICI">Barra Amici</option>
+        </optgroup>
+        <optgroup label="Universal de Hamburguesas">
+          <option value="UH_MERCH">Merch</option>
+          <option value="UH_COCINA">Cocina</option>
+          <option value="UH_BARRA">Barra</option>
+          <option value="UH_SUMINISTROS">Suministros</option>
+        </optgroup>
+      </select>
+    </div>
+    <div id="prep-status"></div>
+    <div id="prep-editor" style="display:none">
+      <div id="prep-zonas"></div>
+      <div style="display:flex;gap:8px;margin:14px 0;flex-wrap:wrap">
+        <button onclick="prepAddZone()" style="font-size:13px;padding:8px 12px;border:1px dashed #94a3b8;border-radius:8px;background:#fff;cursor:pointer;color:#475569">+ Agregar zona</button>
+      </div>
+      <div style="border-top:1px solid #e5e7eb;padding-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button onclick="savePreparacion(false)" style="font-size:13px;padding:9px 14px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer;color:#374151;font-weight:600">Guardar borrador</button>
+        <button onclick="savePreparacion(true)" style="font-size:13px;padding:9px 16px;border:none;border-radius:8px;background:#16a34a;color:#fff;cursor:pointer;font-weight:700">Guardar y activar</button>
+        <button id="prep-btn-desactivar" onclick="deactivatePreparacion()" style="display:none;font-size:13px;padding:9px 14px;border:1px solid #fca5a5;border-radius:8px;background:#fff;cursor:pointer;color:#dc2626;font-weight:600">Desactivar preparación</button>
+        <span id="prep-msg" style="font-size:13px;color:#6b7280"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: ADMINS (R7, solo password maestro) -->
+  <div id="tab-admins" class="tab-content">
+    <div style="font-weight:800;color:#1e293b;margin-bottom:6px">Perfiles de admin por almacén</div>
+    <p style="font-size:13px;color:#64748b;margin-bottom:14px;line-height:1.5">
+      Un perfil entra al login con su nombre y su password, y solo puede subir plantillas,
+      editar preparaciones, exportar y borrar sesiones de sus almacenes. Solo el password
+      maestro crea o edita perfiles. La lectura de sesiones sigue siendo pública para los operarios.
+    </p>
+    <div id="admins-lista" style="margin-bottom:18px">
+      <div class="loading-state"><div class="spinner-sm"></div>Cargando perfiles...</div>
+    </div>
+    <div class="plt-status-card">
+      <div style="font-weight:700;margin-bottom:10px" id="adm-form-titulo">Nuevo perfil</div>
+      <input class="corr-input" type="text" id="adm-nombre" placeholder="Nombre (con este nombre entra al login)">
+      <input class="corr-input" type="password" id="adm-password" placeholder="Password del perfil" autocomplete="new-password">
+      <div style="font-size:13px;font-weight:600;color:#555;margin:8px 0 6px">Almacenes permitidos</div>
+      <div id="adm-almacenes" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px"></div>
+      <label style="font-size:13px;color:#475569;display:flex;align-items:center;gap:6px;margin-bottom:12px">
+        <input type="checkbox" id="adm-active" checked> Activo
+      </label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-pdf-card" onclick="guardarAdmin()"><svg class="ic" width="13" height="13"><use href="#i-save"/></svg> Guardar perfil</button>
+        <button class="btn-notas" onclick="nuevoAdminReset()" id="adm-cancelar" style="display:none"><svg class="ic" width="13" height="13"><use href="#i-x"/></svg> Cancelar edición</button>
+      </div>
+      <div id="adm-msg" style="margin-top:8px;font-size:13px"></div>
+    </div>
+  </div>
+
+  <!-- TAB: GROQ -->
+  <div id="tab-groq" class="tab-content">
+    <div class="chat-container">
+      <div class="chat-messages" id="chat-messages">
+        <div class="msg ai">Hola, soy tu asistente de inventario. Puedo ayudarte a analizar las tomas, identificar errores, generar reportes o responder preguntas sobre el inventario. ¿En qué te ayudo?</div>
+      </div>
+      <div class="chat-input-row">
+        <input type="text" class="chat-input" id="chat-input" placeholder="Pregunta algo..." onkeyup="if(event.key==='Enter') enviarChat()">
+        <button class="btn-send" onclick="enviarChat()">➤</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ARCHIVO PARA XETUX -->
+<div id="modal-archivo" class="modal-notas-overlay">
+  <div class="modal-notas-box" style="max-width:520px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h2 style="font-size:17px;" id="archivo-titulo">Archivo para Xetux</h2>
+      <button onclick="cerrarModalArchivo()" style="background:#e2e8f0;color:#333;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:bold;">Cerrar</button>
+    </div>
+    <div style="font-size:12px;color:#6b7280;margin-bottom:4px">Nombre exacto que espera Xetux</div>
+    <div style="display:flex;gap:6px;align-items:stretch;margin-bottom:4px">
+      <code id="archivo-nombre" style="flex:1;min-width:0;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;font-size:12px;word-break:break-all;color:#0f172a"></code>
+      <button onclick="copiarNombreArchivo()" style="flex-shrink:0;background:#e2e8f0;color:#334155;border:none;border-radius:6px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer">Copiar</button>
+    </div>
+    <div id="archivo-copiado" style="font-size:12px;color:#16a34a;height:16px"></div>
+    <div id="archivo-guardar-bloque" style="margin-top:8px">
+      <button onclick="guardarArchivoXetux()" id="archivo-btn-guardar" style="width:100%;background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer">Guardar archivo…</button>
+      <div style="font-size:12px;color:#6b7280;margin-top:8px;line-height:1.5">
+        Guárdalo <strong>encima del anterior</strong> y no lo renombres: Xetux valida el nombre
+        y una descarga normal crea <code>… (1).xlsx</code>, que Xetux rechaza.
+      </div>
+      <div id="archivo-guardar-msg" style="font-size:13px;font-weight:600;margin-top:8px"></div>
+    </div>
+    <div id="archivo-extra" style="font-size:13px;color:#475569;margin-top:12px;line-height:1.5"></div>
+  </div>
+</div>
+
+<!-- MODAL: con qué plantilla se exporta.
+     Elegir plantilla no cabe en un confirm(): un aceptar/cancelar para dos
+     caminos distintos se acepta sin leer, y de aquí sale el archivo a Xetux. -->
+<div id="modal-plantilla-export" class="modal-notas-overlay">
+  <div class="modal-notas-box" style="max-width:540px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <h2 style="font-size:17px;" id="plx-titulo">¿Con qué plantilla exportas?</h2>
+      <button onclick="cerrarModalPlantillaExport()" style="background:#e2e8f0;color:#333;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:bold;">Cancelar</button>
+    </div>
+    <div id="plx-sub" style="font-size:13px;color:#6b7280;margin-bottom:14px;line-height:1.5"></div>
+
+    <button onclick="plxElegir('fresca')" style="width:100%;text-align:left;background:#ecfdf5;border:1px solid #86efac;border-radius:10px;padding:12px 14px;margin-bottom:10px;cursor:pointer">
+      <div style="font-size:14px;font-weight:800;color:#166534">Subir la plantilla fresca de Xetux</div>
+      <div style="font-size:12px;color:#4b5563;margin-top:3px;line-height:1.45">
+        La que Xetux acaba de exportar al crear la toma. Es lo normal al cerrar:
+        el archivo lleva el consecutivo de esa toma y si no coincide, Xetux lo rechaza.
+      </div>
+    </button>
+
+    <button onclick="plxElegir('guardada')" style="width:100%;text-align:left;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;cursor:pointer">
+      <div style="font-size:14px;font-weight:800;color:#1e40af">Usar la plantilla guardada</div>
+      <div style="font-size:12px;color:#4b5563;margin-top:3px;line-height:1.45">
+        La que ya está cargada para este almacén.
+      </div>
+      <div style="font-size:11px;color:#475569;margin-top:6px">
+        Archivo: <code id="plx-nombre" style="background:#f1f5f9;border-radius:4px;padding:1px 5px;word-break:break-all"></code>
+      </div>
+    </button>
+  </div>
+</div>
+
+<!-- MODAL DETALLE SESIÓN D1 -->
+<div id="modal-detalle-sesion" class="modal-notas-overlay">
+  <div class="modal-notas-box modal-detalle-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h2 style="font-size:17px;">Detalle de sesión</h2>
+      <button onclick="cerrarDetalleSesion()" style="background:#e2e8f0;color:#333;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:bold;">Cerrar</button>
+    </div>
+    <div id="detalle-sesion-body" style="font-size:13px;color:#334155;line-height:1.5;"></div>
+  </div>
+</div>
+
+<script>
+const GROQ_MODEL = 'llama-3.1-8b-instant';
+let adminActual = null;
+
+function getGroqKey() {
+  return localStorage.getItem('groq_api_key') || '';
+}
+
+// R9b: los 6 scripts por almacén de Piazza son HISTÓRICO CONGELADO — solo
+// los lee "Cargar histórico" (?action=listar). El envío de excepciones va
+// al script único por centro (SCRIPT_CENTRO).
+const SHEETS_LEGACY_PIAZZA = {
+  COCINA:     'https://script.google.com/macros/s/AKfycbyTJ-jeve3udC1mAuhcmjlUwY0oiJO2HMu55ovpUa5z48JX2j1K25BsVULrgr_tnIQ/exec',
+  ALIMENTARI: 'https://script.google.com/macros/s/AKfycbxgmVa9zMMYy0eGe8zFEVnoUuZWPH1w9cgT2oxBXI307N5eMD6vLnfd88Aovo6n6spO/exec',
+  SALUMERIA:  'https://script.google.com/macros/s/AKfycbwJ89hDt3pIyXwiQkbSaL7--Fr-DXTsFm5tTgo-rKoCc-G0fR14iJKqyjVwRCO3XC_3/exec',
+  BARRA:      'https://script.google.com/macros/s/AKfycby_lsQ9Rn36eAP7zQJrvGjCfDD_rAIhkDSsfYTL8UWg-jYB0YkVdR_uXD-fb0BZvF60BQ/exec',
+  CAVA:       'https://script.google.com/macros/s/AKfycbzQ7Pwt-rv9mPxCOzXkbI6gisss9FVtFzJyKWHGZbQOOMDHrJESa55UTNWriDUeH94B/exec',
+  GENERAL:    'https://script.google.com/macros/s/AKfycbyg1vJUxEGFaHs8V1co2rLxY8IA5h-Ol23-peGDg-Hdon-kI81F_r7Rx9Yey9OdNFQtVg/exec'
+};
+
+// R9b: un Apps Script por centro — libro de excepciones (manuales + fotos +
+// observaciones). La toma íntegra vive en D1; el conteo oficial en Xetux.
+const SCRIPT_CENTRO = {
+  PIAZZA: 'https://script.google.com/macros/s/AKfycby7_vWJe4hDBLPrUqRPHE90YOmkufAMB-JrcBLYDkESy_vEwe9A5UCifoV9mD0EwU9S/exec',
+  UH:     'https://script.google.com/macros/s/AKfycbzfvPxsYUWv1r0DvLpTAUozeZsYTlGT2vORxmIbKC9kcElo2wqoTdW9eFMao351Hxcz5Q/exec'
+};
+
+const ic = (n, s = 15) => `<svg class="ic" width="${s}" height="${s}"><use href="#i-${n}"/></svg>`;
+const WORKER_URL = 'https://operaciones-api.pablo-aranda.workers.dev';
+// R12 — versión del protocolo de escritura (bump junto con inventario.html y
+// el ?v= de los imports). v1 = desglose R11; v2 = acuses auditables R23.
+const APP_VERSION = 2;
+const OPERATING_TIME_ZONE = 'America/Mexico_City';
+const INVENTARIO_AREAS = {
+  BARRA_RESTAURANTE: { titulo:'Barra Restaurante', scriptUrl: SCRIPT_CENTRO.PIAZZA,
+                       zonaNames:['Almacén Barra','Refri Almacén Barra','Contra Barra','Refris de Servicio'] },
+  COCINA:            { titulo:'Cocina',     scriptUrl: SCRIPT_CENTRO.PIAZZA, zonaNames:['Cocina'] },
+  ALIMENTARI:        { titulo:'Alimentari', scriptUrl: SCRIPT_CENTRO.PIAZZA, zonaNames:['Almacén','Tienda'] },
+  CAVA:              { titulo:'Cava',       scriptUrl: SCRIPT_CENTRO.PIAZZA, zonaNames:['Racks cava','Refri cava 1','Refri cava 2'] },
+  SALUMERIA:         { titulo:'Salumeria',  scriptUrl: SCRIPT_CENTRO.PIAZZA, zonaNames:['Camara maduracion','Congelador horizontal','Refri','Camara fria'] },
+  GENERAL:           { titulo:'General',    scriptUrl: SCRIPT_CENTRO.PIAZZA, zonaNames:['General'] },
+  BARRA_AMICI:       { titulo:'Barra Amici', scriptUrl: SCRIPT_CENTRO.PIAZZA, zonaNames:['Barra Amici'] },
+  // Centro UH — Universal de Hamburguesas (R8/R9b): mismo Code.js de centro,
+  // deployment propio; scriptUrl null hasta su deploy.
+  // UH confirmó sus 4 almacenes 2026-07-21: merch, cocina, barra, suministros.
+  // UH_GENERAL era un provisional de R8 y ya no existe (nunca tuvo plantilla,
+  // catálogo ni tomas en D1, así que se retiró sin migración).
+  UH_MERCH:          { centro:'UH', titulo:'Merch',       scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Merch'] },
+  UH_COCINA:         { centro:'UH', titulo:'Cocina',      scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Cocina'] },
+  UH_BARRA:          { centro:'UH', titulo:'Barra',       scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Barra'] },
+  UH_SUMINISTROS:    { centro:'UH', titulo:'Suministros', scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Suministros'] }
+};
+
+// R9a: el centro es el primer nivel de filtrado del tab Tomas.
+// chips = [claveCanónica, etiqueta]; 'BARRA' agrupa BARRA_* (clave legacy R7).
+const CENTROS = {
+  PIAZZA: { nombre: 'Piazza Pasticcio', chips: [
+    ['COCINA','Cocina'], ['ALIMENTARI','Alimentari'], ['SALUMERIA','Salumeria'],
+    ['BARRA','Barra'], ['CAVA','Cava'], ['GENERAL','General'] ] },
+  UH: { nombre: 'Universal de Hamburguesas', chips: [
+    ['UH_MERCH','Merch'], ['UH_COCINA','Cocina'],
+    ['UH_BARRA','Barra'], ['UH_SUMINISTROS','Suministros'] ] }
+};
+function centroDe(a) { return (String(a).startsWith('UH_') || a === 'UH') ? 'UH' : 'PIAZZA'; }
+
+// Etiqueta inequívoca de almacén: SIEMPRE lleva el centro, ambos centros por
+// igual (antes solo UH lo traía hardcodeado en el título y Piazza quedaba
+// implícito — confuso al asignar permisos o mirar tomas con filtro "Todos").
+// Acepta claves completas (BARRA_RESTAURANTE) y canónicas R7 ('BARRA').
+const CENTRO_CORTO = { PIAZZA: 'Piazza', UH: 'Universal' };
+function tituloAlmacen(key) {
+  const c = centroDe(key);
+  const chip = (CENTROS[c].chips.find(([k]) => k === key) || [])[1];
+  const t = INVENTARIO_AREAS[key]?.titulo || chip || key;
+  return `${t} · ${CENTRO_CORTO[c]}`;
+}
+
+let tomasLegacySheets = null; // null = histórico Sheets aún no consultado (R9a: solo on-demand)
+let sesionesInventario = [];
+let filtroCentro = 'TODOS';   // R9a: primer nivel — 'TODOS' | 'PIAZZA' | 'UH'
+let filtroAlmacen = 'TODOS';  // segundo nivel — clave canónica ('BARRA' agrupa BARRA_*)
+let adminPasswordActual = '';
+let adminEsMaster = false;
+let adminAlmacenes = '*'; // '*' (maestro) o array de claves canónicas (perfil R7)
+const exportandoSesiones = new Set();
+let _modalSesion = null;
+let _modalTemplate = null;
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// ── AUTH ──────────────────────────────────────────────────
+// Headers para acciones de admin: el Worker resuelve maestro vs perfil R7
+// por password + nombre (X-Admin-User).
+function adminHeaders() {
+  return { 'Content-Type': 'application/json', 'X-Admin-Password': adminPasswordActual, 'X-Admin-User': adminActual };
+}
+
+// R7: 'BARRA' es la clave legacy de Sheets — cubre cualquier BARRA_*
+// R8: 'UH' es la clave agregada del centro Universal — cubre cualquier UH_*
+function almacenPermitidoUI(almacen) {
+  if (adminEsMaster || adminAlmacenes === '*') return true;
+  if (!Array.isArray(adminAlmacenes)) return false;
+  if (almacen === 'BARRA') return adminAlmacenes.some(a => String(a).startsWith('BARRA'));
+  if (almacen === 'UH')    return adminAlmacenes.some(a => String(a).startsWith('UH_'));
+  return adminAlmacenes.includes(almacen);
+}
+
+async function login() {
+  const nombre = document.getElementById('nombre-input').value.trim();
+  const pwd = document.getElementById('pwd-input').value;
+  const errEl = document.getElementById('login-error');
+  if (!nombre) { errEl.textContent = 'Ingresa tu nombre'; return; }
+  if (!pwd)    { errEl.textContent = 'Ingresa la contraseña'; return; }
+  // El password ya no vive en este archivo (repo público): lo valida el Worker
+  errEl.textContent = 'Verificando…';
+  let loginData;
+  try {
+    const r = await fetch(WORKER_URL + '/inv/plantilla', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'inv_admin_check', appVersion: APP_VERSION, adminPassword: pwd, adminUser: nombre })
+    });
+    loginData = await r.json();
+    if (!loginData.ok) { errEl.textContent = loginData.error || 'Contraseña incorrecta'; return; }
+  } catch (e) {
+    errEl.textContent = 'Sin conexión con el servidor'; return;
+  }
+  errEl.textContent = '';
+  adminActual = nombre;
+  adminPasswordActual = pwd;
+  adminEsMaster = !!loginData.master;
+  adminAlmacenes = loginData.master ? '*' : (loginData.almacenes || []);
+  aplicarPermisosUI();
+  const key = document.getElementById('groq-key-input').value.trim();
+  if (key) localStorage.setItem('groq_api_key', key);
+  document.getElementById('pantalla-login').style.display = 'none';
+  document.getElementById('pantalla-admin').style.display = 'block';
+  document.getElementById('admin-nombre-display').textContent = `Admin — ${adminActual}`;
+  cargarSesionesInventario();
+  // Al entrar y cada 10 min: la pestaña del admin se queda abierta días.
+  revisarVersionInterfaz();
+  if (!_timerVersion) _timerVersion = setInterval(revisarVersionInterfaz, 600000);
+}
+let _timerVersion = null;
+
+function logout() {
+  document.getElementById('pantalla-login').style.display = 'flex';
+  document.getElementById('pantalla-admin').style.display = 'none';
+  document.getElementById('pwd-input').value = '';
+  adminPasswordActual = '';
+  adminEsMaster = false;
+  adminAlmacenes = [];
+}
+
+// R7: esconde de la UI lo que el perfil no puede administrar (el Worker es
+// quien de verdad rechaza la acción; esto solo evita botones muertos)
+function aplicarPermisosUI() {
+  document.getElementById('tab-btn-admins').style.display = adminEsMaster ? '' : 'none';
+  if (filtroAlmacen !== 'TODOS' && !almacenPermitidoUI(filtroAlmacen)) filtroAlmacen = 'TODOS';
+  renderFiltros();
+  for (const selId of ['plt-almacen', 'prep-almacen']) {
+    const sel = document.getElementById(selId);
+    if (!sel) continue;
+    for (const opt of sel.options) {
+      if (!opt.value) continue;
+      const permitido = almacenPermitidoUI(opt.value);
+      opt.hidden = opt.disabled = !permitido;
+      if (!permitido && sel.value === opt.value) sel.selectedIndex = 0;
+    }
+  }
+}
+
+// ── TABS ──────────────────────────────────────────────────
+function showTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  event.target.classList.add('active');
+  if (tab === 'reporte') generarReporte();
+  if (tab === 'admins') cargarAdmins();
+}
+
+// ── FILTROS CENTRO → ALMACÉN (R9a) ────────────────────────
+function renderFiltros() {
+  const rowC = document.getElementById('filtros-centro');
+  const rowA = document.getElementById('filtros-almacen');
+  if (!rowC || !rowA) return;
+  const centrosVisibles = Object.keys(CENTROS).filter(c =>
+    adminEsMaster || adminAlmacenes === '*' ||
+    (Array.isArray(adminAlmacenes) && adminAlmacenes.some(a => centroDe(a) === c)));
+  if (filtroCentro !== 'TODOS' && !centrosVisibles.includes(filtroCentro)) {
+    filtroCentro = 'TODOS'; filtroAlmacen = 'TODOS';
+  }
+  const chipC = (val, label) =>
+    `<button class="filtro-chip ${filtroCentro === val ? 'active' : ''}" onclick="filtrarCentro('${val}')">${label}</button>`;
+  // Un solo centro visible: no hay nada que elegir, ocultar el nivel
+  rowC.style.display = centrosVisibles.length > 1 ? '' : 'none';
+  rowC.innerHTML = chipC('TODOS', 'Todos') + centrosVisibles.map(c => chipC(c, CENTROS[c].nombre)).join('');
+  const centroChips = filtroCentro === 'TODOS'
+    ? (centrosVisibles.length === 1 ? CENTROS[centrosVisibles[0]].chips : null)
+    : CENTROS[filtroCentro].chips;
+  if (!centroChips) { rowA.style.display = 'none'; rowA.innerHTML = ''; return; }
+  const chips = centroChips.filter(([val]) => almacenPermitidoUI(val));
+  const chipA = (val, label) =>
+    `<button class="filtro-chip ${filtroAlmacen === val ? 'active' : ''}" onclick="filtrarAlmacen('${val}')">${label}</button>`;
+  rowA.style.display = '';
+  rowA.innerHTML = chipA('TODOS', 'Todos') + chips.map(([v, l]) => chipA(v, l)).join('');
+}
+
+function filtrarCentro(c) {
+  filtroCentro = c; filtroAlmacen = 'TODOS';
+  renderFiltros(); renderSesionesInventario(); renderHistoricosSheets();
+}
+
+function filtrarAlmacen(a) {
+  filtroAlmacen = a;
+  renderFiltros(); renderSesionesInventario(); renderHistoricosSheets();
+}
+
+function filtroIncluyeAlmacen(almacen) {
+  if (filtroCentro !== 'TODOS' && centroDe(almacen) !== filtroCentro) return false;
+  if (filtroAlmacen === 'TODOS') return true;
+  if (filtroAlmacen === 'BARRA') return String(almacen).startsWith('BARRA');
+  return almacen === filtroAlmacen;
+}
+
+// ── HISTÓRICO SHEETS (legado, solo lectura, on-demand) ────
+// R9a: las tomas viven en D1; los Sheets de Piazza quedan como archivo. Esta
+// consulta solo corre si el admin la pide — el tab funciona sin Apps Scripts.
+async function cargarHistoricosSheets() {
+  const container = document.getElementById('tomas-container');
+  const btn = document.getElementById('btn-historicos-sheets');
+  btn.disabled = true;
+  container.innerHTML = '<div class="loading-state"><div class="spinner-sm"></div>Consultando Sheets de Piazza...</div>';
+  tomasLegacySheets = [];
+  await Promise.all(Object.entries(SHEETS_LEGACY_PIAZZA)
+    .filter(([nombre]) => almacenPermitidoUI(nombre)) // R7
+    .map(([nombre, url]) =>
+      fetch(url + '?action=listar')
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok && data.tomas) {
+            data.tomas.forEach(t => { t.almacen_nombre = nombre; });
+            tomasLegacySheets.push(...data.tomas);
+          }
+        })
+        .catch(() => {}))); // si falla uno, continúa con los demás
+  tomasLegacySheets.sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
+  btn.disabled = false;
+  btn.textContent = 'Recargar histórico';
+  renderHistoricosSheets();
+}
+
+function renderHistoricosSheets() {
+  if (tomasLegacySheets === null) return; // aún no consultado
+  const container = document.getElementById('tomas-container');
+  const tomas = tomasLegacySheets
+    .filter(t => almacenPermitidoUI(t.almacen_nombre))
+    .filter(t => filtroIncluyeAlmacen(t.almacen_nombre));
+  if (!tomas.length) {
+    container.innerHTML = '<div class="empty-state">Sin tomas en los Sheets consultados</div>';
+    return;
+  }
+  container.innerHTML = tomas.slice(0, 100).map(t => `
+    <div class="toma-card" style="border-left-color:#94a3b8">
+      <div class="toma-header">
+        <div class="toma-operario">${esc(t.operario || 'Sin nombre')}</div>
+        <div class="toma-almacen">${esc(t.almacen_nombre)}</div>
+      </div>
+      <div class="toma-meta">${esc(t.area || '—')} · ${esc(t.fecha)} · ${t.items} ítems · solo lectura (Sheets)</div>
+    </div>`).join('')
+    + (tomas.length > 100 ? `<div style="font-size:12px;color:#64748b;margin-top:6px">Mostrando 100 de ${tomas.length}.</div>` : '');
+}
+
+// R12 — este admin quedó atrás del formato de datos: avisar y recargar sin caché
+function mostrarBannerUpdate(mensaje, color = '#b45309') {
+  const previo = document.getElementById('update-banner');
+  // El aviso de protocolo (R12) manda sobre el de interfaz: exportar con el
+  // formato viejo sí corrompe datos; una interfaz vieja solo desconcierta.
+  if (previo && previo.dataset.critico === '1') return;
+  const b = previo || document.createElement('div');
+  b.id = 'update-banner';
+  b.dataset.critico = color === '#b45309' ? '1' : '0';
+  b.style.cssText = `position:fixed;top:0;left:0;right:0;background:${color};color:#fff;z-index:10001;font:600 12px system-ui;padding:8px 12px;text-align:center`;
+  b.innerHTML = `${esc(mensaje)} <button onclick="forzarActualizacion()" style="margin-left:8px;border:none;border-radius:6px;padding:4px 10px;font-weight:700;cursor:pointer">Actualizar</button>`;
+  if (!previo) document.body.appendChild(b);
+}
+
+function forzarActualizacion() {
+  const u = new URL(location.href);
+  u.searchParams.set('v', Date.now()); // atraviesa la caché de Pages
+  location.replace(u.toString());
+}
+
+// ── Pestaña vieja tras un deploy ───────────────────────────
+// El banner R12 solo salta cuando el Worker sube minAppVersion, es decir ante
+// un cambio de FORMATO. Un cambio de interfaz no toca el protocolo, así que una
+// pestaña abierta seguía corriendo la versión vieja en silencio hasta que
+// alguien se acordaba del truco del ?v=. Esto lo detecta: compara el sello del
+// <head> contra el del servidor. GitHub Pages cachea ~10 min, así que el aviso
+// aparece dentro de ese margen, no al instante.
+const BUILD_LOCAL = document.querySelector('meta[name="build"]')?.content || '';
+
+async function buildDelServidor() {
+  const u = new URL(location.pathname, location.origin);
+  u.searchParams.set('v', Date.now());   // atraviesa la caché de Pages
+  const r = await fetch(u.toString(), {
+    cache: 'no-store',
+    headers: { Range: 'bytes=0-4095' }   // el sello vive en el <head>
+  });
+  if (!r.ok) return '';
+  return (/name="build" content="([^"]+)"/.exec(await r.text()) || [])[1] || '';
+}
+
+async function revisarVersionInterfaz() {
+  if (!BUILD_LOCAL) return;
+  try {
+    const remoto = await buildDelServidor();
+    // Sin sello remoto no se concluye nada: un 206 raro o un proxy que recorta
+    // no son motivo para gritarle al admin que está desactualizado.
+    if (remoto && remoto !== BUILD_LOCAL) {
+      mostrarBannerUpdate('Hay una versión nueva del admin. Esta pestaña sigue con la anterior.', '#1d4ed8');
+    }
+  } catch (_) { /* sin red: el resto de la app ya avisa por su cuenta */ }
+}
+
+async function cargarSesionesInventario() {
+  const el = document.getElementById('sesiones-container');
+  if (!el) return;
+  el.innerHTML = '<div class="loading-state"><div class="spinner-sm"></div>Cargando sesiones activas...</div>';
+  try {
+    const r = await fetch(WORKER_URL + '/inv/sesiones?dias=30');
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al cargar sesiones');
+    // R12: pestaña vieja abierta días → banner antes de que un export salga mal
+    if ((Number(d.minAppVersion) || 0) > APP_VERSION) {
+      mostrarBannerUpdate('Admin desactualizado: hay una versión nueva con otro formato de datos — exportar así puede salir mal.');
+    }
+    sesionesInventario = d.sesiones || [];
+    renderSesionesInventario();
+  } catch(e) {
+    el.innerHTML = `<div class="error-msg">No se pudieron cargar sesiones D1: ${esc(e.message)}</div>`;
+  }
+}
+
+function fechaConteoLegible(fecha) {
+  const partes = String(fecha || '').split('-');
+  return partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : String(fecha || '');
+}
+
+function diasEntreFechas(a, b) {
+  return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000);
+}
+
+// Fechas contiguas = el mismo conteo. La captura que cruza la medianoche deja
+// dos filas en D1 y no son dos tomas: es una sola partida en dos.
+function agruparFechasEnConteos(fechas) {
+  const grupos = [];
+  for (const fecha of [...new Set(fechas)].sort()) {
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && diasEntreFechas(ultimo[ultimo.length - 1], fecha) <= 1) ultimo.push(fecha);
+    else grupos.push([fecha]);
+  }
+  return grupos;
+}
+
+function sesionesDeCentro(centro) {
+  return sesionesInventario
+    .filter(s => almacenPermitidoUI(s.almacen))
+    .filter(s => centroDe(s.almacen) === centro);
+}
+
+// El conteo se identifica por su fecha de cierre (la más nueva de su grupo).
+function fechasDelConteo(centro, fechaCierre) {
+  const conteo = agruparFechasEnConteos(sesionesDeCentro(centro).map(s => s.fecha))
+    .find(g => g[g.length - 1] === fechaCierre);
+  return conteo || [fechaCierre];
+}
+
+function sesionesDePDFGeneral(centro, fechaCierre) {
+  const fechas = fechasDelConteo(centro, fechaCierre);
+  return sesionesDeCentro(centro)
+    .filter(s => fechas.includes(s.fecha))
+    .sort((a, b) => tituloAlmacen(a.almacen).localeCompare(tituloAlmacen(b.almacen), 'es')
+                 || String(a.fecha).localeCompare(String(b.fecha)));
+}
+
+// Un botón por restaurante y conteo. El filtro de almacén no reduce el PDF:
+// "general" siempre significa todas las tomas que el admin puede ver. El PDF es
+// independiente del XLSX: exportedAt solo describe la carga a Xetux.
+function renderAccionesPDFGeneral() {
+  const el = document.getElementById('pdf-general-container');
+  if (!el) return;
+  const centros = [...new Set(sesionesInventario
+    .filter(s => almacenPermitidoUI(s.almacen))
+    .map(s => centroDe(s.almacen)))]
+    .filter(c => filtroCentro === 'TODOS' || c === filtroCentro);
+  const disponibles = [];
+  for (const centro of centros) {
+    const delCentro = sesionesDeCentro(centro);
+    for (const conteo of agruparFechasEnConteos(delCentro.map(s => s.fecha))) {
+      const todas = delCentro.filter(s => conteo.includes(s.fecha));
+      if (!todas.length) continue;
+      disponibles.push({
+        centro, fechas: conteo, cierre: conteo[conteo.length - 1],
+        almacenes: new Set(todas.map(s => s.almacen)).size
+      });
+    }
+  }
+  disponibles.sort((a, b) => String(b.cierre).localeCompare(String(a.cierre)) || a.centro.localeCompare(b.centro));
+  if (!disponibles.length) { el.innerHTML = ''; return; }
+
+  el.innerHTML = `<div class="pdf-general-card">
+    <div>
+      <div class="pdf-general-title">PDF integral del restaurante</div>
+      <div class="pdf-general-help">Reúne todos los almacenes del conteo en un archivo, aunque todavía no hayas generado los XLSX. Un almacén contado a caballo de dos días va como una sola sección.</div>
+    </div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end">
+      ${disponibles.map(g => {
+        const rango = g.fechas.length > 1
+          ? `${fechaConteoLegible(g.fechas[0])}–${fechaConteoLegible(g.cierre)}`
+          : fechaConteoLegible(g.cierre);
+        return `<button class="btn-pdf-general" data-pdf-general="${esc(`${g.centro}|${g.cierre}`)}"
+          onclick="imprimirConteoGeneral('${esc(g.centro)}','${esc(g.cierre)}')">
+          ${ic('printer',13)} ${esc(CENTROS[g.centro].nombre)} · ${esc(rango)}
+          (${g.almacenes} ${g.almacenes !== 1 ? 'almacenes' : 'almacén'})
+        </button>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+// Una tarjeta = UN conteo de UN almacén. Si el cambio de día lo partió en varias
+// filas de D1, aquí se ven como una sola toma: dos tarjetas con aviso de "partida"
+// confundían más que el problema, porque cada botón hacía lo mismo que el gemelo.
+function conteosDeSesiones(sesiones) {
+  const porAlmacen = new Map();
+  for (const s of sesiones) {
+    if (!porAlmacen.has(s.almacen)) porAlmacen.set(s.almacen, []);
+    porAlmacen.get(s.almacen).push(s);
+  }
+  const conteos = [];
+  for (const [almacen, filas] of porAlmacen) {
+    for (const fechas of agruparFechasEnConteos(filas.map(s => s.fecha))) {
+      const tramos = filas
+        .filter(s => fechas.includes(s.fecha))
+        .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+      if (!tramos.length) continue;
+      const cierre = fechas[fechas.length - 1];
+      const suma = clave => tramos.reduce((n, s) => n + (Number(s[clave]) || 0), 0);
+      conteos.push({
+        almacen, fechas, cierre, tramos,
+        // Los artículos NO se suman: un código contado en dos tramos es UN
+        // renglón en el XLSX. El total exacto sale de unir las sesiones, que
+        // cuesta un fetch por tramo; aquí basta la cota inferior del tramo mayor.
+        articulos: Math.max(...tramos.map(s => Number(s.articulosContados || s.countedItems) || 0)),
+        articulosAprox: tramos.length > 1,
+        zonas: suma('zonasCompletadas'),
+        correcciones: suma('correcciones'),
+        manualesN: suma('manuales'),
+        comentarios: suma('comentarios'),
+        operarios: [...new Set(tramos.flatMap(s => (s.operarios && s.operarios.length) ? s.operarios : [s.operario]).filter(Boolean))],
+        exportados: tramos.filter(s => s.exportedAt).length,
+        exportedBy: [...tramos].reverse().find(s => s.exportedAt)?.exportedBy || '',
+        updatedAt: tramos.map(s => s.updatedAt).filter(Boolean).sort().pop() || ''
+      });
+    }
+  }
+  return conteos.sort((a, b) => String(b.cierre).localeCompare(String(a.cierre))
+                             || tituloAlmacen(a.almacen).localeCompare(tituloAlmacen(b.almacen), 'es'));
+}
+
+// El total exacto de un conteo unido no está en /inv/sesiones: esa lista trae
+// artículos POR FILA y sumarlas contaría dos veces los códigos presentes en los
+// dos tramos (en ALIMENTARI, 31 de 81 — sumar daría 112). La unión exige las
+// sesiones completas, así que la tarjeta pinta primero una cota ("66+") y la
+// afina enseguida, pidiendo tramos SOLO de las tarjetas unidas (hoy: una).
+// La clave lleva updatedAt, así que cualquier cambio invalida el caché solo.
+const _articulosDeConteo = new Map();
+
+function claveConteo(c) {
+  return `${c.almacen}|${c.fechas.join(',')}|${c.updatedAt}`;
+}
+
+function pintarArticulosDeConteo(clave) {
+  const exacto = _articulosDeConteo.get(clave);
+  if (exacto == null) return;
+  document.querySelectorAll(`[data-conteo-articulos="${CSS.escape(clave)}"]`)
+    .forEach(el => { el.textContent = `${exacto} artículos`; });
+}
+
+async function afinarArticulosDeConteos(conteos) {
+  for (const c of conteos.filter(x => x.tramos.length > 1)) {
+    const clave = claveConteo(c);
+    if (_articulosDeConteo.has(clave)) { pintarArticulosDeConteo(clave); continue; }
+    try {
+      const sesiones = await Promise.all(c.fechas.map(async f => {
+        const r = await fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(c.almacen) + '&fecha=' + encodeURIComponent(f));
+        return r.json();
+      }));
+      const cods = new Set();
+      for (const S of sesiones) {
+        if (!S?.ok || !S.found) throw new Error('tramo no disponible');
+        for (const zc of Object.values(S.countsByZone || {}))
+          for (const cod of Object.keys(zc || {})) cods.add(cod);
+      }
+      _articulosDeConteo.set(clave, cods.size);
+      pintarArticulosDeConteo(clave);
+    } catch (_) {
+      // Sin red o con un tramo caído se queda la cota: mejor "66+" que un número
+      // inventado, y el reintento llega solo en el siguiente refresco.
+    }
+  }
+}
+
+function renderSesionesInventario() {
+  const el = document.getElementById('sesiones-container');
+  if (!el) return;
+  renderAccionesPDFGeneral();
+  const sesiones = sesionesInventario
+    .filter(s => almacenPermitidoUI(s.almacen)) // R7
+    .filter(s => filtroIncluyeAlmacen(s.almacen));
+  if (!sesiones.length) {
+    el.innerHTML = '<div class="empty-state" style="background:white;border-radius:10px">Sin tomas en los últimos 30 días</div>';
+    return;
+  }
+  const conteos = conteosDeSesiones(sesiones);
+  el.innerHTML = conteos.map(c => {
+    const todoExportado = c.exportados === c.tramos.length;
+    const exp = todoExportado
+      ? `<span style="background:#dcfce7;color:#166534;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">${ic('circle-check',11)} Exportada</span>`
+      : `<span style="background:#fffbeb;color:#92400e;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">${ic('clock',11)} Pendiente</span>`;
+    const updated = c.updatedAt ? new Date(c.updatedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short', timeZone:OPERATING_TIME_ZONE }) : '—';
+    // Sin esto el badge decía "Pendiente" y el meta "Exportada" en la misma línea.
+    const exportTxt = !c.exportados ? ''
+      : todoExportado ? ` · Exportada por ${esc(c.exportedBy || '—')}`
+      : ` · ${c.exportados} de ${c.tramos.length} tramos exportados por ${esc(c.exportedBy || '—')}`;
+    const corrTxt = c.correcciones ? ` · ${c.correcciones} correc${c.correcciones!==1?'ciones':'ción'}` : '';
+    const manTxt = c.manualesN ? ` · ${c.manualesN} no catalogado${c.manualesN!==1?'s':''}` : '';
+    const comTxt = c.comentarios ? ` · ${c.comentarios} comentario${c.comentarios!==1?'s':''}` : '';
+    const quienes = c.operarios.length ? c.operarios.join(' · ') : '—';
+    const fechaTxt = c.fechas.map(fechaConteoLegible).join(' y ');
+    // El conteo unido se explica en una línea sobria, no en una alerta: es lo
+    // normal cuando la captura cruza la medianoche, no una anomalía.
+    const notaUnida = c.tramos.length > 1
+      ? `<div class="toma-meta" style="color:#475569;background:#f8fafc;border-radius:6px;padding:4px 7px;margin-top:5px">
+           ${ic('refresh-cw',12)} Un solo conteo capturado en ${c.tramos.length} días
+           (${c.tramos.map(t => `${esc(fechaConteoLegible(t.fecha))}: ${esc((t.operarios && t.operarios[0]) || t.operario || '—')}${t.exportedAt ? ', ya exportado' : ''}`).join(' · ')}).
+           El PDF y el XLSX lo tratan como uno.
+         </div>`
+      : '';
+    // Los botones operan sobre el conteo completo: reciben la fecha de cierre y
+    // cada acción resuelve sus tramos con fechasDeTomaDeAlmacen().
+    const f = esc(c.cierre);
+    const a = esc(c.almacen);
+    return `<div class="toma-card" style="border-left-color:${todoExportado ? '#16a34a' : '#f59e0b'}">
+      <div class="toma-header">
+        <div class="toma-operario">${esc(tituloAlmacen(c.almacen))} ${exp}</div>
+        <div class="toma-almacen">${esc(c.almacen)}</div>
+      </div>
+      <div class="toma-meta">
+        Fecha ${esc(fechaTxt)} · <span data-conteo-articulos="${esc(claveConteo(c))}">${c.articulos}${c.articulosAprox ? '+' : ''} artículos</span> · ${c.zonas} zonas listas${manTxt}${comTxt}${corrTxt} · Actualizada ${updated}${exportTxt}
+      </div>
+      ${notaUnida}
+      <div class="toma-footer" style="flex-wrap:wrap;gap:6px;">
+        <div class="toma-items">Capturaron: ${esc(quienes)}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn-notas" onclick="verDetalleSesion('${a}','${f}')">${ic('search',13)} Explorar</button>
+          <button class="btn-notas" onclick="imprimirSesion('${a}','${f}')">${ic('printer',13)} PDF</button>
+          <button class="btn-pdf-card" onclick="abrirModalPlantillaExport('${a}','${f}')">${ic('download',13)} ${c.exportados ? 'Re-exportar' : 'Exportar'}</button>
+          <button class="btn-borrar" onclick="borrarSesionInventario('${a}','${f}')">${ic('trash-2',13)} Borrar ${c.tramos.length > 1 ? 'conteo' : 'sesión'}</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  // Después de pintar, no antes: la lista no espera a los fetches del afinado.
+  afinarArticulosDeConteos(conteos);
+}
+
+function zonaNombre(almacen, zid) {
+  const idx = parseInt(zid, 10);
+  // R5: si la sesión congeló su preparación, los nombres reales viven en el snapshot
+  const snap = _modalSesion?.zoneSnapshot;
+  if (snap?.[idx]?.nombre) return snap[idx].nombre;
+  const cfg = INVENTARIO_AREAS[almacen] || {};
+  return cfg.zonaNames?.[idx] || (Number.isFinite(idx) ? `Zona ${idx + 1}` : zid);
+}
+
+function baseZone(key) {
+  return parseInt(key, 10);
+}
+
+function detalleTotalesPorZona(S, T) {
+  const filas = [];
+  const totales = {};
+  for (const [zid, zc] of Object.entries(S.countsByZone || {})) {
+    for (const [cod, val] of Object.entries(zc || {})) {
+      const f = (S.presChoiceByZone?.[zid]?.[cod]) ?? factorDefault(T, cod);
+      const baseQty = cantidadBase(val, f);
+      // R11: valor desglosado → mostrar las líneas ("2× BOTELLA 0.75 + 0.3 abierto")
+      const lineas = lineasDesglose(val);
+      const qty = lineas
+        ? lineas.map(l => Number(l.f) === 1 ? `${l.q} abierto` : `${l.q}× ${l.n || l.f}`).join(' + ')
+        : val;
+      const correction = S.correctionsByZone?.[zid]?.[cod] || null;
+      totales[cod] = (totales[cod] || 0) + baseQty;
+      filas.push({ zid, cod, qty, factor: lineas ? null : f, baseQty, correction });
+    }
+  }
+  return { filas, totales };
+}
+
+function correctionsByCod(S) {
+  const out = {};
+  for (const [zid, zc] of Object.entries(S.correctionsByZone || {})) {
+    for (const [cod, corr] of Object.entries(zc || {})) {
+      if (!out[cod]) out[cod] = [];
+      out[cod].push({ zid, ...corr });
+    }
+  }
+  return out;
+}
+
+async function verDetalleSesion(almacen, fecha) {
+  const modal = document.getElementById('modal-detalle-sesion');
+  const body = document.getElementById('detalle-sesion-body');
+  modal.style.display = 'block';
+  body.innerHTML = '<div class="loading-state"><div class="spinner-sm"></div>Cargando sesión...</div>';
+  try {
+    // Se LEE el conteo completo (si el cambio de día lo partió, unido) pero se
+    // ESCRIBE al tramo de cierre: las correcciones `_admin` de cualquier tramo
+    // las recoge la unión, así que basta con guardarlas todas en uno.
+    const tramosDetalle = fechasDeTomaDeAlmacen(almacen, fecha);
+    const [crudas, tr] = await Promise.all([
+      Promise.all(tramosDetalle.map(async f => {
+        const r = await fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(f));
+        const d = await r.json();
+        if (!d.ok || !d.found) throw new Error(`Sesión no encontrada: ${almacen} ${f}`);
+        return { ...d, fecha: f };
+      })),
+      fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen))
+    ]);
+    const T = await tr.json();
+    const S = unirSesionesDeAlmacen(crudas);
+    S.updatedAt = crudas.map(s => s.updatedAt).filter(Boolean).sort().pop() || '';
+    const template = T.ok && T.found ? T : {};
+    _modalSesion = S;
+    _modalTemplate = template;
+    const { filas, totales } = detalleTotalesPorZona(S, template);
+    const rawLookup = template.raw ? itemsFromRaw(template.raw, template) : {};
+    const templateOptions = Object.values(templateLookup(template))
+      .sort((a,b) => String(a.nombre || a.codigo).localeCompare(String(b.nombre || b.codigo)))
+      .map(item => `<option value="${esc(item.codigo)} - ${esc(item.nombre || item.codigo)}"></option>`)
+      .join('');
+    const countedCods = Object.keys(totales);
+    const correctedCods = new Set();
+    for (const zc of Object.values(S.correctionsByZone || {})) for (const cod of Object.keys(zc || {})) correctedCods.add(cod);
+    const zones = new Set(Object.keys(S.countsByZone || {}).map(k => baseZone(k)));
+    const completed = new Set((S.completedZones || []).map(k => baseZone(k)));
+    const manuales = S.manuales || [];
+    const updated = S.updatedAt ? new Date(S.updatedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short', timeZone:OPERATING_TIME_ZONE }) : '—';
+    const exported = S.exportedAt ? new Date(S.exportedAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short', timeZone:OPERATING_TIME_ZONE }) : 'No';
+    // R5.1: quién capturó qué — el deviceId de la clave "zona:deviceId" se traduce
+    // a nombre con operariosByDevice (acumulado por el Worker en cada sync)
+    const operarioDeZid = zid => {
+      const dev = String(zid).split(':')[1];
+      if (!dev) return '—';
+      return S.operariosByDevice?.[dev]?.operario || ('disp. …' + dev.slice(-5));
+    };
+    const opsPorDev = {};
+    for (const [key, zc] of Object.entries(S.countsByZone || {})) {
+      const dev = String(key).split(':')[1];
+      if (!dev) continue;
+      opsPorDev[dev] = (opsPorDev[dev] || 0) + Object.keys(zc || {}).length;
+    }
+    const opsResumen = Object.entries(opsPorDev)
+      .map(([dev, n]) => `${esc(S.operariosByDevice?.[dev]?.operario || 'disp. …' + dev.slice(-5))} (${n})`)
+      .join(' · ');
+    const receipts = S.receipts || [];
+    const receiptsHtml = receipts.length ? `
+      <div style="font-weight:800;margin:16px 0 6px;color:#166534">Acuses confirmados por el servidor (${receipts.length})</div>
+      <div style="display:grid;gap:7px;margin-bottom:14px">
+        ${receipts.slice().reverse().map(receipt => {
+          const received = receipt.receivedAt
+            ? new Date(receipt.receivedAt).toLocaleString('es-MX', {
+                dateStyle:'short', timeStyle:'medium', timeZone:OPERATING_TIME_ZONE
+              })
+            : '—';
+          const verifyUrl = WORKER_URL + '/inv/receipt?id=' + encodeURIComponent(receipt.id || '');
+          return `<div style="border:1px solid #86efac;background:#f0fdf4;border-radius:8px;padding:9px 10px;font-size:12px">
+            <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+              <strong style="color:#166534">${esc(receipt.id || '—')}</strong>
+              <a href="${esc(verifyUrl)}" target="_blank" rel="noopener"
+                style="color:#166534;font-weight:700">Verificar en servidor ↗</a>
+            </div>
+            ${esc(receipt.zoneName || 'Zona')} · ${esc(receipt.operario || '—')} ·
+            ${esc(received)} · ${receipt.itemCount ?? (receipt.items || []).length} catalogados ·
+            ${receipt.manualItemCount ?? (receipt.manualItems || []).length} no catalogados<br>
+            <span style="color:#64748b">Dispositivo: ${esc(receipt.deviceId || '—')} · SHA-256 del contenido:
+            <code style="font-size:10px;word-break:break-all">${esc(receipt.hash || '—')}</code></span>
+          </div>`;
+        }).join('')}
+      </div>` : `
+      <div style="border:1px solid #fde68a;background:#fffbeb;color:#92400e;border-radius:8px;padding:9px 10px;font-size:12px;margin:12px 0">
+        Esta toma todavía no tiene acuses individuales emitidos por el servidor.
+      </div>`;
+    const rows = filas
+      .sort((a,b) => String(a.zid).localeCompare(String(b.zid)) || String(a.cod).localeCompare(String(b.cod)))
+      .slice(0, 350)
+      .map(f => {
+        const item = rawLookup[f.cod] || { nombre:f.cod, unidad:template.unitMap?.[f.cod] || '' };
+        const corrLabel = f.correction ? `<br><span class="corr-badge">Editado por ${esc(f.correction.operario || '—')}</span>` : '';
+        return `<tr class="${f.correction ? 'corr-row' : ''}">
+          <td>${esc(zonaNombre(almacen, f.zid))}</td>
+          <td>${esc(operarioDeZid(f.zid))}</td>
+          <td>${esc(f.cod)}</td>
+          <td>${esc(item.nombre)}${corrLabel}</td>
+          <td style="text-align:right">${esc(f.qty)}</td>
+          <td style="text-align:right">${esc(parseFloat(f.baseQty.toFixed(4)))}</td>
+          <td>${esc(item.unidad)}</td>
+        </tr>`;
+      }).join('');
+    const comentarios = manuales.filter(m => m.type === 'comment');
+    const manualesReales = manuales.filter(m => m.type !== 'comment');
+    const manualRows = manualesReales.map(m => {
+      const id = esc(m.id || '');
+      const fechaOrigen = esc(m._fechaOrigen || fecha);
+      return `<tr id="mrow-${id}">
+        <td>${esc(m.zona || '—')}</td>
+        <td class="mrow-nombre">${esc(m.nombre || '—')}</td>
+        <td class="mrow-cantidad" style="text-align:right">${esc(m.cantidad ?? '—')}</td>
+        <td class="mrow-uni">${esc(m.uni || m.unidad || '')}</td>
+        <td style="white-space:nowrap">
+          <button onclick="editarManual('${esc(almacen)}','${fechaOrigen}',${JSON.stringify(m).replace(/"/g,'&quot;')})"
+            style="background:#dbeafe;color:#1d4ed8;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:bold;margin-right:4px">Editar</button>
+          <button onclick="borrarManual('${esc(almacen)}','${fechaOrigen}','${id}')"
+            style="background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:bold">Borrar</button>
+        </td>
+      </tr>`;
+    }).join('');
+    const comentariosHtml = comentarios.length ? `
+      <h3 style="margin:24px 0 8px;font-size:14px;font-weight:700;color:#7c3aed">Comentarios de supervisor (${comentarios.length})</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:#f3e8ff;color:#6d28d9">
+          <th style="padding:6px 8px;text-align:left">Artículo</th>
+          <th style="padding:6px 8px;text-align:left">Zona</th>
+          <th style="padding:6px 8px;text-align:left">Supervisor</th>
+          <th style="padding:6px 8px;text-align:left">Comentario</th>
+        </tr></thead>
+        <tbody>${comentarios.map(c => {
+          const item = rawLookup[c.cod] || {};
+          return `<tr style="border-bottom:1px solid #e9d5ff">
+            <td style="padding:6px 8px"><strong>${esc(c.cod)}</strong><br><small style="color:#6b7280">${esc(item.nombre || '')}</small></td>
+            <td style="padding:6px 8px">${esc(c.zona || '—')}</td>
+            <td style="padding:6px 8px">${esc(c.supervisor || '—')}</td>
+            <td style="padding:6px 8px;font-style:italic">${esc(c.texto)}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>` : '';
+    // Totales por artículo con correcciones aplicadas
+    // Incluye también códigos que solo existen en _admin (agregados vía "Añadir artículo")
+    const adminCorr = S.correctionsByZone?.['_admin'] || {};
+    const totalesPorCod = {};
+    for (const [cod, baseQty] of Object.entries(totales)) {
+      totalesPorCod[cod] = cod in adminCorr ? adminCorr[cod].qty : parseFloat(baseQty.toFixed(4));
+    }
+    for (const [cod, corr] of Object.entries(adminCorr)) {
+      if (!(cod in totalesPorCod)) totalesPorCod[cod] = corr.qty ?? 0;
+    }
+    const sortedCods = Object.keys(totalesPorCod).sort((a,b) => a.localeCompare(b));
+    const editRows = sortedCods.map(cod => {
+      const item = rawLookup[cod] || { nombre:cod, unidad:template.unitMap?.[cod] || '' };
+      const corrected = cod in adminCorr;
+      const adminOnly = corrected && !(cod in totales);
+      const original  = adminOnly ? null : corrected ? parseFloat((totales[cod] || 0).toFixed(4)) : null;
+      const currentVal = totalesPorCod[cod];
+      const corrInfo = adminOnly
+        ? `<div class="corr-badge" style="margin-top:3px">Agregado por admin</div>`
+        : corrected ? `<div class="corr-badge" style="margin-top:3px">Corregido — orig: ${original}</div>` : '';
+      const calculadoCell = adminOnly
+        ? `<span style="color:#94a3b8">—</span>`
+        : corrected
+          ? `<span style="color:#94a3b8;text-decoration:line-through">${original}</span>`
+          : parseFloat((totales[cod]||0).toFixed(4));
+      return `<tr class="${corrected ? 'corr-row' : ''}">
+        <td>${esc(cod)}</td>
+        <td>${esc(item.nombre)}</td>
+        <td>${esc(item.unidad)}</td>
+        <td style="text-align:right">${calculadoCell}</td>
+        <td style="text-align:right">
+          <input type="number" step="any" class="edit-qty-input" data-cod="${esc(cod)}" data-original="${currentVal}"
+            value="${currentVal}" onchange="this.classList.toggle('modified',parseFloat(this.value)!==parseFloat(this.dataset.original))">
+          ${corrInfo}
+        </td>
+      </tr>`;
+    }).join('');
+
+    body.innerHTML = `
+      <div class="detalle-grid">
+        <div class="detalle-stat"><div class="detalle-stat-num">${countedCods.length}</div><div class="detalle-stat-label">Artículos</div></div>
+        <div class="detalle-stat"><div class="detalle-stat-num">${zones.size}</div><div class="detalle-stat-label">Zonas capturadas</div></div>
+        <div class="detalle-stat"><div class="detalle-stat-num">${completed.size}</div><div class="detalle-stat-label">Zonas cerradas</div></div>
+        <div class="detalle-stat"><div class="detalle-stat-num">${Object.keys(adminCorr).length}</div><div class="detalle-stat-label">Correcciones admin</div></div>
+        <div class="detalle-stat"><div class="detalle-stat-num">${receipts.length}</div><div class="detalle-stat-label">Acuses auditables</div></div>
+      </div>
+      <div style="background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:12px">
+        <strong>${esc(almacen)}</strong> · ${esc(tramosDetalle.map(fechaConteoLegible).join(' y '))} · Operario sesión: ${esc(S.operario || '—')}<br>
+        ${opsResumen ? `Capturaron: ${opsResumen} artículos<br>` : ''}
+        Actualizada: ${updated} · Exportada: ${esc(exported)}${S.exportedBy ? ` por ${esc(S.exportedBy)}` : ''}
+        <div style="margin-top:6px;font-size:12px;color:#475569">
+          Archivo Xetux: <code id="detalle-archivo-xetux" style="background:#f1f5f9;border-radius:4px;padding:1px 5px;word-break:break-all">${esc(template.originalFilename || 'sin nombre de Xetux (plantilla pre-v4.7)')}</code>
+          ${template.originalFilename ? `<button onclick="copiarNombreArchivoDetalle()" style="background:#e2e8f0;color:#334155;border:none;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px">Copiar</button>` : ''}
+          <span id="detalle-archivo-copiado" style="color:#16a34a;margin-left:4px"></span>
+        </div>
+      </div>
+      ${receiptsHtml}
+      <input id="detalle-search" type="text" placeholder="Buscar código o artículo…"
+        oninput="filtrarDetalleSesion(this.value)"
+        style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:4px">
+      <div id="detalle-search-msg" style="font-size:12px;color:#64748b;margin-bottom:4px"></div>
+      <div style="font-weight:800;margin:12px 0 4px">Totales — edita y guarda si hay un error</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:8px">Cambia el valor en la columna "Corregido". El original queda registrado como referencia.</div>
+      <div style="max-height:380px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">
+        <table class="detalle-table">
+          <thead><tr><th>Código</th><th>Artículo</th><th>Unidad</th><th style="text-align:right">Calculado</th><th style="text-align:right">Corregido</th></tr></thead>
+          <tbody id="detalle-totales-body">${editRows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">Sin cantidades</td></tr>'}</tbody>
+        </table>
+      </div>
+      <button class="btn-guardar-corr" onclick="guardarCorrecciones('${esc(almacen)}','${esc(fecha)}')">Guardar correcciones</button>
+      <div id="corr-save-msg" style="margin-top:8px;font-size:13px"></div>
+      <div style="font-weight:800;margin:16px 0 4px">Añadir artículo</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:8px">Si contaste el artículo incorrecto: pon el código equivocado en 0 arriba, y aquí agrega el correcto.</div>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;background:#f8fafc;padding:10px;border-radius:8px;border:1px solid #e2e8f0">
+        <div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:3px">Código o nombre</div>
+          <input id="add-cod-input" type="text" placeholder="MP0553 o nombre" list="add-cod-list"
+            style="width:240px;border:1px solid #c4b5fd;border-radius:5px;padding:5px 8px;font-size:13px"
+            oninput="actualizarNombreArticulo()">
+          <datalist id="add-cod-list">${templateOptions}</datalist>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:3px">Nombre</div>
+          <div id="add-nombre-display" style="font-size:12px;color:#374151;min-width:120px;padding:6px 0">—</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:3px">Cantidad (base)</div>
+          <input id="add-qty-input" type="number" step="any" min="0" placeholder="0"
+            style="width:80px;border:1px solid #c4b5fd;border-radius:5px;padding:5px 8px;font-size:13px">
+        </div>
+        <button onclick="agregarArticuloCorrecion('${esc(almacen)}','${esc(fecha)}')"
+          style="background:#7c3aed;color:white;padding:7px 16px;border-radius:6px;font-size:13px;white-space:nowrap">
+          Agregar →
+        </button>
+      </div>
+      <div id="add-art-msg" style="margin-top:6px;font-size:13px"></div>
+      <div style="font-weight:800;margin:14px 0 6px">Detalle por zona</div>
+      <div style="max-height:240px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">
+        <table class="detalle-table">
+          <thead><tr><th>Zona</th><th>Operario</th><th>Código</th><th>Artículo</th><th style="text-align:right">Captura</th><th style="text-align:right">Base</th><th>Unidad</th></tr></thead>
+          <tbody id="detalle-zonas-body">${rows || '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">Sin capturas</td></tr>'}</tbody>
+        </table>
+      </div>
+      ${filas.length > 350 ? `<div style="font-size:12px;color:#64748b;margin-top:6px">Mostrando 350 de ${filas.length} renglones.</div>` : ''}
+      <div style="font-weight:800;margin:14px 0 6px">No catalogados</div>
+      <div style="max-height:180px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">
+        <table class="detalle-table">
+          <thead><tr><th>Zona</th><th>Artículo</th><th style="text-align:right">Cantidad</th><th>Unidad</th><th></th></tr></thead>
+          <tbody id="detalle-manuales-body">${manualRows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">Sin no catalogados</td></tr>'}</tbody>
+        </table>
+      </div>
+      ${comentariosHtml}`;
+  } catch(e) {
+    body.innerHTML = `<div class="error-msg">No se pudo cargar el detalle: ${esc(e.message)}</div>`;
+  }
+}
+
+function filtrarDetalleSesion(q) {
+  const nq = normalizeTemplateSearch(q);
+  let visibles = 0, total = 0;
+  ['detalle-totales-body', 'detalle-zonas-body', 'detalle-manuales-body'].forEach(id => {
+    document.querySelectorAll('#' + id + ' > tr').forEach(tr => {
+      if (tr.querySelector('td[colspan]')) return; // placeholder "Sin cantidades" etc.
+      total++;
+      const show = !nq || normalizeTemplateSearch(tr.textContent).includes(nq);
+      tr.style.display = show ? '' : 'none';
+      if (show) visibles++;
+    });
+  });
+  const msg = document.getElementById('detalle-search-msg');
+  if (msg) msg.textContent = nq ? `${visibles} de ${total} renglones coinciden` : '';
+}
+
+function cerrarDetalleSesion() {
+  document.getElementById('modal-detalle-sesion').style.display = 'none';
+  _modalSesion = null;
+  _modalTemplate = null;
+}
+
+function actualizarNombreArticulo() {
+  const raw = document.getElementById('add-cod-input')?.value?.trim();
+  const el  = document.getElementById('add-nombre-display');
+  if (!el) return;
+  if (!raw) { el.textContent = '—'; return; }
+  const T = _modalTemplate || {};
+  const item = resolveTemplateArticle(raw, T);
+  el.textContent = item ? `${item.nombre || item.codigo} (${item.codigo})` : 'Código/nombre no en plantilla';
+  el.style.color  = item ? '#374151' : '#dc2626';
+}
+
+async function agregarArticuloCorrecion(almacen, fecha) {
+  const codEl = document.getElementById('add-cod-input');
+  const qtyEl = document.getElementById('add-qty-input');
+  const msg   = document.getElementById('add-art-msg');
+  const raw   = codEl?.value?.trim();
+  const qty   = parseFloat(qtyEl?.value);
+  if (!raw) { msg.innerHTML = '<span style="color:#dc2626">Escribe un código o nombre.</span>'; return; }
+  if (isNaN(qty) || qty < 0) { msg.innerHTML = '<span style="color:#dc2626">Cantidad inválida.</span>'; return; }
+  const T = _modalTemplate || {};
+  const resolved = resolveTemplateArticle(raw, T);
+  const cod = resolved?.codigo || raw.toUpperCase();
+  if (T.rowMap && !(cod in T.rowMap)) {
+    if (!confirm(`El código "${cod}" no está en la plantilla y no se exportará al XLSX.\n¿Agregarlo de todas formas?`)) return;
+  }
+  if (resolved) codEl.value = resolved.codigo;
+  msg.innerHTML = '<span style="color:#64748b">Guardando…</span>';
+  try {
+    const r = await fetch(WORKER_URL + '/inv/sesion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'inv_sesion', appVersion: APP_VERSION, almacen, fecha, operario: adminActual,
+        correctionsByZone: { '_admin': { [cod]: { qty, operario: adminActual, ts: new Date().toISOString() } } } })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al guardar');
+    msg.innerHTML = `<span style="color:#16a34a">${cod} agregado con cantidad ${qty}.</span>`;
+    codEl.value = '';
+    qtyEl.value = '';
+    document.getElementById('add-nombre-display').textContent = '—';
+    await cargarSesionesInventario();
+  } catch(e) {
+    msg.innerHTML = `<span style="color:#dc2626">Error: ${esc(e.message)}</span>`;
+  }
+}
+
+async function borrarManual(almacen, fecha, manId) {
+  if (!confirm('¿Borrar este ítem no catalogado?')) return;
+  try {
+    const r = await fetch(WORKER_URL + '/inv/sesion', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'inv_sesion', appVersion: APP_VERSION, almacen, fecha, operario: adminActual,
+        removeManuales: [manId] })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al borrar');
+    document.getElementById('mrow-' + manId)?.remove();
+    await cargarSesionesInventario();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function editarManual(almacen, fecha, m) {
+  const nombre   = prompt('Nombre del artículo:', m.nombre || '');
+  if (nombre === null) return;
+  const cantStr  = prompt('Cantidad:', m.cantidad ?? '');
+  if (cantStr === null) return;
+  const cantidad = parseFloat(cantStr);
+  if (isNaN(cantidad)) { alert('Cantidad inválida'); return; }
+  const uni      = prompt('Unidad:', m.uni || m.unidad || '');
+  if (uni === null) return;
+  try {
+    // `_fechaOrigen` sólo enruta el modal unido; no se persiste en D1.
+    const { _fechaOrigen, ...manualPersistible } = m;
+    const updated = { ...manualPersistible, nombre, cantidad, uni, unidad: uni };
+    const r = await fetch(WORKER_URL + '/inv/sesion', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'inv_sesion', appVersion: APP_VERSION, almacen, fecha, operario: adminActual,
+        manuales: [updated] })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al guardar');
+    const row = document.getElementById('mrow-' + m.id);
+    if (row) {
+      row.querySelector('.mrow-nombre').textContent = nombre;
+      row.querySelector('.mrow-cantidad').textContent = cantidad;
+      row.querySelector('.mrow-uni').textContent = uni;
+    }
+    await cargarSesionesInventario();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function guardarCorrecciones(almacen, fecha) {
+  const btn = document.querySelector('.btn-guardar-corr');
+  const msg = document.getElementById('corr-save-msg');
+  const inputs = document.querySelectorAll('.edit-qty-input');
+  const corrections = {};
+  const ts = new Date().toISOString();
+  inputs.forEach(inp => {
+    const cod = inp.dataset.cod;
+    const original = parseFloat(inp.dataset.original);
+    const val = parseFloat(inp.value);
+    if (!isNaN(val) && val !== original) corrections[cod] = { qty: val, operario: adminActual, ts };
+  });
+  if (!Object.keys(corrections).length) { msg.innerHTML = '<span style="color:#64748b">Sin cambios.</span>'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+  try {
+    const r = await fetch(WORKER_URL + '/inv/sesion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'inv_sesion', appVersion: APP_VERSION, almacen, fecha, operario: adminActual,
+        correctionsByZone: { '_admin': corrections } })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al guardar');
+    msg.innerHTML = `<span style="color:#16a34a">${Object.keys(corrections).length} corrección${Object.keys(corrections).length!==1?'es':''} guardada${Object.keys(corrections).length!==1?'s':''}.</span>`;
+    await cargarSesionesInventario();
+  } catch(e) {
+    msg.innerHTML = `<span style="color:#dc2626">Error: ${esc(e.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Guardar correcciones';
+  }
+}
+
+async function borrarSesionInventario(almacen, fecha) {
+  // La tarjeta muestra el conteo entero, así que borrar tiene que llevarse todos
+  // sus tramos: dejar uno vivo lo haría reaparecer como tarjeta suelta, y esa
+  // media toma es justo la que exporta CEROS a Xetux.
+  const tramos = fechasDeTomaDeAlmacen(almacen, fecha);
+  const detalle = tramos.length > 1
+    ? `Borrar el conteo completo de ${tituloAlmacen(almacen)}?\n\nSe borran sus ${tramos.length} tramos: ${tramos.map(fechaConteoLegible).join(' y ')}.\n`
+    : `Borrar la sesión activa de ${tituloAlmacen(almacen)} del ${fechaConteoLegible(fecha)}?\n`;
+  if (!confirm(detalle + 'Esto borra la sesión del Worker/Admin. No borra los acuses ni los registros ya enviados a Google Sheets.')) return;
+  try {
+    const borrados = [];
+    for (const f of tramos) {
+      const r = await fetch(WORKER_URL + '/inv/sesion', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({
+          action:'inv_delete', appVersion: APP_VERSION,
+          almacen,
+          fecha: f,
+          operario:adminActual,
+          adminPassword:adminPasswordActual,
+          adminUser:adminActual
+        })
+      });
+      const d = await r.json();
+      if (!d.ok) {
+        // Con un solo tramo el mensaje va tal cual: decorarlo solo estorba. El
+        // detalle de qué tramo falló y cuáles ya se fueron importa cuando hay varios.
+        const base = d.error || 'No se pudo borrar la sesión';
+        if (tramos.length === 1) throw new Error(base);
+        const parcial = borrados.length ? `\n\nYa se borraron: ${borrados.map(fechaConteoLegible).join(', ')}.` : '';
+        throw new Error(`${base} (tramo ${fechaConteoLegible(f)})${parcial}`);
+      }
+      borrados.push(f);
+    }
+    await cargarSesionesInventario();
+    alert(`${borrados.length > 1 ? `Conteo borrado (${borrados.length} tramos)` : 'Sesión borrada'} del Admin/Worker. Los acuses y los registros de Sheets no se tocaron.`);
+  } catch(e) {
+    // La tarjeta pudo quedar obsoleta entre que se pintó y el clic: otro admin
+    // borró la sesión, o un teléfono que seguía sincronizando la recreó con otra
+    // fecha. Sin refrescar acá, la tarjeta fantasma se queda en pantalla y cada
+    // reintento repite el mismo error (incidente 2026-07-27).
+    try { await cargarSesionesInventario(); } catch(_) {}
+    alert(/no encontrada/i.test(e.message)
+      ? 'Esa toma ya no existe en el servidor. La lista quedó actualizada.'
+      : 'Error al borrar: ' + e.message);
+  }
+}
+
+function b64ToArrayBuffer(rawB64) {
+  const bin = atob(rawB64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+
+// factorDefault y calcularTotalesSesion viven en js/sesion-merge.js (módulo
+// compartido con el Worker) y se exponen en window al final de este archivo.
+
+function itemsFromRaw(rawB64, T) {
+  const wb = XLSX.read(b64ToArrayBuffer(rawB64), { type:'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+  const norm = s => String(s ?? '').replace(/^﻿/,'').trim();
+  const hIdx = rows.findIndex(r => r.some(h => /^c[oó]digo$/i.test(norm(h))));
+  if (hIdx === -1) return {};
+  const H = rows[hIdx].map(norm);
+  const iCod = H.findIndex(h => /^c[oó]digo$/i.test(h));
+  const iArt = H.findIndex(h => /^art[ií]culo$/i.test(h));
+  const iUni = H.findIndex(h => /^unidad$/i.test(h));
+  const out = {};
+  for (let r = hIdx + 1; r < rows.length; r++) {
+    const row = rows[r];
+    const cod = norm(row[iCod]);
+    if (!cod || /_\d+$/.test(cod)) continue;
+    out[cod] = {
+      codigo: cod,
+      nombre: iArt >= 0 ? norm(row[iArt]) : cod,
+      unidad: (T?.unitMap?.[cod]) || (iUni >= 0 ? norm(row[iUni]) : '')
+    };
+  }
+  return out;
+}
+
+function normalizeTemplateSearch(s) {
+  return String(s ?? '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim();
+}
+
+function templateLookup(T) {
+  const lookup = T?.raw ? itemsFromRaw(T.raw, T) : {};
+  for (const cod of Object.keys(T?.rowMap || {})) {
+    if (!lookup[cod]) lookup[cod] = { codigo: cod, nombre: cod, unidad: T?.unitMap?.[cod] || '' };
+  }
+  return lookup;
+}
+
+function resolveTemplateArticle(input, T) {
+  const lookup = templateLookup(T);
+  const raw = String(input || '').trim();
+  if (!raw) return null;
+  const codeLike = raw.split(/\s+[-·]\s+/)[0].trim().toUpperCase();
+  if (lookup[codeLike]) return lookup[codeLike];
+
+  const q = normalizeTemplateSearch(raw);
+  const items = Object.values(lookup);
+  return items.find(i => normalizeTemplateSearch(i.codigo) === q)
+      || items.find(i => normalizeTemplateSearch(i.nombre) === q)
+      || items.find(i => normalizeTemplateSearch(i.codigo).includes(q) || normalizeTemplateSearch(i.nombre).includes(q))
+      || null;
+}
+
+async function catalogoLookup(almacen, T) {
+  const lookup = {};
+  const posibles = almacen === 'BARRA_RESTAURANTE' ? ['BARRA_RESTAURANTE', 'BARRA'] : [almacen];
+  for (const key of posibles) {
+    try {
+      const r = await fetch(WORKER_URL + '/articulos?almacen=' + encodeURIComponent(key));
+      if (!r.ok) continue;
+      const d = await r.json();
+      for (const a of (d.articulos || [])) {
+        lookup[a.codigo] = { codigo:a.codigo, nombre:a.nombre, unidad:(T?.unitMap?.[a.codigo]) || a.unidad || '' };
+      }
+      if (Object.keys(lookup).length) break;
+    } catch(e) {}
+  }
+  return lookup;
+}
+
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+function construirXlsxInventario(almacen, fecha, T, totales) {
+  const wb = XLSX.read(b64ToArrayBuffer(T.raw), { type:'array', cellStyles:true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  for (const [cod, qty] of Object.entries(totales)) {
+    const rowIdx = T.rowMap?.[cod];
+    if (rowIdx === undefined) continue;
+    const addr = XLSX.utils.encode_cell({ r: rowIdx, c: T.cantidadColIdx });
+    ws[addr] = { t:'n', v: parseFloat(qty.toFixed(4)) };
+  }
+  const out = XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles:true });
+  // Xetux puede rechazar la importación si el archivo no conserva el nombre con que
+  // exportó la plantilla; usar el original y caer al legacy solo si no existe (pre-v4.7).
+  // El .xlsx va tal cual: el zip de v4.8 (carpeta ALMACEN/) no sirve — Xetux no lo
+  // reconoce y obliga a descomprimir a mano.
+  return { bytes: new Uint8Array(out), fname: T.originalFilename || `Inventario_${almacen}_${fecha}.xlsx` };
+}
+
+// ── Archivo para Xetux ─────────────────────────────────────
+// El nombre lo impone Xetux (consecutivo XTINVxxxxxx) y no dice de qué almacén es,
+// así que se muestra junto al almacén y la fecha, con botón de copiar para pegarlo
+// en el diálogo de importación.
+//
+// Guardar va en un clic propio y no automático: showSaveFilePicker exige gesto de
+// usuario reciente y el export tarda segundos (fetches + XLSX.write), así que
+// abierto desde el flujo del export daría SecurityError y caería al <a download>,
+// que es justo lo que hay que evitar — no sobrescribe, crea "… (1).xlsx" y Xetux
+// lo rechaza. Por eso también existe el ritual de borrar antes de bajar.
+let _archivoXetux = null;   // { fname, bytes|null, almacen, fecha }
+
+function abrirModalArchivo({ fname, bytes, almacen, fecha, extraHtml }) {
+  _archivoXetux = { fname, bytes: bytes || null, almacen, fecha };
+  document.getElementById('archivo-titulo').textContent =
+    `${bytes ? 'Inventario listo' : 'Archivo para Xetux'} — ${tituloAlmacen(almacen)} · ${fecha}`;
+  document.getElementById('archivo-nombre').textContent = fname;
+  document.getElementById('archivo-copiado').textContent = '';
+  document.getElementById('archivo-guardar-msg').textContent = '';
+  document.getElementById('archivo-guardar-bloque').style.display = bytes ? 'block' : 'none';
+  const btn = document.getElementById('archivo-btn-guardar');
+  btn.disabled = false;
+  btn.textContent = window.showSaveFilePicker ? 'Guardar archivo…' : 'Descargar archivo';
+  document.getElementById('archivo-extra').innerHTML = extraHtml || '';
+  document.getElementById('modal-archivo').style.display = 'block';
+}
+
+function cerrarModalArchivo() {
+  document.getElementById('modal-archivo').style.display = 'none';
+  _archivoXetux = null;
+}
+
+// ── Exportar: elegir plantilla ─────────────────────────────
+// Antes eran dos botones en la tarjeta ("Cerrar con plantilla fresca" y
+// "Generar XLSX y enviar"). Son el mismo trámite con distinta plantilla, así que
+// ahora hay un solo botón que pregunta. El nombre del archivo Xetux se enseña
+// aquí, que es cuando de verdad hace falta.
+let _plxDestino = null;   // { almacen, fecha }
+
+async function abrirModalPlantillaExport(almacen, fecha) {
+  const tramos = fechasDeTomaDeAlmacen(almacen, fecha);
+  const yaExportado = sesionesInventario
+    .some(s => s.almacen === almacen && tramos.includes(s.fecha) && s.exportedAt);
+  // El botón ya dice "Re-exportar": la intención está expresada, así que no se
+  // vuelve a preguntar "¿ya fue exportada, re-exportar de todos modos?". La
+  // confirmación de cobertura (cuántos van en CERO) sí sale siempre.
+  _plxDestino = { almacen, fecha, force: yaExportado };
+  document.getElementById('plx-titulo').textContent =
+    yaExportado ? '¿Con qué plantilla re-exportas?' : '¿Con qué plantilla exportas?';
+  document.getElementById('plx-sub').innerHTML =
+    `${esc(tituloAlmacen(almacen))} · ${esc(tramos.map(fechaConteoLegible).join(' y '))}` +
+    (tramos.length > 1 ? `<br>Los ${tramos.length} tramos salen en un solo archivo.` : '');
+  const nombreEl = document.getElementById('plx-nombre');
+  nombreEl.textContent = 'consultando…';
+  document.getElementById('modal-plantilla-export').style.display = 'block';
+
+  const btnGuardada = document.querySelector('[onclick="plxElegir(\'guardada\')"]');
+  btnGuardada.disabled = false;
+  btnGuardada.style.opacity = '1';
+  try {
+    const r = await fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen));
+    const d = await r.json();
+    if (!d.ok || !d.found || !d.raw) throw new Error('sin plantilla');
+    nombreEl.textContent = d.originalFilename || '(plantilla sin nombre de Xetux)';
+  } catch (_) {
+    // Sin plantilla guardada, exportar con ella fallaría más adelante: mejor
+    // cerrar esa puerta aquí que dejar que reviente a medio camino.
+    nombreEl.textContent = 'no hay plantilla guardada para este almacén';
+    btnGuardada.disabled = true;
+    btnGuardada.style.opacity = '.5';
+  }
+}
+
+function cerrarModalPlantillaExport() {
+  document.getElementById('modal-plantilla-export').style.display = 'none';
+  _plxDestino = null;
+}
+
+function plxElegir(cual) {
+  const destino = _plxDestino;
+  if (!destino) return;
+  cerrarModalPlantillaExport();
+  // La ruta "fresca" ya exporta con force (sube plantilla y cierra en un paso).
+  if (cual === 'fresca') cerrarConPlantillaFresca(destino.almacen, destino.fecha);
+  else exportarSesionInventario(destino.almacen, destino.fecha, destino.force);
+}
+
+// Mismo dato que el modal de archivo, dentro de Explorar: sustituye al botón
+// "Nombre del archivo" que colgaba de la tarjeta.
+async function copiarNombreArchivoDetalle() {
+  const el = document.getElementById('detalle-archivo-copiado');
+  const nombre = document.getElementById('detalle-archivo-xetux')?.textContent || '';
+  try {
+    await navigator.clipboard.writeText(nombre);
+    el.style.color = '#16a34a'; el.textContent = 'Copiado.';
+  } catch(e) {
+    el.style.color = '#dc2626'; el.textContent = 'Cópialo a mano.';
+  }
+}
+
+async function copiarNombreArchivo() {
+  const el = document.getElementById('archivo-copiado');
+  try {
+    await navigator.clipboard.writeText(_archivoXetux?.fname || '');
+    el.style.color = '#16a34a'; el.textContent = 'Nombre copiado.';
+  } catch(e) {
+    el.style.color = '#dc2626'; el.textContent = 'No se pudo copiar — selecciónalo a mano.';
+  }
+}
+
+async function guardarArchivoXetux() {
+  if (!_archivoXetux?.bytes) return;
+  const { bytes, fname, almacen } = _archivoXetux;
+  const msg = document.getElementById('archivo-guardar-msg');
+  msg.style.color = '#6b7280'; msg.textContent = 'Guardando…';
+  if (window.showSaveFilePicker) {
+    try {
+      // id: Chrome recuerda la última carpeta usada por cada id, así que la
+      // segunda exportación de este almacén ya abre en su carpeta.
+      const handle = await window.showSaveFilePicker({
+        suggestedName: fname,
+        id: 'inv_' + String(almacen).toLowerCase().replace(/[^a-z0-9]/g, ''),
+        types: [{ description: 'Excel de inventario', accept: { [XLSX_MIME]: ['.xlsx'] } }]
+      });
+      const w = await handle.createWritable();
+      await w.write(bytes);
+      await w.close();
+      if (handle.name !== fname) {
+        msg.style.color = '#d97706';
+        msg.textContent = `Guardado como "${handle.name}". Xetux espera "${fname}" — renómbralo antes de importar.`;
+      } else {
+        msg.style.color = '#16a34a';
+        msg.textContent = `Guardado como ${handle.name}. Ya puedes importarlo en Xetux.`;
+      }
+      document.getElementById('archivo-btn-guardar').disabled = true;
+      return;
+    } catch(e) {
+      if (e.name === 'AbortError') { msg.textContent = ''; return; }
+      // Sin gesto válido o sin permiso: mejor bajarlo que no bajarlo.
+      console.warn('showSaveFilePicker:', e);
+    }
+  }
+  const url = URL.createObjectURL(new Blob([bytes], { type: XLSX_MIME }));
+  const a = document.createElement('a');
+  a.href = url; a.download = fname; a.click();
+  URL.revokeObjectURL(url);
+  msg.style.color = '#d97706';
+  msg.textContent = 'Descargado a tu carpeta de descargas. Si ya existía uno igual, borra el viejo: este bajó como "(1)" y Xetux lo rechaza.';
+}
+
+// El nombre del archivo XTINVxxxxxx ya no tiene botón propio en la tarjeta:
+// se ve en el modal de exportar y en la cabecera de Explorar, que son los dos
+// momentos en que hace falta. Ver abrirModalPlantillaExport y verDetalleSesion.
+
+async function marcarExportacion(almacen, fecha, force) {
+  const r = await fetch(WORKER_URL + '/inv/sesion', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json' },
+    body: JSON.stringify({
+      action:'inv_export', appVersion: APP_VERSION,
+      almacen,
+      fecha,
+      operario:adminActual,
+      adminPassword:adminPasswordActual,
+      adminUser:adminActual,
+      force:!!force
+    })
+  });
+  const d = await r.json();
+  if (!d.ok) throw new Error(d.error || 'No se pudo marcar la exportación');
+  return d;
+}
+
+// Cierre semanal con plantilla fresca: en Xetux el archivo válido para importar
+// la carga masiva nace al crear la toma de inventario — lleva su consecutivo
+// XTINVxxxxxx, y si no coincide con la toma abierta Xetux responde "El código
+// del archivo no concuerda con el inventario actual". Por eso subir plantilla y
+// exportar la sesión ocurren siempre juntos, y por eso el botón sigue disponible
+// DESPUÉS de exportar: si la toma de Xetux se rehizo, hay que repetir el par con
+// el export nuevo (exportar con force ya funcionaba; solo estaba oculto).
+// Este flujo colapsa ambos pasos:
+// valida lo contado contra el xlsx recién exportado de Xetux, lo sube como
+// plantilla del almacén y dispara el export normal sin re-preguntar el hash.
+function cerrarConPlantillaFresca(almacen, fecha) {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = '.xlsx,.xls';
+  inp.onchange = () => { if (inp.files[0]) subirPlantillaYExportar(almacen, fecha, inp.files[0]); };
+  inp.click();
+}
+
+async function subirPlantillaYExportar(almacen, fecha, file) {
+  try {
+    const buf = await file.arrayBuffer();
+    const { rowMap, cantidadColIdx, presMap, unitMap, articulos } = parsePlantilla(buf);
+
+    // Guarda R16 también en esta ruta: la validación de contados NO protege
+    // contra un export del MISMO almacén (sus códigos coinciden todos), que se
+    // subiría como plantilla — el incidente 2026-07-27 por la otra puerta.
+    const senales = senalesDeExport(buf, cantidadColIdx);
+    if (senales) {
+      alert(
+        `"${file.name}" no es una plantilla de Xetux:\n` + senales +
+        '\nAquí va la plantilla que Xetux exporta al crear la toma ' +
+        '(Inventarios → Gestión de inventario → Exportar), no el inventario ya contado.'
+      );
+      return;
+    }
+
+    // La cobertura se mide contra la toma COMPLETA: si el almacén quedó partido
+    // en dos fechas, validar una sola fila daría por buena una plantilla a la
+    // que le faltan los códigos de la otra.
+    const tramosFrescos = fechasDeTomaDeAlmacen(almacen, fecha);
+    const S = unirSesionesDeAlmacen(await Promise.all(tramosFrescos.map(async f => {
+      const sr = await fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(f));
+      const d = await sr.json();
+      if (!d.ok || !d.found) throw new Error(`Sesión no encontrada: ${almacen} ${f}`);
+      return { ...d, fecha: f };
+    })));
+    const contados = new Set();
+    for (const zc of Object.values(S.countsByZone || {}))
+      for (const cod of Object.keys(zc || {})) contados.add(cod);
+    for (const [cod, corr] of Object.entries(S.correctionsByZone?.['_admin'] || {}))
+      if (corr?.qty != null) contados.add(cod);
+    const fuera = [...contados].filter(cod => rowMap[cod] === undefined);
+    if (fuera.length) {
+      alert(
+        `No se subió nada: ${fuera.length} artículo(s) contado(s) no están en "${file.name}":\n` +
+        fuera.join(', ') +
+        `\n\n¿Seguro que es la plantilla de ${tituloAlmacen(almacen)}?`
+      );
+      return;
+    }
+    // Este camino exporta con force: es la única confirmación que verá el admin,
+    // así que aquí va también la cobertura (lo no contado entra a Xetux como CERO).
+    const enCero = Object.keys(rowMap).length - contados.size;
+    if (!confirm(
+      `"${file.name}"\n${Object.keys(rowMap).length} artículos; cubre los ${contados.size} contados en la toma del ${tramosFrescos.map(fechaConteoLegible).join(' y ')}.\n\n` +
+      (tramosFrescos.length > 1 ? `La toma está partida en ${tramosFrescos.length} tramos y se exportarán juntos.\n\n` : '') +
+      `Los otros ${enCero} van SIN cantidad — Xetux los aplica como CERO.\n\n` +
+      `¿Subirla como plantilla de ${tituloAlmacen(almacen)} y exportar la sesión?`
+    )) return;
+
+    const bytes = new Uint8Array(buf);
+    let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
+    const raw = btoa(bin);
+    const templateHash = await hashRaw(raw);
+    const r = await fetch(WORKER_URL + '/inv/plantilla', {
+      method: 'POST', headers: adminHeaders(),
+      body: JSON.stringify({ action:'inv_plantilla', appVersion: APP_VERSION, almacen, rowMap, cantidadColIdx, presMap, unitMap, articulos, raw, originalFilename: file.name || '', templateHash, templateTs: Date.now() })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'No se pudo subir la plantilla');
+
+    await exportarSesionInventario(almacen, fecha, true, { hashVerificado: true });
+  } catch (e) {
+    alert('Error al cerrar con plantilla fresca: ' + e.message);
+  }
+}
+
+async function exportarSesionInventario(almacen, fecha, force, opts) {
+  const cfg = INVENTARIO_AREAS[almacen] || {};
+  // Un almacén es UN conteo: si quedó partido en varias filas de D1, el XLSX
+  // lleva la unión. Exportar una fila sola manda a Xetux como CERO todo lo que
+  // contó la otra, que es la forma silenciosa de borrar existencias.
+  const tramos = fechasDeTomaDeAlmacen(almacen, fecha);
+  const fechaCierre = tramos[tramos.length - 1];
+  const exportKey = `${almacen}:${tramos.join(',')}`;
+  if (exportandoSesiones.has(exportKey)) {
+    alert('Esta sesión ya se está exportando en esta ventana.');
+    return;
+  }
+  // La confirmación se pide más abajo, ya con la sesión y la plantilla en mano:
+  // así puede decir cuántos artículos se escriben y cuántos van vacíos (= CERO en
+  // Xetux al aplicar), que es lo que de verdad hay que revisar antes de exportar.
+  exportandoSesiones.add(exportKey);
+  try {
+    const [crudas, tr] = await Promise.all([
+      Promise.all(tramos.map(async f => {
+        const r = await fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(f));
+        const d = await r.json();
+        if (!d.ok || !d.found) throw new Error(`Sesión no encontrada: ${almacen} ${f}`);
+        return { ...d, fecha: f };
+      })),
+      fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen))
+    ]);
+    const T = await tr.json();
+    if (!T.ok || !T.found || !T.raw) throw new Error('Plantilla Xetux no disponible');
+    const S = unirSesionesDeAlmacen(crudas);
+    const partida = crudas.length > 1;
+    const detalleTramos = S.tramos
+      .map(t => `${fechaConteoLegible(t.fecha)} (${t.operario || '—'}${t.exportedAt ? ', ya exportada' : ''})`)
+      .join('\n  · ');
+    // El merge es explícito en la ruta a Xetux: nada se une en silencio.
+    if (partida && !confirm(
+      `${tituloAlmacen(almacen)} quedó partido en ${crudas.length} tramos:\n  · ${detalleTramos}\n\n` +
+      'Un almacén es UN conteo, así que el XLSX llevará los tramos SUMADOS y los marcará todos como exportados.\n\n' +
+      '¿Son el mismo conteo? (Si son conteos distintos, cancela: exportarlos juntos mezclaría dos tomas.)'
+    )) return;
+    // Basta con que un tramo se haya capturado contra otra plantilla para revisar.
+    if (T.templateHash && S.templateHashes.some(h => h !== T.templateHash)) {
+      // Plantilla re-subida a mitad de toma (Xetux solo acepta el nombre de su
+      // último export, así que re-subirla es rutina). Exportar sigue siendo
+      // válido si todos los códigos con conteo existen en la plantilla vigente;
+      // un código ausente perdería su cantidad en silencio — solo eso bloquea.
+      const contados = new Set();
+      for (const zc of Object.values(S.countsByZone || {}))
+        for (const cod of Object.keys(zc || {})) contados.add(cod);
+      for (const [cod, corr] of Object.entries(S.correctionsByZone?.['_admin'] || {}))
+        if (corr?.qty != null) contados.add(cod);
+      const fuera = [...contados].filter(cod => T.rowMap?.[cod] === undefined);
+      if (fuera.length) {
+        throw new Error(
+          `La plantilla cambió desde que se capturó esta sesión y ${fuera.length} artículo(s) contado(s) ya no están en ella:\n` +
+          fuera.join(', ') +
+          '\n\nNo se exportó nada; sube una plantilla Xetux que los incluya.'
+        );
+      }
+      if (!opts?.hashVerificado && !confirm(
+        'La plantilla cambió desde que se capturó esta sesión.\n\n' +
+        `Verificado: los ${contados.size} artículos contados existen todos en la plantilla actual. ` +
+        'Los factores de conversión por defecto serán los de la plantilla nueva.\n\n' +
+        '¿Exportar con la plantilla actual?'
+      )) return;
+    }
+    if (S.exportedAt && !force) {
+      const yaExportados = S.tramos.filter(t => t.exportedAt).length;
+      const msg = partida
+        ? `${yaExportados} de los ${crudas.length} tramos ya se exportaron${S.exportedBy ? ` (último: ${S.exportedBy})` : ''}.\nEste archivo los reemplaza con la toma completa.`
+        : (S.exportedBy ? `Ya fue exportada por ${S.exportedBy}.` : 'Ya fue exportada.');
+      if (!confirm(`${msg}\n¿Re-exportar de todos modos?`)) return;
+      force = true;
+    }
+    const manualesPendientes = (S.manuales || []).filter(m => m.type !== 'comment');
+    if (manualesPendientes.length && !confirm(
+      `Esta sesión tiene ${manualesPendientes.length} ítem(s) no catalogado(s).\n\n` +
+      'Si alguno sí existe en la plantilla, primero agrégalo como corrección en el detalle de sesión para que entre al XLSX.\n\n' +
+      '¿Exportar de todos modos?'
+    )) return;
+
+    const totales = calcularTotalesSesion(S, T);
+
+    // Xetux aplica como CERO todo artículo que llegue sin cantidad, así que una toma
+    // a medias borra existencias en silencio. El dato que hay que ver antes de
+    // exportar es la cobertura, no el número suelto de artículos contados.
+    const enPlantilla = Object.keys(T.rowMap || {}).length;
+    const seEscriben = Object.keys(totales).filter(cod => T.rowMap?.[cod] !== undefined).length;
+    const enCero = enPlantilla - seEscriben;
+    const zonasAbiertas = (S.zoneSnapshot?.length || 0) - new Set((S.completedZones || []).map(z => parseInt(z))).size;
+    // Solo "Cerrar con plantilla fresca" (hashVerificado) confirmó ya con su
+    // propia línea de cobertura. Los demás caminos la ven aquí — incluido
+    // re-exportar (force), que aplicaría los mismos CEROs que la primera vez.
+    if (!opts?.hashVerificado && !confirm(
+      `${force ? 'Re-exportar' : 'Exportar'} la toma de ${tituloAlmacen(almacen)} del ${tramos.map(fechaConteoLegible).join(' y ')}?\n\n` +
+      (partida ? `Une los ${crudas.length} tramos en un solo archivo.\n` : '') +
+      `Se escriben ${seEscriben} de los ${enPlantilla} artículos de la plantilla.\n` +
+      `Los otros ${enCero} van SIN cantidad — Xetux los aplica como CERO.\n` +
+      (zonasAbiertas > 0 ? `\n⚠️ Quedan ${zonasAbiertas} zona(s) sin cerrar: puede que alguien siga contando.\n` : '') +
+      (force ? `\nEsta toma ya se había exportado; el archivo se genera de nuevo.`
+             : `\nEsto marcará ${partida ? 'los tramos' : 'la sesión'} como exportad${partida ? 'os' : 'a'}.`)
+    )) return;
+
+    const corrections = correctionsByCod(S);
+    const rawLookup = itemsFromRaw(T.raw, T);
+    const catLookup = await catalogoLookup(almacen, T);
+    // Los comentarios de la toma son excepciones: al XLSX de Xetux solo viajan
+    // cantidades, así que la observación va a Sheets junto con las correcciones.
+    const comentariosByCod = {};
+    for (const m of (S.manuales || [])) {
+      if (m.type === 'comment' && m.cod)
+        (comentariosByCod[m.cod] = comentariosByCod[m.cod] || []).push(m.zona ? `${m.texto} (${m.zona})` : m.texto);
+    }
+    const observacionDe = cod => {
+      const notas = [];
+      if (corrections[cod]) notas.push(`Editado despues de cerrar zona: ${corrections[cod].map(c => `${zonaNombre(almacen, c.zid)} por ${c.operario || '—'}`).join('; ')}`);
+      for (const t of (comentariosByCod[cod] || [])) notas.push(`Comentario: ${t}`);
+      return notas.join(' · ');
+    };
+    const productos = Object.entries(totales)
+      .filter(([cod]) => T.rowMap?.[cod] !== undefined)
+      .map(([cod, qty]) => {
+        const item = catLookup[cod] || rawLookup[cod] || { codigo:cod, nombre:cod, unidad:T.unitMap?.[cod] || '' };
+        return {
+          codigo: cod,
+          nombre: item.nombre,
+          unidad: item.unidad,
+          cantidad: parseFloat(qty.toFixed(4)),
+          cod,
+          art: item.nombre,
+          uni: item.unidad,
+          catalogado: true,
+          corregido: !!corrections[cod],
+          observacion: observacionDe(cod)
+        };
+      });
+    // Comentarios sobre artículos que no entran al XLSX (sin conteo, o contados
+    // pero ya fuera de la plantilla actual): fila de excepción para no perderlos.
+    for (const cod of Object.keys(comentariosByCod)) {
+      if (totales[cod] !== undefined && T.rowMap?.[cod] !== undefined) continue;
+      const item = catLookup[cod] || rawLookup[cod] || { codigo:cod, nombre:cod, unidad:T.unitMap?.[cod] || '' };
+      productos.push({
+        codigo: cod, nombre: item.nombre, unidad: item.unidad,
+        cantidad: totales[cod] !== undefined ? parseFloat(totales[cod].toFixed(4)) : '',
+        cod, art: item.nombre, uni: item.unidad,
+        catalogado: true, corregido: false, observacion: observacionDe(cod)
+      });
+    }
+    const manuales = (S.manuales || []).filter(m => m.type !== 'comment').map(m => {
+      const { _fechaOrigen, ...manualPersistible } = m;
+      return {
+        ...manualPersistible,
+        unidad: m.unidad || m.uni || '',
+        descripcion: m.descripcion || m.zona || '',
+        foto_base64: m.foto_base64 || m.foto || null
+      };
+    });
+
+    const { bytes, fname } = construirXlsxInventario(almacen, fechaCierre, T, totales);
+
+    // R9b: a Sheets solo viajan EXCEPCIONES — manuales (con foto) y
+    // catalogados con observación. La toma íntegra ya vive en D1 y el
+    // conteo oficial va en el XLSX a Xetux. Sin excepciones, no se llama.
+    const excepciones = productos.filter(p => p.observacion);
+    let resumenSheets = '';
+    if (cfg.scriptUrl && (excepciones.length || manuales.length)) {
+      await fetch(cfg.scriptUrl, {
+        method:'POST',
+        mode:'no-cors',
+        headers:{ 'Content-Type':'text/plain' },
+        body: JSON.stringify({
+          operario: S.operario || adminActual,
+          exportadoPor: adminActual,
+          area: almacen,
+          almacen,
+          fecha: fechaCierre,
+          tramos: tramos.join(' + '),
+          timestamp: new Date().toISOString(),
+          productos: excepciones,
+          manuales
+        })
+      });
+      resumenSheets = `Excepciones a Sheets: ${excepciones.length} con observación + ${manuales.length} manuales.`;
+    } else if (cfg.scriptUrl) {
+      resumenSheets = 'Sin excepciones — nada que enviar a Sheets.';
+    } else {
+      resumenSheets = 'Sin Sheets configurado para este almacén.';
+    }
+
+    // Todos los tramos quedan marcados: si uno se quedara pendiente, la app
+    // volvería a ofrecerlo como toma suelta y alguien lo re-exportaría solo,
+    // que es exactamente el CERO en Xetux que esto viene a evitar. Secuencial,
+    // porque el Worker serializa escrituras por sesión (R13).
+    const marcados = [];
+    for (const f of tramos) {
+      const yaExportado = S.tramos.some(t => t.fecha === f && t.exportedAt);
+      try {
+        await marcarExportacion(almacen, f, force || yaExportado);
+        marcados.push(f);
+      } catch (e) {
+        throw new Error(
+          `El archivo se generó, pero no se pudo marcar el tramo del ${fechaConteoLegible(f)}: ${e.message}\n\n` +
+          (marcados.length ? `Sí quedaron marcados: ${marcados.map(fechaConteoLegible).join(', ')}.\n` : '') +
+          'Vuelve a exportar para dejar todos los tramos marcados.'
+        );
+      }
+    }
+    await cargarSesionesInventario();
+    const etiquetaFecha = tramos.map(fechaConteoLegible).join(' y ');
+    const notaTramos = partida
+      ? `<div style="margin-top:6px;color:#92400e">Este archivo une ${crudas.length} tramos (${esc(etiquetaFecha)}) en un solo conteo.</div>`
+      : '';
+    // El modal va al final: guardar necesita un clic propio (ver abrirModalArchivo).
+    // Si el modal fallara, el archivo no se puede perder: se baja a la antigua.
+    try {
+      abrirModalArchivo({ fname, bytes, almacen, fecha: etiquetaFecha, extraHtml: esc(resumenSheets) + notaTramos });
+    } catch(e) {
+      console.warn('modal archivo:', e);
+      const url = URL.createObjectURL(new Blob([bytes], { type: XLSX_MIME }));
+      const a = document.createElement('a');
+      a.href = url; a.download = fname; a.click();
+      URL.revokeObjectURL(url);
+      alert(`Descargado: ${fname}\n(${tituloAlmacen(almacen)} · ${etiquetaFecha})\n\n${resumenSheets}`);
+    }
+  } catch(e) {
+    alert('Error al exportar: ' + e.message);
+  } finally {
+    exportandoSesiones.delete(exportKey);
+  }
+}
+
+// ── REPORTE (R9a: desde sesiones D1) ──────────────────────
+function generarReporte() {
+  const ses = sesionesInventario.filter(s => almacenPermitidoUI(s.almacen));
+  const operarios = new Set();
+  ses.forEach(s => {
+    (s.operarios || []).forEach(o => operarios.add(o));
+    if (s.operario) operarios.add(s.operario);
+  });
+
+  document.getElementById('stat-total').textContent = ses.length;
+  document.getElementById('stat-operarios').textContent = operarios.size;
+  document.getElementById('stat-items').textContent = ses.reduce((n, s) => n + (s.articulosContados || 0), 0);
+  document.getElementById('stat-manuales').textContent = ses.reduce((n, s) => n + (s.manuales || 0), 0);
+
+  const porAlmacen = {};
+  ses.forEach(s => {
+    if (!porAlmacen[s.almacen]) porAlmacen[s.almacen] = { tomas: 0, items: 0 };
+    porAlmacen[s.almacen].tomas++;
+    porAlmacen[s.almacen].items += (s.articulosContados || 0);
+  });
+
+  document.getElementById('reporte-detalle').innerHTML = Object.entries(porAlmacen).map(([alm, d]) => `
+    <div class="toma-card" style="border-left-color:#22c55e">
+      <div class="toma-operario">${esc(tituloAlmacen(alm))}</div>
+      <div class="toma-meta" style="margin-top:8px">
+        ${d.tomas} toma${d.tomas!==1?'s':''} · ${d.items} artículos capturados
+      </div>
+    </div>
+  `).join('') || '<div class="empty-state">Sin datos</div>';
+}
+
+// ── PDF ────────────────────────────────────────────────────
+// El PDF se reconstruye desde la sesion D1. Ademas del total, conserva cada
+// aporte zona/dispositivo para no perder autoría cuando varias personas cuentan
+// el mismo artículo.
+// `fechas` puede traer varios tramos del MISMO almacén: la toma que cruzó la
+// medianoche vive partida en D1 y aquí se vuelve a unir, para que el PDF no
+// muestre dos veces el mismo almacén con la mitad del conteo cada vez.
+async function cargarDatosPDFSesion(almacen, fechas) {
+  const tramos = [...new Set([].concat(fechas))].sort();
+  const [sesiones, T] = await Promise.all([
+    Promise.all(tramos.map(async f => {
+      const r = await fetch(WORKER_URL + '/inv/sesion?almacen=' + encodeURIComponent(almacen) + '&fecha=' + encodeURIComponent(f));
+      const S = await r.json();
+      if (!S.ok || !S.found) throw new Error(`Sesión no encontrada: ${almacen} ${f}`);
+      return { ...S, fecha: f };
+    })),
+    fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen)).then(r => r.json())
+  ]);
+  const template = T.ok && T.found ? T : {};
+  const rawLookup = template.raw ? itemsFromRaw(template.raw, template) : {};
+  const unida = unirSesionesDeAlmacen(sesiones);
+  const datos = construirDatosPDFSesion({
+    sesion: unida,
+    plantilla: template,
+    articulos: rawLookup,
+    nombresLegacy: INVENTARIO_AREAS[almacen]?.zonaNames || []
+  });
+  return {
+    toma: {
+      almacen_nombre: almacen,
+      area: tituloAlmacen(almacen),
+      fecha: tramos[tramos.length - 1],
+      fechas: tramos,
+      tramos: sesiones.map(s => `${fechaConteoLegible(s.fecha)} (${s.operario || '—'})`),
+      operario: datos.operarios.join(', ') || unida.operario || '',
+      exportedAt: unida.exportedAt,
+      exportedBy: unida.exportedBy,
+      tramosExportados: unida.tramosExportados,
+      totalTramos: unida.tramos.length,
+      xlsxCompleto: unida.xlsxCompleto
+    },
+    items: datos.items,
+    corrs: datos.correcciones,
+    notaGeneral: datos.notaGeneral,
+    operarios: datos.operarios
+  };
+}
+
+// Los tramos del almacén dentro de su conteo, para que el PDF de la tarjeta
+// traiga la toma completa y no solo el pedazo de la fila que se tocó.
+function fechasDeTomaDeAlmacen(almacen, fecha) {
+  const suyas = sesionesInventario
+    .filter(s => s.almacen === almacen)
+    .map(s => s.fecha);
+  const conteo = agruparFechasEnConteos(suyas).find(g => g.includes(fecha));
+  return conteo || [fecha];
+}
+
+async function imprimirSesion(almacen, fecha) {
+  try {
+    const seccion = await cargarDatosPDFSesion(almacen, fechasDeTomaDeAlmacen(almacen, fecha));
+    await generarPDFAdmin(seccion.toma, seccion.items, seccion.corrs, seccion.notaGeneral);
+  } catch (e) {
+    alert('No se pudo generar el PDF: ' + e.message);
+  }
+}
+
+function estadoBotonPDFGeneral(centro, fecha, cargando) {
+  const key = `${centro}|${fecha}`;
+  document.querySelectorAll('.btn-pdf-general').forEach(btn => {
+    if (btn.dataset.pdfGeneral !== key) return;
+    if (cargando) {
+      btn.dataset.textoAnterior = btn.innerHTML;
+      btn.disabled = true;
+      btn.textContent = 'Preparando PDF general...';
+    } else {
+      btn.disabled = false;
+      if (btn.dataset.textoAnterior) btn.innerHTML = btn.dataset.textoAnterior;
+    }
+  });
+}
+
+async function imprimirConteoGeneral(centro, fecha) {
+  const sesiones = sesionesDePDFGeneral(centro, fecha);
+  if (!sesiones.length) {
+    alert('No hay tomas para generar el PDF integral.');
+    return;
+  }
+  estadoBotonPDFGeneral(centro, fecha, true);
+  try {
+    // Una sección por almacén, no por fila de D1.
+    const porAlmacen = new Map();
+    for (const s of sesiones) {
+      if (!porAlmacen.has(s.almacen)) porAlmacen.set(s.almacen, []);
+      porAlmacen.get(s.almacen).push(s.fecha);
+    }
+    const secciones = await Promise.all(
+      [...porAlmacen].map(([almacen, fechas]) => cargarDatosPDFSesion(almacen, fechas))
+    );
+    await generarPDFAdminGeneral(centro, fecha, secciones);
+  } catch (e) {
+    alert('No se pudo generar el PDF general: ' + e.message);
+  } finally {
+    estadoBotonPDFGeneral(centro, fecha, false);
+  }
+}
+
+let _html2pdfAdminPromise = null;
+function cargarHtml2PdfAdmin() {
+  if (window.html2pdf) return Promise.resolve(window.html2pdf);
+  if (_html2pdfAdminPromise) return _html2pdfAdminPromise;
+  _html2pdfAdminPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = new URL('vendor/html2pdf.bundle.min.js?v=0.10.1', document.baseURI).href;
+    script.onload = () => window.html2pdf
+      ? resolve(window.html2pdf)
+      : reject(new Error('La librería PDF no inició'));
+    script.onerror = () => reject(new Error('No se pudo cargar la librería PDF'));
+    document.head.appendChild(script);
+  }).catch(error => {
+    _html2pdfAdminPromise = null;
+    throw error;
+  });
+  return _html2pdfAdminPromise;
+}
+
+const PDF_ADMIN_LAYOUT = Object.freeze({
+  izquierda: 10, derecha: 10, arriba: 10, abajo: 12,
+  anchoPagina: 210, altoPagina: 297, anchoContenido: 190,
+  limiteInferior: 282
+});
+
+function textoPDFAdmin(valor) {
+  return String(valor == null ? '' : valor)
+    .replace(/\r/g, '')
+    .replace(/\u00a0/g, ' ');
+}
+
+function cantidadTextoPDFAdmin(valor) {
+  if (valor == null || valor === '') return '—';
+  const n = Number(valor);
+  return Number.isFinite(n)
+    ? n.toLocaleString('es-MX', { maximumFractionDigits: 4 })
+    : textoPDFAdmin(valor);
+}
+
+function lineasTextoPDFAdmin(pdf, valor, ancho) {
+  const resultado = [];
+  for (const parrafo of textoPDFAdmin(valor).split('\n')) {
+    const lineas = pdf.splitTextToSize(parrafo || ' ', Math.max(2, ancho));
+    resultado.push(...(Array.isArray(lineas) ? lineas : [lineas]));
+  }
+  return resultado.length ? resultado : [''];
+}
+
+function escribirLineasPDFAdmin(pdf, lineas, x, y, altoLinea, opciones = {}) {
+  lineas.forEach((linea, i) => pdf.text(textoPDFAdmin(linea), x, y + (i * altoLinea), opciones));
+  return y + (lineas.length * altoLinea);
+}
+
+function nuevaPaginaPDFAdmin(pdf, tituloContinuacion) {
+  pdf.addPage();
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(9);
+  pdf.setTextColor(30, 58, 138);
+  pdf.text(textoPDFAdmin(tituloContinuacion), PDF_ADMIN_LAYOUT.izquierda, 11);
+  pdf.setDrawColor(203, 213, 225);
+  pdf.line(PDF_ADMIN_LAYOUT.izquierda, 14, 200, 14);
+  pdf.setTextColor(31, 41, 55);
+  return 18;
+}
+
+function dibujarTituloPDFAdmin(pdf, titulo, subtitulo, metadatos) {
+  let y = PDF_ADMIN_LAYOUT.arriba + 2;
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(15);
+  pdf.setTextColor(17, 24, 39);
+  const tituloLineas = lineasTextoPDFAdmin(pdf, titulo, PDF_ADMIN_LAYOUT.anchoContenido);
+  y = escribirLineasPDFAdmin(pdf, tituloLineas, PDF_ADMIN_LAYOUT.izquierda, y, 6.2) + 0.5;
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8.5);
+  pdf.setTextColor(75, 85, 99);
+  const subtituloLineas = lineasTextoPDFAdmin(pdf, subtitulo, PDF_ADMIN_LAYOUT.anchoContenido);
+  y = escribirLineasPDFAdmin(pdf, subtituloLineas, PDF_ADMIN_LAYOUT.izquierda, y, 4) + 2;
+
+  pdf.setFontSize(7.5);
+  const metaLineas = metadatos.flatMap(linea => lineasTextoPDFAdmin(pdf, linea, PDF_ADMIN_LAYOUT.anchoContenido - 4));
+  const altoMeta = Math.max(9, (metaLineas.length * 3.5) + 4);
+  pdf.setFillColor(248, 250, 252);
+  pdf.setDrawColor(203, 213, 225);
+  pdf.roundedRect(PDF_ADMIN_LAYOUT.izquierda, y, PDF_ADMIN_LAYOUT.anchoContenido, altoMeta, 1.5, 1.5, 'FD');
+  pdf.setTextColor(75, 85, 99);
+  escribirLineasPDFAdmin(pdf, metaLineas, PDF_ADMIN_LAYOUT.izquierda + 2, y + 3.5, 3.5);
+  return y + altoMeta + 3;
+}
+
+function dibujarParrafoPDFAdmin(pdf, texto, y, { color = [100, 116, 139], tamano = 7.5 } = {}) {
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(tamano);
+  pdf.setTextColor(...color);
+  const lineas = lineasTextoPDFAdmin(pdf, texto, PDF_ADMIN_LAYOUT.anchoContenido);
+  return escribirLineasPDFAdmin(pdf, lineas, PDF_ADMIN_LAYOUT.izquierda, y, 3.6) + 2;
+}
+
+function dibujarAvisoPDFAdmin(pdf, texto, y, tipo = 'info') {
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(7.5);
+  const lineas = lineasTextoPDFAdmin(pdf, texto, PDF_ADMIN_LAYOUT.anchoContenido - 4);
+  const alto = (lineas.length * 3.5) + 4;
+  const esAviso = tipo === 'aviso';
+  pdf.setFillColor(...(esAviso ? [255, 251, 235] : [248, 250, 252]));
+  pdf.setDrawColor(...(esAviso ? [253, 230, 138] : [203, 213, 225]));
+  pdf.roundedRect(PDF_ADMIN_LAYOUT.izquierda, y, PDF_ADMIN_LAYOUT.anchoContenido, alto, 1.5, 1.5, 'FD');
+  pdf.setTextColor(...(esAviso ? [146, 64, 14] : [71, 85, 105]));
+  escribirLineasPDFAdmin(pdf, lineas, PDF_ADMIN_LAYOUT.izquierda + 2, y + 3.5, 3.5);
+  return y + alto + 3;
+}
+
+function dibujarTablaVectorPDFAdmin(pdf, {
+  columnas, filas, y, tituloContinuacion, colorFila
+}) {
+  const altoCabecera = 8;
+  const altoLinea = 3.05;
+  const tamano = 6.4;
+
+  const dibujarCabecera = () => {
+    let x = PDF_ADMIN_LAYOUT.izquierda;
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.2);
+    for (const columna of columnas) {
+      // pdf.text() deja el color del texto como relleno activo del stream, y
+      // jsPDF no vuelve a emitir el suyo si cree que no cambió: sin repetir
+      // setFillColor por celda, la cabecera sale azul sobre azul.
+      pdf.setFillColor(224, 231, 255);
+      pdf.setDrawColor(148, 163, 184);
+      pdf.setTextColor(30, 58, 138);
+      pdf.rect(x, y, columna.ancho, altoCabecera, 'FD');
+      const lineas = lineasTextoPDFAdmin(pdf, columna.titulo, columna.ancho - 2).slice(0, 2);
+      escribirLineasPDFAdmin(pdf, lineas, x + (columna.align === 'right' ? columna.ancho - 1 : 1), y + 3, 2.7,
+        columna.align === 'right' ? { align: 'right' } : {});
+      x += columna.ancho;
+    }
+    y += altoCabecera;
+  };
+
+  if (!filas.length) {
+    return dibujarAvisoPDFAdmin(pdf, 'Sin artículos inventariados.', y);
+  }
+
+  dibujarCabecera();
+  filas.forEach((fila, indice) => {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(tamano);
+    const celdas = columnas.map(columna => ({
+      columna,
+      lineas: lineasTextoPDFAdmin(pdf, fila[columna.clave], columna.ancho - 2)
+    }));
+    const maxLineas = Math.max(1, ...celdas.map(celda => celda.lineas.length));
+    const altoFila = Math.max(6.5, (maxLineas * altoLinea) + 2);
+    if (y + altoFila > PDF_ADMIN_LAYOUT.limiteInferior) {
+      y = nuevaPaginaPDFAdmin(pdf, tituloContinuacion);
+      dibujarCabecera();
+    }
+
+    const fondo = colorFila ? colorFila(fila, indice) : (indice % 2 ? [248, 250, 252] : [255, 255, 255]);
+    let x = PDF_ADMIN_LAYOUT.izquierda;
+    for (const { columna, lineas } of celdas) {
+      pdf.setFillColor(...fondo);
+      pdf.setDrawColor(203, 213, 225);
+      pdf.rect(x, y, columna.ancho, altoFila, 'FD');
+      const color = typeof columna.color === 'function' ? columna.color(fila) : [31, 41, 55];
+      pdf.setTextColor(...color);
+      const posX = columna.align === 'right' ? x + columna.ancho - 1 : x + 1;
+      escribirLineasPDFAdmin(pdf, lineas, posX, y + 3, altoLinea,
+        columna.align === 'right' ? { align: 'right' } : {});
+      x += columna.ancho;
+    }
+    y += altoFila;
+  });
+  return y + 3;
+}
+
+function filasItemsVectorPDFAdmin(items, corrs) {
+  const corrMap = {};
+  (corrs || []).forEach(c => { if (c.codigo) corrMap[c.codigo] = c; });
+  return (items || []).map(item => {
+    const correccion = item.correccion || corrMap[item.codigo];
+    const aportes = (item.aportes || []).length
+      ? item.aportes.map(aporte => `${aporte.operario || 'Sin atribución'} / ${aporte.zona || 'Sin zona'}: ${cantidadTextoPDFAdmin(aporte.cantidad)}`).join('\n')
+      : 'Sin captura individual (agregado por admin)';
+    const detalleCorreccion = correccion
+      ? `${cantidadTextoPDFAdmin(correccion.cantCorregida ?? correccion.qty)}${correccion.operario ? `\npor ${correccion.operario}` : ''}${correccion.nota ? `\n${correccion.nota}` : ''}`
+      : '—';
+    return {
+      codigo: item.codigo,
+      nombre: `${item.nombre || item.codigo}${item.manual ? '\nNo catalogado' : ''}`,
+      unidad: item.unidad || '',
+      contado: cantidadTextoPDFAdmin(item.cantidadContada),
+      final: cantidadTextoPDFAdmin(item.cantidadFinal),
+      aportes,
+      correccion: detalleCorreccion,
+      _manual: !!item.manual,
+      _corregido: !!correccion
+    };
+  });
+}
+
+function dibujarItemsVectorPDFAdmin(pdf, seccion, y, tituloContinuacion) {
+  const columnas = [
+    { clave:'codigo', titulo:'Código', ancho:22 },
+    { clave:'nombre', titulo:'Artículo', ancho:39 },
+    { clave:'unidad', titulo:'UM', ancho:11 },
+    { clave:'contado', titulo:'Contado', ancho:16, align:'right' },
+    { clave:'final', titulo:'Final', ancho:16, align:'right', color:f => f._corregido ? [185, 28, 28] : [31, 41, 55] },
+    { clave:'aportes', titulo:'Quién contó / aportación', ancho:52 },
+    { clave:'correccion', titulo:'Corrección admin', ancho:34, color:f => f._corregido ? [146, 64, 14] : [100, 116, 139] }
+  ];
+  return dibujarTablaVectorPDFAdmin(pdf, {
+    columnas,
+    filas: filasItemsVectorPDFAdmin(seccion.items, seccion.corrs),
+    y,
+    tituloContinuacion,
+    colorFila: (fila, indice) => fila._corregido ? [254, 249, 195]
+      : (fila._manual ? [239, 246, 255] : (indice % 2 ? [248, 250, 252] : [255, 255, 255]))
+  });
+}
+
+function dibujarResumenVectorPDFAdmin(pdf, secciones, y, tituloContinuacion) {
+  const columnas = [
+    { clave:'almacen', titulo:'Almacén', ancho:42 },
+    { clave:'fecha', titulo:'Fecha', ancho:26 },
+    { clave:'capturaron', titulo:'Capturaron', ancho:48 },
+    { clave:'renglones', titulo:'Renglones', ancho:20, align:'right' },
+    { clave:'correcciones', titulo:'Correcciones', ancho:24, align:'right' },
+    { clave:'estado', titulo:'Estado', ancho:30 }
+  ];
+  const filas = secciones.map(seccion => ({
+    almacen: seccion.toma.area || seccion.toma.almacen_nombre,
+    fecha: fechasTomaPDFAdmin(seccion.toma).map(fechaConteoLegible).join('\ny '),
+    capturaron: seccion.toma.operario || '—',
+    renglones: seccion.items.length,
+    correcciones: (seccion.corrs || []).length,
+    estado: estadoXlsxPDFAdmin(seccion.toma).resumen
+  }));
+  return dibujarTablaVectorPDFAdmin(pdf, { columnas, filas, y, tituloContinuacion });
+}
+
+function dibujarFirmasVectorPDFAdmin(pdf, y, etiquetas, tituloContinuacion) {
+  if (y + 28 > PDF_ADMIN_LAYOUT.limiteInferior) y = nuevaPaginaPDFAdmin(pdf, tituloContinuacion);
+  y += 18;
+  const separacion = 18;
+  const ancho = (PDF_ADMIN_LAYOUT.anchoContenido - (separacion * (etiquetas.length - 1))) / etiquetas.length;
+  etiquetas.forEach((etiqueta, indice) => {
+    const x = PDF_ADMIN_LAYOUT.izquierda + (indice * (ancho + separacion));
+    pdf.setDrawColor(51, 65, 85);
+    pdf.line(x, y, x + ancho, y);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(75, 85, 99);
+    pdf.text(textoPDFAdmin(etiqueta), x, y + 4);
+  });
+  return y + 8;
+}
+
+function fechasTomaPDFAdmin(toma) {
+  const fechas = (toma?.fechas || []).filter(Boolean);
+  return fechas.length ? fechas : [toma?.fecha].filter(Boolean);
+}
+
+function estadoXlsxPDFAdmin(toma) {
+  const totalDeclarado = Number(toma?.totalTramos);
+  const total = Number.isFinite(totalDeclarado) && totalDeclarado > 0
+    ? totalDeclarado
+    : Math.max((toma?.tramos || []).length, 1);
+  const exportadosDeclarados = Number(toma?.tramosExportados);
+  const exportados = Number.isFinite(exportadosDeclarados)
+    ? Math.max(0, Math.min(total, exportadosDeclarados))
+    : (toma?.exportedAt ? total : 0);
+  const completo = typeof toma?.xlsxCompleto === 'boolean'
+    ? toma.xlsxCompleto
+    : exportados === total;
+  const quien = toma?.exportedBy ? String(toma.exportedBy) : '';
+  if (!exportados) {
+    return { total, exportados, completo: false, resumen: 'Sin XLSX (incluida)', detalle: 'XLSX aún no generado' };
+  }
+  if (completo) {
+    return {
+      total, exportados, completo: true, resumen: 'XLSX generado',
+      detalle: `XLSX generado${quien ? ` por ${quien}` : ''}`
+    };
+  }
+  return {
+    total, exportados, completo: false,
+    resumen: `XLSX parcial (${exportados}/${total})`,
+    detalle: `XLSX parcial: ${exportados} de ${total} tramos${quien ? ` · último marcado por ${quien}` : ''}`
+  };
+}
+
+function dibujarMetaAlmacenVectorPDFAdmin(pdf, seccion, y) {
+  const { toma, items, corrs, notaGeneral } = seccion;
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(7.5);
+  pdf.setTextColor(75, 85, 99);
+  const fechas = fechasTomaPDFAdmin(toma);
+  const estadoXlsx = estadoXlsxPDFAdmin(toma);
+  const meta = [
+    `Almacén: ${toma.almacen_nombre} | Fecha: ${fechas.map(fechaConteoLegible).join(' y ')} | Renglones: ${items.length} | Correcciones: ${(corrs || []).length}`,
+    `Capturaron: ${toma.operario || '—'} | ${estadoXlsx.detalle}`
+  ];
+  // Una captura puede distribuirse entre dos fechas operativas; el PDF las une
+  // y lo dice sin afirmar que ocurrió justo al cruzar la medianoche.
+  if ((toma.tramos || []).length > 1) {
+    meta.push(`Toma unida: captura distribuida en ${toma.tramos.length} fechas — ${toma.tramos.join(' · ')}. Los tramos se consolidan en el total conjunto.`);
+  }
+  for (const linea of meta) {
+    const lineas = lineasTextoPDFAdmin(pdf, linea, PDF_ADMIN_LAYOUT.anchoContenido);
+    y = escribirLineasPDFAdmin(pdf, lineas, PDF_ADMIN_LAYOUT.izquierda, y, 3.5);
+  }
+  y += 1.5;
+  pdf.setDrawColor(203, 213, 225);
+  pdf.line(PDF_ADMIN_LAYOUT.izquierda, y, 200, y);
+  y += 3;
+  if (notaGeneral) y = dibujarAvisoPDFAdmin(pdf, `Nota general: ${notaGeneral}`, y);
+  return dibujarParrafoPDFAdmin(pdf,
+    'El total contado suma todas las aportaciones. Si hubo corrección, "Final" muestra el valor administrativo y las aportaciones conservan el conteo original.', y);
+}
+
+function dibujarDocumentoIndividualPDFAdmin(pdf, documento) {
+  const seccion = documento.seccion;
+  const { toma } = seccion;
+  let y = dibujarTituloPDFAdmin(pdf,
+    `${CENTROS[centroDe(toma.almacen_nombre)].nombre} - Toma de inventario`,
+    'Reporte administrativo con autoría por artículo',
+    [`Revisado por: ${documento.revisadoPor || '—'} | Generado: ${documento.generadoEn}`]);
+  y = dibujarMetaAlmacenVectorPDFAdmin(pdf, seccion, y);
+  y = dibujarItemsVectorPDFAdmin(pdf, seccion, y, `${toma.area || toma.almacen_nombre} - continuación`);
+  dibujarFirmasVectorPDFAdmin(pdf, y, ['Firma del Operario', 'Firma del Supervisor'], 'Firmas');
+}
+
+function dibujarDocumentoGeneralPDFAdmin(pdf, documento) {
+  const { centro, fecha, secciones } = documento;
+  const operarios = [...new Set(secciones.flatMap(s => s.operarios || []))];
+  const totalRenglones = secciones.reduce((n, s) => n + s.items.length, 0);
+  const sinXlsxCompleto = secciones.filter(s => !estadoXlsxPDFAdmin(s.toma).completo).length;
+  const fechasConteo = [...new Set(secciones.flatMap(s => fechasTomaPDFAdmin(s.toma)))].sort();
+  const rangoConteo = fechasConteo.length > 1
+    ? `${fechaConteoLegible(fechasConteo[0])} a ${fechaConteoLegible(fechasConteo[fechasConteo.length - 1])}`
+    : fechaConteoLegible(fechasConteo[0] || fecha);
+  let y = dibujarTituloPDFAdmin(pdf,
+    `${CENTROS[centro].nombre} - Conteo integral de inventario`,
+    `Fecha del conteo: ${rangoConteo} | Un archivo con todos los almacenes`,
+    [
+      `Almacenes: ${secciones.length} | Renglones: ${totalRenglones} | Personas que capturaron: ${operarios.length}`,
+      `Revisado por: ${documento.revisadoPor || '—'} | Generado: ${documento.generadoEn}`
+    ]);
+  if (sinXlsxCompleto) {
+    y = dibujarAvisoPDFAdmin(pdf,
+      `${sinXlsxCompleto} toma${sinXlsxCompleto !== 1 ? 's' : ''} todavía no ${sinXlsxCompleto !== 1 ? 'tienen' : 'tiene'} el XLSX completo. Se ${sinXlsxCompleto !== 1 ? 'incluyen' : 'incluye'} de todas formas con el conteo guardado hasta este momento.`,
+      y, 'aviso');
+  }
+  y = dibujarResumenVectorPDFAdmin(pdf, secciones, y, 'Resumen de almacenes - continuación');
+  dibujarParrafoPDFAdmin(pdf,
+    'Cada almacén comienza en una página nueva. Cuando varias personas contaron el mismo artículo, aparecen todas sus aportaciones y la suma conserva el total del conteo.', y);
+
+  let yFinal = y;
+  secciones.forEach(seccion => {
+    pdf.addPage();
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(13);
+    pdf.setTextColor(30, 58, 138);
+    pdf.text(textoPDFAdmin(seccion.toma.area || seccion.toma.almacen_nombre), PDF_ADMIN_LAYOUT.izquierda, 12);
+    let ySeccion = dibujarMetaAlmacenVectorPDFAdmin(pdf, seccion, 18);
+    yFinal = dibujarItemsVectorPDFAdmin(pdf, seccion, ySeccion,
+      `${seccion.toma.area || seccion.toma.almacen_nombre} - continuación`);
+  });
+  dibujarFirmasVectorPDFAdmin(pdf, yFinal,
+    ['Responsable de Inventarios', 'Supervisor / Contraloría'], 'Firmas del conteo integral');
+}
+
+async function crearDocumentoBasePDFAdmin() {
+  await cargarHtml2PdfAdmin();
+  // html2pdf ya trae jsPDF. Se inicializa con un lienzo diminuto y, desde ahí,
+  // todo el reporte se escribe como texto/vector. Así nunca existe el lienzo
+  // gigante que en Safari/Android devolvía páginas blancas.
+  const semilla = document.createElement('div');
+  semilla.setAttribute('aria-hidden', 'true');
+  semilla.style.cssText = 'position:fixed;left:0;bottom:0;width:2px;height:2px;background:#fff;pointer-events:none;';
+  document.body.appendChild(semilla);
+  try {
+    const worker = window.html2pdf().set({
+      margin: 0,
+      image: { type:'jpeg', quality:0.8 },
+      html2canvas: { scale:1, logging:false },
+      jsPDF: { unit:'mm', format:'a4', orientation:'portrait', compress:true }
+    }).from(semilla).toPdf();
+    await worker;
+    return await worker.get('pdf');
+  } finally {
+    semilla.remove();
+  }
+}
+
+function numerarPaginasPDFAdmin(pdf) {
+  const total = pdf.getNumberOfPages();
+  for (let pagina = 1; pagina <= total; pagina++) {
+    pdf.setPage(pagina);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(100, 116, 139);
+    pdf.text(`${pagina} / ${total}`, 200, 291, { align:'right' });
+  }
+}
+
+async function descargarPDFAdmin(filename, documento, general = false) {
+  const cover = document.createElement('div');
+  cover.style.cssText = 'position:fixed;inset:0;z-index:10002;background:rgba(255,255,255,.96);color:#166534;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px;font:800 16px system-ui,sans-serif';
+  cover.innerHTML = `${general ? 'Preparando PDF integral del restaurante' : 'Preparando PDF administrativo'}<span style="font-size:12px;font-weight:500;margin-top:8px;color:#4b5563">Puede tardar unos segundos…</span>`;
+  document.body.appendChild(cover);
+  try {
+    const pdf = await crearDocumentoBasePDFAdmin();
+    if (documento.tipo === 'general') dibujarDocumentoGeneralPDFAdmin(pdf, documento);
+    else dibujarDocumentoIndividualPDFAdmin(pdf, documento);
+    numerarPaginasPDFAdmin(pdf);
+    pdf.setProperties({
+      title: filename.replace(/\.pdf$/i, ''),
+      subject: 'Conteo de inventario',
+      author: documento.revisadoPor || 'Inventarios Piazza',
+      creator: 'App de inventarios'
+    });
+    const guardado = pdf.save(filename, { returnPromise:true });
+    if (guardado && typeof guardado.then === 'function') await guardado;
+  } finally {
+    cover.remove();
+  }
+}
+
+async function generarPDFAdmin(toma, items, corrs, notaGeneral) {
+  const documento = {
+    tipo: 'individual',
+    revisadoPor: adminActual || '',
+    generadoEn: new Date().toLocaleString('es-MX', { timeZone: OPERATING_TIME_ZONE }),
+    seccion: { toma, items, corrs: corrs || [], notaGeneral: notaGeneral || '' }
+  };
+  return descargarPDFAdmin(`Toma_${toma.almacen_nombre}_${toma.fecha}.pdf`, documento, false);
+}
+
+async function generarPDFAdminGeneral(centro, fecha, secciones) {
+  const documento = {
+    tipo: 'general', centro, fecha, secciones,
+    revisadoPor: adminActual || '',
+    generadoEn: new Date().toLocaleString('es-MX', { timeZone: OPERATING_TIME_ZONE })
+  };
+  return descargarPDFAdmin(`Conteo_general_${centro}_${fecha}.pdf`, documento, true);
+}
+
+// ── GROQ CHAT ─────────────────────────────────────────────
+function buildContexto() {
+  const resumen = sesionesInventario.slice(0, 20).map(s =>
+    `- ${(s.operarios || []).join('/') || s.operario || '—'} | ${s.almacen} | Fecha: ${s.fecha} | ${s.articulosContados || 0} artículos | ${s.exportedAt ? 'exportada' : 'pendiente'}`
+  ).join('\n');
+  return `Eres un asistente de operaciones para los centros Piazza Pasticcio y Universal de Hamburguesas (CDMX).
+Tienes acceso al resumen de las últimas tomas de inventario (últimos 30 días):
+${resumen}
+Responde en español, de forma concisa y práctica.`;
+}
+
+let chatHistory = [];
+
+async function enviarChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  if (!getGroqKey()) { alert('No hay API Key de GROQ guardada. Cierra sesión e ingrésala en el login.'); return; }
+  input.value = '';
+
+  const messagesDiv = document.getElementById('chat-messages');
+  messagesDiv.innerHTML += `<div class="msg user">${msg}</div>`;
+  messagesDiv.innerHTML += `<div class="msg ai loading" id="loading-msg">Pensando...</div>`;
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+  chatHistory.push({ role: 'user', content: msg });
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getGroqKey()}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [
+          { role: 'system', content: buildContexto() },
+          ...chatHistory
+        ],
+        max_tokens: 500,
+        temperature: 0.7
+      })
+    });
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+    const reply = data.choices?.[0]?.message?.content || ('DEBUG: ' + JSON.stringify(data).substring(0, 200));
+    chatHistory.push({ role: 'assistant', content: reply });
+
+    document.getElementById('loading-msg').remove();
+    messagesDiv.innerHTML += `<div class="msg ai">${reply}</div>`;
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  } catch(e) {
+    document.getElementById('loading-msg').textContent = 'Error: ' + e.message;
+  }
+}
+
+// ── PLANTILLAS XETUX ──────────────────────────────────────
+
+// parsePlantilla y hashRaw viven en js/plantilla-parser.js (módulo compartido con
+// tests/test-parser.html) y se exponen en window al final de este archivo.
+
+async function loadPlantillaStatus() {
+  const almacen = document.getElementById('plt-almacen').value;
+  if (!almacen) return;
+  const statusEl = document.getElementById('plt-status');
+  const uploadEl = document.getElementById('plt-upload');
+  const msgEl    = document.getElementById('plt-msg');
+  statusEl.innerHTML = '<div style="color:#888;font-size:13px">Cargando…</div>';
+  uploadEl.style.display = 'none';
+  msgEl.textContent = '';
+  try {
+    const r = await fetch(WORKER_URL + '/inv/plantilla?almacen=' + almacen);
+    const d = await r.json();
+    if (d.ok && d.found) {
+      const date  = d.updatedAt ? new Date(d.updatedAt).toLocaleString('es-MX', { timeZone: OPERATING_TIME_ZONE }) : '—';
+      const count = Object.keys(d.rowMap || {}).length;
+      const pres  = Object.keys(d.presMap || {}).length;
+      // El nombre del archivo es lo que Xetux valida al importar: si el que está
+      // cargado no es el de la toma abierta, la carga masiva se rechaza con "El
+      // código del archivo no concuerda con el inventario actual". Se muestra
+      // primero para poder cotejarlo de un vistazo contra el XTINV de Xetux.
+      statusEl.innerHTML = `<div class="plt-status-card">
+        <div style="font-weight:700;color:#16a34a;margin-bottom:6px">Plantilla configurada</div>
+        <div style="font-size:12px;color:#6b7280">Archivo cargado (es el que Xetux va a exigir)</div>
+        <div style="font-size:12px;color:#0f172a;word-break:break-all;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;margin:3px 0 8px">
+          ${esc(d.originalFilename || '(sin nombre — plantilla pre-v4.7, vuelve a subirla)')}
+        </div>
+        <div style="font-size:13px;color:#555"><strong>${count}</strong> artículos · <strong>${pres}</strong> con presentaciones</div>
+        <div style="font-size:12px;color:#94a3b8;margin-top:4px">Actualizada: ${date}</div>
+        <div style="font-size:11px;color:#cbd5e1;margin-top:2px">Hash: ${d.templateHash || '—'}</div>
+      </div>`;
+    } else {
+      statusEl.innerHTML = `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px;color:#92400e;font-size:13px;margin-bottom:14px">
+        No hay plantilla configurada para <strong>${almacen}</strong>.
+      </div>`;
+    }
+    uploadEl.style.display = 'block';
+    if (d.ok && d.found) {
+      renderDefaultsEditor(d.defaultPres || {});
+      renderRevisionPresentaciones(d);
+    } else {
+      renderDefaultsEditor(null);
+      document.getElementById('plt-revision').innerHTML = '';
+    }
+  } catch(e) {
+    statusEl.innerHTML = `<div style="color:#dc2626;font-size:13px">Error: ${e.message}</div>`;
+  }
+}
+
+// ── R6: revisión de presentaciones sospechosas ─────────────
+// Se calcula al vuelo desde el raw de la plantilla (parser puro). Solo informa
+// y pide decisión humana — la corrección real se hace en Xetux o con defaultPres.
+//
+// Cada Xetux escribe las unidades a su manera: Piazza usa LT/PZA y Universal de
+// Hamburguesas usa L/PZ. Con /^(LT|KG)$/ el aviso ignoraba en silencio todos los
+// artículos en L de UH, que es justo donde muerde el error de contar piezas y
+// registrar litros. Es una regla de AVISO: ampliarla no descarta ningún dato.
+// (La regla ml_g del parser NO se amplía a "L" a propósito: UH tiene BIDON 20 L
+// y BARRIL 29 LT legítimos que el filtro >10 borraría.)
+const UNIDAD_PESO_VOLUMEN = /^(KG|K|G|GR|GRS|LT|LTS|L|ML)$/i;
+
+const MOTIVOS_R6 = {
+  ml_g:            { titulo: 'Factor >10 en LT/KG — probable mL/g mal capturado en Xetux', accion: 'DESCARTADA al parsear. Corregir el factor en Xetux y re-subir la plantilla.', color: '#dc2626' },
+  factor_1:        { titulo: 'Factor 1.0 con nombre de unidad base', accion: 'DESCARTADA porque solo repite LT/KG/PZA. Una presentación nombrada, por ejemplo BOTELLA DE 1 LT, sí se conserva.', color: '#d97706' },
+  factor_ilegible: { titulo: 'Sin factor legible en el nombre', accion: 'DESCARTADA al parsear. El nombre del artículo presentación no trae "(0.75 LT)".', color: '#d97706' },
+  nombre_ambiguo:  { titulo: 'Mismo nombre con factores distintos', accion: 'CONSERVADAS ambas — el operario ve dos opciones iguales de nombre. Unificar en Xetux.', color: '#d97706' },
+  duplicada:       { titulo: 'Presentación repetida (mismo factor)', accion: 'Se usa una sola. Limpieza cosmética en Xetux, sin urgencia.', color: '#6b7280' },
+};
+
+function renderRevisionPresentaciones(d) {
+  const cont = document.getElementById('plt-revision');
+  cont.innerHTML = '';
+  if (!d.raw || typeof parsePlantilla !== 'function') return;
+  let P;
+  try { P = parsePlantilla(b64ToArrayBuffer(d.raw)); } catch(e) { return; }
+  const nombres = itemsFromRaw(d.raw, d);
+  const nom = cod => nombres[cod]?.nombre || cod;
+  const correcciones = P.correcciones || [];
+
+  const grupos = {};
+  for (const s of (P.sospechosas || [])) (grupos[s.motivo] = grupos[s.motivo] || []).push(s);
+  const sinPres = Object.keys(P.rowMap).filter(cod =>
+    UNIDAD_PESO_VOLUMEN.test(P.unitMap[cod] || '') && !P.presMap[cod] &&
+    !((d.defaultPres || {})[P.unitMap[cod]]?.length));
+
+  const total = (P.sospechosas || []).length + sinPres.length;
+  let html = '';
+  if (correcciones.length) {
+    html += `<details open style="border:1px solid #86efac;border-radius:10px;background:#f0fdf4;margin-bottom:8px">
+      <summary style="padding:10px 12px;cursor:pointer;font-size:13px;font-weight:700;color:#166534">Correcciones operativas aplicadas (${correcciones.length})</summary>
+      <div style="padding:0 12px 12px">
+        ${correcciones.map(c => `<div style="font-size:12px;color:#14532d;padding:3px 0"><strong>${esc(c.cod)} · ${esc(nom(c.cod))}</strong> — ${esc(c.detalle || c.nombre)}</div>`).join('')}
+      </div>
+    </details>`;
+  }
+  if (!total) {
+    cont.innerHTML = html || `<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px;font-size:13px;color:#166534">✓ Revisión de presentaciones: sin hallazgos.</div>`;
+    return;
+  }
+
+  html += `<details style="border:1px solid #fcd34d;border-radius:10px;background:#fffbeb">
+    <summary style="padding:10px 12px;cursor:pointer;font-size:13px;font-weight:700;color:#92400e">Revisión de presentaciones: ${total} hallazgo${total !== 1 ? 's' : ''} — requieren decisión humana, nada se corrige solo</summary>
+    <div style="padding:4px 12px 12px">`;
+  for (const [motivo, lista] of Object.entries(grupos)) {
+    const m = MOTIVOS_R6[motivo] || { titulo: motivo, accion: '', color: '#6b7280' };
+    html += `<div style="margin-top:10px">
+      <div style="font-size:12px;font-weight:700;color:${m.color}">${esc(m.titulo)} (${lista.length})</div>
+      <div style="font-size:11px;color:#78716c;margin-bottom:4px">${esc(m.accion)}</div>
+      ${lista.slice(0, 60).map(s => `<div style="font-size:12px;color:#44403c;padding:2px 0 2px 10px">${esc(s.cod)} · ${esc(nom(s.cod))} — <strong>${esc(s.nombre)}</strong>${s.factor != null ? ` (factor ${esc(s.factor)})` : ''}</div>`).join('')}
+      ${lista.length > 60 ? `<div style="font-size:11px;color:#a8a29e;padding:2px 0 2px 10px">… y ${lista.length - 60} más</div>` : ''}
+    </div>`;
+  }
+  if (sinPres.length) {
+    html += `<div style="margin-top:10px">
+      <div style="font-size:12px;font-weight:700;color:#b45309">LT/KG sin presentación ni default (${sinPres.length})</div>
+      <div style="font-size:11px;color:#78716c;margin-bottom:4px">El operario capturará 1:1 en la unidad (riesgo clásico: contar botellas y registrar litros). Normal en artículos que sí se pesan/miden directo; agregar presentación en Xetux o una regla en "Presentaciones por defecto" solo donde haga falta.</div>
+      ${sinPres.slice(0, 60).map(cod => `<div style="font-size:12px;color:#44403c;padding:2px 0 2px 10px">${esc(cod)} · ${esc(nom(cod))} — ${esc(P.unitMap[cod])}</div>`).join('')}
+      ${sinPres.length > 60 ? `<div style="font-size:11px;color:#a8a29e;padding:2px 0 2px 10px">… y ${sinPres.length - 60} más</div>` : ''}
+    </div>`;
+  }
+  html += '</div></details>';
+  cont.innerHTML = html;
+}
+
+// defaultPres null/undefined = el almacén no tiene plantilla: se oculta el editor.
+// Si quedara visible con las filas del almacén anterior, "Guardar" las escribiría
+// en el almacén equivocado.
+function renderDefaultsEditor(defaultPres) {
+  const sec = document.getElementById('plt-defaults-section');
+  const tbody = document.getElementById('plt-defs-body');
+  tbody.innerHTML = '';
+  document.getElementById('plt-defs-msg').textContent = '';
+  if (!defaultPres) { sec.style.display = 'none'; return; }
+  for (const [uni, pres] of Object.entries(defaultPres)) {
+    for (const p of (pres || [])) _addDefaultRow(uni, p.nombre, p.factor);
+  }
+  sec.style.display = 'block';
+}
+
+function _addDefaultRow(uni, nombre, factor) {
+  const tbody = document.getElementById('plt-defs-body');
+  const tr = document.createElement('tr');
+  const cellStyle = 'padding:3px 4px';
+  // El factor es texto con inputmode decimal, no type=number: con teclado en
+  // español "0,75" deja un input number en value="" y la fila se perdía en
+  // silencio. Aquí la coma se normaliza al guardar.
+  const inp = (val, ph, w, extra='') =>
+    `<input type="text" value="${String(val??'')}" placeholder="${ph}" ${extra} style="width:${w};font-size:12px;border:1px solid #d1d5db;border-radius:4px;padding:3px 6px">`;
+  tr.innerHTML = `
+    <td style="${cellStyle}">${inp(uni,'LT','55px')}</td>
+    <td style="${cellStyle}">${inp(nombre,'BOTELLA','130px')}</td>
+    <td style="${cellStyle};text-align:right">${inp(factor,'0.75','65px','inputmode="decimal"')}</td>
+    <td style="${cellStyle}"><button onclick="this.closest('tr').remove()" style="border:none;background:none;color:#ef4444;cursor:pointer;font-size:16px;line-height:1">×</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function addDefaultRow() { _addDefaultRow('', '', ''); }
+
+// Guardar es todo-o-nada y se verifica contra el servidor: antes una fila mal
+// escrita se descartaba callada y se guardaba {} mostrando "✓ Guardado", así que
+// los defaults parecían puestos y el export seguía enviando el conteo sin convertir.
+async function saveDefaults() {
+  const almacen = document.getElementById('plt-almacen').value;
+  const msg = document.getElementById('plt-defs-msg');
+  const defaultPres = {};
+  const malas = [];
+  [...document.querySelectorAll('#plt-defs-body tr')].forEach((tr, i) => {
+    const [iUni, iNom, iFac] = tr.querySelectorAll('input');
+    const uni = iUni.value.trim().toUpperCase();
+    const nom = iNom.value.trim();
+    const facTxt = iFac.value.trim().replace(',', '.');
+    const fac = parseFloat(facTxt);
+    tr.style.background = '';
+    if (!uni && !nom && !facTxt) return;             // fila vacía: se ignora
+    if (!uni || !nom || !(fac > 0)) {
+      malas.push(i + 1);
+      tr.style.background = '#fee2e2';
+      return;
+    }
+    if (!defaultPres[uni]) defaultPres[uni] = [];
+    defaultPres[uni].push({ nombre: nom, factor: fac });
+  });
+  if (malas.length) {
+    msg.style.color = '#dc2626';
+    msg.textContent = `✗ No se guardó nada: revisa la fila ${malas.join(', ')} (unidad, nombre y factor > 0).`;
+    return;
+  }
+  if (!Object.keys(defaultPres).length &&
+      !confirm(`Sin filas: esto BORRA las presentaciones por defecto de ${tituloAlmacen(almacen)}. ¿Continuar?`)) return;
+  msg.style.color = '#6b7280'; msg.textContent = 'Guardando…';
+  try {
+    const r = await fetch(WORKER_URL + '/inv/plantilla', {
+      method: 'POST', headers: adminHeaders(),
+      body: JSON.stringify({ action: 'inv_defaults', appVersion: APP_VERSION, almacen, defaultPres })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error');
+    // Releer del servidor: lo que se ve tiene que ser lo que quedó guardado.
+    const vr = await fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen));
+    const v = await vr.json();
+    const guardado = (v.ok && v.found) ? (v.defaultPres || {}) : null;
+    if (!guardado || JSON.stringify(guardado) !== JSON.stringify(defaultPres)) {
+      msg.style.color = '#dc2626';
+      msg.textContent = '✗ El servidor no confirmó el guardado. Vuelve a intentar.';
+      return;
+    }
+    const n = Object.values(guardado).reduce((a, p) => a + p.length, 0);
+    msg.style.color = '#16a34a';
+    msg.textContent = `✓ Guardado y verificado en el servidor (${n} regla${n !== 1 ? 's' : ''}).`;
+    renderRevisionPresentaciones({ ...v });
+  } catch(e) {
+    msg.style.color = '#dc2626'; msg.textContent = '✗ ' + e.message;
+  }
+}
+
+// Cuenta filas con cantidad capturada en la columna que detectó el parser. Una
+// plantilla recién exportada de Xetux trae esa columna vacía; un export de la
+// app trae los conteos.
+function filasConCantidad(buf, idx) {
+  try {
+    const wb = XLSX.read(buf, { type:'array' });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:'' });
+    let n = 0;
+    for (const r of rows) {
+      const v = r[idx];
+      if (v !== '' && v != null && !isNaN(parseFloat(v))) n++;
+    }
+    return n;
+  } catch(_) { return 0; }
+}
+
+// R16: distingue un export de la app de una plantilla de Xetux, por las dos
+// señales independientes del incidente 2026-07-27 (Xetux escribe con Apache POI
+// y la columna Cantidad vacía; el export lo escribe SheetJS ya con conteos).
+// Devuelve el texto de las señales si el archivo es un export, o null si parece
+// plantilla. La usan LAS DOS rutas de subida — lección del incidente: cuando dos
+// rutas hacen lo mismo, la guarda va en las dos.
+function senalesDeExport(buf, cantidadColIdx) {
+  let props = {};
+  try { props = XLSX.read(buf, { type:'array', bookProps:true }).Props || {}; } catch(_) {}
+  const generadoPorLaApp = /sheetjs/i.test(props.Application || '');
+  const conCantidad = filasConCantidad(buf, cantidadColIdx);
+  if (!generadoPorLaApp && !conCantidad) return null;
+  return (generadoPorLaApp ? '· lo generó esta app (SheetJS), no Xetux\n' : '') +
+         (conCantidad ? `· trae ${conCantidad} fila(s) con cantidad capturada; una plantilla viene vacía\n` : '');
+}
+
+async function uploadPlantilla(file) {
+  const almacen = document.getElementById('plt-almacen').value;
+  if (!almacen || !file) return;
+  const msg = document.getElementById('plt-msg');
+  msg.style.color = '#888'; msg.textContent = 'Leyendo archivo…';
+  try {
+    const buf = await file.arrayBuffer();
+    const { rowMap, cantidadColIdx, presMap, unitMap, articulos } = parsePlantilla(buf);
+
+    // Guarda 1 — no aceptar un EXPORT como plantilla (incidente 2026-07-27).
+    // El export de la app y la plantilla de Xetux comparten patrón de nombre y
+    // viven en carpetas vecinas, así que el diálogo de archivos los confunde.
+    const senales = senalesDeExport(buf, cantidadColIdx);
+    if (senales) {
+      msg.style.color = '#dc2626';
+      msg.textContent = '✗ Eso es un export, no una plantilla. No se subió nada.';
+      alert(
+        `"${file.name}" no es una plantilla de Xetux:\n` + senales +
+        '\nLas plantillas se bajan de Xetux (normalmente quedan en Descargas). ' +
+        'Los archivos que están en las carpetas de exports son el inventario ya contado.'
+      );
+      document.getElementById('plt-file').value = '';
+      return;
+    }
+
+    // Guarda 2 — no pisar un almacén con la plantilla de otro. Desde R26 el
+    // cruce bajo BLOQUEA: el confirm anterior permitió cargar CAVA en UH_MERCH.
+    // El Worker repite esta misma defensa para cubrir Admin viejo o falla del GET.
+    let previos = [];
+    try {
+      const pr = await fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen));
+      const pd = await pr.json();
+      if (pd.found && pd.rowMap) previos = Object.keys(pd.rowMap);
+    } catch(_) {}
+    if (previos.length) {
+      const comunes = previos.filter(c => rowMap[c] !== undefined).length;
+      if (comunes / previos.length < 0.2) {
+        msg.style.color = '#dc2626';
+        msg.textContent = `✗ Carga bloqueada: el archivo no corresponde a ${tituloAlmacen(almacen)}.`;
+        alert(
+          `CARGA BLOQUEADA — no se subió nada.\n\n` +
+          `"${file.name}" trae ${Object.keys(rowMap).length} artículos, pero solo ${comunes} de los ` +
+          `${previos.length} que ${tituloAlmacen(almacen)} ya tiene.\n\n` +
+          `Selecciona el almacén correcto antes de volver a intentarlo.`
+        );
+        document.getElementById('plt-file').value = '';
+        return;
+      }
+    }
+
+    msg.style.color = '#888';
+    msg.textContent = `✓ ${Object.keys(rowMap).length} artículos · calculando hash…`;
+
+    const bytes = new Uint8Array(buf);
+    let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
+    const raw = btoa(bin);
+    const templateHash = await hashRaw(raw);
+
+    msg.textContent = `✓ ${Object.keys(rowMap).length} artículos · subiendo al servidor…`;
+    const r = await fetch(WORKER_URL + '/inv/plantilla', {
+      method: 'POST', headers: adminHeaders(),
+      body: JSON.stringify({ action:'inv_plantilla', appVersion: APP_VERSION, almacen, rowMap, cantidadColIdx, presMap, unitMap, articulos, raw, originalFilename: file.name || '', templateHash, templateTs: Date.now() })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      document.getElementById('plt-file').value = '';
+      // loadPlantillaStatus limpia plt-msg al arrancar: el mensaje de éxito
+      // tiene que ir DESPUÉS del refresh o el admin nunca llega a verlo.
+      await loadPlantillaStatus();
+      msg.style.color = '#16a34a';
+      msg.textContent = `✓ Plantilla de ${tituloAlmacen(almacen)} guardada correctamente` +
+        (d.catalogoSincronizado != null
+          ? ` · catálogo sincronizado con ${d.catalogoSincronizado} artículos`
+          : d.catalogoDerivado
+            ? ` · catálogo creado con ${d.catalogoDerivado} artículos`
+            : '');
+    } else {
+      msg.style.color = '#dc2626';
+      msg.textContent = 'Error: ' + (d.error || 'desconocido');
+    }
+  } catch(e) {
+    msg.style.color = '#dc2626';
+    msg.textContent = 'Error: ' + e.message;
+  }
+}
+
+// ── PREPARACIÓN DE CONTEO (R5, spec §14) ─────────────────────
+// Edita inv_zone_configs: zonas, artículos activos/inactivos y orden por almacén.
+// Las tomas abiertas no cambian: congelan su zoneSnapshot al iniciar.
+
+let _prep = null;       // { id, templateHash, zones, active } en edición
+let _prepT = null;      // plantilla del almacén seleccionado
+let _prepLookup = {};   // cod -> { codigo, nombre, unidad }
+let _prepOrder = [];    // cods en orden de aparición en la plantilla
+
+const PREP_COLORS = ['#667eea','#10b981','#f59e0b','#ef4444','#8b5cf6','#0d9488','#f97316','#6b7280'];
+
+function prepZoneId() { return 'z_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+async function loadPreparacion() {
+  const almacen = document.getElementById('prep-almacen').value;
+  if (!almacen) return;
+  const statusEl = document.getElementById('prep-status');
+  const editorEl = document.getElementById('prep-editor');
+  statusEl.innerHTML = '<div style="color:#888;font-size:13px">Cargando…</div>';
+  editorEl.style.display = 'none';
+  _prep = null; _prepT = null; _prepLookup = {}; _prepOrder = [];
+  try {
+    const rp = await fetch(WORKER_URL + '/inv/plantilla?almacen=' + encodeURIComponent(almacen));
+    const dp = await rp.json();
+    if (!dp.ok || !dp.found) {
+      statusEl.innerHTML = `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px;color:#92400e;font-size:13px">
+        No hay plantilla configurada para <strong>${esc(almacen)}</strong>. Sube la plantilla primero (tab Plantillas).</div>`;
+      return;
+    }
+    _prepT = dp;
+    _prepLookup = templateLookup(dp);
+    _prepOrder = Object.keys(_prepLookup);
+
+    let rc = await fetch(WORKER_URL + '/inv/zone-config?almacen=' + encodeURIComponent(almacen));
+    let dc = await rc.json();
+    if (!dc.found) {
+      // Sin config activa: ofrecer el borrador más reciente si existe
+      const ra = await fetch(WORKER_URL + '/inv/zone-config?almacen=' + encodeURIComponent(almacen) + '&all=1');
+      const da = await ra.json();
+      if ((da.configs || []).length) {
+        const ri = await fetch(WORKER_URL + '/inv/zone-config?almacen=' + encodeURIComponent(almacen) + '&id=' + encodeURIComponent(da.configs[0].id));
+        dc = await ri.json();
+      }
+    }
+    if (dc.found) {
+      _prep = { id: dc.id, templateHash: dc.templateHash || '', zones: dc.zones || [], active: !!dc.active };
+    }
+    renderPreparacion();
+  } catch(e) {
+    statusEl.innerHTML = `<div style="color:#dc2626;font-size:13px">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderPreparacion() {
+  const statusEl = document.getElementById('prep-status');
+  const editorEl = document.getElementById('prep-editor');
+  const arts = _prepOrder.length;
+
+  if (!_prep) {
+    statusEl.innerHTML = `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;font-size:13px;color:#475569;margin-bottom:8px">
+      Sin preparación guardada. La app usa el comportamiento actual (zonas fijas o catálogo completo).
+      La plantilla tiene <strong>${arts}</strong> artículos.
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="prepSeed(true)" style="font-size:13px;padding:8px 12px;border:none;border-radius:8px;background:#1d4ed8;color:#fff;cursor:pointer;font-weight:600">Crear: 1 zona con todo activo</button>
+        <button onclick="prepSeed(false)" style="font-size:13px;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer;color:#374151">Crear vacía</button>
+      </div></div>`;
+    editorEl.style.display = 'none';
+    return;
+  }
+
+  const hashWarn = _prep.templateHash && _prepT.templateHash && _prep.templateHash !== _prepT.templateHash
+    ? `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px;color:#92400e;font-size:12px;margin-top:8px">La plantilla cambió desde que se guardó esta preparación. Los artículos que ya no existen aparecen marcados en rojo; al guardar se conservan (decide tú si quitarlos).</div>`
+    : '';
+  statusEl.innerHTML = `<div style="background:${_prep.active?'#f0fdf4':'#f8fafc'};border:1px solid ${_prep.active?'#86efac':'#e2e8f0'};border-radius:8px;padding:12px;font-size:13px;color:#334155;margin-bottom:12px">
+    ${_prep.active ? '<strong style="color:#16a34a">Preparación ACTIVA</strong> — las tomas nuevas de este almacén usan estas zonas.' : '<strong style="color:#64748b">Borrador</strong> — guardada pero no activa; la app sigue con el comportamiento actual.'}
+    <span style="color:#94a3b8"> · ${arts} artículos en plantilla</span>
+    ${hashWarn}</div>`;
+  document.getElementById('prep-btn-desactivar').style.display = _prep.active ? '' : 'none';
+  renderPrepZonas();
+  renderPrepDatalist();
+  editorEl.style.display = 'block';
+}
+
+function prepSeed(conTodo) {
+  const almacen = document.getElementById('prep-almacen').value;
+  _prep = {
+    id: null, templateHash: _prepT.templateHash || '', active: false,
+    zones: conTodo ? [{
+      id: prepZoneId(), nombre: almacen.replace(/_/g,' '), color: PREP_COLORS[0],
+      items: _prepOrder.map(cod => ({ cod, activo: true }))
+    }] : []
+  };
+  renderPreparacion();
+}
+
+function prepAddZone() {
+  if (!_prep) return;
+  _prep.zones.push({ id: prepZoneId(), nombre: 'Zona ' + (_prep.zones.length + 1), color: PREP_COLORS[_prep.zones.length % PREP_COLORS.length], items: [] });
+  renderPrepZonas();
+}
+
+function prepItemLabel(cod) {
+  const a = _prepLookup[cod];
+  const enPlantilla = a || (cod in (_prepT?.rowMap || {}));
+  const nombre = a?.nombre || cod;
+  const uni = a?.unidad || '';
+  return { nombre, uni, enPlantilla };
+}
+
+function renderPrepZonas() {
+  const cont = document.getElementById('prep-zonas');
+  const btnStyle = 'border:none;background:#f1f5f9;border-radius:6px;cursor:pointer;font-size:13px;padding:4px 8px;color:#475569';
+  cont.innerHTML = _prep.zones.map((z, zi) => {
+    const activos = z.items.filter(i => i.activo !== false).length;
+    const rows = z.items.map((it, ii) => {
+      const { nombre, uni, enPlantilla } = prepItemLabel(it.cod);
+      return `<div class="prep-item" data-search="${esc(normalizeTemplateSearch(nombre + ' ' + it.cod))}" style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:13px">
+        <input type="checkbox" ${it.activo !== false ? 'checked' : ''} onchange="prepToggleItem(${zi},${ii},this.checked)" style="flex-shrink:0">
+        <div style="flex:1;min-width:0${enPlantilla ? '' : ';color:#dc2626'}">
+          <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(nombre)}${enPlantilla ? '' : ' <span style=\"color:#b45309;font-weight:700\">[fuera de plantilla]</span>'}</div>
+          <div style="font-size:11px;color:#94a3b8">${esc(it.cod)}${uni ? ' · ' + esc(uni) : ''}${enPlantilla ? '' : ' · ya no está en plantilla'}</div>
+        </div>
+        <button onclick="prepMoveItem(${zi},${ii},-1)" style="${btnStyle}">↑</button>
+        <button onclick="prepMoveItem(${zi},${ii},1)" style="${btnStyle}">↓</button>
+        <button onclick="prepRemoveItem(${zi},${ii})" style="${btnStyle};color:#ef4444">×</button>
+      </div>`;
+    }).join('');
+    return `<details style="border:1px solid #e2e8f0;border-radius:10px;margin-bottom:10px;background:#fff;border-left:4px solid ${esc(z.color || '#667eea')}">
+      <summary style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;list-style:none;flex-wrap:wrap">
+        <input type="color" value="${esc(z.color || '#667eea')}" onchange="_prep.zones[${zi}].color=this.value" onclick="event.stopPropagation()" style="width:26px;height:26px;border:none;background:none;cursor:pointer;padding:0">
+        <input type="text" value="${esc(z.nombre)}" oninput="_prep.zones[${zi}].nombre=this.value" onclick="event.stopPropagation()" style="font-size:14px;font-weight:700;border:1px solid transparent;border-radius:6px;padding:4px 6px;flex:1;min-width:120px" onfocus="this.style.borderColor='#cbd5e1'" onblur="this.style.borderColor='transparent'">
+        <span id="prep-count-${zi}" style="font-size:12px;color:#64748b;white-space:nowrap">${z.items.length} arts · ${activos} activos</span>
+        <span onclick="event.preventDefault();prepMoveZone(${zi},-1)" style="${btnStyle}">↑</span>
+        <span onclick="event.preventDefault();prepMoveZone(${zi},1)" style="${btnStyle}">↓</span>
+        <span onclick="event.preventDefault();prepDupZone(${zi})" style="${btnStyle}" title="Duplicar zona">⧉</span>
+        <span onclick="event.preventDefault();prepDelZone(${zi})" style="${btnStyle};color:#ef4444">Borrar</span>
+      </summary>
+      <div style="padding:8px 12px;border-top:1px solid #f1f5f9">
+        <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+          <input type="text" placeholder="Filtrar artículos…" oninput="prepFilterZone(this,${zi})" style="flex:1;min-width:140px;font-size:13px;border:1px solid #d1d5db;border-radius:6px;padding:6px 8px">
+          <button onclick="prepBulk(${zi},this,true)" style="${btnStyle}">Activar visibles</button>
+          <button onclick="prepBulk(${zi},this,false)" style="${btnStyle}">Desactivar visibles</button>
+        </div>
+        <div id="prep-items-${zi}" style="max-height:340px;overflow-y:auto;border:1px solid #f1f5f9;border-radius:8px">${rows || '<div style="padding:12px;font-size:13px;color:#94a3b8">Sin artículos. Agrégalos abajo.</div>'}</div>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <input type="text" id="prep-add-${zi}" list="prep-datalist" placeholder="Buscar artículo de la plantilla…" style="flex:1;min-width:160px;font-size:13px;border:1px solid #d1d5db;border-radius:6px;padding:6px 8px" onkeyup="if(event.key==='Enter')prepAddItem(${zi})">
+          <button onclick="prepAddItem(${zi})" style="${btnStyle};background:#1d4ed8;color:#fff">+ Agregar</button>
+          <button onclick="prepAddAll(${zi})" style="${btnStyle}">+ Todos los de la plantilla</button>
+        </div>
+      </div>
+    </details>`;
+  }).join('') || '<div style="font-size:13px;color:#94a3b8;padding:8px 0">Sin zonas todavía.</div>';
+}
+
+function renderPrepDatalist() {
+  let dl = document.getElementById('prep-datalist');
+  if (!dl) { dl = document.createElement('datalist'); dl.id = 'prep-datalist'; document.body.appendChild(dl); }
+  dl.innerHTML = _prepOrder.map(cod => {
+    const a = _prepLookup[cod];
+    return `<option value="${esc(cod)} - ${esc(a?.nombre || cod)}"></option>`;
+  }).join('');
+}
+
+function prepToggleItem(zi, ii, checked) {
+  _prep.zones[zi].items[ii].activo = checked;
+  const z = _prep.zones[zi];
+  const el = document.getElementById('prep-count-' + zi);
+  if (el) el.textContent = `${z.items.length} arts · ${z.items.filter(i => i.activo !== false).length} activos`;
+}
+
+function prepMoveItem(zi, ii, dir) {
+  const items = _prep.zones[zi].items;
+  const j = ii + dir;
+  if (j < 0 || j >= items.length) return;
+  [items[ii], items[j]] = [items[j], items[ii]];
+  renderPrepZonas();
+  document.querySelector(`#prep-items-${zi}`)?.closest('details')?.setAttribute('open','');
+}
+
+function prepRemoveItem(zi, ii) {
+  _prep.zones[zi].items.splice(ii, 1);
+  renderPrepZonas();
+  document.querySelector(`#prep-items-${zi}`)?.closest('details')?.setAttribute('open','');
+}
+
+function prepMoveZone(zi, dir) {
+  const j = zi + dir;
+  if (j < 0 || j >= _prep.zones.length) return;
+  [_prep.zones[zi], _prep.zones[j]] = [_prep.zones[j], _prep.zones[zi]];
+  renderPrepZonas();
+}
+
+function prepDupZone(zi) {
+  const z = _prep.zones[zi];
+  _prep.zones.splice(zi + 1, 0, { id: prepZoneId(), nombre: z.nombre + ' (copia)', color: z.color, items: z.items.map(i => ({ ...i })) });
+  renderPrepZonas();
+}
+
+function prepDelZone(zi) {
+  if (!confirm(`¿Eliminar la zona "${_prep.zones[zi].nombre}"?`)) return;
+  _prep.zones.splice(zi, 1);
+  renderPrepZonas();
+}
+
+function prepFilterZone(inp, zi) {
+  const q = normalizeTemplateSearch(inp.value);
+  document.querySelectorAll(`#prep-items-${zi} .prep-item`).forEach(r => {
+    r.style.display = !q || (r.dataset.search || '').includes(q) ? '' : 'none';
+  });
+}
+
+function prepBulk(zi, btn, activo) {
+  const visibles = new Set();
+  document.querySelectorAll(`#prep-items-${zi} .prep-item`).forEach((r, ii) => {
+    if (r.style.display !== 'none') visibles.add(ii);
+  });
+  _prep.zones[zi].items.forEach((it, ii) => { if (visibles.has(ii)) it.activo = activo; });
+  const filtro = btn.closest('div').querySelector('input')?.value || '';
+  renderPrepZonas();
+  const det = document.querySelector(`#prep-items-${zi}`)?.closest('details');
+  if (det) {
+    det.setAttribute('open','');
+    const finp = det.querySelector('input[placeholder^="Filtrar"]');
+    if (finp && filtro) { finp.value = filtro; prepFilterZone(finp, zi); }
+  }
+}
+
+function prepAddItem(zi) {
+  const inp = document.getElementById('prep-add-' + zi);
+  const art = resolveTemplateArticle(inp.value, _prepT);
+  if (!art) { alert('Artículo no encontrado en la plantilla'); return; }
+  const items = _prep.zones[zi].items;
+  if (items.some(i => i.cod === art.codigo)) { alert('Ese artículo ya está en la zona'); return; }
+  items.push({ cod: art.codigo, activo: true });
+  inp.value = '';
+  renderPrepZonas();
+  document.querySelector(`#prep-items-${zi}`)?.closest('details')?.setAttribute('open','');
+}
+
+function prepAddAll(zi) {
+  const items = _prep.zones[zi].items;
+  const existing = new Set(items.map(i => i.cod));
+  const nuevos = _prepOrder.filter(cod => !existing.has(cod));
+  if (!nuevos.length) { alert('La zona ya tiene todos los artículos de la plantilla'); return; }
+  if (!confirm(`¿Agregar ${nuevos.length} artículos de la plantilla a "${_prep.zones[zi].nombre}"?`)) return;
+  nuevos.forEach(cod => items.push({ cod, activo: true }));
+  renderPrepZonas();
+  document.querySelector(`#prep-items-${zi}`)?.closest('details')?.setAttribute('open','');
+}
+
+async function savePreparacion(activar) {
+  const almacen = document.getElementById('prep-almacen').value;
+  const msg = document.getElementById('prep-msg');
+  if (!_prep) return;
+  for (const z of _prep.zones) {
+    if (!z.nombre.trim()) { msg.style.color = '#dc2626'; msg.textContent = '✗ Hay una zona sin nombre'; return; }
+  }
+  if (activar && !_prep.zones.some(z => z.items.some(i => i.activo !== false))) {
+    msg.style.color = '#dc2626'; msg.textContent = '✗ No se puede activar sin artículos activos'; return;
+  }
+  msg.style.color = '#6b7280'; msg.textContent = 'Guardando…';
+  const zones = _prep.zones.map(z => ({
+    id: z.id || prepZoneId(),
+    nombre: z.nombre.trim(),
+    color: z.color || '#667eea',
+    items: z.items.map((it, ii) => ({ cod: it.cod, orden: (ii + 1) * 10, activo: it.activo !== false }))
+  }));
+  try {
+    const r = await fetch(WORKER_URL + '/inv/zone-config', {
+      method: 'POST', headers: adminHeaders(),
+      body: JSON.stringify({ action: 'inv_zone_config_save', appVersion: APP_VERSION, almacen, id: _prep.id || undefined, templateHash: _prepT.templateHash || '', zones })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al guardar');
+    _prep.id = d.id;
+    _prep.templateHash = _prepT.templateHash || '';
+    if (activar) {
+      const ra = await fetch(WORKER_URL + '/inv/zone-config', {
+        method: 'POST', headers: adminHeaders(),
+        body: JSON.stringify({ action: 'inv_zone_config_activate', appVersion: APP_VERSION, almacen, id: d.id })
+      });
+      const da = await ra.json();
+      if (!da.ok) throw new Error(da.error || 'Guardado pero no se pudo activar');
+      _prep.active = true;
+    }
+    msg.style.color = '#16a34a';
+    msg.textContent = activar ? '✓ Guardada y ACTIVA — las tomas nuevas ya la usan' : '✓ Borrador guardado';
+    renderPreparacion();
+  } catch(e) {
+    msg.style.color = '#dc2626'; msg.textContent = '✗ ' + e.message;
+  }
+}
+
+async function deactivatePreparacion() {
+  const almacen = document.getElementById('prep-almacen').value;
+  const msg = document.getElementById('prep-msg');
+  if (!confirm('¿Desactivar la preparación? El almacén volverá al comportamiento anterior (zonas fijas o catálogo completo). La config queda guardada como borrador.')) return;
+  try {
+    const r = await fetch(WORKER_URL + '/inv/zone-config', {
+      method: 'POST', headers: adminHeaders(),
+      body: JSON.stringify({ action: 'inv_zone_config_activate', appVersion: APP_VERSION, almacen, deactivate: true })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error');
+    _prep.active = false;
+    msg.style.color = '#16a34a'; msg.textContent = '✓ Preparación desactivada';
+    renderPreparacion();
+  } catch(e) {
+    msg.style.color = '#dc2626'; msg.textContent = '✗ ' + e.message;
+  }
+}
+
+// ── ADMINS (R7, solo password maestro) ────────────────────
+let _admins = [];
+let _adminEditandoId = null;
+
+function renderAdmAlmacenesChecks(seleccionados = []) {
+  const cont = document.getElementById('adm-almacenes');
+  // Agrupados por centro para que "Cocina" de Piazza jamás se confunda con
+  // "Cocina" de Universal al asignar permisos
+  const porCentro = {};
+  Object.entries(INVENTARIO_AREAS).forEach(([key, cfg]) => {
+    (porCentro[centroDe(key)] ??= []).push([key, cfg]);
+  });
+  cont.innerHTML = Object.entries(porCentro).map(([c, items]) => `
+    <div style="width:100%">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#64748b;margin:4px 0 6px">${esc(CENTROS[c].nombre)}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        ${items.map(([key, cfg]) => `
+          <label style="font-size:13px;color:#334155;display:flex;align-items:center;gap:5px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;cursor:pointer">
+            <input type="checkbox" class="adm-alm-check" value="${esc(key)}" ${seleccionados.includes(key) ? 'checked' : ''}> ${esc(cfg.titulo)}
+          </label>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+async function cargarAdmins() {
+  const el = document.getElementById('admins-lista');
+  if (!_adminEditandoId) renderAdmAlmacenesChecks();
+  el.innerHTML = '<div class="loading-state"><div class="spinner-sm"></div>Cargando perfiles...</div>';
+  try {
+    const r = await fetch(WORKER_URL + '/inv/plantilla', {
+      method: 'POST', headers: adminHeaders(),
+      body: JSON.stringify({ action: 'inv_admin_list', appVersion: APP_VERSION })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al cargar perfiles');
+    _admins = d.admins || [];
+    renderAdmins();
+  } catch(e) {
+    el.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
+  }
+}
+
+function renderAdmins() {
+  const el = document.getElementById('admins-lista');
+  if (!_admins.length) {
+    el.innerHTML = '<div class="empty-state" style="background:white;border-radius:10px">Sin perfiles. Todos entran con el password maestro.</div>';
+    return;
+  }
+  el.innerHTML = _admins.map(a => {
+    const titulos = (a.almacenes || []).map(tituloAlmacen);
+    const badge = a.active
+      ? '<span style="background:#dcfce7;color:#166534;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">Activo</span>'
+      : '<span style="background:#fee2e2;color:#991b1b;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:bold;">Inactivo</span>';
+    return `<div class="toma-card" style="border-left-color:${a.active ? '#667eea' : '#94a3b8'}">
+      <div class="toma-header">
+        <div class="toma-operario">${esc(a.nombre)} ${badge}</div>
+      </div>
+      <div class="toma-meta">${titulos.length ? esc(titulos.join(' · ')) : 'Sin almacenes asignados'}</div>
+      <div class="toma-footer" style="flex-wrap:wrap;gap:6px;">
+        <div></div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-notas" onclick="editarAdmin('${esc(a.id)}')">${ic('pencil',13)} Editar</button>
+          <button class="btn-borrar" onclick="borrarAdmin('${esc(a.id)}','${esc(a.nombre)}')">${ic('trash-2',13)} Borrar</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function editarAdmin(id) {
+  const a = _admins.find(x => x.id === id);
+  if (!a) return;
+  _adminEditandoId = id;
+  document.getElementById('adm-form-titulo').textContent = `Editando: ${a.nombre}`;
+  document.getElementById('adm-nombre').value = a.nombre;
+  const pw = document.getElementById('adm-password');
+  pw.value = ''; pw.placeholder = 'Password (vacío = no cambiar)';
+  document.getElementById('adm-active').checked = !!a.active;
+  document.getElementById('adm-cancelar').style.display = '';
+  document.getElementById('adm-msg').textContent = '';
+  renderAdmAlmacenesChecks(a.almacenes || []);
+}
+
+function nuevoAdminReset() {
+  _adminEditandoId = null;
+  document.getElementById('adm-form-titulo').textContent = 'Nuevo perfil';
+  document.getElementById('adm-nombre').value = '';
+  const pw = document.getElementById('adm-password');
+  pw.value = ''; pw.placeholder = 'Password del perfil';
+  document.getElementById('adm-active').checked = true;
+  document.getElementById('adm-cancelar').style.display = 'none';
+  document.getElementById('adm-msg').textContent = '';
+  renderAdmAlmacenesChecks();
+}
+
+async function guardarAdmin() {
+  const msg = document.getElementById('adm-msg');
+  const nombre = document.getElementById('adm-nombre').value.trim();
+  const password = document.getElementById('adm-password').value;
+  const almacenes = [...document.querySelectorAll('.adm-alm-check:checked')].map(c => c.value);
+  const active = document.getElementById('adm-active').checked;
+  if (!nombre) { msg.style.color = '#dc2626'; msg.textContent = '✗ Falta el nombre'; return; }
+  if (!_adminEditandoId && !password) { msg.style.color = '#dc2626'; msg.textContent = '✗ Falta el password'; return; }
+  if (!almacenes.length && !confirm('El perfil no tiene almacenes asignados: podrá entrar pero no administrar nada. ¿Guardar así?')) return;
+  msg.style.color = '#6b7280'; msg.textContent = 'Guardando…';
+  try {
+    const body = { action: 'inv_admin_save', appVersion: APP_VERSION, nombre, almacenes, active };
+    if (_adminEditandoId) body.id = _adminEditandoId;
+    if (password) body.password = password;
+    const r = await fetch(WORKER_URL + '/inv/plantilla', {
+      method: 'POST', headers: adminHeaders(), body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al guardar');
+    nuevoAdminReset(); // primero: también limpia adm-msg
+    msg.style.color = '#16a34a'; msg.textContent = '✓ Perfil guardado';
+    await cargarAdmins();
+  } catch(e) {
+    msg.style.color = '#dc2626'; msg.textContent = '✗ ' + e.message;
+  }
+}
+
+async function borrarAdmin(id, nombre) {
+  if (!confirm(`¿Borrar el perfil "${nombre}"? Dejará de poder entrar al admin.`)) return;
+  try {
+    const r = await fetch(WORKER_URL + '/inv/plantilla', {
+      method: 'POST', headers: adminHeaders(),
+      body: JSON.stringify({ action: 'inv_admin_delete', appVersion: APP_VERSION, id })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Error al borrar');
+    if (_adminEditandoId === id) nuevoAdminReset();
+    await cargarAdmins();
+  } catch(e) {
+    alert('Error al borrar: ' + e.message);
+  }
+}
+
+// drag & drop en plt-drop
+document.addEventListener('DOMContentLoaded', () => {
+  const dz = document.getElementById('plt-drop');
+  if (!dz) return;
+  dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('over');
+    const f = e.dataTransfer.files[0];
+    if (f) uploadPlantilla(f);
+  });
+});
+</script>
+<script type="module">
+// R12: el ?v= amarra el módulo a esta versión del HTML — sin él, un admin.html
+// fresco puede correr con un módulo viejo de caché (o al revés), que fue
+// exactamente el incidente #NUM! de 2026-07-23. `r24` invalida solo el parser;
+// el contrato de escritura con el Worker permanece en APP_VERSION 2.
+import { parsePlantilla, hashRaw } from './js/plantilla-parser.js?v=2-r24';
+import { factorDefault, calcularTotalesSesion, cantidadBase, lineasDesglose } from './js/sesion-merge.js?v=2';
+import { construirDatosPDFSesion, unirSesionesDeAlmacen } from './js/admin-pdf.js?v=2-r1';
+window.parsePlantilla = parsePlantilla;
+window.hashRaw = hashRaw;
+window.factorDefault = factorDefault;
+window.calcularTotalesSesion = calcularTotalesSesion;
+window.cantidadBase = cantidadBase;
+window.lineasDesglose = lineasDesglose;
+window.construirDatosPDFSesion = construirDatosPDFSesion;
+window.unirSesionesDeAlmacen = unirSesionesDeAlmacen;
+</script>
+</body>
+</html>

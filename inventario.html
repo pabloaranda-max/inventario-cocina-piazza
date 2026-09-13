@@ -1,0 +1,2400 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Inventario · Piazza Pasticcio</title>
+<script>
+// Chrome captura el <link rel=manifest> al parsear la página; cambiarle el
+// href con JS después NO cambia la identidad de la app que se instala (por
+// eso instalar ?centro=UH daba la app de Piazza). El link correcto tiene que
+// emitirse aquí mismo, antes de que exista cualquier <link>.
+(function(){
+  var uh = location.pathname.indexOf('/inventario-uh/') !== -1 ||
+           (new URLSearchParams(location.search).get('centro') || '').toUpperCase() === 'UH';
+  var pre = uh ? 'branding/icon-uh-' : 'branding/icon-';
+  document.write(
+    '<link rel="icon" type="image/png" href="' + pre + '192.png" id="favicon">' +
+    '<link rel="apple-touch-icon" href="' + pre + '180.png" id="touch-icon">' +
+    '<link rel="manifest" href="' + (uh ? 'manifest-uh' : 'manifest') + '.webmanifest" id="manifest-link">' +
+    '<meta name="theme-color" content="' + (uh ? '#111827' : '#667eea') + '">'
+  );
+})();
+</script>
+<style>
+@font-face{font-family:'Brand';font-weight:400;src:url(branding/fonts/FreightNeo%20W03%20Book.ttf)format('truetype')}
+@font-face{font-family:'BrandScript';font-weight:900;src:url(branding/fonts/TT%20Nooks%20Script%20Black.otf)format('opentype')}
+:root{
+  --brand-green:#2f3e1e;--brand-wine:#9b1e21;--brand-bone:#eee3ca;
+  --brand-yellow:#efa91e;--brand-ink:#1f2916;--brand-paper:#fffdf8;
+  --brand-border:rgba(47,62,30,0.14);--brand-muted:rgba(47,62,30,0.52);
+  --brand-shadow:0 18px 48px rgba(47,62,30,0.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Brand','Avenir Next','Segoe UI',serif;background:linear-gradient(180deg,#f8f4ea 0%,#fffdf8 28%,#f4f5f0 100%);color:var(--brand-ink);min-height:100vh}
+.screen{display:none;min-height:100vh;flex-direction:column}
+.screen.active{display:flex}
+.hdr{color:white;padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:50}
+.hdr h1{font-size:17px;font-weight:700;flex:1}
+.hdr-back{background:none;border:none;color:white;font-size:22px;padding:0 6px;cursor:pointer;line-height:1}
+button{cursor:pointer;border:none;font-family:inherit;font-weight:600;border-radius:10px;transition:opacity .15s}
+button:active{opacity:.75}
+.btn{display:block;width:100%;padding:15px;font-size:16px;border-radius:12px;text-align:center}
+.btn-primary{background:var(--color,#667eea);color:white}
+.btn-green{background:#22c55e;color:white}
+.btn-gray{background:#e5e7eb;color:#374151}
+.btn-sm{padding:8px 14px;font-size:13px;border-radius:8px}
+.zone-done-banner{background:#f0fdf4;border:1px solid #86efac;color:#166534;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:13px;line-height:1.4}
+.zone-done-banner strong{display:block;margin-bottom:2px}
+.correction-badge{display:inline-block;margin-top:4px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:700}
+.form-group{margin-bottom:14px}
+label{display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:5px}
+input[type=text],input[type=date],select{width:100%;padding:13px 14px;border:1px solid rgba(47,62,30,.16);border-radius:10px;font-size:16px;font-family:inherit;background:rgba(255,253,248,.82);color:var(--brand-green);-webkit-appearance:none;appearance:none}
+input:focus,select:focus{outline:none;border-color:var(--color,#667eea)}
+.content{flex:1;padding:16px;overflow-y:auto}
+.card{background:var(--brand-paper);background:color-mix(in srgb,var(--brand-paper) 94%,white);border:1px solid var(--brand-border);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 14px 36px rgba(47,62,30,.06)}
+.divider{height:1px;background:var(--brand-border);margin:16px 0}
+.section-label{font-size:11px;font-weight:700;color:var(--brand-muted);text-transform:uppercase;letter-spacing:.8px;margin:18px 0 8px}
+.row{display:flex;gap:8px;margin-top:10px}
+.progress-bar{height:4px;background:#e5e7eb;border-radius:4px;overflow:hidden;margin:4px 0 0}
+.progress-fill{height:100%;background:#22c55e;border-radius:4px;transition:width .3s}
+.zone-card{background:var(--brand-paper);background:color-mix(in srgb,var(--brand-paper) 94%,white);border:1px solid var(--brand-border);border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px rgba(47,62,30,.05);cursor:pointer;border-left:4px solid var(--brand-border)}
+.zone-card:active{opacity:.8}
+.zone-card.done{border-color:#22c55e;border-left-color:#16a34a;background:#f0fdf4;box-shadow:0 4px 14px rgba(22,163,74,.12)}
+.zone-card.done .zone-name{color:#166534}
+.zone-card.partial{border-left-color:#f59e0b}
+.zone-card.corrected{border-left-color:#facc15;background:#fffbeb}
+.zone-card.done.corrected{border-color:#22c55e;border-left-color:#16a34a;background:#f0fdf4}
+.zone-card.locked{border-left-color:#94a3b8;cursor:not-allowed;opacity:.6}
+.zone-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.zone-info{flex:1;min-width:0}
+.zone-name{font-weight:700;font-size:15px}
+.zone-meta{font-size:12px;color:#888;margin-top:2px}
+.zone-status{font-size:20px;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.zone-status-closed{display:inline-flex;align-items:center;gap:4px;background:#166534;color:#fff;border-radius:999px;padding:5px 8px;font-size:10px;font-weight:800;letter-spacing:.04em;white-space:nowrap}
+.zone-receipt-btn{border:1px solid #15803d;background:#fff;color:#166534;border-radius:7px;padding:5px 7px;font-size:10px;font-weight:800;white-space:nowrap}
+.zone-receipt-pending{color:#166534;font-size:10px;font-weight:700;white-space:nowrap}
+.subgrupo-hdr{font-size:11px;font-weight:700;color:var(--brand-muted);text-transform:uppercase;letter-spacing:1px;padding:10px 16px 4px;background:rgba(47,62,30,.04)}
+.subgrupo-hdr.hidden{display:none}
+.item-row{background:var(--brand-paper);padding:11px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--brand-border)}
+.item-row.corrected{background:#fffbeb}
+.item-row.hidden{display:none}
+.item-row.search-match{border-left:3px solid var(--color,#667eea);padding-left:13px}
+.item-row.search-match .item-name{color:#1e293b}
+mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
+.item-text{flex:1;min-width:0}
+.item-name{font-size:14px;font-weight:600}
+.item-unit{font-size:11px;color:#aaa;margin-top:2px}
+.item-unit.warn{color:#d97706}
+.qty-wrap{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.qty-input{width:72px;padding:10px 6px;border:1.5px solid #ddd;border-radius:8px;text-align:center;font-size:16px;font-weight:700;font-family:inherit;-webkit-appearance:none;appearance:none}
+.qty-input:focus{outline:none;border-color:var(--color,#667eea);background:#f5f3ff}
+.qty-input.filled{border-color:#22c55e;background:#f0fff4}
+.qty-label{font-size:11px;color:#aaa;white-space:nowrap}
+.lt-badge{font-size:11px;font-weight:700;color:var(--color,#667eea);background:#ede9fe;padding:2px 6px;border-radius:6px;white-space:nowrap;min-width:54px;text-align:right}
+.pres-sel{font-size:12px;border:1px solid #ddd;border-radius:6px;padding:3px 6px;background:white;color:#333;max-width:110px}
+/* R11 — desglose por presentación */
+.item-row.desglosado{flex-wrap:wrap}
+.desg-btn{border:1px solid #ddd;background:white;border-radius:8px;padding:8px 7px;display:flex;align-items:center;color:var(--color,#667eea);flex-shrink:0}
+.desglose-block{flex-basis:100%;background:#fafaff;border:1px solid var(--brand-border,#eee);border-radius:8px;padding:6px 10px;margin-top:8px}
+.desg-linea{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0}
+.desg-label{font-size:12px;color:#555;flex:1;min-width:0}
+.desg-input{width:64px;padding:8px 6px}
+.desg-total{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:6px 0 2px;margin-top:2px;border-top:1px dashed #ddd;font-size:12px;color:#666}
+.desg-cerrar{background:none;border:none;color:#999;font-size:11px;text-decoration:underline;padding:4px;margin-right:auto}
+.search-bar{background:rgba(255,253,248,.9);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:10px 16px;border-bottom:1px solid var(--brand-border);display:flex;gap:8px;position:sticky;top:53px;z-index:40}
+.search-bar input{flex:1;padding:10px 14px;border:1.5px solid #ddd;border-radius:10px;font-size:16px;font-family:inherit}
+.search-bar input:focus{outline:none;border-color:var(--color,#667eea)}
+.search-bar button{background:#f3f4f6;color:#555;padding:10px 14px;border-radius:10px;font-size:14px}
+.fab-bar{position:fixed;bottom:0;left:0;right:0;padding:12px 16px;background:rgba(255,253,248,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--brand-border);z-index:50;display:flex;gap:8px}
+.alert{border-radius:10px;padding:12px 14px;margin-bottom:10px;font-size:13px;line-height:1.4}
+.alert-warn{background:#fffbeb;border:1px solid #fcd34d;color:#92400e}
+.alert-error{background:#fef2f2;border:1px solid #fca5a5;color:#991b1b}
+.alert-ok{background:#f0fdf4;border:1px solid #86efac;color:#166534}
+.alert-info{background:#eff6ff;border:1px solid #93c5fd;color:#1e40af}
+.alert-title{font-weight:700;margin-bottom:4px}
+/* Area selector */
+.area-list{padding:0 16px 16px}
+.area-item{background:var(--brand-paper);background:color-mix(in srgb,var(--brand-paper) 94%,white);border:1px solid var(--brand-border);padding:16px;display:flex;align-items:center;gap:14px;border-radius:12px;margin-bottom:8px;box-shadow:0 4px 14px rgba(47,62,30,.05);cursor:pointer;border-left:4px solid var(--ac,#667eea);transition:opacity .15s}
+.area-item:active{opacity:.75}
+.area-item-badge{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:800;flex-shrink:0}
+.area-item-info{flex:1;min-width:0}
+.area-item-name{font-size:15px;font-weight:700;color:#111}
+.area-item-sub{font-size:12px;color:#888;margin-top:2px}
+.area-item-arrow{color:#c4c4c4;font-size:18px;flex-shrink:0}
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-end;justify-content:center}
+.modal-overlay.active{display:flex}
+.modal-box{background:white;border-radius:20px 20px 0 0;padding:24px 20px;width:100%;max-height:90vh;overflow-y:auto}
+.modal-title{font-size:18px;font-weight:800;margin-bottom:16px}
+.modal-close{float:right;background:none;border:none;font-size:22px;color:#999;padding:0;margin-top:-4px}
+/* Supervisor */
+.sup-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.25);color:#6d28d9;border-radius:20px;padding:3px 10px 3px 8px;font-size:12px;font-weight:700;cursor:pointer}
+.sup-badge:hover{background:rgba(124,58,237,.2)}
+.comment-btn{background:none;border:none;cursor:pointer;font-size:14px;padding:0 4px;opacity:.45;line-height:1;flex-shrink:0}
+.comment-btn.has-comment{opacity:1;color:#7c3aed}
+.comment-btn:hover{opacity:1}
+.item-comment-text{font-size:11px;color:#7c3aed;margin-top:2px;font-style:italic}
+/* Welcome */
+.welcome-hero{background:rgba(255,253,248,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--brand-border);padding:20px 16px 16px;display:flex;align-items:center;gap:14px}
+.welcome-logo-img{width:48px;height:48px;object-fit:contain;border-radius:10px;border:1px solid rgba(155,30,33,.14);background:rgba(255,253,248,.7);padding:5px;flex-shrink:0}
+.welcome-logo-text{}
+.welcome-logo-name{font-family:'BrandScript',cursive;font-size:24px;line-height:1;color:var(--brand-wine)}
+.welcome-logo-sub{font-size:12px;font-weight:600;letter-spacing:.08em;color:var(--brand-green);margin-top:2px}
+.welcome-hero p{display:none}
+.ic{display:inline-block;vertical-align:-3px;flex:none}
+</style>
+</head>
+<body>
+
+<!-- R9b+ iconos Lucide (ISC) — sprite inline, cero red -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true"><symbol id="i-triangle-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></symbol><symbol id="i-circle-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="m15 9-6 6" /> <path d="m9 9 6 6" /></symbol><symbol id="i-circle-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="m9 12 2 2 4-4" /></symbol><symbol id="i-refresh-cw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></symbol><symbol id="i-clipboard-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></symbol><symbol id="i-message-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /></symbol><symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 3v12" /> <path d="m17 8-5-5-5 5" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></symbol><symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /> <path d="M7 11V7a5 5 0 0 1 10 0v4" /></symbol><symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /></symbol><symbol id="i-trash-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></symbol><symbol id="i-list-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M11 12H3" /> <path d="M16 6H3" /> <path d="M16 18H3" /> <path d="M18 9v6" /> <path d="M21 12h-6" /></symbol><symbol id="i-store" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5" /> <path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244" /> <path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05" /></symbol></svg>
+
+<!-- PANTALLA: selector de área -->
+<div id="screen-welcome" class="screen">
+  <div class="welcome-hero">
+    <img class="welcome-logo-img" src="branding/logo.png" alt="Piazza Pasticcio">
+    <div class="welcome-logo-text" style="flex:1;min-width:0">
+      <div class="welcome-logo-name">Piazza Pasticcio</div>
+      <div class="welcome-logo-sub" id="welcome-sub">Inventarios · selecciona el almacén</div>
+    </div>
+    <div id="sup-badge-wrap"></div>
+  </div>
+  <div id="welcome-body" class="content" style="padding-top:0"></div>
+</div>
+
+<!-- PANTALLA: nueva sesión -->
+<div id="screen-session" class="screen">
+  <div class="hdr" id="session-hdr">
+    <button class="hdr-back" onclick="go('welcome')">←</button>
+    <h1>Nueva toma</h1>
+  </div>
+  <div class="content">
+    <div class="form-group">
+      <label>Operario</label>
+      <input type="text" id="inp-operario" placeholder="Tu nombre">
+    </div>
+    <div class="form-group">
+      <label>Fecha</label>
+      <input type="date" id="inp-fecha">
+    </div>
+    <button class="btn btn-primary" id="btn-iniciar-toma" style="margin-top:8px" onclick="startSession()">Iniciar →</button>
+  </div>
+</div>
+
+<!-- PANTALLA: resumen de zonas -->
+<div id="screen-overview" class="screen">
+  <div class="hdr" id="ov-hdr">
+    <button class="hdr-back" onclick="go('welcome')">←</button>
+    <h1 id="ov-title">Toma de inventario</h1>
+  </div>
+  <div class="content">
+    <div id="ov-meta" style="font-size:13px;color:#888;margin-bottom:4px"></div>
+    <div id="ov-warn" style="margin-bottom:8px"></div>
+    <div id="ov-feedback"></div>
+    <div style="margin-bottom:16px"><div class="progress-bar"><div class="progress-fill" id="ov-bar" style="width:0%"></div></div></div>
+    <div id="ov-zones"></div>
+    <div style="margin-top:20px">
+      <button class="btn btn-primary" id="btn-generate" onclick="go('generate')">Ver resumen →</button>
+    </div>
+  </div>
+</div>
+
+<!-- PANTALLA: conteo -->
+<div id="screen-count" class="screen">
+  <div class="hdr" id="count-hdr">
+    <button class="hdr-back" onclick="exitCount()">←</button>
+    <div style="flex:1;min-width:0">
+      <h1 id="count-zone-name">Conteo</h1>
+      <div class="progress-bar"><div class="progress-fill" id="count-bar" style="width:0%"></div></div>
+    </div>
+    <span id="count-pct" style="font-size:13px;white-space:nowrap;opacity:.85"></span>
+  </div>
+  <div class="search-bar">
+    <input type="text" id="count-search" placeholder="Buscar en toda la plantilla…" oninput="filterCount(this.value)">
+    <button onclick="clearSearch()">✕</button>
+  </div>
+  <div id="count-list" style="padding-bottom:90px"></div>
+  <div class="fab-bar">
+    <button class="btn btn-green" style="flex:2" onclick="doneZone()">✓ Cerrar esta zona</button>
+    <button class="btn btn-gray btn-sm" style="flex:1" onclick="openManualModal()">+ No catalogado</button>
+    <button class="btn btn-gray btn-sm" id="btn-ver-manuales" style="flex:1;display:none" onclick="openManualesLista()"><svg class="ic" width="16" height="16"><use href="#i-clipboard-list"/></svg> <span id="manuales-count-badge">0</span></button>
+  </div>
+</div>
+
+<!-- PANTALLA: resumen de toma (solo lectura) -->
+<div id="screen-generate" class="screen">
+  <div class="hdr" id="gen-hdr">
+    <button class="hdr-back" onclick="go('overview')">←</button>
+    <h1>Resumen de toma</h1>
+  </div>
+  <div class="content">
+    <div id="validation-out"></div>
+    <div class="alert alert-info" style="margin-top:16px">
+      <div class="alert-title"><svg class="ic" width="15" height="15"><use href="#i-upload"/></svg> Exportación desde Admin</div>
+      El Excel y el envío a Sheets se generan desde <strong>admin.html</strong> una vez que el equipo termine de contar.
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ítem no catalogado -->
+<div id="modal-manual" class="modal-overlay">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeManualModal()">✕</button>
+    <div class="modal-title" id="man-modal-title">Ítem no catalogado</div>
+    <input type="hidden" id="man-edit-id">
+    <div class="form-group">
+      <label>Nombre *</label>
+      <input type="text" id="man-nombre" placeholder="Ej: Herradura Reposado" list="manual-template-list" oninput="updateManualTemplateHint()">
+      <datalist id="manual-template-list"></datalist>
+      <div id="man-template-hint" style="font-size:12px;color:#64748b;margin-top:4px"></div>
+    </div>
+    <div class="row">
+      <div class="form-group" style="flex:1">
+        <label id="man-cantidad-label">Cantidad *</label>
+        <input type="number" id="man-cantidad" inputmode="decimal" step="0.01" min="0" placeholder="0">
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>Unidad base</label>
+        <input type="text" id="man-unidad" placeholder="KG, LT, PZA…">
+      </div>
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="man-pres-toggle" onchange="toggleManualPres(this.checked)" style="width:18px;height:18px">
+        Tiene presentación (botella, caja, paquete…)
+      </label>
+    </div>
+    <div id="man-pres-block" style="display:none;background:#f5f3ff;border-radius:8px;padding:12px;margin-bottom:12px">
+      <div class="row">
+        <div class="form-group" style="flex:1">
+          <label>Nombre presentación</label>
+          <input type="text" id="man-pres-nombre" placeholder="Ej: BOTELLA 750ml" oninput="updateManualCantidadLabel()">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>Factor (LT/KG por unidad)</label>
+          <input type="number" id="man-pres-factor" inputmode="decimal" step="0.001" min="0.001" placeholder="0.75" oninput="updateManualCantidadLabel()">
+        </div>
+      </div>
+      <div id="man-pres-hint" style="font-size:12px;color:#7c3aed;margin-top:4px"></div>
+    </div>
+    <div class="form-group">
+      <label>Foto (opcional)</label>
+      <input type="file" id="man-foto" accept="image/*" capture="environment" onchange="previewFoto(this)" style="font-size:14px;padding:8px 0">
+      <div id="man-foto-preview" style="margin-top:8px"></div>
+    </div>
+    <button class="btn btn-primary" onclick="saveManual()">Guardar</button>
+  </div>
+</div>
+
+<!-- MODAL: login supervisor -->
+<div id="modal-supervisor-login" class="modal-overlay">
+  <div class="modal-box">
+    <button class="modal-close" onclick="document.getElementById('modal-supervisor-login').classList.remove('active')">✕</button>
+    <div class="modal-title">Modo supervisor</div>
+    <div class="form-group">
+      <label>Tu nombre</label>
+      <input type="text" id="sup-nombre" placeholder="Ej: Pablo" autocomplete="name">
+    </div>
+    <div class="form-group">
+      <label>PIN de supervisor</label>
+      <input type="password" id="sup-pin" inputmode="numeric" placeholder="••••••" onkeyup="if(event.key==='Enter')loginSupervisor()">
+    </div>
+    <div id="sup-login-error" style="color:#dc2626;font-size:13px;margin-bottom:8px;display:none"></div>
+    <button class="btn btn-primary" onclick="loginSupervisor()">Activar modo supervisor</button>
+  </div>
+</div>
+
+<!-- MODAL: comentario de supervisor -->
+<div id="modal-comment" class="modal-overlay">
+  <div class="modal-box">
+    <button class="modal-close" onclick="document.getElementById('modal-comment').classList.remove('active')">✕</button>
+    <div class="modal-title" id="comment-modal-title">Comentario</div>
+    <textarea id="comment-text" rows="4" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:10px;font-size:15px;font-family:inherit;resize:vertical" placeholder="Ej: Stock físico difiere, revisar con proveedor…"></textarea>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveComment()">Guardar</button>
+      <button class="btn btn-gray" id="btn-delete-comment" style="flex:0;display:none" onclick="deleteComment()">Borrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: lista de no catalogados -->
+<div id="modal-manuales-lista" class="modal-overlay">
+  <div class="modal-box" style="max-height:85vh;overflow-y:auto">
+    <button class="modal-close" onclick="document.getElementById('modal-manuales-lista').classList.remove('active')">✕</button>
+    <div class="modal-title">Mis no catalogados</div>
+    <div id="manuales-lista-body"></div>
+    <button class="btn btn-primary" style="margin-top:12px" onclick="document.getElementById('modal-manuales-lista').classList.remove('active');openManualModal()">+ Agregar nuevo</button>
+  </div>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script>
+// ── Configuración ──────────────────────────────────────────────────────────
+
+const WORKER_URL = 'https://operaciones-api.pablo-aranda.workers.dev';
+// R12 — versión del protocolo de escritura. v1 = desglose R11; v2 = cada cierre
+// de zona debe solicitar el acuse auditable R23. El Worker rechaza versiones
+// menores a MIN_APP_VERSION (426), incluida una app cacheada que cerraría sin PDF.
+const APP_VERSION = 2;
+const OPERATING_TIME_ZONE = 'America/Mexico_City';
+
+// La fecha que identifica una toma es la fecha operativa de CDMX, no la UTC del
+// dispositivo. Con toISOString(), después de las 18:00 en CDMX la app proponía
+// el día siguiente y podía fragmentar una toma entre dos fechas.
+function fechaOperativaCDMX(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: OPERATING_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+  const byType = Object.fromEntries(parts.map(p => [p.type, p.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
+}
+
+let _minAppVersion = 0; // lo publica el Worker en los GET de arranque
+const ic = (n, s = 16) => `<svg class="ic" width="${s}" height="${s}"><use href="#i-${n}"/></svg>`;
+// R9b: esta app ya no habla con Apps Script — la toma vive en D1 y las
+// excepciones las envía admin.html al exportar (script único por centro).
+
+// R8 — centros de consumo. Cada almacén pertenece a un centro; sin campo
+// `centro` en AREA_CONFIG se asume PIAZZA (los 7 originales no se tocan).
+// La URL de entrada fija el centro: inventario.html?centro=UH
+const CENTROS = {
+  PIAZZA: { nombre: 'Piazza Pasticcio' },
+  UH:     { nombre: 'Universal de Hamburguesas', color: '#111827',
+            logo: 'branding/logo-universal.png' }
+};
+const CENTRO = (() => {
+  // El repo espejo inventario-uh sirve una copia byte-idéntica de esta página:
+  // ahí el centro se decide por la ruta, sin depender de ?centro=
+  if (location.pathname.indexOf('/inventario-uh/') !== -1) return 'UH';
+  const c = (new URLSearchParams(location.search).get('centro') || 'PIAZZA').toUpperCase();
+  return CENTROS[c] ? c : 'PIAZZA';
+})();
+const centroDe = key => AREA_CONFIG[key]?.centro || 'PIAZZA';
+
+const AREA_CONFIG = {
+  BARRA_RESTAURANTE: {
+    titulo:'Barra Restaurante', color:'#667eea',
+    zonas:[{"nombre":"almacen barra","color":"#667eea","items":[{"cod":"XMAT2410000271","art":"TEQUILA CASCAHUIN BLANCO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000439","art":"TEQUILA CASA DRAGONES BLANCO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000448","art":"TEQUILA DON JULIO 70 AÑEJO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2504000817","art":"TEQUILA HERRADURA REPOSADO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000450","art":"TEQUILA 7 LEGUAS BLANCO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2602001363","art":"TEQ RESERVA DE LA FAMILIA PLATINO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2605001444","art":"TEQ CUERVO TRADICIONAL PLATA","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2412000644","art":"TEQUILA TRADICIONAL CRISTALINO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2409000178","art":"MEZCAL ESPADIN TRES CHICON","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2605001432","art":"MEZ 7 MISTERIOS DOBA YEJ","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2409000121","art":"GIN CONDESA CLASICO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2409000120","art":"GIN CONDESA XOCONOSTLE","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2501000677","art":"GIN CONDESA SOUMERIA","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000454","art":"GIN BULLDOG","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000408","art":"GIN BOMBAY SAPHIRE","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000403","art":"VODKA STOLICHNAYA","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2501000678","art":"VODKA TITOS","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000501","art":"BRANDY TORRES 5","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000502","art":"BRANDY TORRES 20","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000504","art":"BRANDY TORRES ALTA LUZ CRISTALINO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2412000603","art":"WHISKY MACALLAN 12 AÑOS DOUBLE CASK","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000477","art":"WHISKY EAGLE RARE 10","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000258","art":"WHISKY JOHNNIE WALKER ETIQUETA NEGRA","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000259","art":"WHISKY JOHNNIE WALKER ROJA","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000393","art":"WHISKY REVES ROJO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000480","art":"RON FLOR DE CAÑA 7","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000524","art":"RON FLOR DE CAÑA CRISTALINO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000481","art":"RON FLOR DE CAÑA 12","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000482","art":"RON FLOR DE CAÑA 18","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000413","art":"RON BACARDI BLANCO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2412000601","art":"RON BACARDI AÑEJO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000251","art":"RON MOUNT GAY BLACK BARREL","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000250","art":"LIC 43","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2410000249","art":"LICOR DE CAFE KAHLUA","uni":"LT","grp":"BEBIDAS"},{"cod":"MP0201","art":"LICOR PRIMO","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2410000246","art":"LICOR AMARO AVERNA","uni":"LT","grp":"BEBIDAS"},{"cod":"MP0202","art":"BITTER CAMPARI","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000232","art":"LIC SAMBUCA NEGRO LNZ","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2501000682","art":"LICOR SAMBUCA  BLANCO","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2410000248","art":"LICOR CYNAR","uni":"LT","grp":"BEBIDAS"},{"cod":"XPRO2505001078","art":"JAGERMAISTER MANIFEST","uni":"PZA","grp":"GRUPO DE PRODUCTO"},{"cod":"XMAT2409000190","art":"LICOR AMARETTO DISARONNO","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2411000486","art":"LICOR AMARETTO DISARONNO VELVET","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2411000511","art":"TEQUILA ENEMIGO BLANCO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000512","art":"TEQUILA ENEMIGO CRISTALINO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000228","art":"TEQUILA ENEMIGO EXTRA AÑEJO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000233","art":"GRAPPA BARRICATA CASA NOVA  CDC","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000400","art":"LICOR VERMOUTH ANTICA FORMULA","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2412000616","art":"GRAPPA POLI SARPA BLANCA","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2412000628","art":"RUNNEGHT ROSSO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000254","art":"LICOR VERMOUTH CARPANO ROSSO","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2410000253","art":"LICOR VERMOUTH CARPANO BLANCO","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2410000255","art":"LICOR VERMOUTH CARPANO DRY","uni":"LT","grp":"BEBIDAS"},{"cod":"MP0443","art":"LICOR YZAGUIRRE ROJO","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2412000618","art":"LICOR GRAN BASSANO VERMUT BLANCO","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2412000619","art":"LICOR GRAN BASSANO VERMUT TINTO","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2410000242","art":"LIC APEROL","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2410000351","art":"LICOR SAINT GERMAIN","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2410000365","art":"CINZANO PRO SPRITZ","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000237","art":"AGUA MINERAL  DE .237 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000238","art":"AGUA TONICA DE 237 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"MP0479","art":"PELLEGRINO LIMONATA DE .330 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2411000507","art":"COCA COLA  ZERO MINI","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2411000506","art":"COCA COLA REGULAR MINI","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2508000983","art":"AGUA TONICA SCHWEPPES DE BOTELLA DE .296","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2411000385","art":"COCA COLA SIN AZUCAR 355 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2411000384","art":"COCA COLA  REGULAR 355 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2411000508","art":"SPRITE REGULAR 355 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2411000509","art":"SPRITE ZERO 355 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000264","art":"BOHEMIA CLASICA","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2411000404","art":"BOHEMIA CRISTAL","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000263","art":"BOHEMIA OSCURA","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000278","art":"FELIX SCHORLE FRAMBUESA","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000277","art":"FELIX SCHORLE MANDARINA","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000279","art":"FELIX SCHORLE MARACUYA","uni":"PZA","grp":"CERVEZA Y REFRESCO"}]},{"nombre":"refri almacen barra","color":"#10b981","items":[{"cod":"XMAT2410000266","art":"HEINEKEN  0.0","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000357","art":"CERVEZA PIEDRA LISA SESSION IPA","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"MP0463","art":"CERVEZA BIRRA PORETTI 4 CEBADAS","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000264","art":"BOHEMIA CLASICA","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2411000404","art":"BOHEMIA CRISTAL","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000263","art":"BOHEMIA OSCURA","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2604001411","art":"AGU EVIAN CON GAS .330 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2604001410","art":"AGU EVIAN CON GAS .750 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2604001409","art":"AGU EVIAN NATURAL .330ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2604001408","art":"AGU EVIAN NATURAL .750 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2411000384","art":"COCA COLA  REGULAR 355 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"}]},{"nombre":"CONTRA BARRA","color":"#f59e0b","items":[{"cod":"XMAT2410000260","art":"LICOR POXAN","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"MP0190","art":"RON LA GLORIA AÑEJO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"MP0189","art":"RON LA GLORIA CRISTALINO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2412000622","art":"GRAPPA CLEOPATRA","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000499","art":"BRANDY  ST REMY MARTIN VSOP","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000498","art":"COGNAC  REMY MARTIN 738","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000500","art":"BRANDY ST REMY XO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000364","art":"BRANDY TORRES 10","uni":"LT","grp":""},{"cod":"XMAT2411000502","art":"BRANDY TORRES 20","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000501","art":"BRANDY TORRES 5","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000504","art":"BRANDY TORRES ALTA LUZ CRISTALINO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000478","art":"WHISKY THE BUSKER TRIPLE CASK","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000366","art":"WHISKY WILD TURKEY BOURBON","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000475","art":"WHISKY BUFFALO TRACE","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2501000679","art":"WHISKY BUSHMILLS","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000477","art":"WHISKY EAGLE RARE 10","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2412000603","art":"WHISKY MACALLAN 12 AÑOS DOUBLE CASK","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000393","art":"WHISKY REVES ROJO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000259","art":"WHISKY JOHNNIE WALKER ROJA","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000258","art":"WHISKY JOHNNIE WALKER ETIQUETA NEGRA","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000359","art":"WHISKY JACK DANIELS","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2605001432","art":"MEZ 7 MISTERIOS DOBA YEJ","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2605001434","art":"7 MISTERIOS ENSAMBLE","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000463","art":"MEZCAL TRES CHICON SIERRA NEGRA","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2409000178","art":"MEZCAL ESPADIN TRES CHICON","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000462","art":"MEZCAL TRES CHICON MADRECUISHE","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000459","art":"MEZCAL CARA CARA  CIRIAL ESPADIN","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000458","art":"MEZCAL CARA CARA TOBALA TEPEZTATE","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000460","art":"MEZCAL EDITOR","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000461","art":"MEZCAL ABRAXAS","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000439","art":"TEQUILA CASA DRAGONES BLANCO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000448","art":"TEQUILA DON JULIO 70 AÑEJO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000472","art":"TEQUILA LOCO AMBAR","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000471","art":"TEQUILA LOCO BLANCO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000473","art":"TEQUILA LOCO PURO CORAZON","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2506000911","art":"TEQ. PATRON AÑEJO CRISTALINO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000466","art":"TEQUILA PATRON SILVER","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000449","art":"TEQUILA DON JULIO BLANCO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2504000817","art":"TEQUILA HERRADURA REPOSADO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000474","art":"TEQUILA ESPOLON BLANCO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000450","art":"TEQUILA 7 LEGUAS BLANCO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000252","art":"TEQUILA GRAN CENTENARIO PLATA","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2601001214","art":"TEQ MAESTRO DOBEL TAHONA","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2602001363","art":"TEQ RESERVA DE LA FAMILIA PLATINO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2511001157","art":"JOSE CUERVO RESERVA DE LA FAMILIA","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2412000644","art":"TEQUILA TRADICIONAL CRISTALINO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000403","art":"VODKA STOLICHNAYA","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000409","art":"VODKA GREY GOOSE","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2501000678","art":"VODKA TITOS","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000257","art":"VODKA ABSOLUT AZUL","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000436","art":"GIN ARMONICO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000464","art":"MEZCAL CONTRA LUZ CRISTALINO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000408","art":"GIN BOMBAY SAPHIRE","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2411000454","art":"GIN BULLDOG","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000245","art":"GIN THE BOTANIST","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2412000621","art":"GIN POLI MARCONI 46","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2501000682","art":"LICOR SAMBUCA  BLANCO","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2410000232","art":"LIC SAMBUCA NEGRO LNZ","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2411000398","art":"LICOR GENEPY DI BALME","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2411000377","art":"LICOR CHARTREUSE AMARILLO","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2411000378","art":"LICOR CHARTREUSE VERDE","uni":"LT","grp":"BEBIDAS"},{"cod":"MP0397","art":"LICOR ITALICUS ROSOLIO DE BERGAMOTTO","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000250","art":"LIC 43","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2410000249","art":"LICOR DE CAFE KAHLUA","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2411000494","art":"LICOR CONTREU","uni":"LT","grp":"BEBIDAS"},{"cod":"XPRO2505001078","art":"JAGERMAISTER MANIFEST","uni":"PZA","grp":"GRUPO DE PRODUCTO"},{"cod":"XMAT2512001203","art":"CHAMBORD","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2411000486","art":"LICOR AMARETTO DISARONNO VELVET","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2409000190","art":"LICOR AMARETTO DISARONNO","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2411000437","art":"LICOR DE MAIZ NIXTA","uni":"LT","grp":"BEBIDAS"},{"cod":"XMAT2411000488","art":"LICOR QUAGLIA CEREZA","uni":"LT","grp":""},{"cod":"XMAT2411000491","art":"LICOR QUAGLIA LAMPONE FRAMBUESA","uni":"LT","grp":""},{"cod":"XMAT2410000241","art":"LICOR APERETIVO FERNET BRANCA","uni":"LT","grp":""},{"cod":"XMAT2410000355","art":"LICOR DE VIOLETTA","uni":"LT","grp":""},{"cod":"XMAT2410000356","art":"LICOR DE CHINOTTO","uni":"LT","grp":""},{"cod":"XMAT2411000397","art":"LICOR DE AVELLANAS NOCCIOLA","uni":"LT","grp":""},{"cod":"XMAT2501000687","art":"LICOR DE GENZIANA","uni":"LT","grp":""},{"cod":"XMAT2411000400","art":"LICOR VERMOUTH ANTICA FORMULA","uni":"LT","grp":""},{"cod":"XMAT2410000243","art":"LICOR APERITIVO LILLET BLANCO","uni":"LT","grp":""},{"cod":"XMAT2411000492","art":"LICOR BRANCA MENTA","uni":"LT","grp":""},{"cod":"XMAT2412000618","art":"LICOR GRAN BASSANO VERMUT BLANCO","uni":"LT","grp":""},{"cod":"XMAT2412000619","art":"LICOR GRAN BASSANO VERMUT TINTO","uni":"LT","grp":""},{"cod":"XMAT2410000256","art":"LICOR VERMOUTH COCCHI DI TORINO","uni":"LT","grp":""},{"cod":"XMAT2410000367","art":"LICOR VERMOUTH COCCHI EXTRA DRY","uni":"LT","grp":""},{"cod":"XMAT2410000240","art":"LICOR APERITIVO COCCHI ROSA","uni":"LT","grp":""},{"cod":"XMAT2410000248","art":"LICOR CYNAR","uni":"LT","grp":""},{"cod":"XMAT2410000230","art":"LICOR LUXARDO MARASCHINO","uni":"LT","grp":""},{"cod":"XMAT2411000496","art":"BITTER ROUGE WHITE","uni":"LT","grp":""},{"cod":"XMAT2412000628","art":"RUNNEGHT ROSSO","uni":"LT","grp":""},{"cod":"XMAT2501000686","art":"BITTER AMARO DE ANGOSTURA","uni":"LT","grp":""},{"cod":"XMAT2410000246","art":"LICOR AMARO AVERNA","uni":"LT","grp":""},{"cod":"XMAT2410000247","art":"LICOR AMARO MONTENEGRO","uni":"LT","grp":""},{"cod":"XMAT2411000522","art":"LICOR AMARO CLASSICO 1890 ET. BLANCA","uni":"LT","grp":""},{"cod":"XMAT2411000465","art":"MEZCAL DON RAMON SALMIANA","uni":"LT","grp":""},{"cod":"MP0525","art":"AMARO MARTINA","uni":"LT","grp":""},{"cod":"XMAT2410000352","art":"BITTER BATTISTA","uni":"LT","grp":""},{"cod":"XMAT2412000616","art":"GRAPPA POLI SARPA BLANCA","uni":"LT","grp":""},{"cod":"XMAT2412000617","art":"GRAPPA POLI SARPA ORO","uni":"LT","grp":""},{"cod":"XMAT2412000620","art":"LICOR VACA MORA AMARO","uni":"LT","grp":""},{"cod":"XMAT2411000504","art":"BRANDY TORRES ALTA LUZ CRISTALINO","uni":"LT","grp":""},{"cod":"XMAT2411000413","art":"RON BACARDI BLANCO","uni":"LT","grp":""},{"cod":"XMAT2412000602","art":"RON BACARDI RESERVA OCHO SELEC","uni":"LT","grp":""},{"cod":"XMAT2412000601","art":"RON BACARDI AÑEJO","uni":"LT","grp":""},{"cod":"XMAT2411000481","art":"RON FLOR DE CAÑA 12","uni":"LT","grp":""},{"cod":"XMAT2411000482","art":"RON FLOR DE CAÑA 18","uni":"LT","grp":""},{"cod":"XMAT2411000527","art":"RON FLOR DE CAÑA 4","uni":"LT","grp":""},{"cod":"XMAT2411000480","art":"RON FLOR DE CAÑA 7","uni":"LT","grp":""},{"cod":"XMAT2411000524","art":"RON FLOR DE CAÑA CRISTALINO","uni":"LT","grp":""},{"cod":"XMAT2411000479","art":"RON APPLETON STATE SIGNATURE","uni":"LT","grp":""},{"cod":"XMAT2501000685","art":"RON ANGOSTURA AÑEJO 7 AÑOS DE .750 ML","uni":"LT","grp":""},{"cod":"XMAT2410000351","art":"LICOR SAINT GERMAIN","uni":"LT","grp":""},{"cod":"XMAT2410000244","art":"LICOR APERETIVO PUNT E MES","uni":"LT","grp":""},{"cod":"XMAT2410000254","art":"LICOR VERMOUTH CARPANO ROSSO","uni":"LT","grp":""},{"cod":"MP0202","art":"BITTER CAMPARI","uni":"LT","grp":""},{"cod":"MP0201","art":"LICOR PRIMO","uni":"LT","grp":""},{"cod":"XMAT2409000121","art":"GIN CONDESA CLASICO","uni":"LT","grp":""},{"cod":"XMAT2409000120","art":"GIN CONDESA XOCONOSTLE","uni":"LT","grp":""},{"cod":"XMAT2503000794","art":"CERVEZA COLIMA CERO LAGER AMBAR","uni":"PZA","grp":""},{"cod":"XMAT2410000357","art":"CERVEZA PIEDRA LISA SESSION IPA","uni":"PZA","grp":""},{"cod":"XMAT2503000793","art":"HEINEKEN ORIGINAL","uni":"PZA","grp":""},{"cod":"XMAT2410000266","art":"HEINEKEN  0.0","uni":"PZA","grp":""},{"cod":"MP0463","art":"CERVEZA BIRRA PORETTI 4 CEBADAS","uni":"PZA","grp":""},{"cod":"XMAT2410000264","art":"BOHEMIA CLASICA","uni":"PZA","grp":""},{"cod":"XMAT2411000404","art":"BOHEMIA CRISTAL","uni":"PZA","grp":""},{"cod":"XMAT2410000263","art":"BOHEMIA OSCURA","uni":"PZA","grp":""},{"cod":"XMAT2604001411","art":"AGU EVIAN CON GAS .330 ML","uni":"PZA","grp":""},{"cod":"XMAT2604001410","art":"AGU EVIAN CON GAS .750 ML","uni":"PZA","grp":""},{"cod":"XMAT2604001409","art":"AGU EVIAN NATURAL .330ML","uni":"PZA","grp":""},{"cod":"XMAT2604001408","art":"AGU EVIAN NATURAL .750 ML","uni":"PZA","grp":""},{"cod":"XMAT2410000278","art":"FELIX SCHORLE FRAMBUESA","uni":"PZA","grp":""},{"cod":"XMAT2410000277","art":"FELIX SCHORLE MANDARINA","uni":"PZA","grp":""},{"cod":"XMAT2410000279","art":"FELIX SCHORLE MARACUYA","uni":"PZA","grp":""},{"cod":"MP0479","art":"PELLEGRINO LIMONATA DE .330 ML","uni":"PZA","grp":""},{"cod":"XMAT2410000238","art":"AGUA TONICA DE 237 ML","uni":"PZA","grp":""},{"cod":"XMAT2411000506","art":"COCA COLA REGULAR MINI","uni":"PZA","grp":""},{"cod":"XMAT2410000237","art":"AGUA MINERAL  DE .237 ML","uni":"PZA","grp":""},{"cod":"XMAT2411000507","art":"COCA COLA  ZERO MINI","uni":"PZA","grp":""},{"cod":"XMAT2411000384","art":"COCA COLA  REGULAR 355 ML","uni":"PZA","grp":""},{"cod":"XMAT2411000385","art":"COCA COLA SIN AZUCAR 355 ML","uni":"PZA","grp":""}]},{"nombre":"Refris de Servicio","color":"#ef4444","items":[{"cod":"XMAT2410000365","art":"CINZANO PRO SPRITZ","uni":"LT","grp":"BEBIDAS CON ALCOHOL"},{"cod":"XMAT2410000237","art":"AGUA MINERAL  DE .237 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000238","art":"AGUA TONICA DE 237 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"MP0479","art":"PELLEGRINO LIMONATA DE .330 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2411000507","art":"COCA COLA  ZERO MINI","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2411000506","art":"COCA COLA REGULAR MINI","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2508000983","art":"AGUA TONICA SCHWEPPES DE BOTELLA DE .296","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2411000385","art":"COCA COLA SIN AZUCAR 355 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2411000384","art":"COCA COLA  REGULAR 355 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2411000508","art":"SPRITE REGULAR 355 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2411000509","art":"SPRITE ZERO 355 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000264","art":"BOHEMIA CLASICA","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2411000404","art":"BOHEMIA CRISTAL","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000263","art":"BOHEMIA OSCURA","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000278","art":"FELIX SCHORLE FRAMBUESA","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000277","art":"FELIX SCHORLE MANDARINA","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000279","art":"FELIX SCHORLE MARACUYA","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000266","art":"HEINEKEN  0.0","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2410000357","art":"CERVEZA PIEDRA LISA SESSION IPA","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"MP0463","art":"CERVEZA BIRRA PORETTI 4 CEBADAS","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2604001411","art":"AGU EVIAN CON GAS .330 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2604001410","art":"AGU EVIAN CON GAS .750 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2604001409","art":"AGU EVIAN NATURAL .330ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2604001408","art":"AGU EVIAN NATURAL .750 ML","uni":"PZA","grp":"CERVEZA Y REFRESCO"},{"cod":"XMAT2503000794","art":"CERVEZA COLIMA CERO LAGER AMBAR","uni":"PZA","grp":""},{"cod":"XMAT2503000793","art":"HEINEKEN ORIGINAL","uni":"PZA","grp":""}]}]
+  },
+  COCINA:    { titulo:'Cocina',    color:'#f59e0b', zonas:null },
+  ALIMENTARI:{ titulo:'Alimentari', color:'#10b981', zonas:null, zonaNames:['Almacén','Tienda'], zonaColors:['#10b981','#0d9488'] },
+  CAVA:      { titulo:'Cava',      color:'#8b5cf6', zonas:null, zonaNames:['Racks cava','Refri cava 1','Refri cava 2'], zonaColors:['#8b5cf6','#7c3aed','#6d28d9'] },
+  SALUMERIA: { titulo:'Salumeria', color:'#ef4444', zonas:null, zonaNames:['Camara maduracion','Congelador horizontal','Refri','Camara fria'], zonaColors:['#ef4444','#dc2626','#b91c1c','#991b1b'] },
+  GENERAL:   { titulo:'General',   color:'#6b7280', zonas:null },
+  BARRA_AMICI:{ titulo:'Barra Amici', color:'#f97316', zonas:null },
+  // UH confirmó sus 4 almacenes 2026-07-21: merch, cocina, barra, suministros.
+  // UH_GENERAL era un provisional de R8 y ya no existe (nunca tuvo plantilla,
+  // catálogo ni tomas en D1, así que se retiró sin migración).
+  UH_MERCH:       { centro:'UH', titulo:'Merch',       color:'#db2777', zonas:null },
+  UH_COCINA:      { centro:'UH', titulo:'Cocina',      color:'#d97706', zonas:null },
+  UH_BARRA:       { centro:'UH', titulo:'Barra',       color:'#2563eb', zonas:null },
+  UH_SUMINISTROS: { centro:'UH', titulo:'Suministros', color:'#64748b', zonas:null }
+};
+
+// Guardia visual R8: fuera de PIAZZA el nombre del centro queda siempre visible
+// y el hero pierde el branding de Piazza (logo + nombre pasan a ser del centro)
+if (CENTRO !== 'PIAZZA') {
+  // favicon/manifest de UH ya se emiten en el <head> al parsear (identidad PWA)
+  document.title = 'Inventario · ' + CENTROS[CENTRO].nombre;
+  document.addEventListener('DOMContentLoaded', () => {
+    const c = CENTROS[CENTRO];
+    const img = document.querySelector('.welcome-logo-img');
+    if (img) {
+      if (c.logo) { img.src = c.logo; img.alt = c.nombre; }
+      else {
+        const em = document.createElement('div');
+        em.className = 'welcome-logo-img';
+        em.style.cssText = 'display:flex;align-items:center;justify-content:center;font-size:26px';
+        if (c.emoji) em.textContent = c.emoji;
+        else em.innerHTML = '<svg class="ic" width="28" height="28"><use href="#i-store"/></svg>';
+        img.replaceWith(em);
+      }
+    }
+    const name = document.querySelector('.welcome-logo-name');
+    if (name) {
+      name.textContent = c.nombre;
+      // la tipografía script y el vino son marca Piazza — otro centro va neutro
+      name.style.cssText = 'font-family:system-ui,sans-serif;font-size:18px;font-weight:800;line-height:1.1;color:' + (c.color || '#334155');
+    }
+    const b = document.createElement('div');
+    b.textContent = c.nombre;
+    b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:' +
+      (c.color || '#334155') +
+      ';color:#fff;text-align:center;font:600 11px system-ui;padding:3px 0;z-index:10000';
+    document.body.appendChild(b);
+  });
+}
+
+// ── Estado global ──────────────────────────────────────────────────────────
+
+let ALMACEN = null;   // clave activa ej 'CAVA'
+let CFG     = null;   // AREA_CONFIG[ALMACEN]
+let ZONAS   = null;   // array de zonas resuelto
+let ZCFG    = null;   // preparación activa del Worker (inv_zone_configs) o null
+let T       = null;   // plantilla { rowMap, cantidadColIdx, presMap, templateHash, templateTs }
+let S       = null;   // sesión activa
+let CZ      = null;   // índice de zona en curso
+// Sesión del servidor para MI misma toma: solo se usa para confirmar mis acuses.
+// Nunca reemplaza la sesión local — ver fetchResumenTomasWorker().
+let _sesionServidor = null;
+// Resumen de tomas del almacén, solo para avisar. No trae conteos.
+let _tomasAlmacen   = [];
+let _syncTimer      = null;
+let _pollTimer      = null;
+let _supervisorActual = JSON.parse(localStorage.getItem('inv_supervisor') || 'null');
+let _commentTargetCod = null; // cod del artículo que se está comentando
+let _remoteLockedZones = {};
+let _manFotoB64     = null;
+let _lastZoneClosedMsg = '';
+let _templateItemsByCod = {};
+let _receiptPdfLoader = null;
+const _receiptPending = new Set();
+
+const lsKey = k => `xtux_${k}_${ALMACEN}`;
+const lsGet = k => { try { return JSON.parse(localStorage.getItem(lsKey(k))); } catch { return null; } };
+const lsSet = (k,v) => localStorage.setItem(lsKey(k), JSON.stringify(v));
+const lsDel = k => localStorage.removeItem(lsKey(k));
+
+function getDeviceId() {
+  let id = localStorage.getItem('inv_device_id');
+  if (!id) { id = Date.now().toString(36) + Math.random().toString(36).slice(2); localStorage.setItem('inv_device_id', id); }
+  return id;
+}
+// Conteo colaborativo: cada dispositivo escribe a su propia clave "zoneIdx:deviceId"
+// El Worker hace merge clave por clave → no hay conflictos aunque dos personas cuenten la misma zona
+function myZoneKey(zoneIdx) { return zoneIdx + ':' + getDeviceId(); }
+function baseZone(key) { return parseInt(key); } // parseInt se detiene en ':' — extrae el índice de zona
+
+function newManualId() {
+  return getDeviceId() + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,6);
+}
+
+function normalizeSesion(d) {
+  return {
+    operario:d.operario,
+    fecha:d.fecha,
+    templateHash:d.templateHash||'',
+    countsByZone:d.countsByZone||{},
+    presChoiceByZone:d.presChoiceByZone||{},
+    correctionsByZone:d.correctionsByZone||{},
+    completedZones:d.completedZones||[],
+    manuales:d.manuales||[],
+    lockedZones:d.lockedZones||{},
+    reopenedZones:d.reopenedZones||{},
+    pendingCompletedZoneRemovals:d.pendingCompletedZoneRemovals||[],
+    zoneConfigId:d.zoneConfigId||'',
+    zoneSnapshot:(d.zoneSnapshot && d.zoneSnapshot.length) ? d.zoneSnapshot : null,
+    receipts:d.receipts||[],
+    pendingReceiptEvents:{},
+    snapshotSynced:true // viene del servidor: no re-enviar (y si es null, no inventarle uno)
+  };
+}
+
+function mergeServerReceipts(receipts) {
+  if (!S || !Array.isArray(receipts)) return;
+  const dev = getDeviceId();
+  const byId = new Map((S.receipts || []).map(receipt => [receipt.id, receipt]));
+  receipts
+    .filter(receipt => receipt && receipt.deviceId === dev)
+    .forEach(receipt => {
+      const previous = byId.get(receipt.id) || {};
+      byId.set(receipt.id, {
+        ...previous,
+        ...receipt,
+        items: receipt.items ?? previous.items,
+        manualItems: receipt.manualItems ?? previous.manualItems
+      });
+    });
+  S.receipts = [...byId.values()]
+    .sort((a, b) => String(a.receivedAt || '').localeCompare(String(b.receivedAt || '')));
+  lsSet('s', S);
+}
+
+function latestReceiptForZone(zoneKey) {
+  return (S?.receipts || [])
+    .filter(receipt => receipt.zoneKey === zoneKey && receipt.deviceId === getDeviceId())
+    .sort((a, b) => String(b.receivedAt || '').localeCompare(String(a.receivedAt || '')))[0] || null;
+}
+
+function countedCodCount(sesion) {
+  const cods = new Set();
+  Object.values(sesion?.countsByZone || {}).forEach(zoneCounts => {
+    Object.keys(zoneCounts || {}).forEach(cod => cods.add(cod));
+  });
+  return cods.size;
+}
+
+// Recuperación segura: una sesión del Worker contiene las rebanadas de TODOS
+// los equipos. Un teléfono no debe adoptarlas, pero tampoco puede arrancar vacío
+// si el servidor ya conserva datos de su mismo deviceId: al primer sync de esa
+// zona, mergeZoneMap reemplaza la rebanada completa `zona:deviceId` y borraría
+// silenciosamente los códigos que no estén en el estado local nuevo.
+function estadoPropioDeSesion(sesion) {
+  const dev = getDeviceId();
+  const esPropia = clave => {
+    const texto = String(clave || '');
+    const separador = texto.indexOf(':');
+    return separador >= 0 && texto.slice(separador + 1) === dev;
+  };
+  const filtrarMapa = mapa => Object.fromEntries(
+    Object.entries(mapa || {}).filter(([clave]) => esPropia(clave))
+  );
+  return {
+    countsByZone: filtrarMapa(sesion?.countsByZone),
+    presChoiceByZone: filtrarMapa(sesion?.presChoiceByZone),
+    correctionsByZone: filtrarMapa(sesion?.correctionsByZone),
+    completedZones: (sesion?.completedZones || []).filter(esPropia),
+    manuales: (sesion?.manuales || []).filter(manual =>
+      manual?.deviceId === dev || String(manual?.id || '').startsWith(dev + '-')),
+    receipts: (sesion?.receipts || []).filter(receipt => receipt?.deviceId === dev)
+  };
+}
+
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmtNum = v => parseFloat(v.toFixed(4)).toString();
+
+function setColor(c) {
+  document.documentElement.style.setProperty('--color', c);
+}
+
+// ── Navegación ─────────────────────────────────────────────────────────────
+
+function go(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  if (id === 'welcome')  { ALMACEN = null; renderWelcome(); }
+  if (id === 'overview') { renderOverview(); startPoll(); } else stopPoll();
+  if (id === 'generate') renderValidation();
+  if (id === 'session')  { document.getElementById('session-hdr').style.background = CFG?.color || '#667eea'; }
+}
+
+// ── Worker sync ────────────────────────────────────────────────────────────
+
+async function fetchPlantillaWorker() {
+  try {
+    const r = await fetch(WORKER_URL + '/inv/plantilla?almacen=' + ALMACEN);
+    if (!r.ok) return false;
+    const d = await r.json();
+    _minAppVersion = Number(d.minAppVersion) || 0;
+    if (!d.ok || !d.found) return false;
+    T = { rowMap: d.rowMap, cantidadColIdx: d.cantidadColIdx, presMap: d.presMap || {}, unitMap: d.unitMap || {}, defaultPres: d.defaultPres || {}, templateHash: d.templateHash || '', templateTs: Date.now(), raw: d.raw || null };
+    return true;
+  } catch(e) { console.warn('plantilla fetch:', e); return false; }
+}
+
+// Preparación activa (R5): zonas/artículos/orden editados en admin. Si no hay,
+// la app usa el comportamiento legacy (AREA_CONFIG hardcodeado o catálogo completo).
+async function fetchZoneConfigWorker() {
+  try {
+    const r = await fetch(WORKER_URL + '/inv/zone-config?almacen=' + ALMACEN);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return (d.ok && d.found && d.zones?.length) ? d : null;
+  } catch(e) { console.warn('zone-config fetch:', e); return null; }
+}
+
+async function fetchSesionWorker(fecha) {
+  try {
+    const r = await fetch(WORKER_URL + '/inv/sesion?almacen=' + ALMACEN + '&fecha=' + encodeURIComponent(fecha));
+    if (!r.ok) return null;
+    const d = await r.json();
+    if (!d.ok || !d.found) return null;
+    return normalizeSesion(d);
+  } catch(e) { console.warn('sesion fetch:', e); return null; }
+}
+
+// Resumen de las tomas recientes del almacén, SOLO PARA INFORMAR. Antes esto
+// buscaba la toma abierta más reciente y ofrecía adoptarla; adoptar reemplazaba
+// la sesión local y arrastraba zoneSnapshot y candados ajenos, y dio problemas.
+// Regla vigente: cada equipo abre su propia toma y el admin decide qué es un
+// solo conteo (une los tramos de días contiguos al imprimir y al exportar).
+// Devuelve las filas del listado, no sesiones completas: para un aviso basta.
+async function fetchResumenTomasWorker(dias = 7) {
+  try {
+    const r = await fetch(WORKER_URL + '/inv/sesiones?almacen=' + ALMACEN + '&dias=' + dias);
+    if (!r.ok) return [];
+    const d = await r.json();
+    if (!d.ok) return [];
+    return (d.sesiones || [])
+      .filter(s => s.almacen === ALMACEN && (s.articulosContados || 0) > 0)
+      .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  } catch(e) { console.warn('sesiones fetch:', e); return []; }
+}
+
+// Un POST fallido (red caída, 5xx, conflicto de escritura) se descartaba en
+// silencio, y tras cerrar zona el cliente ya no reenvía countsByZone → esa cola de
+// conteo quedaba varada en el teléfono sin que nadie se enterara. Ahora el payload
+// se reintenta con backoff; si aun así no entra, el operario ve un banner en vez de
+// creer que quedó guardado. `_syncUltimo` evita que un reintento viejo pise el
+// estado nuevo: si ya salió otra sync para la misma zona, la vieja se abandona.
+let _syncSeq = 0;
+const _syncUltimo = {};   // zoneKey -> seq de la sync más reciente emitida
+
+// ── Checkpoints ────────────────────────────────────────────────────────────
+// Entre el sync y el cierre, la captura vive solo en inv_sesiones, que SÍ se
+// destruye (incidente 2026-08-16: 46 artículos borrados por una rebanada nueva
+// bajo la misma clave). Un checkpoint guarda esa captura en inv_receipts, que no
+// borra nadie, sin esperar al cierre. No genera PDF y el operario no lo ve.
+// Espejo de checkpointEventId/RECEIPT_KIND_CHECKPOINT de js/inventory-receipt.js
+// — esta página no carga módulos.
+const CHECKPOINT_KIND  = 'checkpoint';
+const CHECKPOINT_CADA  = 10;    // artículos capturados entre checkpoint y checkpoint
+const _chkUltimo = {};          // zoneKey -> nº de artículos del último checkpoint pedido
+const checkpointEventId = zoneKey => `chk:${zoneKey}`;
+
+function syncSesionWorker(options = {}) {
+  if (!S) return;
+  // Solo enviamos la zona activa de este dispositivo. Clave "zoneIdx:deviceId" garantiza
+  // que el merge del Worker no pise los conteos de otros dispositivos en la misma zona.
+  const myKey = CZ !== null ? myZoneKey(CZ) : null;
+  const cbz   = myKey ? { [myKey]: S.countsByZone?.[myKey]  || {} } : {};
+  const pcbz  = myKey ? { [myKey]: S.presChoiceByZone?.[myKey] || {} } : {};
+  // El checkpoint viaja montado en un sync que ya iba a salir: ni una petición
+  // extra ni un timer propio. Nunca pisa un cierre en curso (options ya lo pide).
+  if (myKey && options.requestReceipt !== true) {
+    const n = Object.keys(cbz[myKey] || {}).length;
+    if (n > 0 && n - (_chkUltimo[myKey] ?? 0) >= CHECKPOINT_CADA) {
+      // Optimista: se avanza al pedirlo, no al confirmarlo. Si este sync queda
+      // obsoleto o falla, el siguiente checkpoint llega 10 artículos después en
+      // vez de reintentar cada 3 s; la captura sigue cubierta por el cierre.
+      _chkUltimo[myKey] = n;
+      options = {
+        ...options,
+        requestReceipt: true,
+        receiptKind: CHECKPOINT_KIND,
+        receiptZoneKey: myKey,
+        receiptZoneName: ZONAS?.[CZ]?.nombre || '',
+        receiptEventId: checkpointEventId(myKey),
+        autoDownloadReceipt: false,
+      };
+    }
+  }
+  enviarPayloadSesion(cbz, pcbz, options);
+}
+
+// Reenvía TODAS las rebanadas de este dispositivo, no solo la zona activa. Repara
+// lo que haya quedado varado (zona ya cerrada, corte de red, sync perdida).
+function resincronizarTodo() {
+  if (!S) return;
+  const dev = getDeviceId();
+  const mias = k => String(k).split(':')[1] === dev;
+  const cbz = {}, pcbz = {};
+  for (const k of Object.keys(S.countsByZone || {}))      if (mias(k)) cbz[k]  = S.countsByZone[k]  || {};
+  for (const k of Object.keys(S.presChoiceByZone || {}))  if (mias(k)) pcbz[k] = S.presChoiceByZone[k] || {};
+  enviarPayloadSesion(cbz, pcbz);
+}
+
+function enviarPayloadSesion(cbz, pcbz, options = {}) {
+  const removeCompletedZones = S.pendingCompletedZoneRemovals || [];
+  // El snapshot pesa (todas las zonas con artículos): se envía solo hasta que el
+  // Worker lo tenga (first-write-wins allá; snapshotSynced acá).
+  const sendSnapshot = !!(S.zoneSnapshot?.length && !S.snapshotSynced);
+  const body = {
+    action:'inv_sesion',
+    appVersion:APP_VERSION,
+    almacen:ALMACEN,
+    operario:S.operario,
+    fecha:S.fecha,
+    templateHash:S.templateHash||'',
+    countsByZone:cbz,
+    presChoiceByZone:pcbz,
+    correctionsByZone:S.correctionsByZone||{},
+    completedZones:S.completedZones||[],
+    removeCompletedZones,
+    manuales:S.manuales||[],
+    zoneConfigId:S.zoneConfigId||'',
+    zoneSnapshot: sendSnapshot ? S.zoneSnapshot : undefined,
+    requestReceipt: options.requestReceipt === true,
+    receiptZoneKey: options.receiptZoneKey,
+    receiptZoneName: options.receiptZoneName,
+    receiptEventId: options.receiptEventId,
+    receiptKind: options.receiptKind
+  };
+  const seq  = ++_syncSeq;
+  const keys = Object.keys(cbz);
+  keys.forEach(k => { _syncUltimo[k] = seq; });
+  enviarSesion(body, {
+    seq,
+    keys,
+    intento:0,
+    removeCompletedZones,
+    sendSnapshot,
+    receiptZoneKey: options.receiptZoneKey || '',
+    receiptEventId: options.receiptEventId || '',
+    receiptKind: options.receiptKind || '',
+    autoDownloadReceipt: options.autoDownloadReceipt === true
+  });
+}
+
+// Un payload deja de estar vigente cuando ya salió una sync más nueva para la misma
+// zona (esa lleva el estado actual, superset del que falló). Un payload sin conteos
+// —zona ya cerrada— nunca queda obsoleto: se reintenta hasta que entre.
+function syncVigente(ctx) { return ctx.keys.every(k => _syncUltimo[k] === ctx.seq); }
+
+function enviarSesion(body, ctx) {
+  if (!syncVigente(ctx)) return;
+  fetch(WORKER_URL + '/inv/sesion', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  })
+  .then(async r => {
+    // R12: el Worker rechaza escrituras de app vieja — avisar sin perder nada
+    // (todo sigue en localStorage y se re-sincroniza tras actualizar)
+    if (r.status === 426) { mostrarBannerUpdate(); return; }
+    if (!r.ok) { reintentarSesion(body, ctx); return; }
+    let data = {};
+    try { data = await r.json(); } catch (_) {}
+    ocultarBannerSync();
+    let dirty = false;
+    if (ctx.removeCompletedZones.length && S) {
+      S.pendingCompletedZoneRemovals = (S.pendingCompletedZoneRemovals || []).filter(z => !ctx.removeCompletedZones.includes(z));
+      dirty = true;
+    }
+    if (ctx.sendSnapshot && S) { S.snapshotSynced = true; dirty = true; }
+    if (dirty && S) lsSet('s', S);
+    // Un checkpoint es una copia de seguridad del servidor, no un acuse del
+    // operario: ni mensaje, ni PDF, ni entra a S.receipts —si entrara,
+    // latestReceiptForZone podría ofrecer el PDF de un checkpoint en vez del
+    // cierre. Que falle tampoco se avisa: lo cubre el siguiente y el cierre.
+    if (ctx.receiptKind === CHECKPOINT_KIND) return;
+    if (data.receipt) {
+      registerReceipt(data.receipt, ctx.autoDownloadReceipt);
+    } else if (ctx.receiptZoneKey) {
+      receiptAttemptFailed(ctx,
+        'El servidor recibió la zona, pero no devolvió el acuse. Toca "Confirmar y PDF" para intentarlo de nuevo.');
+    }
+  })
+  .catch(e => { console.warn('sesion sync:', e); reintentarSesion(body, ctx); });
+}
+
+function reintentarSesion(body, ctx) {
+  if (!syncVigente(ctx)) return;
+  if (ctx.intento >= 5) {
+    mostrarBannerSync();
+    receiptAttemptFailed(ctx,
+      'No fue posible confirmar el acuse con el servidor. Tu conteo sigue guardado en este dispositivo; toca "Confirmar y PDF" para reintentar.');
+    return;
+  }
+  const espera = 1000 * Math.pow(2, ctx.intento) + Math.floor(Math.random() * 500);
+  setTimeout(() => enviarSesion(body, { ...ctx, intento: ctx.intento + 1 }), espera);
+}
+
+function receiptAttemptFailed(ctx, message) {
+  if (!S || !ctx.receiptZoneKey) return;
+  if (ctx.receiptKind === CHECKPOINT_KIND) return;   // silencioso por diseño
+  const currentEvent = S.pendingReceiptEvents?.[ctx.receiptZoneKey];
+  if (ctx.receiptEventId && currentEvent !== ctx.receiptEventId) return;
+  _receiptPending.delete(ctx.receiptZoneKey);
+  _lastZoneClosedMsg = message;
+  if (document.getElementById('screen-overview')?.classList.contains('active')) renderOverview();
+}
+
+// Al recuperar conexión, reenviar todo lo de este dispositivo (incluye zonas ya
+// cerradas, que el sync normal ya no manda).
+window.addEventListener('online', () => { if (S) resincronizarTodo(); });
+
+function scheduleSyncSesion() { clearTimeout(_syncTimer); _syncTimer = setTimeout(syncSesionWorker, 3000); }
+
+async function lockZone(zoneIdx, release) {
+  try {
+    const r = await fetch(WORKER_URL + '/inv/sesion', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'inv_lock', appVersion:APP_VERSION, almacen:ALMACEN, fecha:S.fecha, zone_idx:zoneIdx, device_id:getDeviceId(), operario:S.operario, release:!!release })
+    });
+    return await r.json();
+  } catch(e) { console.warn('lockZone:', e); return { ok:true }; }
+}
+
+async function pollLocks() {
+  if (!S) return;
+  try {
+    const r = await fetch(WORKER_URL + '/inv/sesion?almacen=' + ALMACEN + '&fecha=' + encodeURIComponent(S.fecha));
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.ok && d.found) {
+      _remoteLockedZones = d.lockedZones || {};
+      S.correctionsByZone = d.correctionsByZone || S.correctionsByZone || {};
+      mergeServerReceipts(d.receipts || []);
+      renderOverview();
+    }
+  } catch(e) {}
+}
+
+function startPoll() { stopPoll(); _pollTimer = setInterval(pollLocks, 8000); }
+function stopPoll()  { if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; } }
+
+// ── Resolución de zonas dinámicas ──────────────────────────────────────────
+
+// Fallback cuando D1 no tiene catálogo: leer artículos directo del xlsx de la plantilla
+async function buildItemsFromRaw(raw) {
+  const bin = atob(raw), bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const wb   = XLSX.read(bytes.buffer, { type:'array' });
+  const ws   = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+  const norm = s => String(s ?? '').replace(/^﻿/,'').trim();
+  const hIdx = rows.findIndex(r => r.some(h => /^c[oó]digo$/i.test(norm(h))));
+  if (hIdx === -1) return [];
+  const H    = rows[hIdx].map(norm);
+  const iCod = H.findIndex(h => /^c[oó]digo$/i.test(h));
+  const iArt = H.findIndex(h => /^art[ií]culo$/i.test(h));
+  const iUni = H.findIndex(h => /^unidad$/i.test(h));
+  const iSub = H.findIndex(h => /^subgrupo$/i.test(h));
+  const iGrp = H.findIndex(h => /^grupo$/i.test(h));
+  const out  = [];
+  for (let r = hIdx + 1; r < rows.length; r++) {
+    const row = rows[r];
+    const num = norm(row[0]), cod = norm(row[iCod]);
+    if (!num || !cod || /_\d+$/.test(cod)) continue;
+    const art = iArt >= 0 ? norm(row[iArt]) : cod;
+    const uni = (T?.unitMap?.[cod]) || (iUni >= 0 ? norm(row[iUni]) : '');
+    const grp = (iSub >= 0 && norm(row[iSub])) || (iGrp >= 0 ? norm(row[iGrp]) : '');
+    out.push({ cod, art, uni, grp });
+  }
+  return out;
+}
+
+function indexTemplateItems(items) {
+  _templateItemsByCod = {};
+  (items || []).forEach(item => { if (item.cod) _templateItemsByCod[item.cod] = item; });
+}
+
+function applyTemplateItem(item) {
+  const tpl = _templateItemsByCod[item.cod];
+  if (!tpl) return item;
+  return {
+    ...item,
+    art: tpl.art || item.art,
+    uni: tpl.uni || item.uni,
+    grp: tpl.grp || item.grp
+  };
+}
+
+function normalizeSearchText(s) {
+  return String(s ?? '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim();
+}
+
+function matchesSearchText(text, query) {
+  const haystack = normalizeSearchText(text);
+  const tokens = normalizeSearchText(query).split(/\s+/).filter(Boolean);
+  return tokens.length > 0 && tokens.every(t => haystack.includes(t));
+}
+
+function resolveTemplateItem(input) {
+  const raw = String(input || '').trim();
+  if (!raw) return null;
+  const codeLike = raw.split(/\s+[-·]\s+/)[0].trim().toUpperCase();
+  if (_templateItemsByCod[codeLike]) return _templateItemsByCod[codeLike];
+  const q = normalizeSearchText(raw);
+  const items = Object.values(_templateItemsByCod);
+  return items.find(i => normalizeSearchText(i.cod) === q)
+      || items.find(i => normalizeSearchText(i.art) === q)
+      || items.find(i => matchesSearchText(itemSearchText(i), q))
+      || null;
+}
+
+function renderTemplateDatalist() {
+  const dl = document.getElementById('manual-template-list');
+  if (!dl) return;
+  dl.innerHTML = Object.values(_templateItemsByCod)
+    .sort((a,b) => String(a.art || a.cod).localeCompare(String(b.art || b.cod)))
+    .map(i => `<option value="${esc(i.cod)} - ${esc(i.art || i.cod)}"></option>`)
+    .join('');
+}
+
+// Zonas desde la preparación editable (inv_zone_configs): solo artículos activos,
+// en el orden del editor. Nombres/unidades salen del catálogo D1 + xlsx de plantilla.
+async function resolveZonasFromConfig(cfgZones) {
+  const lookup = {};
+  try {
+    const r = await fetch(WORKER_URL + '/articulos?almacen=' + ALMACEN);
+    if (r.ok) {
+      const d = await r.json();
+      const rm = T?.rowMap;
+      (d.articulos || []).filter(a => !rm || a.codigo in rm).forEach(a => {
+        lookup[a.codigo] = { cod: a.codigo, art: a.nombre, uni: (T?.unitMap?.[a.codigo]) || a.unidad || '', grp: a.subgrupo || a.grupo || '' };
+      });
+      indexTemplateItems(Object.values(lookup));
+    }
+  } catch(e) { console.warn('articulos fetch:', e); }
+  if (T?.raw) {
+    try { indexTemplateItems(await buildItemsFromRaw(T.raw)); } catch(e) { console.warn('buildItemsFromRaw config:', e); }
+  }
+  return cfgZones.map(z => ({
+    nombre: z.nombre,
+    color: z.color || CFG.color,
+    items: (z.items || [])
+      .filter(it => it.activo !== false)
+      .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+      .map(it => applyTemplateItem(lookup[it.cod] || { cod: it.cod, art: it.cod, uni: T?.unitMap?.[it.cod] || '', grp: '' }))
+  })).filter(z => z.items.length);
+}
+
+async function resolveZonas() {
+  // R5: la preparación activa manda sobre el hardcode y el catálogo completo
+  if (ZCFG?.zones?.length) return await resolveZonasFromConfig(ZCFG.zones);
+  if (CFG.zonas) {
+    const zones = CFG.zonas.map(z => ({ ...z, items: [...(z.items || [])] }));
+    if (T?.raw) {
+      try {
+        const fromRaw = await buildItemsFromRaw(T.raw);
+        indexTemplateItems(fromRaw);
+        const existing = new Set(zones.flatMap(z => z.items.map(i => i.cod)));
+        const missing = fromRaw.filter(i => (i.cod in (T.rowMap || {})) && !existing.has(i.cod));
+        if (missing.length) {
+          console.info('Complementando zonas hardcodeadas con', missing.length, 'artículos del xlsx:', missing.map(i => i.cod));
+          zones.push({
+            nombre: 'En plantilla',
+            color: CFG.color,
+            items: missing
+          });
+        }
+      } catch(e) { console.warn('buildItemsFromRaw hardcoded complement:', e); }
+    }
+    return zones;
+  }
+  // Cargar catálogo desde D1
+  let items = [];
+  try {
+    const r = await fetch(WORKER_URL + '/articulos?almacen=' + ALMACEN);
+    if (r.ok) {
+      const d = await r.json();
+      const rm = T?.rowMap;
+      items = (d.articulos || d || [])
+        .filter(a => !rm || a.codigo in rm)
+        .map(a => ({ cod: a.codigo, art: a.nombre, uni: (T?.unitMap?.[a.codigo]) || a.unidad, grp: a.subgrupo || a.grupo || '' }));
+      indexTemplateItems(items);
+    }
+  } catch(e) { console.warn('articulos fetch:', e); }
+
+  // Complementar con artículos del xlsx que estén en rowMap pero falten en D1
+  if (T?.raw) {
+    try {
+      const fromRaw = await buildItemsFromRaw(T.raw);
+      indexTemplateItems(fromRaw);
+      const existing = new Set(items.map(i => i.cod));
+      const missing = fromRaw.filter(i => (i.cod in (T.rowMap || {})) && !existing.has(i.cod));
+      if (missing.length) {
+        console.info('Complementando catálogo con', missing.length, 'artículos del xlsx:', missing.map(i => i.cod));
+        items = [...items, ...missing];
+      }
+    } catch(e) { console.warn('buildItemsFromRaw complement:', e); }
+  }
+  items = items.map(applyTemplateItem);
+
+  // Si hay zonaNames, replicar el catálogo en N zonas independientes
+  if (CFG.zonaNames?.length) {
+    return CFG.zonaNames.map((nombre, i) => ({
+      nombre,
+      color: CFG.zonaColors?.[i] || CFG.color,
+      items: [...items]
+    }));
+  }
+  return [{ nombre: CFG.titulo, color: CFG.color, items }];
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
+async function selectArea(key) {
+  // R8: un almacén de otro centro nunca se abre desde esta URL
+  if (!AREA_CONFIG[key] || centroDe(key) !== CENTRO) { ALMACEN = null; renderWelcome(); return; }
+  ALMACEN = key;
+  CFG     = AREA_CONFIG[key];
+  const savedKey = key;
+  T = null;
+  _templateItemsByCod = {};
+  setColor(CFG.color);
+  document.getElementById('inp-fecha').value = fechaOperativaCDMX();
+
+  S = lsGet('s');
+  const [ok, zcfg] = await Promise.all([fetchPlantillaWorker(), fetchZoneConfigWorker()]);
+  if (ALMACEN !== savedKey) return;
+  // R12: app vieja → bloquear ANTES de contar (el Worker rechazaría el sync)
+  if (_minAppVersion > APP_VERSION) { renderUpdateRequired(); return; }
+  if (!ok) T = null;
+  ZCFG = zcfg;
+
+  // Regla crítica (§14): una sesión existente se renderiza desde SU zoneSnapshot,
+  // nunca desde la preparación activa actual. Sin snapshot: resolución normal.
+  if (S?.zoneSnapshot?.length) {
+    ZONAS = S.zoneSnapshot;
+    if (T?.raw) { try { indexTemplateItems(await buildItemsFromRaw(T.raw)); } catch(e) {} }
+  } else {
+    ZONAS = await resolveZonas();
+  }
+  if (ALMACEN !== savedKey) return;
+
+  // Con sesión local se lee la MISMA toma (misma fecha) solo para recuperar mis
+  // acuses; sin sesión local se pide el resumen del almacén solo para avisar.
+  // En ningún caso se carga el conteo del servidor sobre la sesión local.
+  if (S?.fecha) {
+    _sesionServidor = await fetchSesionWorker(S.fecha);
+    _tomasAlmacen = [];
+  } else {
+    _sesionServidor = null;
+    _tomasAlmacen = await fetchResumenTomasWorker();
+  }
+  if (ALMACEN !== savedKey) return;
+  if (S && _sesionServidor?.receipts?.length) mergeServerReceipts(_sesionServidor.receipts);
+
+  renderAreaWelcome();
+}
+
+// R12 — actualización forzada: ?v=timestamp atraviesa la caché de Pages (una
+// recarga normal puede servir la misma copia vieja). Conserva ?centro= y demás.
+function forzarActualizacion() {
+  const u = new URL(location.href);
+  u.searchParams.set('v', Date.now());
+  location.replace(u.toString());
+}
+
+function renderUpdateRequired() {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-welcome').classList.add('active');
+  document.getElementById('welcome-sub').textContent = 'Actualización necesaria';
+  document.getElementById('welcome-body').innerHTML = `
+    <div style="padding:24px 16px 16px">
+      <div class="alert alert-warn"><div class="alert-title">${ic('refresh-cw',15)} Hay una versión nueva de la app</div>
+      Para no mezclar datos entre versiones hay que actualizar antes de contar. Los conteos ya guardados no se pierden.</div>
+      <button class="btn btn-primary" onclick="forzarActualizacion()">Actualizar ahora</button>
+    </div>`;
+}
+
+function mostrarBannerUpdate() {
+  if (document.getElementById('update-banner')) return;
+  const b = document.createElement('div');
+  b.id = 'update-banner';
+  b.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#b45309;color:#fff;z-index:10001;font:600 12px system-ui;padding:8px 12px;text-align:center';
+  b.innerHTML = 'App desactualizada: el servidor no recibe estos conteos hasta actualizar. Lo capturado queda guardado en este teléfono. <button onclick="forzarActualizacion()" style="margin-left:8px;border:none;border-radius:6px;padding:4px 10px;font-weight:700;cursor:pointer">Actualizar</button>';
+  document.body.appendChild(b);
+}
+
+// Sync agotada tras varios reintentos: el operario tiene que saberlo — lo capturado
+// vive en este teléfono y no está en el servidor. Se quita solo al primer sync OK.
+function mostrarBannerSync() {
+  if (document.getElementById('sync-banner')) return;
+  const b = document.createElement('div');
+  b.id = 'sync-banner';
+  b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#b91c1c;color:#fff;z-index:10001;font:600 12px system-ui;padding:8px 12px;text-align:center';
+  b.innerHTML = 'Sin conexión con el servidor: lo contado está guardado en este teléfono pero NO se ha enviado. No borres la app; se reintenta solo al volver la señal. <button onclick="resincronizarTodo()" style="margin-left:8px;border:none;border-radius:6px;padding:4px 10px;font-weight:700;cursor:pointer">Reintentar</button>';
+  document.body.appendChild(b);
+}
+function ocultarBannerSync() { document.getElementById('sync-banner')?.remove(); }
+
+// ── Pantalla: selector de área ─────────────────────────────────────────────
+
+function renderWelcome() {
+  setColor('#667eea');
+  const body = document.getElementById('welcome-body');
+  const sub  = document.getElementById('welcome-sub');
+  sub.textContent = 'Inventarios · ' + CENTROS[CENTRO].nombre;
+
+  const sorted = Object.entries(AREA_CONFIG)
+    .filter(([key]) => centroDe(key) === CENTRO)
+    .sort((a, b) => a[1].titulo.localeCompare(b[1].titulo, 'es'));
+  const options = sorted.map(([key, cfg]) => {
+    return `<option value="${key}">${cfg.titulo}</option>`;
+  }).join('');
+
+  body.innerHTML = `
+    <div style="padding:24px 16px 16px">
+      <div class="form-group">
+        <label for="area-select">Almacén</label>
+        <select id="area-select">
+          <option value="" disabled selected>— Seleccionar —</option>
+          ${options}
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="onAreaSelectGo()">Continuar →</button>
+    </div>`;
+  renderSupBadge();
+}
+
+function onAreaSelectGo() {
+  const sel = document.getElementById('area-select');
+  if (!sel.value) return;
+  selectArea(sel.value);
+}
+
+function renderAreaWelcome() {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-welcome').classList.add('active');
+
+  const totalItems = ZONAS.reduce((a,z) => a + z.items.length, 0);
+  const sub  = document.getElementById('welcome-sub');
+  const body = document.getElementById('welcome-body');
+  sub.textContent = `${CFG.titulo} · ${totalItems} artículos · ${ZONAS.length} zona${ZONAS.length!==1?'s':''}`;
+
+  let html = `<button class="btn btn-gray" style="margin-bottom:12px" onclick="ALMACEN=null;go('welcome')">← Cambiar almacén</button>`;
+
+  if (!T) {
+    html += `<div class="alert alert-warn"><div class="alert-title">${ic('triangle-alert',15)} Plantilla no configurada</div>Contacta al administrador para subir la plantilla de este almacén. Puedes contar, pero no podrás generar el Excel para Xetux.</div>
+      <div class="section-label">Zonas</div>` +
+      ZONAS.map(z => `<div class="zone-card" style="border-left-color:${z.color}">
+        <div class="zone-dot" style="background:${z.color}"></div>
+        <div class="zone-info"><div class="zone-name">${esc(z.nombre)}</div><div class="zone-meta">${z.items.length} artículos</div></div>
+      </div>`).join('') +
+      `<div style="margin-top:12px"><button class="btn btn-gray" onclick="go('session')">Iniciar conteo sin plantilla</button></div>`;
+    body.innerHTML = html;
+    return;
+  }
+
+  if (S && S.fecha) {
+    const counted = countedCodCount(S);
+    // Este dispositivo muestra SU conteo. Lo que capturaron otros equipos en la
+    // misma toma vive en el servidor y se une allá; cargarlo aquí reemplazaría
+    // la sesión local, que es justo lo que ya no se hace.
+    const done    = new Set((S.completedZones||[]).map(k => baseZone(k))).size;
+    const warnHash = T.templateHash && S.templateHash && T.templateHash !== S.templateHash
+      ? `<div class="alert alert-warn" style="margin-top:8px"><div class="alert-title">${ic('triangle-alert',15)} La plantilla cambió desde que inició esta toma</div>Los factores de conversión pueden haber cambiado.</div>` : '';
+    html += `<div class="card" style="border-left:4px solid ${CFG.color}">
+      <div style="font-weight:700;margin-bottom:2px">Toma del ${S.fecha}</div>
+      <div style="font-size:13px;color:#888">${S.operario} · ${done}/${ZONAS.length} zonas · ${counted} artículos contados</div>
+      ${warnHash}
+      <div class="row">
+        <button class="btn btn-primary" style="flex:2" onclick="go('overview')">Continuar →</button>
+        <button class="btn btn-gray btn-sm" style="flex:1" onclick="confirmNewSession()">Nueva</button>
+      </div></div>`;
+  } else {
+    html += avisoTomasDelAlmacen() +
+      `<button class="btn btn-primary" onclick="go('session')">Iniciar nueva toma →</button>`;
+  }
+  body.innerHTML = html;
+}
+
+// Informa, no ofrece. Este equipo abre siempre su propia toma; saber que alguien
+// más ya está contando el almacén evita que dos personas crean que llevan tomas
+// separadas el mismo día, sin darles un botón que reemplace su captura.
+function avisoTomasDelAlmacen() {
+  if (!_tomasAlmacen.length) return '';
+  const hoy = fechaOperativaCDMX();
+  const deHoy = _tomasAlmacen.find(s => s.fecha === hoy);
+  const previa = _tomasAlmacen.find(s => s.fecha !== hoy && !s.exportedAt);
+  let html = '';
+  if (deHoy) {
+    const quienes = (deHoy.operarios && deHoy.operarios.length)
+      ? deHoy.operarios.join(' · ') : (deHoy.operario || '—');
+    // Mismo (almacén, fecha) = misma fila en D1, y cada equipo escribe su propia
+    // rebanada `zonaIdx:dispositivo`: los conteos se suman, no se pisan.
+    html += `<div class="card" style="border-left:4px solid #0ea5e9;margin-bottom:12px">
+      <div style="font-weight:700;margin-bottom:2px">${ic('store',15)} Ya hay una toma de hoy en este almacén</div>
+      <div style="font-size:13px;color:#888">${esc(quienes)} · ${deHoy.articulosContados || 0} artículos contados</div>
+      <div style="font-size:12px;color:#0369a1;margin-top:6px">Tu conteo se suma al de ellos por zona. Toma zonas distintas para no contar lo mismo dos veces.</div>
+    </div>`;
+  }
+  if (previa) {
+    html += `<div class="card" style="border-left:4px solid #f59e0b;margin-bottom:12px">
+      <div style="font-weight:700;margin-bottom:2px">${ic('triangle-alert',15)} Hay una toma sin cerrar del ${esc(previa.fecha)}</div>
+      <div style="font-size:12px;color:#b45309;margin-top:4px">No la retomas desde aquí: cuenta normal y el admin la unirá con la de hoy si son el mismo conteo.</div>
+    </div>`;
+  }
+  return html;
+}
+
+async function confirmNewSession() {
+  if (!confirm('¿Iniciar nueva toma? Se perderán los conteos actuales.')) return;
+  S = null; lsDel('s');
+  // La sesión vieja pudo renderizarse desde su snapshot: re-resolver zonas actuales
+  ZONAS = await resolveZonas();
+  renderAreaWelcome();
+}
+
+// ── Sesión ─────────────────────────────────────────────────────────────────
+
+async function startSession() {
+  const operario = document.getElementById('inp-operario').value.trim();
+  const fecha    = document.getElementById('inp-fecha').value;
+  if (!operario) { alert('Ingresa tu nombre'); return; }
+  if (!fecha)    { alert('Selecciona la fecha'); return; }
+
+  // Si el almacén ya tiene toma de esta fecha, este equipo cuenta CONTRA EL MISMO
+  // mapa de zonas. No es adoptar la toma —no llega ni un conteo— pero las
+  // rebanadas se guardan como `zonaIdx:dispositivo`: si el admin editó la
+  // preparación a media jornada, el "índice 2" de este equipo no sería el
+  // "índice 2" congelado y su captura quedaría bajo el nombre de zona ajeno.
+  // El Worker ya protege el dato (zone_snapshot es first-write-wins); esto
+  // protege lo que el operario cree que está contando.
+  let zonas = ZONAS;
+  let zoneConfigId = ZCFG?.id || '';
+  let snapshotSynced = false;
+  let propio = estadoPropioDeSesion(null);
+  // Doble toque en un teléfono lento: sin esto salen dos sesiones y dos syncs.
+  const btn = document.getElementById('btn-iniciar-toma');
+  if (btn?.disabled) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Preparando…'; }
+  try {
+    // Sin red devuelve null y se arranca con las zonas locales: nunca bloquea.
+    const yaEnServidor = await fetchSesionWorker(fecha);
+    if (yaEnServidor?.zoneSnapshot?.length) {
+      zonas = yaEnServidor.zoneSnapshot;
+      zoneConfigId = yaEnServidor.zoneConfigId || zoneConfigId;
+      snapshotSynced = true;   // el del servidor manda; no reenviar el propio
+      ZONAS = zonas;
+    }
+    if (yaEnServidor) propio = estadoPropioDeSesion(yaEnServidor);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Iniciar →'; }
+  }
+
+  // Snapshot §14: la toma congela zonas/orden/activos con los que inició — editar
+  // la preparación después no la altera. Se envía al Worker en el primer sync.
+  S = { operario, fecha, templateHash: T?.templateHash||'', countsByZone:propio.countsByZone, presChoiceByZone:propio.presChoiceByZone, correctionsByZone:propio.correctionsByZone, completedZones:propio.completedZones, manuales:propio.manuales, reopenedZones:{}, pendingCompletedZoneRemovals:[], receipts:propio.receipts, pendingReceiptEvents:{},
+        zoneConfigId, zoneSnapshot: JSON.parse(JSON.stringify(zonas || [])), snapshotSynced };
+  lsSet('s', S);
+  syncSesionWorker();
+  go('overview');
+}
+
+// ── Conteo ─────────────────────────────────────────────────────────────────
+
+async function startCount(zoneIdx) {
+  // Bloquear solo si ESTE dispositivo ya completó esta zona
+  if ((S.completedZones||[]).indexOf(myZoneKey(zoneIdx)) !== -1) return;
+  // Si otro dispositivo está contando la misma zona, el overview lo muestra — pero no bloqueamos
+  lockZone(zoneIdx, false).catch(() => {}); // registrar presencia; no bloquear si falla
+  _remoteLockedZones[zoneIdx] = { device_id: getDeviceId(), operario: S.operario };
+  _lastZoneClosedMsg = '';
+  CZ = zoneIdx;
+  const zone = ZONAS[zoneIdx];
+  document.getElementById('count-zone-name').textContent = zone.nombre;
+  document.getElementById('count-hdr').style.background = zone.color;
+  document.getElementById('count-search').value = '';
+  renderCountList(zone.items, myZoneKey(zoneIdx));
+  updateProgress();
+  updateManualesBadge();
+  go('count');
+}
+
+function reopenZone(zoneIdx) {
+  const zid = myZoneKey(zoneIdx);
+  const zone = ZONAS[zoneIdx];
+  if ((S.completedZones||[]).indexOf(zid) === -1) {
+    startCount(zoneIdx);
+    return;
+  }
+  if (!confirm(
+    `Reabrir y modificar "${zone.nombre}"?\n\n` +
+    'La zona dejará de aparecer como CERRADA mientras editas. ' +
+    'Los cambios posteriores quedarán marcados como corrección en Admin y Sheets.'
+  )) return;
+  S.completedZones = (S.completedZones || []).filter(z => z !== zid);
+  if (!S.reopenedZones) S.reopenedZones = {};
+  if (!S.pendingCompletedZoneRemovals) S.pendingCompletedZoneRemovals = [];
+  S.reopenedZones[zid] = true;
+  if (!S.pendingCompletedZoneRemovals.includes(zid)) S.pendingCompletedZoneRemovals.push(zid);
+  _receiptPending.delete(zid);
+  if (S.pendingReceiptEvents) delete S.pendingReceiptEvents[zid];
+  _lastZoneClosedMsg = `${zone.nombre} reabierta. Los cambios quedarán marcados como corrección.`;
+  lsSet('s', S);
+  syncSesionWorker();
+  startCount(zoneIdx);
+}
+
+function getQtyForZone(zid, cod) {
+  return (S.countsByZone?.[zid])?.[cod];
+}
+
+// Cada Xetux escribe las unidades a su manera: Piazza usa LT/PZA y Universal de
+// Hamburguesas usa L/PZ. Comparar contra 'LT'/'PZA' a secas dejaba a UH sin el
+// aviso naranja de "se mide directo, sin presentación" y con el paso de captura
+// equivocado.
+const UNIDAD_PESO_VOLUMEN = /^(KG|K|G|GR|GRS|LT|LTS|L|ML)$/i;
+const UNIDAD_PIEZA        = /^(PZA|PZAS|PZ|PIEZA|PIEZAS|UND|U)$/i;
+
+function getPresOptions(cod) {
+  const explicit = T?.presMap?.[cod];
+  if (explicit?.length) return explicit;
+  const uni = T?.unitMap?.[cod] || '';
+  return (T?.defaultPres?.[uni]) || [];
+}
+
+function getPresChoice(zid, cod) {
+  return (S.presChoiceByZone?.[zid])?.[cod] ?? null;
+}
+
+// R11 — desglose por presentación. countsByZone[zid][cod] es polimórfico:
+// número (legacy, factor vía presChoice/default) o array [{n,f,q}] con el
+// factor DENTRO de cada línea; f:1 = abierto/suelto en unidad base (spec §6).
+// Espejo de lineasDesglose/cantidadBase de js/sesion-merge.js — esta página es
+// autocontenida (el espejo UH no copia js/): mantener ambos en sincronía.
+const _desgloseOpen = new Set(); // "zid|cod" con desglose abierto pero aún sin captura
+
+function esDesglose(val) { return Array.isArray(val); }
+
+function cantidadBaseInv(val, factorLegacy) {
+  if (Array.isArray(val)) return val.reduce((s, l) => s + (Number(l?.q) || 0) * (Number(l?.f) || 0), 0);
+  return (Number(val) || 0) * factorLegacy;
+}
+
+// Líneas que ofrece el desglose: las presentaciones del artículo + siempre la
+// de abierto/suelto (f:1, unidad base directa).
+function lineasDePlantilla(cod) {
+  return [...getPresOptions(cod).map(o => ({ n: o.nombre || '', f: o.factor })), { n: '', f: 1 }];
+}
+
+function itemSearchText(item) {
+  const templateItem = _templateItemsByCod[item.cod] || null;
+  const pres = getPresOptions(item.cod)
+    .map(o => `${o.nombre || ''} ${o.factor || ''}`)
+    .join(' ');
+  return `${item.art || ''} ${templateItem?.art || ''} ${item.cod || ''} ${item.uni || ''} ${pres}`;
+}
+
+function markCorrection(zid, cod, tipo) {
+  if (!S.reopenedZones?.[zid]) return;
+  if (!S.correctionsByZone) S.correctionsByZone = {};
+  if (!S.correctionsByZone[zid]) S.correctionsByZone[zid] = {};
+  S.correctionsByZone[zid][cod] = {
+    tipo,
+    operario:S.operario,
+    at:new Date().toISOString(),
+    zona:ZONAS[baseZone(zid)]?.nombre || ''
+  };
+}
+
+function hasCorrection(zid, cod) {
+  return !!S.correctionsByZone?.[zid]?.[cod];
+}
+
+function renderItemRow(item, zid, inOtherZone) {
+  const templateItem = _templateItemsByCod[item.cod] || null;
+  const displayItem = templateItem
+    ? { ...item, art: templateItem.art || item.art, uni: templateItem.uni || item.uni, grp: templateItem.grp || item.grp }
+    : item;
+  const raw    = getQtyForZone(zid, item.cod);
+  const desglosado = esDesglose(raw) || _desgloseOpen.has(zid + '|' + item.cod);
+  const flt    = typeof raw === 'number' ? raw : NaN;
+  const opts   = getPresOptions(item.cod);
+  const chosen = getPresChoice(zid, item.cod) ?? (opts[0]?.factor ?? null);
+  const filled = raw !== undefined ? 'filled' : '';
+  const corrected = hasCorrection(zid, item.cod);
+  const dataZ  = `data-zid="${zid}"`;
+
+  let presHtml = '';
+  if (!desglosado && opts.length === 1) {
+    const f = opts[0].factor;
+    const ltStr = !isNaN(flt) ? fmtNum(flt * f) : '—';
+    presHtml = `<span class="lt-badge" id="ltb_${zid}_${esc(item.cod)}">${ltStr} ${item.uni}</span>`;
+  } else if (!desglosado && opts.length > 1) {
+    const selOpts = opts.map(o => `<option value="${o.factor}" ${o.factor==chosen?'selected':''}>${o.nombre} (${o.factor})</option>`).join('');
+    const ltStr = chosen && !isNaN(flt) ? fmtNum(flt * chosen) : (raw!==undefined?fmtNum(flt):'—');
+    presHtml = `<select class="pres-sel" ${dataZ} data-cod="${esc(item.cod)}" onchange="onPresChange(this)">${selOpts}</select>
+      <span class="lt-badge" id="ltb_${zid}_${esc(item.cod)}">${ltStr} ${item.uni}</span>`;
+  }
+
+  const baseUnitLabel = desglosado          ? `${displayItem.uni} · desglosado`
+                      : opts.length === 1   ? `bots × ${opts[0].factor} ${displayItem.uni}`
+                      : opts.length > 1     ? `${displayItem.uni} · selecciona presentación`
+                      : displayItem.uni;
+  const unitLabel = inOtherZone ? `disponible aquí · ${baseUnitLabel}` : baseUnitLabel;
+  const unitWarn  = UNIDAD_PESO_VOLUMEN.test(displayItem.uni || '') && opts.length === 0 ? ' warn' : '';
+  const inputStep = opts.length > 0 && !UNIDAD_PIEZA.test(displayItem.uni || '') ? '0.5' : '0.01';
+
+  const comment = getComment(item.cod);
+  const commentBtn = _supervisorActual
+    ? `<button class="comment-btn${comment?' has-comment':''}" onclick="openCommentModal('${esc(item.cod)}','${esc(displayItem.art)}')" title="${comment?'Ver comentario':'Agregar comentario'}">${ic('message-circle',15)}</button>`
+    : '';
+  const commentText = comment ? `<div class="item-comment-text">${esc(comment.texto)}</div>` : '';
+
+  let qtyHtml, desgloseHtml = '';
+  if (desglosado) {
+    const cur   = esDesglose(raw) ? raw : [];
+    const total = cantidadBaseInv(cur, 0);
+    // Líneas ofrecidas + las capturadas que ya no calzan con la plantilla
+    // (p.ej. re-subida a mitad de toma) — nunca ocultar cantidad capturada.
+    const ofrecidas = lineasDePlantilla(item.cod);
+    const huerfanas = cur.filter(c => !ofrecidas.some(l => Number(l.f) === Number(c.f) && (l.n || '') === (c.n || '')));
+    const lineaHtml = l => {
+      const q = cur.find(c => Number(c.f) === Number(l.f) && (c.n || '') === (l.n || ''))?.q;
+      const label = Number(l.f) === 1 ? `Abierto / suelto (${displayItem.uni} directo)` : `${l.n} (${l.f} ${displayItem.uni})`;
+      return `<div class="desg-linea"><span class="desg-label">${esc(label)}</span>
+        <input type="number" class="qty-input desg-input${q !== undefined ? ' filled' : ''}" inputmode="decimal"
+          step="${Number(l.f) === 1 ? '0.01' : '0.5'}" min="0" placeholder="0" value="${q !== undefined ? q : ''}"
+          ${dataZ} data-cod="${esc(item.cod)}" data-f="${l.f}" data-n="${esc(l.n || '')}"
+          oninput="onDesgloseQty(this)" onfocus="this.select()"></div>`;
+    };
+    qtyHtml = `<span class="lt-badge" id="ltb_${zid}_${esc(item.cod)}">${fmtNum(total)} ${displayItem.uni}</span>`;
+    desgloseHtml = `<div class="desglose-block">
+      ${[...ofrecidas, ...huerfanas].map(lineaHtml).join('')}
+      <div class="desg-total">
+        <button class="desg-cerrar" ${dataZ} data-cod="${esc(item.cod)}" onclick="quitarDesglose(this)">Quitar desglose</button>
+        = <b id="dtot_${zid}_${esc(item.cod)}">${fmtNum(total)}</b>&nbsp;${displayItem.uni}
+      </div>
+    </div>`;
+  } else {
+    const desgBtn = opts.length > 0
+      ? `<button class="desg-btn" ${dataZ} data-cod="${esc(item.cod)}" onclick="toggleDesglose(this)" title="Desglosar por presentación">${ic('list-plus',18)}</button>`
+      : '';
+    qtyHtml = `${presHtml}
+      <input type="number" class="qty-input ${filled}" inputmode="decimal"
+        step="${inputStep}" min="0" placeholder="0"
+        value="${raw!==undefined?raw:''}"
+        ${dataZ} data-cod="${esc(item.cod)}"
+        oninput="onQty(this)" onfocus="this.select()">${desgBtn}`;
+  }
+
+  return `<div class="item-row${inOtherZone?' other-zone':''}${corrected?' corrected':''}${desglosado?' desglosado':''}" data-search="${esc(itemSearchText(item))}">
+    <div class="item-text">
+      <div style="display:flex;align-items:flex-start;gap:4px">
+        <div class="item-name" style="flex:1">${esc(displayItem.art)}</div>
+        ${commentBtn}
+      </div>
+      <div class="item-unit${unitWarn}">${unitLabel}</div>
+      ${corrected ? '<span class="correction-badge">Editado despues de cerrar</span>' : ''}
+      ${commentText}
+    </div>
+    <div class="qty-wrap">
+      ${qtyHtml}
+    </div>
+    ${desgloseHtml}
+  </div>`;
+}
+
+function renderCountList(items, zid) {
+  let html = '', lastGrp = null;
+  for (const item of items) {
+    if (item.grp !== lastGrp) {
+      lastGrp = item.grp;
+      if (item.grp) html += `<div class="subgrupo-hdr" data-grp="${esc(item.grp)}">${esc(item.grp)}</div>`;
+    }
+    html += renderItemRow(item, zid, false);
+  }
+  document.getElementById('count-list').innerHTML = html;
+}
+
+function onQty(inp) {
+  const zid = inp.dataset.zid;
+  const cod = inp.dataset.cod;
+  const v   = inp.value.trim();
+  const num = parseFloat(v);
+  if (!S.countsByZone) S.countsByZone = {};
+  if (!S.countsByZone[zid]) S.countsByZone[zid] = {};
+
+  if (v !== '' && !isNaN(num) && num >= 0) {
+    S.countsByZone[zid][cod] = num;
+    markCorrection(zid, cod, 'cantidad');
+    // Actualizar badge LT
+    const chosen = getPresChoice(zid, cod) ?? (getPresOptions(cod)[0]?.factor ?? null);
+    if (chosen) {
+      const badge = document.getElementById('ltb_' + zid + '_' + cod);
+      if (badge) badge.textContent = fmtNum(num * chosen) + ' ' + (ZONAS[CZ]?.items.find(i=>i.cod===cod)?.uni || 'LT');
+    }
+  } else {
+    delete S.countsByZone[zid][cod];
+    markCorrection(zid, cod, 'borrado');
+    const badge = document.getElementById('ltb_' + zid + '_' + cod);
+    if (badge) badge.textContent = '— ' + (getPresOptions(cod)[0] ? (ZONAS[CZ]?.items.find(i=>i.cod===cod)?.uni||'LT') : 'LT');
+  }
+
+  inp.classList.toggle('filled', v !== '' && !isNaN(parseFloat(v)));
+  lsSet('s', S);
+  scheduleSyncSesion();
+  updateProgress();
+}
+
+function onPresChange(sel) {
+  const zid = sel.dataset.zid;
+  const cod = sel.dataset.cod;
+  const f   = parseFloat(sel.value);
+  if (!S.presChoiceByZone) S.presChoiceByZone = {};
+  if (!S.presChoiceByZone[zid]) S.presChoiceByZone[zid] = {};
+  S.presChoiceByZone[zid][cod] = f;
+  markCorrection(zid, cod, 'presentacion');
+  // Recalcular badge
+  const qty = getQtyForZone(zid, cod);
+  const badge = document.getElementById('ltb_' + zid + '_' + cod);
+  if (badge && qty !== undefined) badge.textContent = fmtNum(qty * f) + ' ' + (ZONAS[CZ]?.items.find(i=>i.cod===cod)?.uni||'LT');
+  lsSet('s', S);
+  scheduleSyncSesion();
+}
+
+// R11b — handlers del desglose ------------------------------------------------
+
+function findItemByCod(cod) {
+  for (const z of ZONAS) { const it = z.items.find(i => i.cod === cod); if (it) return it; }
+  return _templateItemsByCod[cod] || { cod, art: cod, uni: T?.unitMap?.[cod] || '', grp: '' };
+}
+
+// Reemplaza la fila en el DOM re-usando renderItemRow (conserva búsqueda activa)
+function rerenderRow(el, zid, cod) {
+  const row = el.closest('.item-row');
+  if (!row) return;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = renderItemRow(findItemByCod(cod), zid, row.classList.contains('other-zone'));
+  const neu = tmp.firstElementChild;
+  if (row.classList.contains('search-match')) neu.classList.add('search-match');
+  if (row.classList.contains('hidden')) neu.classList.add('hidden');
+  row.replaceWith(neu);
+}
+
+function toggleDesglose(btn) {
+  const zid = btn.dataset.zid, cod = btn.dataset.cod;
+  const raw = getQtyForZone(zid, cod);
+  if (typeof raw === 'number') {
+    // sembrar el número previo en la línea de la presentación elegida (spec R11b)
+    const f = getPresChoice(zid, cod) ?? (getPresOptions(cod)[0]?.factor ?? 1);
+    const linea = lineasDePlantilla(cod).find(l => Number(l.f) === Number(f)) || { n: '', f: 1 };
+    S.countsByZone[zid][cod] = [{ n: linea.n, f: linea.f, q: raw }];
+    markCorrection(zid, cod, 'cantidad');
+    lsSet('s', S);
+    scheduleSyncSesion();
+  }
+  _desgloseOpen.add(zid + '|' + cod);
+  rerenderRow(btn, zid, cod);
+}
+
+function quitarDesglose(btn) {
+  const zid = btn.dataset.zid, cod = btn.dataset.cod;
+  const raw = getQtyForZone(zid, cod);
+  const tieneCaptura = esDesglose(raw) && raw.some(l => Number(l.q) > 0);
+  if (tieneCaptura && !confirm('¿Quitar el desglose?\n\nSe borra lo capturado en las líneas de este artículo.')) return;
+  if (esDesglose(raw)) {
+    delete S.countsByZone[zid][cod];
+    markCorrection(zid, cod, 'borrado');
+    lsSet('s', S);
+    scheduleSyncSesion();
+    updateProgress();
+  }
+  _desgloseOpen.delete(zid + '|' + cod);
+  rerenderRow(btn, zid, cod);
+}
+
+function onDesgloseQty(inp) {
+  const zid = inp.dataset.zid, cod = inp.dataset.cod;
+  const lineas = [];
+  inp.closest('.desglose-block').querySelectorAll('.desg-input').forEach(i => {
+    const v = i.value.trim();
+    const q = parseFloat(v);
+    const ok = v !== '' && !isNaN(q) && q >= 0;
+    i.classList.toggle('filled', ok);
+    if (ok) lineas.push({ n: i.dataset.n || '', f: parseFloat(i.dataset.f), q });
+  });
+  if (!S.countsByZone) S.countsByZone = {};
+  if (!S.countsByZone[zid]) S.countsByZone[zid] = {};
+  if (lineas.length) {
+    S.countsByZone[zid][cod] = lineas;
+    markCorrection(zid, cod, 'cantidad');
+  } else {
+    delete S.countsByZone[zid][cod];   // array vacío → se borra la clave (spec §6)
+    markCorrection(zid, cod, 'borrado');
+  }
+  const total = cantidadBaseInv(lineas, 0);
+  const item  = findItemByCod(cod);
+  const uni   = _templateItemsByCod[cod]?.uni || item.uni || '';
+  const dtot  = document.getElementById('dtot_' + zid + '_' + cod);
+  if (dtot) dtot.textContent = fmtNum(total);
+  const badge = document.getElementById('ltb_' + zid + '_' + cod);
+  if (badge) badge.textContent = fmtNum(total) + ' ' + uni;
+  lsSet('s', S);
+  scheduleSyncSesion();
+  updateProgress();
+}
+
+function updateProgress() {
+  if (CZ === null) return;
+  const zone   = ZONAS[CZ];
+  const zbz    = S.countsByZone?.[myZoneKey(CZ)] || {};
+  const filled = zone.items.filter(i => zbz[i.cod] !== undefined).length;
+  const preferred = new Set(zone.items.map(i => i.cod));
+  const extraFilled = Object.keys(zbz).filter(cod => !preferred.has(cod)).length;
+  const pct    = zone.items.length ? filled / zone.items.length * 100 : 0;
+  document.getElementById('count-bar').style.width = pct + '%';
+  document.getElementById('count-pct').textContent =
+    filled + '/' + zone.items.length + (extraFilled ? ` · +${extraFilled}` : '');
+}
+
+function hlMatch(text, q) {
+  if (!q) return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const idx = text.toLowerCase().indexOf(q);
+  if (idx < 0) return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const esc2 = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return esc2(text.slice(0,idx)) + '<mark>' + esc2(text.slice(idx,idx+q.length)) + '</mark>' + esc2(text.slice(idx+q.length));
+}
+
+function filterCount(q) {
+  const ql = q.toLowerCase().trim();
+  document.querySelectorAll('#count-list .item-row').forEach(r => {
+    const searchStr = r.dataset.search || '';
+    const matches = !!ql && matchesSearchText(searchStr, ql);
+    r.classList.toggle('hidden', !!ql && !matches);
+    r.classList.toggle('search-match', matches);
+    const nameEl = r.querySelector('.item-name');
+    if (nameEl) {
+      if (!nameEl.dataset.name) nameEl.dataset.name = nameEl.textContent;
+      nameEl.innerHTML = matches ? hlMatch(nameEl.dataset.name, ql) : nameEl.dataset.name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+  });
+  document.querySelectorAll('#count-list .subgrupo-hdr').forEach(hdr => {
+    let next = hdr.nextElementSibling, vis = false;
+    while (next && !next.classList.contains('subgrupo-hdr')) {
+      if (next.classList.contains('item-row') && !next.classList.contains('hidden')) vis = true;
+      next = next.nextElementSibling;
+    }
+    hdr.classList.toggle('hidden', !vis);
+  });
+
+  let extra = document.getElementById('count-extra');
+  if (!extra) { extra = document.createElement('div'); extra.id = 'count-extra'; document.getElementById('count-list').after(extra); }
+  if (!ql) { extra.innerHTML = ''; return; }
+
+  const currentCods = new Set(CZ !== null ? ZONAS[CZ].items.map(i => i.cod) : []);
+  const disponibles = new Map();
+
+  // La preparación solo decide qué se ve de entrada. Al buscar, unificamos los
+  // artículos preparados en otras zonas y el resto de la plantilla en UNA lista,
+  // sin insinuar que el artículo pertenece a otra ubicación.
+  ZONAS.forEach(zone => zone.items.forEach(item => {
+    if (!currentCods.has(item.cod) && !disponibles.has(item.cod)) disponibles.set(item.cod, item);
+  }));
+  Object.keys(T?.rowMap || {}).forEach(cod => {
+    if (currentCods.has(cod) || disponibles.has(cod)) return;
+    disponibles.set(cod, _templateItemsByCod[cod] || {
+      cod,
+      art: cod,
+      uni: T?.unitMap?.[cod] || '',
+      grp: ''
+    });
+  });
+
+  const matches = [...disponibles.values()].filter(item =>
+    matchesSearchText(itemSearchText(item), ql)
+  );
+  extra.innerHTML = matches.length
+    ? `<div class="subgrupo-hdr" style="background:#f0fdf4;color:#166534;border-top:2px solid #86efac">Más artículos de la plantilla · disponibles en esta zona</div>` +
+      matches.map(item => renderItemRow(item, myZoneKey(CZ), true)).join('')
+    : '';
+}
+
+function clearSearch() {
+  document.getElementById('count-search').value = '';
+  filterCount('');
+  const e = document.getElementById('count-extra');
+  if (e) e.innerHTML = '';
+}
+
+function exitCount() {
+  if (CZ !== null) { lockZone(CZ, true); delete _remoteLockedZones[CZ]; }
+  CZ = null;
+  go('overview');
+}
+
+function requestZoneReceipt(zoneIdx, autoDownload = true) {
+  if (!S || !ZONAS?.[zoneIdx]) return;
+  const zid = myZoneKey(zoneIdx);
+  const zoneCounts = S.countsByZone?.[zid] || {};
+  const choices = { ...(S.presChoiceByZone?.[zid] || {}) };
+
+  // Congelar también el factor por defecto de cada captura simple. Así el acuse
+  // y el export no cambian si mañana se edita la plantilla/presentación.
+  for (const [cod, raw] of Object.entries(zoneCounts)) {
+    if (!Array.isArray(raw) && choices[cod] == null) {
+      choices[cod] = getPresChoice(zid, cod) ?? (getPresOptions(cod)[0]?.factor ?? 1);
+    }
+  }
+  if (!S.presChoiceByZone) S.presChoiceByZone = {};
+  S.presChoiceByZone[zid] = choices;
+  if (!S.pendingReceiptEvents) S.pendingReceiptEvents = {};
+  if (!S.pendingReceiptEvents[zid]) S.pendingReceiptEvents[zid] = newManualId();
+
+  _receiptPending.add(zid);
+  lsSet('s', S);
+  if (document.getElementById('screen-overview')?.classList.contains('active')) renderOverview();
+  enviarPayloadSesion(
+    { [zid]: zoneCounts },
+    { [zid]: choices },
+    {
+      requestReceipt: true,
+      receiptZoneKey: zid,
+      receiptZoneName: ZONAS[zoneIdx].nombre,
+      receiptEventId: S.pendingReceiptEvents[zid],
+      autoDownloadReceipt: autoDownload
+    }
+  );
+}
+
+function registerReceipt(receipt, autoDownload) {
+  if (!S || !receipt?.id) return;
+  mergeServerReceipts([receipt]);
+  const zid = receipt.zoneKey;
+  const isCurrentEvent = S.pendingReceiptEvents?.[zid] === receipt.eventId;
+  if (isCurrentEvent) {
+    _receiptPending.delete(zid);
+    delete S.pendingReceiptEvents[zid];
+    _lastZoneClosedMsg =
+      `${receipt.zoneName || 'La zona'} quedó CONFIRMADA por el servidor. ` +
+      `Acuse ${receipt.id}. El PDF ${autoDownload ? 'se está descargando' : 'está disponible'}.`;
+  } else {
+    _lastZoneClosedMsg = S.pendingReceiptEvents?.[zid]
+      ? `Llegó el acuse ${receipt.id} del cierre anterior; el cierre actual sigue confirmándose.`
+      : `El servidor confirmó el acuse ${receipt.id} del cierre anterior. La zona permanece abierta para corrección.`;
+  }
+  lsSet('s', S);
+  if (document.getElementById('screen-overview')?.classList.contains('active')) renderOverview();
+  if (autoDownload) {
+    downloadReceiptPdf(receipt, true).catch(error => {
+      console.warn('acuse PDF:', error);
+      _lastZoneClosedMsg =
+        `El servidor confirmó el acuse ${receipt.id}, pero el dispositivo no pudo descargarlo automáticamente. ` +
+        'Toca "Descargar PDF" en la zona cerrada.';
+      if (document.getElementById('screen-overview')?.classList.contains('active')) renderOverview();
+    });
+  }
+}
+
+function doneZone() {
+  if (CZ === null) return;
+  const zone = ZONAS[CZ];
+  const zid = myZoneKey(CZ);
+  const zbz = S.countsByZone?.[zid] || {};
+  const filled = zone.items.filter(i => zbz[i.cod] !== undefined).length;
+  const preferred = new Set(zone.items.map(i => i.cod));
+  const extraFilled = Object.keys(zbz).filter(cod => !preferred.has(cod)).length;
+  const extraTxt = extraFilled
+    ? ` También capturaste ${extraFilled} artículo${extraFilled !== 1 ? 's' : ''} adicional${extraFilled !== 1 ? 'es' : ''} de la plantilla.`
+    : '';
+  if (!confirm(
+    `Cerrar "${zone.nombre}"?\n\n` +
+    `Capturaste ${filled} de ${zone.items.length} artículos preparados en esta zona.${extraTxt}\n\n` +
+    'Al confirmar quedará marcada en verde como CERRADA y los conteos se enviarán al servidor. ' +
+    'Después podrás tocar su tarjeta para reabrirla y modificarla.'
+  )) return;
+  if ((S.completedZones||[]).indexOf(zid) === -1) {
+    if (!S.completedZones) S.completedZones = [];
+    S.completedZones.push(zid);
+  }
+  _lastZoneClosedMsg =
+    `${zone.nombre} quedó CERRADA para ${S.operario}. Se está confirmando con el servidor; ` +
+    'al recibir el folio se descargará el PDF. Puedes reabrirla después si necesitas corregir.';
+  lsSet('s', S);
+  if (CZ !== null) { lockZone(CZ, true); delete _remoteLockedZones[CZ]; }
+  clearTimeout(_syncTimer);
+  requestZoneReceipt(CZ, true);
+  CZ = null;
+  go('overview');
+}
+
+// ── Overview ───────────────────────────────────────────────────────────────
+
+function renderOverview() {
+  if (!S) { go('welcome'); return; }
+  document.getElementById('ov-title').textContent = 'Toma · ' + S.fecha;
+  document.getElementById('ov-meta').textContent  = S.operario + ' · ' + CFG.titulo;
+  document.getElementById('ov-hdr').style.background = CFG.color;
+  document.getElementById('ov-feedback').innerHTML = _lastZoneClosedMsg
+    ? `<div class="zone-done-banner"><strong>Zona cerrada</strong>${esc(_lastZoneClosedMsg)}</div>`
+    : '';
+
+  // Advertencia de plantilla cambiada
+  const ov_warn = document.getElementById('ov-warn');
+  if (T?.templateHash && S.templateHash && T.templateHash !== S.templateHash) {
+    ov_warn.innerHTML = `<div class="alert alert-warn"><div class="alert-title">${ic('triangle-alert',15)} La plantilla cambió</div>Los factores de conversión pueden diferir de cuando inició esta toma.</div>`;
+  } else ov_warn.innerHTML = '';
+
+  let total = 0, filled = 0, allDone = true;
+  const myDev = ':' + getDeviceId();
+  const html = ZONAS.map((zone, i) => {
+    // Sumar conteos de TODOS los dispositivos para esta zona (para mostrar progreso real)
+    const zbz = {};
+    for (const [key, counts] of Object.entries(S.countsByZone || {})) {
+      if (baseZone(key) === i) {
+        for (const [cod, qty] of Object.entries(counts)) zbz[cod] = (zbz[cod]||0) + cantidadBaseInv(qty, 1);
+      }
+    }
+	    const zoneFilled = zone.items.filter(it => zbz[it.cod] !== undefined).length;
+	    const preferredCods = new Set(zone.items.map(it => it.cod));
+	    const extraFilled = Object.keys(zbz).filter(cod => !preferredCods.has(cod)).length;
+	    const done       = (S.completedZones||[]).indexOf(myZoneKey(i)) !== -1;
+	    const zid        = myZoneKey(i);
+	    const receipt    = latestReceiptForZone(zid);
+	    const correctedCount = Object.keys(S.correctionsByZone?.[zid] || {}).length;
+	    const pct        = zone.items.length ? Math.round(zoneFilled / zone.items.length * 100) : 0;
+    total  += zone.items.length;
+    filled += zoneFilled;
+    if (!done) allDone = false;
+    const remoteLock    = _remoteLockedZones[i];
+    const otherCounting = !done && remoteLock && remoteLock.device_id !== getDeviceId();
+    const myLock        = !done && remoteLock && remoteLock.device_id === getDeviceId();
+	    const cls    = [done ? 'done' : (zoneFilled > 0 ? 'partial' : ''), correctedCount ? 'corrected' : ''].filter(Boolean).join(' ');
+	    const status = done
+	      ? '<span class="zone-status-closed">✓ CERRADA</span>'
+	      : (correctedCount ? '!' : myLock ? '✎' : zoneFilled > 0 ? '...' : '○');
+	    let metaLine = zoneFilled + '/' + zone.items.length + ' preparados · ' + pct + '%';
+	    if (extraFilled) metaLine += ` · ${extraFilled} adicional${extraFilled !== 1 ? 'es' : ''}`;
+	    if (otherCounting) metaLine += ' · ' + esc(remoteLock.operario) + ' contando';
+	    if (done) metaLine += ' · Toca para reabrir y modificar';
+	    const receiptAwaiting = !!S.pendingReceiptEvents?.[zid];
+	    if (receipt) metaLine += ` · ${receiptAwaiting ? 'Acuse anterior' : 'Acuse'} ${esc(receipt.id)}`;
+	    if (correctedCount) metaLine += ` · ${correctedCount} correccion${correctedCount!==1?'es':''}`;
+	    const receiptAction = done
+	      ? _receiptPending.has(zid)
+	        ? '<span class="zone-receipt-pending">Confirmando servidor…</span>'
+	        : receiptAwaiting
+	          ? `<button class="zone-receipt-btn" onclick="event.stopPropagation();requestZoneReceipt(${i},true)">Confirmar y PDF</button>`
+	          : receipt
+	          ? `<button class="zone-receipt-btn" onclick="event.stopPropagation();downloadReceiptById('${esc(receipt.id)}')">Descargar PDF</button>`
+	          : `<button class="zone-receipt-btn" onclick="event.stopPropagation();requestZoneReceipt(${i},true)">Confirmar y PDF</button>`
+	      : '';
+	    const clickAttr = done ? ` onclick="reopenZone(${i})"` : ` onclick="startCount(${i})"`;
+    return `<div class="zone-card ${cls}"${clickAttr}>
+      <div class="zone-dot" style="background:${zone.color}"></div>
+      <div class="zone-info">
+        <div class="zone-name">${esc(zone.nombre)}</div>
+        <div class="zone-meta">${metaLine}</div>
+        <div class="progress-bar" style="margin-top:4px"><div class="progress-fill" style="width:${pct}%"></div></div>
+      </div>
+      <div class="zone-status">${status}${receiptAction}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('ov-zones').innerHTML = html;
+  const pct = total ? filled / total * 100 : 0;
+  document.getElementById('ov-bar').style.width = pct + '%';
+  const btn = document.getElementById('btn-generate');
+  if (!T || !T.raw) {
+    btn.style.display = 'none';
+    return;
+  }
+  btn.style.display = 'block';
+  btn.style.background = CFG.color;
+  const myCompleted = (S.completedZones||[]).filter(k => k.endsWith(myDev)).length;
+  const pending = ZONAS.length - myCompleted;
+  btn.textContent = allDone ? 'Ver resumen →'
+    : `Ver resumen (${pending} zona${pending!==1?'s':''} pendiente${pending!==1?'s':''})`;
+  btn.title = 'El Excel se genera desde admin.html';
+}
+
+// ── Validación ─────────────────────────────────────────────────────────────
+
+function renderValidation() {
+  const el = document.getElementById('validation-out');
+  document.getElementById('gen-hdr').style.background = CFG?.color || '#667eea';
+  if (!S) { el.innerHTML = '<p style="color:#888">Sin sesión.</p>'; return; }
+
+  // Calcular totales por cod
+  const totales = {}; // cod → qty_base
+  for (const [zid, zc] of Object.entries(S.countsByZone||{})) {
+    for (const [cod, qty] of Object.entries(zc)) {
+      // getPresOptions, no presMap: incluye los defaults por unidad, que es lo que
+      // aplica el export (factorDefault en js/sesion-merge.js). Con presMap a secas
+      // la pantalla de validación mostraba el conteo sin convertir.
+      const f = (S.presChoiceByZone?.[zid]?.[cod]) ?? (getPresOptions(cod)[0]?.factor ?? 1);
+      totales[cod] = (totales[cod] || 0) + cantidadBaseInv(qty, f);
+    }
+  }
+  const countedCods = Object.keys(totales);
+
+  const allItems = ZONAS.flatMap(z => z.items);
+  const allCods  = [...new Set(allItems.map(i => i.cod))];
+  const notCounted = allCods.filter(cod => totales[cod] === undefined);
+  const withConv   = countedCods.filter(cod => getPresOptions(cod).length > 0);
+
+  let html = '';
+  if (!T || !T.raw) {
+    html += `<div class="alert alert-error"><div class="alert-title">${ic('circle-x',15)} Plantilla Xetux no disponible</div>El administrador debe configurar la plantilla de este almacén.</div>`;
+  }
+  if (notCounted.length) {
+    const sample = notCounted.slice(0,5).map(cod => allItems.find(i=>i.cod===cod)?.art||cod);
+    html += `<div class="alert alert-warn"><div class="alert-title">${ic('triangle-alert',15)} ${notCounted.length} artículos sin contar → quedarán en blanco</div><div>${sample.join(', ')}${notCounted.length>5?' y '+(notCounted.length-5)+' más…':''}</div></div>`;
+  }
+  const manualesReales = (S.manuales || []).filter(m => m.type !== 'comment');
+  if (manualesReales.length) {
+    html += `<div class="alert alert-info"><div class="alert-title">${ic('clipboard-list',15)} ${manualesReales.length} ítem${manualesReales.length!==1?'s':''} no catalogado${manualesReales.length!==1?'s':''}</div>
+      <div>${manualesReales.map(m=>esc(m.nombre)+' — '+m.cantidad+' '+esc(m.uni)).join(', ')}</div>
+      <div style="margin-top:8px"><button class="btn btn-gray btn-sm" style="width:auto;display:inline-block" onclick="compartirManuales()">Compartir lista</button></div></div>`;
+  }
+  const comentariosSup = (S.manuales || []).filter(m => m.type === 'comment');
+  if (comentariosSup.length) {
+    html += `<div class="alert" style="background:#f3e8ff;border-color:#c4b5fd;color:#6d28d9"><div class="alert-title">${ic('message-circle',15)} ${comentariosSup.length} comentario${comentariosSup.length!==1?'s':''} de supervisor</div></div>`;
+  }
+  const desglosados = Object.values(S.countsByZone || {}).reduce((s, zc) => s + Object.values(zc || {}).filter(esDesglose).length, 0);
+  html += `<div class="alert alert-ok"><div class="alert-title">${ic('circle-check',15)} ${countedCods.length} artículos con cantidad</div>
+    <div>${withConv.length} con conversión · ${countedCods.length - withConv.length} directos${desglosados ? ' · ' + desglosados + ' con desglose' : ''}</div></div>`;
+
+  el.innerHTML = html;
+}
+
+
+// ── Manuales ───────────────────────────────────────────────────────────────
+
+function openManualModal(editId) {
+  const existing = editId ? (S.manuales||[]).find(m => m.id === editId) : null;
+  document.getElementById('man-modal-title').textContent = existing ? 'Editar no catalogado' : 'Ítem no catalogado';
+  document.getElementById('man-edit-id').value = editId || '';
+  document.getElementById('man-nombre').value = existing?.nombre || '';
+  renderTemplateDatalist();
+  document.getElementById('man-unidad').value = existing?.uni || existing?.unidad || '';
+  const hasPres = !!(existing?.factor && existing.factor !== 1);
+  document.getElementById('man-pres-toggle').checked = hasPres;
+  document.getElementById('man-pres-block').style.display = hasPres ? '' : 'none';
+  document.getElementById('man-pres-nombre').value = existing?.presentacion || '';
+  document.getElementById('man-pres-factor').value = existing?.factor || '';
+  // Si tiene presentación mostrar cantidadRaw, si no la cantidad base
+  document.getElementById('man-cantidad').value = existing ? (hasPres ? (existing.cantidadRaw ?? existing.cantidad) : existing.cantidad) : '';
+  _manFotoB64 = existing?.foto || null;
+  document.getElementById('man-foto-preview').innerHTML = _manFotoB64 ? `<img src="${_manFotoB64}" style="max-width:100%;border-radius:8px;margin-top:4px">` : '';
+  document.getElementById('man-foto').value = '';
+  updateManualCantidadLabel();
+  updateManualTemplateHint();
+  document.getElementById('modal-manuales-lista').classList.remove('active');
+  document.getElementById('modal-manual').classList.add('active');
+}
+
+function closeManualModal() {
+  document.getElementById('modal-manual').classList.remove('active');
+}
+
+function toggleManualPres(on) {
+  document.getElementById('man-pres-block').style.display = on ? '' : 'none';
+  updateManualCantidadLabel();
+}
+
+function updateManualCantidadLabel() {
+  const on     = document.getElementById('man-pres-toggle').checked;
+  const factor = parseFloat(document.getElementById('man-pres-factor').value);
+  const pres   = document.getElementById('man-pres-nombre').value.trim();
+  const uni    = document.getElementById('man-unidad').value.trim();
+  const label  = document.getElementById('man-cantidad-label');
+  const hint   = document.getElementById('man-pres-hint');
+  if (on && factor > 0) {
+    label.textContent = `Cantidad (${pres || 'presentaciones'}) *`;
+    hint.textContent  = `→ 1 ${pres || 'unidad'} = ${factor} ${uni || 'unidad base'}`;
+  } else {
+    label.textContent = 'Cantidad *';
+    if (hint) hint.textContent = '';
+  }
+}
+
+function updateManualTemplateHint() {
+  const hint = document.getElementById('man-template-hint');
+  if (!hint) return;
+  const item = resolveTemplateItem(document.getElementById('man-nombre')?.value);
+  if (!item) {
+    hint.textContent = 'Si existe en plantilla, puedes buscarlo por nombre o código aquí.';
+    hint.style.color = '#64748b';
+    return;
+  }
+  hint.textContent = `En plantilla: ${item.art} (${item.cod})`;
+  hint.style.color = '#166534';
+}
+
+function openManualesLista() {
+  const lista = document.getElementById('manuales-lista-body');
+  const manuales = (S.manuales || []).filter(m => m.type !== 'comment');
+  if (!manuales.length) { lista.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:20px">Sin no catalogados aún.</p>'; }
+  else {
+    lista.innerHTML = manuales.map(m => {
+      const factor = m.factor && m.factor !== 1 ? m.factor : null;
+      const cantStr = factor
+        ? `${m.cantidadRaw ?? m.cantidad} ${m.presentacion || 'uds'} = ${m.cantidad} ${m.uni}`
+        : `${m.cantidad} ${m.uni}`;
+      const fotoHtml = m.foto ? `<img src="${m.foto}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0">` : '';
+      return `<div style="display:flex;gap:10px;align-items:flex-start;padding:12px 0;border-bottom:1px solid #f1f5f9">
+        ${fotoHtml}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:14px">${esc(m.nombre)}</div>
+          <div style="font-size:13px;color:#64748b">${esc(cantStr)} · ${esc(m.zona || '')}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button onclick="openManualModal('${m.id}')" style="background:#dbeafe;color:#1d4ed8;border:none;border-radius:6px;padding:6px 10px;font-size:13px;font-weight:bold;cursor:pointer">${ic('pencil',14)}</button>
+          <button onclick="deleteManual('${m.id}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:6px 10px;font-size:13px;font-weight:bold;cursor:pointer">${ic('trash-2',14)}</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('modal-manuales-lista').classList.add('active');
+}
+
+function deleteManual(id) {
+  if (!confirm('¿Borrar este ítem?')) return;
+  S.manuales = (S.manuales || []).filter(m => m.id !== id);
+  lsSet('s', S);
+  scheduleSyncSesion();
+  updateManualesBadge();
+  openManualesLista(); // refrescar lista
+}
+
+function updateManualesBadge() {
+  const n = (S.manuales || []).filter(m => m.type !== 'comment').length;
+  const btn = document.getElementById('btn-ver-manuales');
+  const badge = document.getElementById('manuales-count-badge');
+  if (btn) btn.style.display = n > 0 ? '' : 'none';
+  if (badge) badge.textContent = n;
+}
+
+async function previewFoto(inp) {
+  if (!inp.files[0]) return;
+  const file = inp.files[0];
+  const img  = new Image();
+  img.onload = () => {
+    const MAX = 800;
+    const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width * scale; canvas.height = img.height * scale;
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    _manFotoB64 = canvas.toDataURL('image/jpeg', 0.75);
+    document.getElementById('man-foto-preview').innerHTML = `<img src="${_manFotoB64}" style="max-width:100%;border-radius:8px;margin-top:4px">`;
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+function saveManual() {
+  const nombre      = document.getElementById('man-nombre').value.trim();
+  const cantidadRaw = parseFloat(document.getElementById('man-cantidad').value);
+  const uni         = document.getElementById('man-unidad').value.trim();
+  const hasPres     = document.getElementById('man-pres-toggle').checked;
+  const factor      = hasPres ? parseFloat(document.getElementById('man-pres-factor').value) : 1;
+  const presNombre  = hasPres ? document.getElementById('man-pres-nombre').value.trim() : '';
+  const editId      = document.getElementById('man-edit-id').value;
+  if (!nombre)            { alert('Ingresa el nombre'); return; }
+  if (isNaN(cantidadRaw)) { alert('Ingresa la cantidad'); return; }
+  if (hasPres && (isNaN(factor) || factor <= 0)) { alert('Ingresa un factor válido'); return; }
+  const cantidad = parseFloat((cantidadRaw * (hasPres ? factor : 1)).toFixed(4));
+  const templateItem = resolveTemplateItem(nombre);
+  if (templateItem && CZ !== null) {
+    const zid = myZoneKey(CZ);
+    if (!S.countsByZone) S.countsByZone = {};
+    if (!S.countsByZone[zid]) S.countsByZone[zid] = {};
+    S.countsByZone[zid][templateItem.cod] = hasPres ? cantidadRaw : cantidad;
+    if (hasPres) {
+      if (!S.presChoiceByZone) S.presChoiceByZone = {};
+      if (!S.presChoiceByZone[zid]) S.presChoiceByZone[zid] = {};
+      S.presChoiceByZone[zid][templateItem.cod] = factor;
+    }
+    if (editId) S.manuales = (S.manuales || []).filter(m => m.id !== editId);
+    markCorrection(zid, templateItem.cod, editId ? 'manual_convertido' : 'manual_a_plantilla');
+    lsSet('s', S);
+    syncSesionWorker();
+    renderCountList(ZONAS[CZ].items, zid);
+    filterCount(document.getElementById('count-search')?.value || '');
+    updateProgress();
+    updateManualesBadge();
+    closeManualModal();
+    return;
+  }
+  const zona = CZ !== null ? ZONAS[CZ].nombre : CFG.titulo;
+  const manual = {
+    id:           editId || newManualId(),
+    nombre, cantidad, uni, zona,
+    cantidadRaw:  hasPres ? cantidadRaw : undefined,
+    factor:       hasPres ? factor : undefined,
+    presentacion: hasPres ? presNombre : undefined,
+    foto:         _manFotoB64 !== null ? _manFotoB64 : (editId ? (S.manuales||[]).find(m=>m.id===editId)?.foto || null : null),
+    deviceId:     getDeviceId(),
+    createdAt:    editId ? (S.manuales||[]).find(m=>m.id===editId)?.createdAt : new Date().toISOString(),
+    updatedAt:    new Date().toISOString()
+  };
+  if (!S.manuales) S.manuales = [];
+  if (editId) {
+    const idx = S.manuales.findIndex(m => m.id === editId);
+    if (idx >= 0) S.manuales[idx] = manual; else S.manuales.push(manual);
+  } else {
+    S.manuales.push(manual);
+  }
+  lsSet('s', S);
+  scheduleSyncSesion();
+  updateManualesBadge();
+  closeManualModal();
+  alert(editId ? '✓ Actualizado' : '✓ Guardado');
+}
+
+// ── Supervisor ─────────────────────────────────────────────────────────────
+
+function renderSupBadge() {
+  const wrap = document.getElementById('sup-badge-wrap');
+  if (!wrap) return;
+  if (_supervisorActual) {
+    wrap.innerHTML = `<span class="sup-badge" onclick="logoutSupervisor()" title="Toca para cerrar sesión">${ic('lock',12)} ${esc(_supervisorActual.nombre)}</span>`;
+  } else {
+    wrap.innerHTML = `<span class="sup-badge" onclick="document.getElementById('modal-supervisor-login').classList.add('active')" title="Acceso supervisor">${ic('lock',12)} Supervisar</span>`;
+  }
+}
+
+async function loginSupervisor() {
+  const nombre = document.getElementById('sup-nombre').value.trim();
+  const pin    = document.getElementById('sup-pin').value.trim();
+  const errEl  = document.getElementById('sup-login-error');
+  errEl.style.display = 'none';
+  if (!nombre) { errEl.textContent = 'Escribe tu nombre'; errEl.style.display = ''; return; }
+  if (!pin)    { errEl.textContent = 'Escribe el PIN'; errEl.style.display = ''; return; }
+  try {
+    const r = await fetch(WORKER_URL + '/inv/sesion', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'inv_supervisor_login', appVersion: APP_VERSION, nombre, pin })
+    });
+    const d = await r.json();
+    if (!d.ok) { errEl.textContent = d.error || 'PIN incorrecto'; errEl.style.display = ''; return; }
+    _supervisorActual = d.usuario;
+    localStorage.setItem('inv_supervisor', JSON.stringify(_supervisorActual));
+    document.getElementById('modal-supervisor-login').classList.remove('active');
+    document.getElementById('sup-pin').value = '';
+    renderSupBadge();
+    renderCountListIfActive();
+  } catch(e) { errEl.textContent = 'Error de conexión'; errEl.style.display = ''; }
+}
+
+function logoutSupervisor() {
+  if (!confirm('¿Cerrar sesión de supervisor?')) return;
+  _supervisorActual = null;
+  localStorage.removeItem('inv_supervisor');
+  renderSupBadge();
+  renderCountListIfActive();
+}
+
+function renderCountListIfActive() {
+  if (CZ !== null && ZONAS?.[CZ]) renderCountList(ZONAS[CZ].items, myZoneKey(CZ));
+}
+
+// ── Comentarios de supervisor ───────────────────────────────────────────────
+
+function getComment(cod) {
+  return (S.manuales || []).find(m => m.type === 'comment' && m.cod === cod) || null;
+}
+
+function openCommentModal(cod, nombre) {
+  if (!_supervisorActual) return;
+  _commentTargetCod = cod;
+  const existing = getComment(cod);
+  document.getElementById('comment-modal-title').textContent = nombre;
+  document.getElementById('comment-text').value = existing?.texto || '';
+  const delBtn = document.getElementById('btn-delete-comment');
+  delBtn.style.display = existing ? '' : 'none';
+  document.getElementById('modal-comment').classList.add('active');
+  setTimeout(() => document.getElementById('comment-text').focus(), 100);
+}
+
+function saveComment() {
+  const texto = document.getElementById('comment-text').value.trim();
+  const cod   = _commentTargetCod;
+  if (!cod) return;
+  if (!S.manuales) S.manuales = [];
+  const idx = S.manuales.findIndex(m => m.type === 'comment' && m.cod === cod);
+  if (texto) {
+    const entry = { id: idx >= 0 ? S.manuales[idx].id : newManualId(),
+      type: 'comment', cod, texto,
+      supervisor: _supervisorActual.nombre, zona: CZ !== null ? ZONAS[CZ].nombre : '',
+      ts: new Date().toISOString() };
+    if (idx >= 0) S.manuales[idx] = entry; else S.manuales.push(entry);
+  } else if (idx >= 0) {
+    S.manuales.splice(idx, 1);
+  }
+  lsSet('s', S);
+  scheduleSyncSesion();
+  document.getElementById('modal-comment').classList.remove('active');
+  _commentTargetCod = null;
+  renderCountListIfActive();
+  updateManualesBadge();
+}
+
+function deleteComment() {
+  const cod = _commentTargetCod;
+  if (!cod) return;
+  S.manuales = (S.manuales || []).filter(m => !(m.type === 'comment' && m.cod === cod));
+  lsSet('s', S);
+  scheduleSyncSesion();
+  document.getElementById('modal-comment').classList.remove('active');
+  _commentTargetCod = null;
+  renderCountListIfActive();
+}
+
+async function compartirManuales() {
+  const lista = (S.manuales || []).filter(m => m.type !== 'comment');
+  if (!lista.length) return;
+  const texto = `📋 No catalogados · ${CFG.titulo} · ${S.fecha}\n\n` +
+    lista.map(m => `• ${m.nombre} — ${m.cantidad} ${m.uni} (${m.zona})`).join('\n');
+  if (navigator.share) {
+    try { await navigator.share({ title: 'Inventario no catalogados', text: texto }); return; } catch(e) {}
+  }
+  try { await navigator.clipboard.writeText(texto); alert('Lista copiada al portapapeles'); } catch(e) { alert(texto); }
+}
+
+// ── Acuse PDF individual y auditable ──────────────────────────────────────
+
+function loadReceiptPdfLibrary() {
+  if (window.html2pdf) return Promise.resolve(window.html2pdf);
+  if (_receiptPdfLoader) return _receiptPdfLoader;
+  _receiptPdfLoader = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = new URL('vendor/html2pdf.bundle.min.js?v=0.10.1', document.baseURI).href;
+    script.onload = () => window.html2pdf
+      ? resolve(window.html2pdf)
+      : reject(new Error('La librería PDF no quedó disponible'));
+    script.onerror = () => reject(new Error('No se pudo cargar el generador PDF local'));
+    document.head.appendChild(script);
+  }).catch(error => {
+    _receiptPdfLoader = null;
+    throw error;
+  });
+  return _receiptPdfLoader;
+}
+
+function receiptNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? String(Number(n.toFixed(4))) : '0';
+}
+
+function receiptCaptureText(item) {
+  if (item.mode === 'breakdown') {
+    return (item.lines || []).map(line => {
+      const name = line.name || 'Abierto / suelto';
+      return `${receiptNumber(line.quantity)} × ${name} (${receiptNumber(line.factor)} ${item.unit || 'base'})`;
+    }).join(' + ') || 'Sin líneas';
+  }
+  if (Number(item.factor) !== 1) {
+    return `${receiptNumber(item.entered)} × ${item.presentation || 'presentación'} ` +
+      `(${receiptNumber(item.factor)} ${item.unit || 'base'})`;
+  }
+  return `${receiptNumber(item.entered)} ${item.unit || ''}`.trim();
+}
+
+function receiptFilename(receipt) {
+  const safe = value => String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return `Acuse_${safe(receipt.almacen)}_${safe(receipt.fecha)}_Zona-${Number(receipt.zoneIndex) + 1}_${safe(receipt.id)}.pdf`;
+}
+
+async function downloadReceiptById(id) {
+  try {
+    let receipt = (S?.receipts || []).find(item => item.id === id);
+    if (!receipt || !Array.isArray(receipt.items)) {
+      const response = await fetch(WORKER_URL + '/inv/receipt?id=' + encodeURIComponent(id));
+      const data = await response.json();
+      if (!response.ok || !data.ok || !data.found) throw new Error('Acuse no encontrado en el servidor');
+      receipt = data.receipt;
+      mergeServerReceipts([receipt]);
+    }
+    await downloadReceiptPdf(receipt, false);
+  } catch (error) {
+    alert('No se pudo descargar el acuse: ' + error.message);
+  }
+}
+
+async function downloadReceiptPdf(receipt, automatic = false) {
+  if (!receipt?.id || !receipt?.hash) throw new Error('El acuse no tiene folio o huella');
+  await loadReceiptPdfLibrary();
+
+  const verificationUrl = WORKER_URL + '/inv/receipt?id=' + encodeURIComponent(receipt.id);
+  const received = receipt.receivedAt
+    ? new Date(receipt.receivedAt).toLocaleString('es-MX', {
+        dateStyle:'medium',
+        timeStyle:'medium',
+        timeZone:OPERATING_TIME_ZONE
+      })
+    : '—';
+  const itemRows = (receipt.items || []).map((item, index) => `
+    <tr style="background:${index % 2 ? '#f8fafc' : '#fff'};page-break-inside:avoid">
+      <td>${esc(item.code)}</td>
+      <td>${esc(item.name)}</td>
+      <td>${esc(receiptCaptureText(item))}</td>
+      <td style="text-align:right;font-weight:700">${esc(receiptNumber(item.baseQuantity))}</td>
+      <td>${esc(item.unit || '')}</td>
+    </tr>`).join('');
+  const manualRows = (receipt.manualItems || []).map((item, index) => `
+    <tr style="background:${index % 2 ? '#fff7ed' : '#fffbeb'};page-break-inside:avoid">
+      <td>${esc(item.name)}</td>
+      <td style="text-align:right;font-weight:700">${esc(receiptNumber(item.quantity))}</td>
+      <td>${esc(item.unit || '')}</td>
+      <td>${item.presentation ? esc(item.presentation) : 'Captura directa'}${item.photoAttached ? ' · con foto' : ''}</td>
+    </tr>`).join('');
+  const container = document.createElement('div');
+  container.style.cssText =
+    'position:relative;z-index:20000;width:760px;background:#fff;color:#1f2937;' +
+    'font-family:Arial,sans-serif;font-size:11px;line-height:1.35;padding:22px';
+  container.innerHTML = `
+    <div style="border:2px solid #166534;border-radius:10px;padding:18px">
+      <div style="display:flex;justify-content:space-between;gap:20px;align-items:flex-start">
+        <div>
+          <div style="font-size:10px;letter-spacing:1.2px;color:#166534;font-weight:800">CONFIRMADO POR EL SERVIDOR</div>
+          <h1 style="font-size:20px;margin:4px 0 2px">Acuse de recepción de conteo</h1>
+          <div style="color:#64748b">${esc(CENTROS[centroDe(receipt.almacen)]?.nombre || CENTROS[CENTRO].nombre)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:9px;color:#64748b">FOLIO</div>
+          <div style="font-size:11px;font-weight:800;color:#166534">${esc(receipt.id)}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;margin-top:16px;padding:12px;background:#f0fdf4;border-radius:7px">
+        <div><strong>Almacén:</strong> ${esc(receipt.almacen)}</div>
+        <div><strong>Fecha operativa:</strong> ${esc(receipt.fecha)}</div>
+        <div><strong>Zona:</strong> ${esc(receipt.zoneName || `Zona ${Number(receipt.zoneIndex) + 1}`)}</div>
+        <div><strong>Operario declarado:</strong> ${esc(receipt.operario)}</div>
+        <div><strong>Recibido (CDMX):</strong> ${esc(received)}</div>
+        <div><strong>Dispositivo:</strong> ${esc(receipt.deviceId)}</div>
+      </div>
+      <h2 style="font-size:14px;margin:18px 0 7px">Artículos catalogados (${(receipt.items || []).length})</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:10px">
+        <thead><tr style="background:#166534;color:#fff">
+          <th>Código</th><th>Artículo</th><th>Captura original</th>
+          <th style="text-align:right">Cantidad base</th><th>Unidad</th>
+        </tr></thead>
+        <tbody>${itemRows || '<tr><td colspan="5" style="padding:10px;text-align:center">Zona cerrada sin cantidades catalogadas.</td></tr>'}</tbody>
+      </table>
+      ${(receipt.manualItems || []).length ? `
+        <h2 style="font-size:14px;margin:18px 0 7px">No catalogados (${receipt.manualItems.length})</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:10px">
+          <thead><tr style="background:#92400e;color:#fff">
+            <th>Artículo</th><th style="text-align:right">Cantidad base</th><th>Unidad</th><th>Evidencia</th>
+          </tr></thead>
+          <tbody>${manualRows}</tbody>
+        </table>` : ''}
+      <div style="margin-top:18px;padding:11px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;font-size:9px">
+        <strong>Alcance del acuse.</strong> Este documento acredita que el servidor recibió del dispositivo
+        indicado exactamente las capturas listadas. No representa aprobación final ni incorpora correcciones
+        posteriores de administración. Si la zona se reabre y vuelve a cerrarse, se emite un folio nuevo y este
+        acuse permanece en el historial.
+      </div>
+      <div style="margin-top:12px;font-size:8px;color:#475569;word-break:break-all">
+        <strong>SHA-256 del contenido:</strong> ${esc(receipt.hash)}<br>
+        <strong>Verificación:</strong> <a href="${esc(verificationUrl)}">${esc(verificationUrl)}</a><br>
+        <strong>Plantilla:</strong> ${esc(receipt.templateHash || '—')} ·
+        <strong>Evento:</strong> ${esc(receipt.eventId || '—')}
+      </div>
+    </div>
+    <style>
+      th,td{border:1px solid #d1d5db;padding:5px;text-align:left;vertical-align:top}
+      thead{display:table-header-group}
+    </style>`;
+  const cover = document.createElement('div');
+  cover.setAttribute('data-html2canvas-ignore', 'true');
+  cover.style.cssText =
+    'position:fixed;inset:0;z-index:20001;background:#f0fdf4;color:#166534;' +
+    'display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;' +
+    'padding:28px;font:800 16px system-ui,sans-serif';
+  cover.innerHTML =
+    '✓ Conteo confirmado por el servidor' +
+    '<span style="font-size:12px;font-weight:500;margin-top:8px">Generando tu acuse PDF…</span>';
+  document.body.prepend(container);
+  document.body.appendChild(cover);
+
+  try {
+    await window.html2pdf().set({
+      margin: 8,
+      filename: receiptFilename(receipt),
+      image: { type: 'jpeg', quality: 0.94 },
+      html2canvas: { scale: 1.4, useCORS: false, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+      pagebreak: { mode: ['css', 'legacy'] }
+    }).from(container).save();
+    _lastZoneClosedMsg =
+      `Acuse ${receipt.id} confirmado por el servidor y PDF ${automatic ? 'descargado automáticamente' : 'descargado'}.`;
+    if (document.getElementById('screen-overview')?.classList.contains('active')) renderOverview();
+  } finally {
+    cover.remove();
+    container.remove();
+  }
+}
+
+// ── Bootstrap ──────────────────────────────────────────────────────────────
+
+document.getElementById('inp-fecha').value = fechaOperativaCDMX();
+go('welcome');
+</script>
+</body>
+</html>
