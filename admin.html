@@ -374,6 +374,41 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
   </div>
 </div>
 
+<!-- MODAL: artículos contados que la plantilla de Xetux no trae.
+     Antes era un alert(): no deja copiar, y reactivar los códigos en Xetux a mano
+     desde una captura era la fricción de cada cierre. Códigos y nombres se copian
+     por separado (una línea por artículo) porque en Xetux se busca por uno u otro. -->
+<div id="modal-fuera" class="modal-notas-overlay">
+  <div class="modal-notas-box" style="max-width:640px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <h2 style="font-size:17px;color:#b45309" id="fuera-titulo">Artículos fuera de la plantilla</h2>
+      <button onclick="cerrarModalFuera()" style="background:#e2e8f0;color:#333;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:bold;">Cerrar</button>
+    </div>
+    <div id="fuera-sub" style="font-size:13px;color:#475569;margin-bottom:10px;line-height:1.5"></div>
+    <div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:#f8fafc;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:.4px">
+          <th style="text-align:left;padding:8px 10px">Código</th><th style="text-align:left;padding:8px 10px">Artículo</th>
+          <th style="text-align:right;padding:8px 10px">Contado</th><th style="text-align:left;padding:8px 10px">Zona</th>
+        </tr></thead>
+        <tbody id="fuera-filas"></tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button onclick="copiarFuera('cod')" style="flex:1;min-width:140px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer">Copiar códigos</button>
+      <button onclick="copiarFuera('nombre')" style="flex:1;min-width:140px;background:#e2e8f0;color:#334155;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer">Copiar nombres</button>
+    </div>
+    <div id="fuera-copiado" style="font-size:12px;color:#16a34a;height:16px;margin-top:4px"></div>
+    <div style="font-size:13px;color:#475569;margin-top:8px;line-height:1.55">
+      <strong>No se exportó nada.</strong> Estas cantidades no tienen cómo llegar a Xetux mientras el
+      almacén no tenga los artículos. Dos salidas:<br>
+      · Si <em>sí</em> viven en este almacén: en Xetux reactívalos o agrégalos al almacén, re-exporta la
+      plantilla de la toma y usa <strong>Cerrar con plantilla fresca</strong>.<br>
+      · Si ahora son de <em>otro</em> almacén: su conteo va a la toma de ese almacén, no a esta.
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: con qué plantilla se exporta.
      Elegir plantilla no cabe en un confirm(): un aceptar/cancelar para dos
      caminos distintos se acepta sin leer, y de aquí sale el archivo a Xetux. -->
@@ -1603,6 +1638,61 @@ function construirXlsxInventario(almacen, fecha, T, totales) {
 // lo rechaza. Por eso también existe el ritual de borrar antes de bajar.
 let _archivoXetux = null;   // { fname, bytes|null, almacen, fecha }
 
+// ── Artículos contados que la plantilla no trae ─────────────
+// Un código con conteo que no está en la plantilla perdería su cantidad en
+// silencio: eso bloquea el export (arriba) y el cierre con plantilla fresca.
+// Aquí se enseñan con nombre, cantidad y zona, copiables, para reactivarlos en
+// Xetux sin teclearlos desde una captura. Nombre y unidad salen del snapshot de
+// la sesión (lo que vio el operario), no de la plantilla, que ya no los trae.
+let _fuera = [];   // [{cod, nombre, qty, uni, zonas}]
+
+function mostrarFueraDePlantilla({ almacen, fecha, S, T, fuera, archivo }) {
+  const items = {};
+  for (const z of (S.zoneSnapshot || [])) for (const it of (z?.items || [])) if (it?.cod && !items[it.cod]) items[it.cod] = it;
+  const totales = calcularTotalesSesion(S, T || {});
+  const zonasDe = cod => {
+    const nombres = new Set();
+    for (const [zid, zc] of Object.entries(S.countsByZone || {}))
+      if (zc && zc[cod] != null) nombres.add(S.zoneSnapshot?.[parseInt(zid, 10)]?.nombre || `Zona ${parseInt(zid, 10) + 1}`);
+    if (S.correctionsByZone?.['_admin']?.[cod]?.qty != null) nombres.add('corrección admin');
+    return [...nombres].join(', ');
+  };
+  _fuera = fuera.map(cod => ({
+    cod, nombre: items[cod]?.art || '', uni: items[cod]?.uni || '',
+    qty: totales[cod], zonas: zonasDe(cod)
+  }));
+  document.getElementById('fuera-titulo').textContent =
+    `${fuera.length} artículo(s) contado(s) que la plantilla no trae`;
+  document.getElementById('fuera-sub').innerHTML =
+    `${esc(tituloAlmacen(almacen))} · ${esc(fechaConteoLegible(fecha))}` +
+    (archivo ? ` · plantilla <code>${esc(archivo)}</code>` : ' · la plantilla cambió desde que se capturó esta sesión');
+  document.getElementById('fuera-filas').innerHTML = _fuera.map(f => `
+    <tr style="border-top:1px solid #f1f5f9">
+      <td style="padding:7px 10px;font-family:monospace;white-space:nowrap">${esc(f.cod)}</td>
+      <td style="padding:7px 10px">${esc(f.nombre || '—')}</td>
+      <td style="padding:7px 10px;text-align:right;white-space:nowrap">${f.qty != null ? esc(String(+(+f.qty).toFixed(4))) + ' ' + esc(f.uni) : '—'}</td>
+      <td style="padding:7px 10px;color:#64748b">${esc(f.zonas)}</td>
+    </tr>`).join('');
+  document.getElementById('fuera-copiado').textContent = '';
+  document.getElementById('modal-fuera').style.display = 'block';
+}
+
+async function copiarFuera(que) {
+  const el = document.getElementById('fuera-copiado');
+  const texto = _fuera.map(f => que === 'cod' ? f.cod : (f.nombre || f.cod)).join('\n');
+  try {
+    await navigator.clipboard.writeText(texto);
+    el.style.color = '#16a34a'; el.textContent = `${_fuera.length} ${que === 'cod' ? 'códigos' : 'nombres'} copiados, uno por línea.`;
+  } catch(e) {
+    el.style.color = '#dc2626'; el.textContent = 'No se pudo copiar; selecciónalos de la tabla.';
+  }
+}
+
+function cerrarModalFuera() {
+  document.getElementById('modal-fuera').style.display = 'none';
+  _fuera = [];
+}
+
 function abrirModalArchivo({ fname, bytes, almacen, fecha, extraHtml }) {
   _archivoXetux = { fname, bytes: bytes || null, almacen, fecha };
   document.getElementById('archivo-titulo').textContent =
@@ -1817,11 +1907,8 @@ async function subirPlantillaYExportar(almacen, fecha, file) {
       if (corr?.qty != null) contados.add(cod);
     const fuera = [...contados].filter(cod => rowMap[cod] === undefined);
     if (fuera.length) {
-      alert(
-        `No se subió nada: ${fuera.length} artículo(s) contado(s) no están en "${file.name}":\n` +
-        fuera.join(', ') +
-        `\n\n¿Seguro que es la plantilla de ${tituloAlmacen(almacen)}?`
-      );
+      // Nada se sube: la plantilla no reemplaza a la vigente hasta que cubra lo contado.
+      mostrarFueraDePlantilla({ almacen, fecha, S, T: { rowMap, presMap, unitMap }, fuera, archivo: file.name });
       return;
     }
     // Este camino exporta con force: es la única confirmación que verá el admin,
@@ -1903,11 +1990,8 @@ async function exportarSesionInventario(almacen, fecha, force, opts) {
         if (corr?.qty != null) contados.add(cod);
       const fuera = [...contados].filter(cod => T.rowMap?.[cod] === undefined);
       if (fuera.length) {
-        throw new Error(
-          `La plantilla cambió desde que se capturó esta sesión y ${fuera.length} artículo(s) contado(s) ya no están en ella:\n` +
-          fuera.join(', ') +
-          '\n\nNo se exportó nada; sube una plantilla Xetux que los incluya.'
-        );
+        mostrarFueraDePlantilla({ almacen, fecha, S, T, fuera });
+        return;
       }
       if (!opts?.hashVerificado && !confirm(
         'La plantilla cambió desde que se capturó esta sesión.\n\n' +
