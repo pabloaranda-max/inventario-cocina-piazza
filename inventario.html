@@ -386,13 +386,17 @@ const AREA_CONFIG = {
   SALUMERIA: { titulo:'Salumeria', color:'#ef4444', zonas:null, zonaNames:['Camara maduracion','Congelador horizontal','Refri','Camara fria'], zonaColors:['#ef4444','#dc2626','#b91c1c','#991b1b'] },
   GENERAL:   { titulo:'General',   color:'#6b7280', zonas:null },
   BARRA_AMICI:{ titulo:'Barra Amici', color:'#f97316', zonas:null },
-  // UH confirmó sus 4 almacenes 2026-07-21: merch, cocina, barra, suministros.
-  // UH_GENERAL era un provisional de R8 y ya no existe (nunca tuvo plantilla,
-  // catálogo ni tomas en D1, así que se retiró sin migración).
-  UH_MERCH:       { centro:'UH', titulo:'Merch',       color:'#db2777', zonas:null },
-  UH_COCINA:      { centro:'UH', titulo:'Cocina',      color:'#d97706', zonas:null },
-  UH_BARRA:       { centro:'UH', titulo:'Barra',       color:'#2563eb', zonas:null },
-  UH_SUMINISTROS: { centro:'UH', titulo:'Suministros', color:'#64748b', zonas:null }
+  // Xetux reestructuró UH la semana del 2026-09-07: de 4 almacenes a 7, en este
+  // orden (el mismo del selector de Xetux). Las 4 claves con historial en D1 se
+  // conservan y sólo cambian de título; EMPAQUE, PRODUCCION y GENERAL son nuevas
+  // (UH_GENERAL había existido como provisional de R8 y se retiró sin datos).
+  UH_COCINA:      { centro:'UH', titulo:'Cocina Pedregal',      color:'#d97706', zonas:null },
+  UH_EMPAQUE:     { centro:'UH', titulo:'Empaque Pedregal',     color:'#0891b2', zonas:null },
+  UH_BARRA:       { centro:'UH', titulo:'Barra Pedregal',       color:'#2563eb', zonas:null },
+  UH_PRODUCCION:  { centro:'UH', titulo:'Producción Universal', color:'#7c3aed', zonas:null },
+  UH_MERCH:       { centro:'UH', titulo:'Merch Pedregal',       color:'#db2777', zonas:null },
+  UH_GENERAL:     { centro:'UH', titulo:'General Universal',    color:'#15803d', zonas:null },
+  UH_SUMINISTROS: { centro:'UH', titulo:'Suministros',          color:'#64748b', zonas:null }
 };
 
 // Guardia visual R8: fuera de PIAZZA el nombre del centro queda siempre visible
