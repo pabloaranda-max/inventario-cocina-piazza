@@ -152,3 +152,36 @@ export async function hashRaw(raw) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('').slice(0, 16);
 }
+
+// Cuenta filas con cantidad capturada en la columna que detectó el parser. Una
+// plantilla recién exportada de Xetux trae esa columna vacía; un export de la
+// app trae los conteos.
+export function filasConCantidad(buf, idx, XLSX = globalThis.XLSX) {
+  try {
+    const wb = XLSX.read(buf, { type:'array' });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:'' });
+    let n = 0;
+    for (const r of rows) {
+      const v = r[idx];
+      if (v !== '' && v != null && !isNaN(parseFloat(v))) n++;
+    }
+    return n;
+  } catch(_) { return 0; }
+}
+
+// R16: distingue un export de la app de una plantilla de Xetux, por las dos
+// señales independientes del incidente 2026-07-27 (Xetux escribe con Apache POI
+// y la columna Cantidad vacía; el export lo escribe SheetJS ya con conteos).
+// Devuelve el texto de las señales si el archivo es un export, o null si parece
+// plantilla. La usan TODAS las rutas de subida — las dos del admin y el vigilante
+// de carpetas (tools/vigilar-plantillas) — lección del incidente: cuando varias
+// rutas hacen lo mismo, la guarda va en todas, y es una sola implementación.
+export function senalesDeExport(buf, cantidadColIdx, XLSX = globalThis.XLSX) {
+  let props = {};
+  try { props = XLSX.read(buf, { type:'array', bookProps:true }).Props || {}; } catch(_) {}
+  const generadoPorLaApp = /sheetjs/i.test(props.Application || '');
+  const conCantidad = filasConCantidad(buf, cantidadColIdx, XLSX);
+  if (!generadoPorLaApp && !conCantidad) return null;
+  return (generadoPorLaApp ? '· lo generó esta app (SheetJS), no Xetux\n' : '') +
+         (conCantidad ? `· trae ${conCantidad} fila(s) con cantidad capturada; una plantilla viene vacía\n` : '');
+}

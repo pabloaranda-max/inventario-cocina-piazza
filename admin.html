@@ -3049,37 +3049,8 @@ async function saveDefaults() {
   }
 }
 
-// Cuenta filas con cantidad capturada en la columna que detectó el parser. Una
-// plantilla recién exportada de Xetux trae esa columna vacía; un export de la
-// app trae los conteos.
-function filasConCantidad(buf, idx) {
-  try {
-    const wb = XLSX.read(buf, { type:'array' });
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:'' });
-    let n = 0;
-    for (const r of rows) {
-      const v = r[idx];
-      if (v !== '' && v != null && !isNaN(parseFloat(v))) n++;
-    }
-    return n;
-  } catch(_) { return 0; }
-}
-
-// R16: distingue un export de la app de una plantilla de Xetux, por las dos
-// señales independientes del incidente 2026-07-27 (Xetux escribe con Apache POI
-// y la columna Cantidad vacía; el export lo escribe SheetJS ya con conteos).
-// Devuelve el texto de las señales si el archivo es un export, o null si parece
-// plantilla. La usan LAS DOS rutas de subida — lección del incidente: cuando dos
-// rutas hacen lo mismo, la guarda va en las dos.
-function senalesDeExport(buf, cantidadColIdx) {
-  let props = {};
-  try { props = XLSX.read(buf, { type:'array', bookProps:true }).Props || {}; } catch(_) {}
-  const generadoPorLaApp = /sheetjs/i.test(props.Application || '');
-  const conCantidad = filasConCantidad(buf, cantidadColIdx);
-  if (!generadoPorLaApp && !conCantidad) return null;
-  return (generadoPorLaApp ? '· lo generó esta app (SheetJS), no Xetux\n' : '') +
-         (conCantidad ? `· trae ${conCantidad} fila(s) con cantidad capturada; una plantilla viene vacía\n` : '');
-}
+// filasConCantidad y senalesDeExport viven en js/plantilla-parser.js (módulo
+// compartido con tools/vigilar-plantillas): la guarda R16 es una sola implementación.
 
 async function uploadPlantilla(file) {
   const almacen = document.getElementById('plt-almacen').value;
@@ -3635,11 +3606,12 @@ document.addEventListener('DOMContentLoaded', () => {
 // fresco puede correr con un módulo viejo de caché (o al revés), que fue
 // exactamente el incidente #NUM! de 2026-07-23. `r24` invalida solo el parser;
 // el contrato de escritura con el Worker permanece en APP_VERSION 2.
-import { parsePlantilla, hashRaw } from './js/plantilla-parser.js?v=2-r24';
+import { parsePlantilla, hashRaw, senalesDeExport } from './js/plantilla-parser.js?v=2-r25';
 import { factorDefault, calcularTotalesSesion, cantidadBase, lineasDesglose } from './js/sesion-merge.js?v=2';
 import { construirDatosPDFSesion, unirSesionesDeAlmacen } from './js/admin-pdf.js?v=2-r1';
 window.parsePlantilla = parsePlantilla;
 window.hashRaw = hashRaw;
+window.senalesDeExport = senalesDeExport;
 window.factorDefault = factorDefault;
 window.calcularTotalesSesion = calcularTotalesSesion;
 window.cantidadBase = cantidadBase;
