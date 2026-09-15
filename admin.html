@@ -787,7 +787,8 @@ async function cargarSesionesInventario() {
   if (!el) return;
   el.innerHTML = '<div class="loading-state"><div class="spinner-sm"></div>Cargando sesiones activas...</div>';
   try {
-    const r = await fetch(WORKER_URL + '/inv/sesiones?dias=30');
+    // R29: el listado cruzado (sin almacén) exige auth de admin en el Worker
+    const r = await fetch(WORKER_URL + '/inv/sesiones?dias=30', { headers: adminHeaders() });
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || 'Error al cargar sesiones');
     // R12: pestaña vieja abierta días → banner antes de que un export salga mal
