@@ -396,7 +396,11 @@ const AREA_CONFIG = {
   UH_PRODUCCION:  { centro:'UH', titulo:'Producción Universal', color:'#7c3aed', zonas:null },
   UH_MERCH:       { centro:'UH', titulo:'Merch Pedregal',       color:'#db2777', zonas:null },
   UH_GENERAL:     { centro:'UH', titulo:'General Universal',    color:'#15803d', zonas:null },
-  UH_SUMINISTROS: { centro:'UH', titulo:'Suministros',          color:'#64748b', zonas:null }
+  // Retirado el 2026-09-21 (Pablo): Suministros no se cuenta desde la app. Dos
+  // tomas seguidas (13 y 20-sep) contaron empaque aquí porque su única plantilla
+  // era la lista de empaque de antes de la reestructura. La clave se queda para
+  // que no se reutilice: D1 conserva sus tomas, acuses y plantilla.
+  UH_SUMINISTROS: { centro:'UH', titulo:'Suministros',          color:'#64748b', zonas:null, retirado:true }
 };
 
 // Guardia visual R8: fuera de PIAZZA el nombre del centro queda siempre visible
@@ -1006,8 +1010,9 @@ async function resolveZonas() {
 // ── Init ───────────────────────────────────────────────────────────────────
 
 async function selectArea(key) {
-  // R8: un almacén de otro centro nunca se abre desde esta URL
-  if (!AREA_CONFIG[key] || centroDe(key) !== CENTRO) { ALMACEN = null; renderWelcome(); return; }
+  // R8: un almacén de otro centro nunca se abre desde esta URL; uno retirado
+  // tampoco, ni con sesión local guardada (así deja de sincronizar a D1)
+  if (!AREA_CONFIG[key] || centroDe(key) !== CENTRO || AREA_CONFIG[key].retirado) { ALMACEN = null; renderWelcome(); return; }
   ALMACEN = key;
   CFG     = AREA_CONFIG[key];
   const savedKey = key;
@@ -1100,7 +1105,7 @@ function renderWelcome() {
   sub.textContent = 'Inventarios · ' + CENTROS[CENTRO].nombre;
 
   const sorted = Object.entries(AREA_CONFIG)
-    .filter(([key]) => centroDe(key) === CENTRO)
+    .filter(([key, cfg]) => centroDe(key) === CENTRO && !cfg.retirado)
     .sort((a, b) => a[1].titulo.localeCompare(b[1].titulo, 'es'));
   const options = sorted.map(([key, cfg]) => {
     return `<option value="${key}">${cfg.titulo}</option>`;

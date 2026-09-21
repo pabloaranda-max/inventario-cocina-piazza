@@ -230,7 +230,6 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
           <option value="UH_PRODUCCION">Producción Universal</option>
           <option value="UH_MERCH">Merch Pedregal</option>
           <option value="UH_GENERAL">General Universal</option>
-          <option value="UH_SUMINISTROS">Suministros</option>
         </optgroup>
       </select>
     </div>
@@ -288,7 +287,6 @@ button { cursor: pointer; border: none; font-weight: bold; border-radius: 6px; }
           <option value="UH_PRODUCCION">Producción Universal</option>
           <option value="UH_MERCH">Merch Pedregal</option>
           <option value="UH_GENERAL">General Universal</option>
-          <option value="UH_SUMINISTROS">Suministros</option>
         </optgroup>
       </select>
     </div>
@@ -507,7 +505,11 @@ const INVENTARIO_AREAS = {
   UH_PRODUCCION:     { centro:'UH', titulo:'Producción Universal', scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Producción'] },
   UH_MERCH:          { centro:'UH', titulo:'Merch Pedregal',       scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Merch'] },
   UH_GENERAL:        { centro:'UH', titulo:'General Universal',    scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['General'] },
-  UH_SUMINISTROS:    { centro:'UH', titulo:'Suministros',          scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Suministros'] }
+  // Retirado el 2026-09-21 (Pablo): Suministros ya no se cuenta desde la app (dos
+  // tomas seguidas contaron empaque ahí). Sigue en el catálogo, marcado, para que
+  // sus tomas en D1 conserven título, PDF y export; no se ofrece para plantilla,
+  // preparación ni permisos nuevos.
+  UH_SUMINISTROS:    { centro:'UH', titulo:'Suministros',          scriptUrl: SCRIPT_CENTRO.UH, zonaNames:['Suministros'], retirado:true }
 };
 
 // R9a: el centro es el primer nivel de filtrado del tab Tomas.
@@ -519,7 +521,7 @@ const CENTROS = {
   UH: { nombre: 'Universal de Hamburguesas', chips: [
     ['UH_COCINA','Cocina Pedregal'], ['UH_EMPAQUE','Empaque Pedregal'], ['UH_BARRA','Barra Pedregal'],
     ['UH_PRODUCCION','Producción Universal'], ['UH_MERCH','Merch Pedregal'],
-    ['UH_GENERAL','General Universal'], ['UH_SUMINISTROS','Suministros'] ] }
+    ['UH_GENERAL','General Universal'] ] }
 };
 function centroDe(a) { return (String(a).startsWith('UH_') || a === 'UH') ? 'UH' : 'PIAZZA'; }
 
@@ -3461,6 +3463,7 @@ function renderAdmAlmacenesChecks(seleccionados = []) {
   // "Cocina" de Universal al asignar permisos
   const porCentro = {};
   Object.entries(INVENTARIO_AREAS).forEach(([key, cfg]) => {
+    if (cfg.retirado) return;
     (porCentro[centroDe(key)] ??= []).push([key, cfg]);
   });
   cont.innerHTML = Object.entries(porCentro).map(([c, items]) => `
