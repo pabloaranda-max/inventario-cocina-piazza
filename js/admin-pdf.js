@@ -150,6 +150,54 @@ export function unirSesionesDeAlmacen(sesiones) {
   return unida;
 }
 
+// Texto listo para pegar en WhatsApp con los no catalogados de un conteo: lo
+// que se contó y no está en la plantilla de Xetux, para que quien tenga
+// permisos lo dé de alta. Sale ANTES de exportar — a Sheets viajan sólo al
+// exportar y para entonces la toma ya cerró. Formato de WhatsApp: *negritas*,
+// una línea por artículo, sin prosa.
+const fechaLegible = iso => {
+  const p = String(iso || '').split('-');
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso || '');
+};
+const numeroCorto = n => {
+  const v = Number(n);
+  return Number.isFinite(v) ? String(parseFloat(v.toFixed(4))) : String(n ?? '');
+};
+
+export function textoManualesWhatsApp({ titulo, sesion }) {
+  const manuales = (sesion?.manuales || []).filter(m => m && m.type !== 'comment');
+  if (!manuales.length) return '';
+  const fechas = [...new Set((sesion?.fechas || []).filter(Boolean))].sort();
+  const cuando = fechas.length > 1
+    ? `${fechaLegible(fechas[0])} al ${fechaLegible(fechas[fechas.length - 1])}`
+    : fechaLegible(fechas[0] || '');
+  const quien = m => operarioDeDispositivo(sesion, m.deviceId || '');
+  const operarios = [...new Set(manuales.map(quien))];
+  const unUnico = operarios.length === 1;
+
+  const lineas = manuales.map((m, i) => {
+    const unidad = m.uni || m.unidad || '';
+    const tienePres = m.presentacion && Number(m.factor) > 0 && m.cantidadRaw !== undefined && m.cantidadRaw !== null;
+    const cantidad = tienePres
+      ? `${numeroCorto(m.cantidadRaw)} ${m.presentacion} × ${numeroCorto(m.factor)} = ${numeroCorto(m.cantidad)} ${unidad}`.trim()
+      : `${numeroCorto(m.cantidad)} ${unidad}`.trim();
+    const partes = [`${i + 1}. ${String(m.nombre || '(sin nombre)').trim()} — ${cantidad}`];
+    if (m.zona) partes.push(String(m.zona));
+    if (!unUnico) partes.push(quien(m));
+    if (m.foto || m.foto_base64) partes.push('con foto');
+    return partes.join(' · ');
+  });
+
+  const n = manuales.length;
+  const cabecera = [
+    `*No catalogados · ${titulo}*`,
+    `Toma del ${cuando}${unUnico ? ` · capturó ${operarios[0]}` : ''}`,
+    n === 1 ? '1 artículo contado que no está en la plantilla de Xetux:'
+            : `${n} artículos contados que no están en la plantilla de Xetux:`,
+  ];
+  return [...cabecera, '', ...lineas].join('\n');
+}
+
 export function construirDatosPDFSesion({
   sesion,
   plantilla = {},
