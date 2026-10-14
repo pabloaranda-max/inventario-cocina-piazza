@@ -12,6 +12,15 @@ const KNOWN_XETUX_PRESENTATION_FIXES = {
     sourceCode: 'XMAT2410000317_2',
     presentation: { nombre: 'BOTELLA DE 1 LT', factor: 1 },
     detail: 'Xetux exporta una relación oculta de 750 ml; se usa únicamente la botella confirmada de 1 LT.'
+  },
+  // 14-oct: la ficha no enseña la "BOTELLA 750 ML" pero la API y la exportación sí; desde agosto 2 botellas
+  // de 0.2 LT entraban como 1.5 LT. La de 200 ml se dio de alta en la ficha el 14-oct.
+  MP0230: {
+    articlePattern: /\bANGOSTURA AROMATIC\b/i,
+    unitPattern: /^LT$/i,
+    requiere: list => list.some(p => Math.abs(p.factor - 0.2) < 1e-9),
+    presentation: { nombre: 'BOTELLA 200 ML', factor: 0.2 },
+    detail: 'Xetux exporta una relación oculta de 750 ml; se compra en botella de 0.2 LT ($465.52).'
   }
 };
 
@@ -106,7 +115,7 @@ export function parsePlantilla(buf, XLSX = globalThis.XLSX) {
       knownFix &&
       knownFix.articlePattern.test(articleNameMap[cod] || '') &&
       knownFix.unitPattern.test(uni) &&
-      list.some(p => p.factor === 1 && p.sourceCode === knownFix.sourceCode)
+      (knownFix.requiere ? knownFix.requiere(list) : list.some(p => p.factor === 1 && p.sourceCode === knownFix.sourceCode))
     ) {
       presMap[cod] = [{ ...knownFix.presentation, uni }];
       correcciones.push({
