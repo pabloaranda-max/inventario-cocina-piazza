@@ -21,6 +21,24 @@ const KNOWN_XETUX_PRESENTATION_FIXES = {
     requiere: list => list.some(p => Math.abs(p.factor - 0.2) < 1e-9),
     presentation: { nombre: 'BOTELLA 200 ML', factor: 0.2 },
     detail: 'Xetux exporta una relación oculta de 750 ml; se compra en botella de 0.2 LT ($465.52).'
+  },
+  // 10-nov: se pesan y se capturan en kilos, pero la app elegía la primera presentación y multiplicaba.
+  // La mantequilla entró como 8.44 × 5 = 42.2 kg y el caviar como 0.16 × 0.03 = 0.0048 kg. Pablo: "quitar de
+  // la app el multiplicador de presentación". Queda sólo KILO; el exportador también los suma sin factor
+  // (tools/conteo-en-unidad-base.json) mientras D1 no reciba una plantilla nueva.
+  XMAT2409000115: {
+    articlePattern: /\bMANTEQUILLA ANCHOR\b/i,
+    unitPattern: /^KG$/i,
+    requiere: () => true,
+    presentation: { nombre: 'KILO', factor: 1 },
+    detail: 'Se pesa: la BARRA 5KG de Xetux multiplicaba los kilos capturados por 5.'
+  },
+  XMAT2411000381: {
+    articlePattern: /\bCAVIAR OSETRA\b/i,
+    unitPattern: /^KG$/i,
+    requiere: () => true,
+    presentation: { nombre: 'KILO', factor: 1 },
+    detail: 'Se pesa: la lata de 30 g de Xetux multiplicaba los kilos capturados por 0.03.'
   }
 };
 
