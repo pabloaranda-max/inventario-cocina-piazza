@@ -86,6 +86,8 @@ mark{background:#fef08a;border-radius:3px;padding:0 2px;font-style:normal}
 .item-name{font-size:14px;font-weight:600}
 .item-unit{font-size:11px;color:#aaa;margin-top:2px}
 .item-unit.warn{color:#d97706}
+.item-nota{font-size:11.5px;color:#b45309;font-weight:600;margin-top:3px;line-height:1.3}
+.qty-input.fuera-rango{border-color:#dc2626;background:#fef2f2;color:#b91c1c}
 .qty-wrap{display:flex;align-items:center;gap:4px;flex-shrink:0}
 .qty-input{width:72px;padding:10px 6px;border:1.5px solid #ddd;border-radius:8px;text-align:center;font-size:16px;font-weight:700;font-family:inherit;-webkit-appearance:none;appearance:none}
 .qty-input:focus{outline:none;border-color:var(--color,#667eea);background:#f5f3ff}
@@ -1313,6 +1315,51 @@ function getQtyForZone(zid, cod) {
 // Hamburguesas usa L/PZ. Comparar contra 'LT'/'PZA' a secas dejaba a UH sin el
 // aviso naranja de "se mide directo, sin presentación" y con el paso de captura
 // equivocado.
+// Notas de conteo (17-nov-2026, Pablo: «hacer anotación en la app para obligar a que se cuente correctamente»).
+// Artículos caros que se capturan mal por la unidad: el azafrán se pesa en gramos y la toma va en kilos (medio
+// gramo capturado como 0.00078 o 0.00038), el caviar se pesa y la app lo multiplicaba por la lata de 30 g.
+// `nota` se ve bajo el nombre al contar; `rango` [mín, máx] es sobre el número TAL COMO SE ESCRIBE: fuera de él,
+// la app pide confirmar y si no, borra la captura. Clave = almacén de la app. Para agregar un artículo basta
+// una línea aquí (la página es autocontenida: el espejo no carga js/ desde ella).
+const NOTAS_CONTEO = {
+  COCINA: {
+    XMAT2510001114: { nota: 'Pésalo y captura en KILOS: 1 gramo = 0.001 · medio gramo = 0.0005', rango: [0.0001, 0.02] },
+    XMAT2411000381: { nota: 'Captura los KILOS que pesa, no latas: 147 g = 0.147', rango: [0.005, 1] },
+    XMAT2510001077: { nota: 'Captura los KILOS que pesa, no latas: 30 g = 0.03', rango: [0.005, 1] },
+    XMAT2609001596: { nota: 'Captura los KILOS que pesa, no frascos: 10 g = 0.01', rango: [0.005, 0.5] },
+    XMAT2510001115: { nota: 'Pésala y captura en KILOS: 27 g = 0.027', rango: [0.001, 0.5] },
+    XMAT2408000041: { nota: 'Pésala y captura en KILOS: 177 g = 0.177', rango: [0.001, 1] },
+    XMAT2510001079: { nota: 'Pésala y captura en KILOS: 120 g = 0.12', rango: [0.001, 1] },
+    XMAT2512001209: { nota: 'Pésala y captura en KILOS: 120 g = 0.12', rango: [0.001, 1] },
+    XMAT2409000115: { nota: 'Captura los KILOS que hay, no barras', rango: [0.1, 80] },
+  },
+};
+const _rangoConfirmado = new Set();   // 'zid|cod|valor' que el operario ya confirmó en esta sesión del navegador
+function notaDeConteo(cod) { return NOTAS_CONTEO[ALMACEN]?.[cod] || null; }
+// true si `num` cae dentro del rango de la nota (o si el artículo no tiene rango).
+function enRangoDeConteo(nota, num) {
+  if (!nota?.rango || !Number.isFinite(num)) return true;
+  return num >= nota.rango[0] && num <= nota.rango[1];
+}
+// Al salir del campo: si la cantidad está fuera del rango, se confirma o se borra.
+function onQtyFin(inp) {
+  const zid = inp.dataset.zid, cod = inp.dataset.cod;
+  const nota = notaDeConteo(cod);
+  const num = parseFloat(inp.value.trim());
+  if (!nota || inp.value.trim() === '' || isNaN(num)) { inp.classList.remove('fuera-rango'); return; }
+  const fuera = !enRangoDeConteo(nota, num);
+  inp.classList.toggle('fuera-rango', fuera);
+  const llave = zid + '|' + cod + '|' + num;
+  if (!fuera || _rangoConfirmado.has(llave)) return;
+  const nombre = _templateItemsByCod[cod]?.art || cod;
+  const uni = _templateItemsByCod[cod]?.uni || '';
+  const ok = confirm(`${nombre}\n\nCapturaste ${num} ${uni}. Lo normal va de ${nota.rango[0]} a ${nota.rango[1]} ${uni}.\n${nota.nota}\n\n¿Es correcto ${num} ${uni}?\n\nAceptar = sí, es correcto · Cancelar = borrar y volver a capturar`);
+  if (ok) { _rangoConfirmado.add(llave); return; }
+  inp.value = '';
+  inp.classList.remove('fuera-rango');
+  onQty(inp);
+  setTimeout(() => inp.focus(), 0);
+}
 const UNIDAD_PESO_VOLUMEN = /^(KG|K|G|GR|GRS|LT|LTS|L|ML)$/i;
 const UNIDAD_PIEZA        = /^(PZA|PZAS|PZ|PIEZA|PIEZAS|UND|U)$/i;
 
@@ -1405,6 +1452,9 @@ function renderItemRow(item, zid, inOtherZone) {
   const unitWarn  = UNIDAD_PESO_VOLUMEN.test(displayItem.uni || '') && opts.length === 0 ? ' warn' : '';
   const inputStep = opts.length > 0 && !UNIDAD_PIEZA.test(displayItem.uni || '') ? '0.5' : '0.01';
 
+  const nota = notaDeConteo(item.cod);
+  const notaHtml = nota ? `<div class="item-nota">${esc(nota.nota)}</div>` : '';
+  const fueraRango = nota && !isNaN(flt) && !enRangoDeConteo(nota, flt) ? ' fuera-rango' : '';
   const comment = getComment(item.cod);
   const commentBtn = _supervisorActual
     ? `<button class="comment-btn${comment?' has-comment':''}" onclick="openCommentModal('${esc(item.cod)}','${esc(displayItem.art)}')" title="${comment?'Ver comentario':'Agregar comentario'}">${ic('message-circle',15)}</button>`
@@ -1441,11 +1491,11 @@ function renderItemRow(item, zid, inOtherZone) {
       ? `<button class="desg-btn" ${dataZ} data-cod="${esc(item.cod)}" onclick="toggleDesglose(this)" title="Desglosar por presentación">${ic('list-plus',18)}</button>`
       : '';
     qtyHtml = `${presHtml}
-      <input type="number" class="qty-input ${filled}" inputmode="decimal"
-        step="${inputStep}" min="0" placeholder="0"
+      <input type="number" class="qty-input ${filled}${fueraRango}" inputmode="decimal"
+        step="${nota ? 'any' : inputStep}" min="0" placeholder="0"
         value="${raw!==undefined?raw:''}"
         ${dataZ} data-cod="${esc(item.cod)}"
-        oninput="onQty(this)" onfocus="this.select()">${desgBtn}`;
+        oninput="onQty(this)"${nota ? ' onchange="onQtyFin(this)"' : ''} onfocus="this.select()">${desgBtn}`;
   }
 
   return `<div class="item-row${inOtherZone?' other-zone':''}${corrected?' corrected':''}${desglosado?' desglosado':''}" data-search="${esc(itemSearchText(item))}">
@@ -1455,6 +1505,7 @@ function renderItemRow(item, zid, inOtherZone) {
         ${commentBtn}
       </div>
       <div class="item-unit${unitWarn}">${unitLabel}</div>
+      ${notaHtml}
       ${corrected ? '<span class="correction-badge">Editado despues de cerrar</span>' : ''}
       ${commentText}
     </div>
